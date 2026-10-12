@@ -1,7 +1,6 @@
 import {
   APPLICATION_RECORD_CHANGED_EVENT,
   deleteApplicationRecords,
-  deleteImportedSurveyResponses,
   loadApplicationRecords,
   surveyResponseRecordId,
   upsertApplicationRecords,
@@ -18,7 +17,6 @@ import {
 import type { SurveyType } from '../../../types/survey';
 import type { PartnerCompany, SurveyResponse } from '../../../types/survey';
 import { isTestImportArchive, selectTestImportCleanup } from '../domain/testImport';
-import { selectOrdinaryImportResponses } from '../domain/importCleanup';
 
 function archiveSetupError(error: unknown): Error {
   const message = error instanceof Error ? error.message : 'Unknown Supabase error.';
@@ -36,6 +34,76 @@ export async function loadEvaluationImportArchives(): Promise<EvaluationImportAr
   return records
     .map(parseEvaluationImportArchive)
     .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
+}
+
+export async function loadEvaluationImportResponseCounts(): Promise<Map<string, number>> {
+  const responses = await loadApplicationRecords<SurveyResponse>('survey_response');
+  const uniqueByBatch = new Map<string, Set<string>>();
+  for (const response of responses) {
+    if (response.dataSource !== 'client_csv' || !response.importBatchId) continue;
+    const ids = uniqueByBatch.get(response.importBatchId) ?? new Set<string>();
+    ids.add(response.responseId);
+    uniqueByBatch.set(response.importBatchId, ids);
+  }
+  return new Map([...uniqueByBatch].map(([batchId, ids]) => [batchId, ids.size]));
+}
+
+export async function markEvaluationImportReplaced(
+  existingArchive: EvaluationImportArchive,
+  replacementArchive: EvaluationImportArchive,
+  originalResponseCount: number,
+): Promise<EvaluationImportArchive | null> {
+  if (!isSupabaseConfigured) throw new Error('Supabase is not configured.');
+  const [archives, responseCounts] = await Promise.all([
+    loadEvaluationImportArchives(),
+    loadEvaluationImportResponseCounts(),
+  ]);
+  const current = archives.find((archive) => archive.id === existingArchive.id);
+  if (!current || current.importBatchId !== existingArchive.importBatchId) {
+    throw new Error('The selected source file changed during replacement. Refresh Stored Source Files.');
+  }
+  // Content-addressed batch IDs can be shared by identical source versions, so they cannot prove ownership.
+  if (current.importBatchId === replacementArchive.importBatchId) return null;
+  if (archives.filter((archive) => archive.importBatchId === current.importBatchId).length !== 1) return null;
+  // Retain ambiguous/partial relationships as active; only mark history after every linked row moved.
+  if ((responseCounts.get(current.importBatchId) ?? 0) > 0) return null;
+  const historical = {
+    ...current,
+    importStatus: 'historical' as const,
+    historicalStatus: 'Replaced' as const,
+    replacedAt: replacementArchive.uploadedAt,
+    replacedByArchiveId: replacementArchive.id,
+    originalResponseCount,
+  };
+  await upsertApplicationRecords('evaluation_import_archive', [historical], (archive) => archive.id);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, { detail: { recordType: 'evaluation_import_archive' } }));
+  }
+  return historical;
+}
+
+/** Move selected imports to history while keeping both stored files and linked responses intact. */
+export async function archiveEvaluationImports(
+  selectedArchives: readonly EvaluationImportArchive[],
+): Promise<EvaluationImportArchive[]> {
+  if (!isSupabaseConfigured) throw new Error('Supabase is not configured.');
+  const currentArchives = await loadEvaluationImportArchives();
+  const updates = selectedArchives.map((selected) => {
+    const current = currentArchives.find((archive) => archive.id === selected.id);
+    if (!current || current.importBatchId !== selected.importBatchId || current.storagePath !== selected.storagePath) {
+      throw new Error(`The source file "${selected.sourceFileName}" changed. Refresh Stored Source Files and try again.`);
+    }
+    if (current.importStatus === 'historical') return current;
+    return { ...current, importStatus: 'historical' as const, historicalStatus: 'Archived' as const };
+  }).filter((archive) => archive.importStatus === 'historical' && archive.historicalStatus === 'Archived');
+  const changedArchives = updates.filter((archive) => !selectedArchives.some((selected) =>
+    selected.id === archive.id && selected.importStatus === 'historical' && selected.historicalStatus === 'Archived'));
+  if (changedArchives.length === 0) return [];
+  await upsertApplicationRecords('evaluation_import_archive', changedArchives, (archive) => archive.id);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, { detail: { recordType: 'evaluation_import_archive' } }));
+  }
+  return changedArchives;
 }
 
 export async function saveEvaluationImportArchive(
@@ -108,33 +176,25 @@ export async function discardPendingEvaluationImportArchive(archive: EvaluationI
   await deleteApplicationRecords('evaluation_import_archive', [stored.id]);
 }
 
-export async function removeOrdinaryEvaluationImport(archive: EvaluationImportArchive): Promise<{ responsesRemoved: number }> {
+export async function removeOrdinaryEvaluationImport(archive: EvaluationImportArchive): Promise<void> {
   if (!isSupabaseConfigured) throw new Error('Supabase is not configured.');
-  const storedArchive = (await loadEvaluationImportArchives()).find((item) => item.id === archive.id);
+  const archives = await loadEvaluationImportArchives();
+  const storedArchive = archives.find((item) => item.id === archive.id);
   if (!storedArchive || storedArchive.importBatchId !== archive.importBatchId || storedArchive.storagePath !== archive.storagePath) {
     throw new Error('This source file archive has changed. Refresh the page before removing it.');
   }
   const responses = await loadApplicationRecords<SurveyResponse>('survey_response');
-  const selected = selectOrdinaryImportResponses(storedArchive, responses);
-  let deletedIds: string[] = [];
-  try {
-    deletedIds = await deleteImportedSurveyResponses(supabase, selected.map(surveyResponseRecordId), storedArchive.importBatchId);
-    const remaining = await loadApplicationRecords<SurveyResponse>('survey_response');
-    if (remaining.some((response) => response.importBatchId === storedArchive.importBatchId)) {
-      throw new Error('Some imported responses could not be removed. The stored source file was kept.');
-    }
-    const { error } = await supabase.storage.from(EVALUATION_IMPORT_ARCHIVE_BUCKET).remove([storedArchive.storagePath]);
-    if (error) throw new Error(`The imported responses were removed, but the source file could not be deleted: ${error.message}`);
-    await deleteApplicationRecords('evaluation_import_archive', [storedArchive.id]);
-  } finally {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, { detail: { recordType: 'survey_response' } }));
-    }
+  const linkedResponses = responses.filter((response) => response.importBatchId === storedArchive.importBatchId);
+  if (storedArchive.importStatus !== 'historical' && linkedResponses.length > 0) {
+    throw new Error('Archive this import before permanently removing it. Active imports cannot be permanently removed.');
   }
-  const deletedRecordIds = new Set(deletedIds);
-  return { responsesRemoved: new Set(selected
-    .filter((response) => deletedRecordIds.has(surveyResponseRecordId(response)))
-    .map((response) => response.responseId)).size };
+  if (storedArchive.importStatus === 'historical' || linkedResponses.length === 0) {
+    const { error } = await supabase.storage.from(EVALUATION_IMPORT_ARCHIVE_BUCKET).remove([storedArchive.storagePath]);
+    if (error) throw new Error(`Unable to remove the historical source file: ${error.message}`);
+    await deleteApplicationRecords('evaluation_import_archive', [storedArchive.id]);
+    return;
+  }
+  throw new Error('Archive this import before permanently removing it.');
 }
 
 export async function removeTestEvaluationImport(archive: EvaluationImportArchive): Promise<{ responsesRemoved: number; companiesRemoved: number }> {
@@ -145,11 +205,13 @@ export async function removeTestEvaluationImport(archive: EvaluationImportArchiv
   if (!storedArchive || storedArchive.importBatchId !== archive.importBatchId || storedArchive.storagePath !== archive.storagePath) {
     throw new Error('This test import archive has changed. Refresh the page before removing it.');
   }
-
   const [responses, companies] = await Promise.all([
     loadApplicationRecords<SurveyResponse>('survey_response'),
     loadApplicationRecords<PartnerCompany>('partner_company'),
   ]);
+  if (storedArchive.importStatus !== 'historical' && responses.some((response) => response.importBatchId === storedArchive.importBatchId)) {
+    throw new Error('Archive this test import before permanently removing it.');
+  }
   const selected = selectTestImportCleanup(storedArchive, responses, companies);
 
   try {

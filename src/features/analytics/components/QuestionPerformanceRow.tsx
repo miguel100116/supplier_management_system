@@ -1,4 +1,5 @@
 import React from 'react';
+import { getValueColorBand } from '../domain/valueColorBand';
 
 interface QuestionPerformanceRowProps {
   rank: number;
@@ -8,6 +9,12 @@ interface QuestionPerformanceRowProps {
 
 export function QuestionPerformanceRow({ rank, question, average }: QuestionPerformanceRowProps) {
   const boundedAverage = Math.max(0, Math.min(100, average));
+  const scoreColors = {
+    green: { bar: 'bg-green-500', text: 'text-green-700 dark:text-green-400' },
+    yellow: { bar: 'bg-yellow-400', text: 'text-yellow-700 dark:text-yellow-400' },
+    orange: { bar: 'bg-orange-500', text: 'text-orange-700 dark:text-orange-400' },
+    red: { bar: 'bg-red-500', text: 'text-red-700 dark:text-red-400' },
+  }[getValueColorBand(boundedAverage)];
 
   return (
     <li className="flex items-start gap-3 border-b border-slate-100 py-3 dark:border-slate-800">
@@ -25,12 +32,12 @@ export function QuestionPerformanceRow({ rank, question, average }: QuestionPerf
           aria-valuenow={boundedAverage}
         >
           <span
-            className="block h-full rounded-full bg-[#0078a8]"
+            className={`block h-full rounded-full ${scoreColors.bar}`}
             style={{ width: `${boundedAverage}%` }}
           />
         </span>
       </span>
-      <span className="shrink-0 pt-0.5 text-xs font-bold tabular-nums text-[#0078a8]">
+      <span className={`shrink-0 pt-0.5 text-xs font-bold tabular-nums ${scoreColors.text}`}>
         {average.toFixed(1)}
       </span>
     </li>

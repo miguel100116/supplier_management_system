@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, ChevronLeft, ChevronRight, Info, Trophy, X } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CompanyAnalysisPanel } from '../components/CompanyAnalysisPanel';
 import { PageDescription } from '../components/PageDescription';
 import { StateMessage } from '../components/StateMessage';
@@ -10,6 +10,7 @@ import { formatNumber, hasAnsweredItem, monthlyTrend, questionPerformance, respo
 import { computeCompanyComposite } from '../utils/scoring';
 import { getAnalyticsCompanyRankings, paginateAnalyticsItems, paginateCompanyRankings } from '../features/analytics/domain/rankings';
 import { QuestionPerformanceRow } from '../features/analytics/components/QuestionPerformanceRow';
+import { getValueColorBand } from '../features/analytics/domain/valueColorBand';
 import { AnalyticsDateRangeControls } from '../features/analytics/components/AnalyticsDateRangeControls';
 import type { AnalyticsDateRange } from '../features/analytics/domain/dateRange';
 import { useModalEscape } from '../hooks/useModalEscape';
@@ -41,10 +42,28 @@ type CompanySummary = {
 
 const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
 const panelClass = 'rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950';
-const typeStyles: Record<SurveyType, { dot: string; text: string; soft: string; bar: string }> = {
-  Courier: { dot: 'bg-sky-600', text: 'text-sky-700 dark:text-sky-400', soft: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300', bar: 'bg-sky-600' },
-  Supplier: { dot: 'bg-emerald-600', text: 'text-emerald-700 dark:text-emerald-400', soft: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', bar: 'bg-emerald-600' },
-  Subcontractor: { dot: 'bg-amber-500', text: 'text-amber-700 dark:text-amber-400', soft: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300', bar: 'bg-amber-500' },
+const typeStyles: Record<SurveyType, { soft: string; bar: string }> = {
+  Courier: { soft: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300', bar: 'bg-sky-600' },
+  Supplier: { soft: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', bar: 'bg-emerald-600' },
+  Subcontractor: { soft: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300', bar: 'bg-amber-500' },
+};
+const responseVolumeBandColors = {
+  green: '#22c55e',
+  yellow: '#facc15',
+  orange: '#f97316',
+  red: '#ef4444',
+};
+const leaderboardBandTextColors: Record<string, string> = {
+  Excellent: 'text-green-700 dark:text-green-400',
+  Satisfactory: 'text-blue-700 dark:text-blue-400',
+  Good: 'text-yellow-700 dark:text-yellow-400',
+  Unsatisfactory: 'text-red-700 dark:text-red-400',
+};
+const leaderboardBandDotColors: Record<string, string> = {
+  Excellent: 'bg-green-500',
+  Satisfactory: 'bg-blue-500',
+  Good: 'bg-yellow-400',
+  Unsatisfactory: 'bg-red-500',
 };
 
 function PlaceholderButton({ children, title }: { children: ReactNode; title: string }) {
@@ -165,10 +184,17 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
       <section className={`${panelClass} overflow-hidden`} aria-labelledby="company-leaderboard-heading">
         <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
           <div>
-            <div>
-              <div className="flex items-center gap-2"><Trophy size={18} className="text-[#0078a8]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-base font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
-              <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Compare evaluated partners and select a company to review its category performance.</p>
-            </div>
+              <div>
+                <div className="flex items-center gap-2"><Trophy size={18} className="text-[#0078a8]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-base font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Compare evaluated partners and select a company to review its category performance.</p>
+                <div role="group" aria-label="Company leaderboard rating color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span className="text-[10px] font-semibold text-slate-500">Rating:</span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-green-500" />Excellent</span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-blue-500" />Satisfactory</span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-yellow-400" />Good</span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />Unsatisfactory</span>
+                </div>
+              </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-900 sm:grid-cols-4">
             {(['All', ...surveyTypes] as const).map((type) => (
@@ -184,13 +210,15 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
               <ol key={columnIndex} start={column.startIndex + 1} className="min-w-0">
                 {column.items.map((company, index) => {
                   const style = typeStyles[company.type];
+                  const scoreBand = getBand(company.type, company.scorePercentage);
+                  const scoreBandColor = leaderboardBandTextColors[scoreBand.label] ?? 'text-slate-700 dark:text-slate-200';
                   const rank = column.startIndex + index + 1;
                   return (
                     <li key={`${company.type}:${company.name}`} className={`min-w-0 border-b border-slate-100 dark:border-slate-800/70 ${rank % 2 === 1 ? 'bg-slate-50 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}`}>
                       <button type="button" onClick={() => setSelectedCompany(company)} className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-center px-2 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900/70 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]">
                         <span className="flex h-7 w-8 items-center justify-center rounded-md bg-slate-200 text-xs font-extrabold text-slate-800 dark:bg-slate-700 dark:text-slate-100">{rank}</span>
-                        <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span className={`h-2 w-2 shrink-0 rounded-full ${style.dot}`} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · {getBand(company.type, company.scorePercentage).label}</span></span>
-                        <span className={`flex items-center justify-end gap-1 text-xs font-bold tabular-nums ${style.text}`}>{formatCompositeScore(company.type, company.rankScore).valueText}<ChevronRight size={13} /></span>
+                        <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${leaderboardBandDotColors[scoreBand.label] ?? 'bg-slate-400'}`} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · <span className={scoreBandColor}>{scoreBand.label}</span></span></span>
+                        <span className={`flex items-center justify-end gap-1 text-xs font-bold tabular-nums ${scoreBandColor}`}>{formatCompositeScore(company.type, company.rankScore).valueText}<ChevronRight size={13} /></span>
                         <span className="hidden text-right text-[11px] font-medium tabular-nums text-slate-400 sm:block">{company.count}</span>
                       </button>
                     </li>
@@ -225,13 +253,33 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
             <div className="h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="key" tick={{ fontSize: 10 }} /><YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 10 }} /><YAxis yAxisId="forms" orientation="right" allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Line yAxisId="score" type="monotone" dataKey="average" name="Average Score" stroke="#0078a8" strokeWidth={3} dot={{ r: 3 }} /><Line yAxisId="forms" type="monotone" dataKey="responses" name="Counted Forms" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} /></LineChart></ResponsiveContainer></div>
           </article>
           <article className={`${panelClass} p-4 sm:p-5`}>
-            <div className="mb-4"><h3 className="text-sm font-bold">Response volume</h3><p className="mt-1 text-xs text-slate-500">Submitted evaluations by stakeholder category</p></div>
-            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={volumeData} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="surveyType" tick={{ fontSize: 10 }} /><YAxis allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="responses" fill="#0078a8" radius={[6, 6, 0, 0]} /></BarChart></ResponsiveContainer></div>
+            <div className="mb-4">
+              <h3 className="text-sm font-bold">Response volume</h3>
+              <p className="mt-1 text-xs text-slate-500">Submitted evaluations by stakeholder category</p>
+              <div role="group" aria-label="Response volume color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-[10px] font-semibold text-slate-500">Response count:</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-green-500" />Green 90+</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-yellow-400" />Yellow 80–89</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-orange-500" />Orange 70–79</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />Red under 70</span>
+              </div>
+            </div>
+            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={volumeData} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="surveyType" tick={{ fontSize: 10 }} /><YAxis allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="responses" radius={[6, 6, 0, 0]}>{volumeData.map((item) => <Cell key={item.surveyType} fill={responseVolumeBandColors[getValueColorBand(item.responses)]} />)}</Bar></BarChart></ResponsiveContainer></div>
           </article>
         </div>
         <CompanyAnalysisPanel responses={responses} archiveSeries={archiveSeries} />
         <article className={`${panelClass} overflow-hidden`}>
-          <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6"><h3 className="text-sm font-bold">Question performance</h3><p className="mt-1 text-xs text-slate-500">All scored criteria ranked from highest to lowest</p></div>
+          <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
+            <h3 className="text-sm font-bold">Question performance</h3>
+            <p className="mt-1 text-xs text-slate-500">All scored criteria ranked from highest to lowest</p>
+            <div role="group" aria-label="Question performance score color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="text-[10px] font-semibold text-slate-500">Score bands:</span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-green-500" />Green 90+</span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-yellow-400" />Yellow 80–89.9</span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-orange-500" />Orange 70–79.9</span>
+              <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />Red under 70</span>
+            </div>
+          </div>
           <ol className="grid gap-x-6 px-4 sm:px-6 lg:grid-cols-2">
             {paginatedQuestionData.items.map((question, index) => (
               <QuestionPerformanceRow

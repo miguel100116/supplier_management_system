@@ -27,7 +27,6 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
   const [pendingAction, setPendingAction] = useState<'save' | 'restore' | null>(null);
   const [validationError, setValidationError] = useState('');
   useModalEscape(Boolean(pendingAction), () => setPendingAction(null), 60);
-  useModalEscape(Boolean(openType), () => setOpenType(null), 50);
 
   const openEditor = (type: SurveyType) => {
     setOpenType(type);
@@ -41,6 +40,14 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
     setPendingAction(null);
     setValidationError('');
   };
+
+  const requestCloseEditor = () => {
+    if (openType && !arraysEqual(draftLabels, categoryLabels[openType]) &&
+        !window.confirm('You have unsaved category changes. Discard them and close?')) return;
+    closeEditor();
+  };
+
+  useModalEscape(Boolean(openType), requestCloseEditor, 50);
 
   const isDirty = openType ? !arraysEqual(draftLabels, categoryLabels[openType]) : false;
   const isDefault = openType ? arraysEqual(draftLabels, DEFAULT_CATEGORIES[openType]) : false;
@@ -131,14 +138,14 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
       </div>
 
       {openType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 flex flex-col max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs" onClick={(event) => { if (event.target === event.currentTarget) requestCloseEditor(); }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="category-editor-title" className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 flex flex-col max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-4 shrink-0">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Category Labels</p>
-                <h3 className="text-base font-bold text-slate-800 dark:text-white">{openType} Categories</h3>
+                <h3 id="category-editor-title" className="text-base font-bold text-slate-800 dark:text-white">{openType} Categories</h3>
               </div>
-              <button type="button" onClick={closeEditor} className="icon-button" title="Close">
+              <button type="button" onClick={requestCloseEditor} className="icon-button" title="Close">
                 <X size={18} />
               </button>
             </div>
@@ -177,7 +184,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
                 <RotateCcw size={13} /> Restore to Default
               </button>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={closeEditor} className="secondary-button text-xs">
+                <button type="button" onClick={requestCloseEditor} className="secondary-button text-xs">
                   Cancel
                 </button>
                 <button

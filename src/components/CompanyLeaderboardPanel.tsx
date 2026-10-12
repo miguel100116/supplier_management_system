@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, Trophy, Truck, UsersRound } from 'lucide-react';
+import { Layers, PackageSearch, Trophy, Truck } from 'lucide-react';
 import { SurveyResponse, SurveyType } from '../types/survey';
 import { surveyTypeDisplayLabel, formatCompositeScore, getRemarkText } from '../data/questionWeights';
 import { getLeaderboard } from '../utils/scoring';
@@ -12,8 +12,8 @@ const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
 
 const surveyTypeIcons = {
   Courier: Truck,
-  Supplier: Building2,
-  Subcontractor: UsersRound,
+  Supplier: PackageSearch,
+  Subcontractor: Layers,
 } satisfies Record<SurveyType, typeof Truck>;
 
 function rankIndicatorClass(rank: number): string {
