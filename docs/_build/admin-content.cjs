@@ -113,7 +113,7 @@ module.exports = [
           { type: 'p', text: 'This is your main way of moving between modules. As an Administrator, you will see these items, top to bottom:' },
           { type: 'bullets', items: [
             'Dashboard',
-            'Partner Companies (a group that expands to: Partner Companies, Document Tracker, Supplier Ranking, Feedback Hub)',
+            'Partner Companies (a group that expands to: Partner Companies, Document Tracker, Feedback Hub)',
             'Evaluations (a group that expands to: All Submissions, Outstanding Evaluations, Raw Data Explorer, Archive Center, Categories Manager)',
             'Analytics',
             'Reports & Exports (a group that expands to: Generate Report, Present Mode, Export History)',
@@ -183,7 +183,7 @@ module.exports = [
   {
     title: 'Partner Companies',
     intro: [
-      'This chapter covers the "Partner Companies" group in the sidebar, which contains four related pages: Partner Companies (the main company directory), Document Tracker, Supplier Ranking, and Feedback Hub.',
+      'This chapter covers the "Partner Companies" group in the sidebar, which contains three related pages: Partner Companies (the main company directory), Document Tracker, and Feedback Hub.',
     ],
     sections: [
       // ---- Partner Companies page ----
@@ -292,24 +292,6 @@ module.exports = [
         ],
       },
 
-      // ---- Supplier Ranking ----
-      {
-        heading: 'Supplier Ranking — choosing your Top 20 evaluable Suppliers',
-        blocks: [
-          { type: 'note', text: 'Despite the name, this page does not show a performance leaderboard or calculate scores — that is what the Analytics page (Chapter 7) is for. Supplier Ranking is where you manually decide which 20 Supplier companies employees are allowed to evaluate on survey forms.' },
-          { type: 'p', text: 'The page shows 20 numbered slots. Each slot has a dropdown where you assign one Supplier company to that rank position. Any Supplier not currently in one of the 20 slots appears in a "Not in Top 20" list on the right, which you can search.' },
-          { type: 'h3', text: 'Changing the Top 20' },
-          { type: 'steps', items: [
-            'Go to Supplier Ranking.',
-            'For any slot (1 through 20), use its dropdown to choose which Supplier company should occupy that rank.',
-            'Optionally drag rows using the grip handle to reorder them.',
-            'Click "Save Changes" once you are happy with the list. If you want to start over, click "Reset Rankings" first, or "Cancel" to discard your edits entirely.',
-          ] },
-          { type: 'warn', text: 'If a Supplier survey is currently active and already has submissions, the system will block your save with a warning ("Supplier Evaluation Still Ongoing") — you will need to pause or reset that survey first before changing the Top 20 mid-cycle.' },
-          { type: 'p', text: 'A "Modification Log" at the bottom of the page records every change made to the Top 20 over time, including who made it and when — click any entry to see a full snapshot of the list as it looked at that moment.' },
-        ],
-      },
-
       // ---- Feedback Hub ----
       {
         heading: 'Feedback Hub — sending performance reports to partner companies',
@@ -385,7 +367,7 @@ module.exports = [
             'Click "Next" to move to Step 2.',
             'Set the "Set Deadline" date if it needs to change.',
             'Under "Set Notification", choose how often employees with pending evaluations get reminded: Every 4 Hours (High Frequency), Every 8 Hours, Every 12 Hours, Every 24 Hours (Standard), or Every 48 Hours.',
-            'If you need to change which specific partner companies this survey covers, click "Modify Companies to Evaluate" and tick/untick companies from the full list.',
+            'If you need to change which partner companies this survey covers, click "Modify Companies to Evaluate". For any category, choose "Within the Top 20" to select up to 20 active companies in the current volume-weighted Analytics leaderboard order (unscored active companies fill remaining slots), choose "Active Companies" for the full active list, or tick companies individually.',
             'Click "Save Changes".',
           ] },
           { type: 'note', text: 'This "Set Notification" frequency is what controls how often employees are reminded (through their Notifications inbox and the bell icon) about evaluations they still need to complete. It does not send anything to the partner companies themselves — for that, see "Feedback Hub" in Chapter 5.' },
@@ -520,7 +502,7 @@ module.exports = [
             '"Company" — focus on one specific company, or leave it on "All companies".',
             '"Reset" — clears your filters back to showing everything.',
           ] },
-          { type: 'p', text: 'Two extra toggles at the top of the page control the overall data scope: switch between "Current Period", "All-Time", or a "Custom" selection of specific past periods; and switch the ranking calculation between "Volume-Weighted" (companies with more responses count more) and "Pure Average" (every company’s average counts equally regardless of how many responses they have).' },
+          { type: 'p', text: 'Use the controls at the top of the page to choose the reporting scope: "Current Period", "All-Time", or a "Custom" selection of specific past periods. Company rankings use volume-weighted scores, which adjust company averages based on evaluation volume.' },
         ],
       },
     ],
@@ -797,7 +779,7 @@ module.exports = [
       { q: 'How do I archive a company instead of deleting it?', a: 'Open the company’s card and click "Archive Partner Company" (or the "Archive" button on its card in the list). This hides it from the active registry without deleting anything, and it can be restored later. See Chapter 5, Partner Companies.' },
       { q: 'How do I renew a company’s expiring document?', a: 'Go to Document Tracker, click the document’s cell for that company, click "Renew Document", choose the new expiry date, and confirm. See Chapter 5, Document Tracker.' },
       { q: 'How do I control when document expiry warnings appear?', a: 'On the Document Tracker page, click "Add Notification" and switch on early alerts with your own day-counts per document type. See Chapter 5, Document Tracker.' },
-      { q: 'How do I choose which 20 Suppliers can be evaluated?', a: 'Go to Supplier Ranking, assign companies to the 20 ranked slots using each slot’s dropdown, and click "Save Changes". See Chapter 5, Supplier Ranking.' },
+      { q: 'How do I choose which partner companies can be evaluated?', a: 'In Evaluation Workspace, click "Modify" on the survey, open "Modify Companies to Evaluate", choose "Within the Top 20" or "Active Companies", or select companies individually, then save the survey changes. The saved company IDs determine which companies employees can rate. See Chapter 6, Evaluations.' },
       { q: 'How do I send a company its evaluation results?', a: 'Go to Feedback Hub → "Past Results", find the survey/company, and click "Send to Partner". See Chapter 5, Feedback Hub.' },
       { q: 'How do I create a new evaluation survey?', a: 'Go to All Submissions and click "Create Form". Fill in the survey title, type, and questions, then click "Create and Publish Form". See Chapter 6, Evaluations.' },
       { q: 'How do I edit an existing survey?', a: 'Go to All Submissions, click "Manage" on the survey, then "Edit Survey Form" to change its title, questions, or settings. See Chapter 6, Evaluations.' },

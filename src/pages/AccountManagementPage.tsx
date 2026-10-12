@@ -36,7 +36,6 @@ const PAGE_MODULES: { key: PageModuleKey; label: string; description: string }[]
   { key: 'partner-companies', label: 'Partner Companies', description: 'Manage external courier, supplier, and subcontractor rosters' },
   { key: 'document-register', label: 'Document Tracker', description: 'Categorized compliance-document table across all partner companies' },
   { key: 'renew-documents', label: 'Renew Compliance Documents', description: 'Action permission: update document expiry dates/status in Partner Companies and the Document Tracker, without needing full Account Management access' },
-  { key: 'supplier-ranking', label: 'Supplier Ranking', description: 'Curate and reorder the Top 20 Suppliers evaluable by default in Supplier surveys' },
   { key: 'account-management', label: 'Account Management', description: 'Configure system roles, ranks, and user permissions' },
   { key: 'notifications', label: 'Notification Logs', description: 'Audit trails of incoming survey responses' },
   { key: 'archive', label: 'Archive Center', description: 'Browse and restore archived feedback submissions' },

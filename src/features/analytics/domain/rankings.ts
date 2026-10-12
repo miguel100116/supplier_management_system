@@ -1,7 +1,7 @@
 import { formatCompositeScore } from '../../../data/questionWeights';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
 import { computeRankScore } from '../../../utils/analytics';
-import { computeCompanyComposite, getLeaderboard, getPureAverageLeaderboard, RankingMode } from '../../../utils/scoring';
+import { computeCompanyComposite, getLeaderboard } from '../../../utils/scoring';
 
 export interface CompanyRankingCandidate {
   name: string;
@@ -25,12 +25,9 @@ export interface AnalyticsCompanySummary extends CompanyRankingCandidate {
 export function getAnalyticsCompanyRankings(
   responses: SurveyResponse[],
   surveyTypes: SurveyType[],
-  rankingMode: RankingMode,
 ): AnalyticsCompanySummary[] {
   const summaries = surveyTypes.flatMap((type) => {
-    const companies = rankingMode === 'weighted'
-      ? getLeaderboard(responses, type)
-      : getPureAverageLeaderboard(responses, type);
+    const companies = getLeaderboard(responses, type);
 
     return companies
       .filter((company) => company.hasScore)
@@ -40,7 +37,7 @@ export function getAnalyticsCompanyRankings(
         average: company.compositeScore,
         scorePercentage: company.compositeScore,
         count: company.evaluationCount,
-        rankScore: rankingMode === 'weighted' ? company.rankScore : company.compositeScore,
+        rankScore: company.rankScore,
       }));
   });
 
@@ -89,30 +86,18 @@ export function paginateCompanyRankings<T>(
 }
 
 /**
- * Applies the selected ranking contract to a set of company summaries.
+ * Applies the volume-weighted ranking contract to company summaries.
  * A single-type list compares the rounded, user-visible score before using
  * evaluation volume as a tiebreaker; mixed-type lists stay on the shared
  * 0-100 scale because Subcontractors display in native 0-2 units.
  */
 export function rankCompanySummaries<T extends CompanyRankingCandidate>(
   candidates: T[],
-  rankingMode: RankingMode,
 ): RankedCompany<T>[] {
   const uniformType = candidates.length > 0 && candidates.every((candidate) => candidate.type === candidates[0].type)
     ? candidates[0].type
     : null;
   const visibleScore = (score: number) => uniformType ? formatCompositeScore(uniformType, score).value : score;
-
-  if (rankingMode === 'pure') {
-    return candidates
-      .map((candidate) => ({ ...candidate, rankScore: candidate.scorePercentage }))
-      .sort((left, right) => {
-        const scoreDifference = visibleScore(right.rankScore) - visibleScore(left.rankScore);
-        if (scoreDifference !== 0) return scoreDifference;
-        if (right.count !== left.count) return right.count - left.count;
-        return left.name.localeCompare(right.name);
-      });
-  }
 
   const peers = candidates.map((candidate) => ({ score: candidate.scorePercentage, count: candidate.count }));
   return candidates
@@ -139,14 +124,13 @@ export interface CompanyPerformanceDatum {
 }
 
 /**
- * Builds the best/least-performing chart data once from the filtered response
- * slice. Grouping first avoids repeatedly scanning every response for every
- * company and survey type.
+ * Builds volume-weighted best/least-performing chart data once from the
+ * filtered response slice. Grouping first avoids repeatedly scanning every
+ * response for every company and survey type.
  */
 export function getCompanyPerformanceRanking(
   responses: SurveyResponse[],
   activeSurveyTypes: SurveyType[],
-  rankingMode: RankingMode,
   direction: 'highest' | 'lowest',
   limit: number,
 ): CompanyPerformanceDatum[] {
@@ -187,9 +171,7 @@ export function getCompanyPerformanceRanking(
   return rawStats
     .map((item) => ({
       ...item,
-      score: rankingMode === 'weighted'
-        ? computeRankScore(item.rawScore, item.evaluationCount, peers)
-        : item.rawScore,
+      score: computeRankScore(item.rawScore, item.evaluationCount, peers),
     }))
     .sort((left, right) => {
       const scoreDifference = direction === 'highest'

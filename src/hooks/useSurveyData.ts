@@ -1856,20 +1856,6 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     return normalizedCompany;
   };
 
-  // Update several partner companies in one state update/localStorage write
-  // (e.g. Supplier Ranking's drag-reorder, which can touch up to 20 rows at
-  // once) instead of one updatePartnerCompany call per row. Mirrors
-  // updateSurveysBulk's identical rationale/pattern above.
-  const updatePartnerCompaniesBulk = (updatedCompaniesList: PartnerCompany[]) => {
-    const map = new Map(updatedCompaniesList.map((c) => [c.id, normalizePartnerCompany(c)]));
-    setPartnerCompanies((currentCompanies) => {
-      const updated = currentCompanies.map((c) => map.has(c.id) ? map.get(c.id)! : c);
-      safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
-      persistRemote(upsertApplicationRecords('partner_company', updatedCompaniesList.map(normalizePartnerCompany), (company) => company.id));
-      return updated;
-    });
-  };
-
   const updatePartnerDocument = async (
     companyId: string,
     branchId: string,
@@ -2506,7 +2492,6 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     partnerCompanies,
     addPartnerCompany,
     updatePartnerCompany,
-    updatePartnerCompaniesBulk,
     updatePartnerDocument,
     removePartnerCompany,
     previewMasterListImport,

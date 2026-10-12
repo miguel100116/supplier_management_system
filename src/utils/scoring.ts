@@ -36,12 +36,7 @@ export interface CompanyComposite {
   // explicitly labeled Volume-Weighted Score; compositeScore remains the
   // company's rubric-based rating - see computeRankScore in analytics.ts.
   rankScore: number;
-  // Set by getPureAverageLeaderboard. Standard competition ranking with ties
-  // (1, 1, 3…). Undefined in volume-weighted mode where array position = rank.
-  displayRank?: number;
 }
-
-export type RankingMode = 'weighted' | 'pure';
 
 export interface OutlierFlag {
   company: string;
@@ -281,51 +276,6 @@ export function getLeaderboard(responses: SurveyResponse[], surveyType: SurveyTy
   const sortedUnscored = [...unscored].sort((a, b) => a.company.localeCompare(b.company));
 
   return [...rankedScored, ...sortedUnscored];
-}
-
-/**
- * Every company of a given survey type, ranked purely by compositeScore
- * (actual average, no volume weighting). Tiebreaker: higher evaluationCount
- * ranks first. Companies with identical score AND evaluation count share the
- * same displayRank using standard competition ranking (1, 1, 3…).
- */
-export function getPureAverageLeaderboard(responses: SurveyResponse[], surveyType: SurveyType): CompanyComposite[] {
-  const composites = getCompanyComposites(responses, surveyType);
-
-  const scored = composites.filter((c) => c.hasScore);
-  const unscored = composites.filter((c) => !c.hasScore);
-
-  // Compare by the rounded value actually shown on screen, not the raw
-  // compositeScore - two companies whose displayed numbers are identical
-  // should be treated as tied (and ordered by evaluation count) even if
-  // their exact underlying averages differ by a fraction too small to show.
-  const displayValue = (score: number) => formatCompositeScore(surveyType, score).value;
-
-  const sorted = [...scored].sort((a, b) => {
-    const dispA = displayValue(a.compositeScore);
-    const dispB = displayValue(b.compositeScore);
-    if (dispB !== dispA) return dispB - dispA;
-    return b.evaluationCount - a.evaluationCount;
-  });
-
-  const ranked: CompanyComposite[] = [];
-  for (let i = 0; i < sorted.length; i++) {
-    const c = sorted[i];
-    if (i === 0) {
-      ranked.push({ ...c, displayRank: 1 });
-    } else {
-      const prev = sorted[i - 1];
-      const prevRank = ranked[i - 1].displayRank!;
-      if (displayValue(c.compositeScore) === displayValue(prev.compositeScore) && c.evaluationCount === prev.evaluationCount) {
-        ranked.push({ ...c, displayRank: prevRank });
-      } else {
-        ranked.push({ ...c, displayRank: i + 1 });
-      }
-    }
-  }
-
-  const sortedUnscored = [...unscored].sort((a, b) => a.company.localeCompare(b.company));
-  return [...ranked, ...sortedUnscored];
 }
 
 /**

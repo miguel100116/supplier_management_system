@@ -3,7 +3,7 @@ import test from 'node:test';
 import type { SurveyResponse, SurveyType } from '../types/survey';
 import { hasAnsweredItem, monthlyTrend, responseVolume, seriesTrend, submissionCount, yearlyTrend } from './analytics';
 import { commitRawEvaluationImport, type RawEvalPreview } from './rawEvaluationImport';
-import { getLeaderboard, getPureAverageLeaderboard } from './scoring';
+import { getLeaderboard } from './scoring';
 
 const scoredQuestion: Record<SurveyType, { id: string; max: number; category: string }> = {
   Courier: { id: 'Q01', max: 15, category: 'Reliability/Delivery' },
@@ -130,7 +130,6 @@ for (const surveyType of ['Courier', 'Supplier', 'Subcontractor'] as const) {
       response(surveyType, 'Company B', `${surveyType}-b`, `${surveyType}-b-1`, 0.6),
     ];
 
-    assert.equal(getPureAverageLeaderboard(initial, surveyType)[0].company, 'Company A');
     assert.equal(getLeaderboard(initial, surveyType)[0].company, 'Company A');
 
     const updated = [
@@ -144,12 +143,9 @@ for (const surveyType of ['Courier', 'Supplier', 'Subcontractor'] as const) {
       )),
     ];
 
-    const pure = getPureAverageLeaderboard(updated, surveyType);
     const weighted = getLeaderboard(updated, surveyType);
-    assert.equal(pure[0].company, 'Company B');
     assert.equal(weighted[0].company, 'Company B');
-    assert.equal(pure[0].evaluationCount, 5);
-    assert.equal(pure[0].compositeScore, 92);
+    assert.equal(weighted[0].evaluationCount, 5);
   });
 }
 
@@ -159,7 +155,7 @@ test('stable company IDs keep renamed evaluations in one leaderboard entry', () 
     response('Supplier', 'Current Display Name', 'supplier-1', 'new-response', 1, '2026-09-01T00:00:00.000Z'),
   ];
 
-  const leaderboard = getPureAverageLeaderboard(responses, 'Supplier');
+  const leaderboard = getLeaderboard(responses, 'Supplier');
   assert.equal(leaderboard.length, 1);
   assert.equal(leaderboard[0].companyId, 'supplier-1');
   assert.equal(leaderboard[0].company, 'Current Display Name');
@@ -175,7 +171,7 @@ test('an unambiguous legacy name without an ID joins the matching company group'
     response('Courier', 'Courier Company', 'courier-1', 'current-response', 1),
   ];
 
-  const leaderboard = getPureAverageLeaderboard(responses, 'Courier');
+  const leaderboard = getLeaderboard(responses, 'Courier');
   assert.equal(leaderboard.length, 1);
   assert.equal(leaderboard[0].companyId, 'courier-1');
   assert.equal(leaderboard[0].evaluationCount, 2);

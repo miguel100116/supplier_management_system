@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Archive, ClipboardList, FileText, RefreshCw, Calendar, Building2, UserCheck, Trash2, ArrowLeft, Search, Download, Upload, Loader2, SlidersHorizontal, X, Sparkles, TrendingUp, Pencil, Check } from 'lucide-react';
+import { Archive, ClipboardList, FileText, RefreshCw, Calendar, Building2, UserCheck, Trash2, ArrowLeft, Search, Download, SlidersHorizontal, X, Sparkles, TrendingUp } from 'lucide-react';
 import {
   CartesianGrid,
   Line,
@@ -18,13 +18,13 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { seriesTrend, companySeriesTrend } from '../utils/analytics';
 import { compareDate, compareText, isWithinDateRange } from '../utils/tableFilters';
 import { useModalEscape } from '../hooks/useModalEscape';
+import { useEvaluationImportArchives } from '../features/evaluation-imports/hooks/useEvaluationImportArchives';
 
 interface ArchivePageProps {
   surveys: CustomForm[];
   partnerCompanies: PartnerCompany[];
   archivedResponses: SurveyResponse[];
   archiveSeries?: ArchiveSeries[];
-  onRenameArchiveSeries?: (id: string, newLabel: string) => void;
   onUpdateSurvey?: (survey: CustomForm) => Promise<CustomForm>;
   onUpdatePartnerCompany: (company: PartnerCompany) => Promise<PartnerCompany>;
   onRestoreResponseGroup?: (responseId: string) => Promise<void>;
@@ -32,6 +32,7 @@ interface ArchivePageProps {
   onDeleteArchivedResponseGroups?: (groupIds: { archivedAt: string; surveyId: string }[]) => Promise<void>;
   onRestoreArchivedResponseGroups?: (groupIds: { archivedAt: string; surveyId: string }[]) => Promise<void>;
   onImportArchivedResponses?: (file: File) => Promise<ArchiveImportResult>;
+  currentUserEmail?: string;
   isAdmin: boolean;
 }
 
@@ -50,7 +51,6 @@ export function ArchivePage({
   partnerCompanies,
   archivedResponses,
   archiveSeries = [],
-  onRenameArchiveSeries,
   onUpdateSurvey,
   onUpdatePartnerCompany,
   onRestoreResponseGroup,
@@ -58,9 +58,11 @@ export function ArchivePage({
   onDeleteArchivedResponseGroups,
   onRestoreArchivedResponseGroups,
   onImportArchivedResponses,
+  currentUserEmail = '',
   isAdmin
 }: ArchivePageProps) {
   const isMobile = useIsMobile();
+  const { archives: evaluationImportArchives } = useEvaluationImportArchives(currentUserEmail);
   const [activeTab, setActiveTab] = useState<'surveys' | 'responses' | 'companies'>('surveys');
   const [searchQuery, setSearchQuery] = useState('');
   const [companyTypeFilter, setCompanyTypeFilter] = useState<'All' | PartnerCompanyType>('All');
@@ -83,6 +85,11 @@ export function ArchivePage({
     [partnerCompanies]
   );
 
+  const importFileNameByBatch = useMemo(
+    () => new Map(evaluationImportArchives.map((archive) => [archive.importBatchId, archive.sourceFileName])),
+    [evaluationImportArchives]
+  );
+
   // Group responses primarily by named archive series (a period like "1st Half
   // 2026" can span multiple archive actions/surveys done under the same
   // label). Rows with no seriesId (pre-existing data from before series
@@ -93,6 +100,8 @@ export function ArchivePage({
       id: string;
       label: string;
       seriesId?: string;
+      sourceFileNames: string[];
+      surveyNames: string[];
       surveyTypes: SurveyType[];
       sortKey: string;
       // Distinct (archivedAt, surveyId) event pairs contributing to this
@@ -109,13 +118,15 @@ export function ArchivePage({
       const legacyArchivedAt = r.archivedAt || r.submissionDate;
       const groupId = seriesId ?? `legacy_${legacySurveyId}_${legacyArchivedAt}`;
       const label = seriesId ? seriesById.get(seriesId)!.label : (r.archivedBySurveyTitle || r.surveyType + ' Form');
-      const sortKey = seriesId ? seriesById.get(seriesId)!.createdAt : legacyArchivedAt;
+      const sortKey = legacyArchivedAt;
 
       if (!groups[groupId]) {
         groups[groupId] = {
           id: groupId,
           label,
           seriesId,
+          sourceFileNames: [],
+          surveyNames: [],
           surveyTypes: [],
           sortKey,
           eventKeys: [],
@@ -123,6 +134,17 @@ export function ArchivePage({
           responses: [],
         };
       }
+
+      if (r.importBatchId) {
+        const sourceFileName = importFileNameByBatch.get(r.importBatchId);
+        if (sourceFileName && !groups[groupId].sourceFileNames.includes(sourceFileName)) {
+          groups[groupId].sourceFileNames.push(sourceFileName);
+        }
+      }
+      if (r.archivedBySurveyTitle && !groups[groupId].surveyNames.includes(r.archivedBySurveyTitle)) {
+        groups[groupId].surveyNames.push(r.archivedBySurveyTitle);
+      }
+      if (legacyArchivedAt > groups[groupId].sortKey) groups[groupId].sortKey = legacyArchivedAt;
 
       if (!groups[groupId].surveyTypes.includes(r.surveyType)) {
         groups[groupId].surveyTypes.push(r.surveyType);
@@ -141,7 +163,7 @@ export function ArchivePage({
     });
 
     return Object.values(groups).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-  }, [archivedResponses, archiveSeries]);
+  }, [archivedResponses, archiveSeries, importFileNameByBatch]);
 
   // Handle restoring an archived survey back to active/running status
   const handleRestoreSurvey = (survey: CustomForm) => {
@@ -217,12 +239,14 @@ export function ArchivePage({
     const needle = searchQuery.toLowerCase();
     return groupedArchivedResponses
       .filter((g) =>
-        (!needle.trim() || g.label.toLowerCase().includes(needle) || g.surveyTypes.some((t) => t.toLowerCase().includes(needle))) &&
+        (!needle.trim() || g.label.toLowerCase().includes(needle) || g.sourceFileNames.some((fileName) => fileName.toLowerCase().includes(needle)) || g.surveyNames.some((name) => name.toLowerCase().includes(needle)) || g.surveyTypes.some((t) => t.toLowerCase().includes(needle))) &&
         isWithinDateRange(g.sortKey, dateFrom, dateTo)
       )
       .sort((a, b) => {
-        if (tableSort === 'name-asc') return compareText(a.label, b.label);
-        if (tableSort === 'name-desc') return compareText(b.label, a.label);
+        const aName = a.sourceFileNames.length ? a.sourceFileNames.join(', ') : a.surveyNames.join(', ') || `${a.surveyTypes.join(', ')} Form`;
+        const bName = b.sourceFileNames.length ? b.sourceFileNames.join(', ') : b.surveyNames.join(', ') || `${b.surveyTypes.join(', ')} Form`;
+        if (tableSort === 'name-asc') return compareText(aName, bName);
+        if (tableSort === 'name-desc') return compareText(bName, aName);
         if (tableSort === 'date-asc') return compareDate(a.sortKey, b.sortKey);
         return compareDate(b.sortKey, a.sortKey);
       });
@@ -250,8 +274,7 @@ export function ArchivePage({
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedGroups, setSelectedGroups] = useState<Set<string>>(new Set());
-  const [editingSeriesId, setEditingSeriesId] = useState<string | null>(null);
-  const [editingLabel, setEditingLabel] = useState('');
+  const [responseLogPages, setResponseLogPages] = useState<Record<string, number>>({});
 
   // "Series Trend" panel state: overall trend across periods, or one
   // company's trend across periods (the "project a company's rating trend
@@ -268,19 +291,6 @@ export function ArchivePage({
     return data.map((d) => ({ key: d.label, average: d.average, responses: d.responses }));
   }, [archivedResponses, archiveSeries, trendCompany]);
 
-  const startRenameSeries = (seriesId: string, currentLabel: string) => {
-    setEditingSeriesId(seriesId);
-    setEditingLabel(currentLabel);
-  };
-
-  const commitRenameSeries = () => {
-    if (editingSeriesId && onRenameArchiveSeries && editingLabel.trim()) {
-      onRenameArchiveSeries(editingSeriesId, editingLabel.trim());
-    }
-    setEditingSeriesId(null);
-    setEditingLabel('');
-  };
-
   const toggleExpand = (id: string) => {
     const next = new Set(expandedGroups);
     if (next.has(id)) next.delete(id);
@@ -296,7 +306,9 @@ export function ArchivePage({
   };
 
   const selectAll = () => {
-    if (selectedGroups.size === filteredGroupedResponses.length) {
+    const allFilteredSelected = filteredGroupedResponses.length > 0
+      && filteredGroupedResponses.every((group) => selectedGroups.has(group.id));
+    if (allFilteredSelected) {
       setSelectedGroups(new Set());
     } else {
       setSelectedGroups(new Set(filteredGroupedResponses.map(g => g.id)));
@@ -306,7 +318,6 @@ export function ArchivePage({
   const [confirmDeleteState, setConfirmDeleteState] = useState<{isOpen: boolean}>({ isOpen: false });
 
   // Export/import of raw archived response data (see archiveResponseTransfer.ts)
-  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ArchiveImportResult | null>(null);
   const [importError, setImportError] = useState('');
@@ -315,14 +326,6 @@ export function ArchivePage({
   useModalEscape(Boolean(confirmSurvey), () => setConfirmSurvey(null), 50);
   useModalEscape(Boolean(confirmPartnerCompany), () => setConfirmPartnerCompany(null), 49);
   useModalEscape(Boolean(importResult), () => setImportResult(null), 50);
-
-  const handleExportSelected = () => {
-    const rows = groupedArchivedResponses
-      .filter((g) => selectedGroups.has(g.id))
-      .flatMap((g) => g.responses);
-    if (rows.length === 0) return;
-    exportArchivedResponsesAsExcel(rows, 'archived_responses_selected', archiveSeries);
-  };
 
   const handleExportAll = () => {
     if (archivedResponses.length === 0) return;
@@ -406,6 +409,9 @@ export function ArchivePage({
       : filteredGroupedResponses.length;
   const activeFilterCount = countActiveArchiveFilters(tableSort, dateFrom, dateTo, companyTypeFilter, activeTab);
   const archiveItemLabel = activeTab === 'companies' ? 'company' : activeTab === 'surveys' ? 'survey' : 'response';
+  const hasVisibleResponseGroupSelection = filteredGroupedResponses.some((group) => selectedGroups.has(group.id));
+  const allFilteredResponseGroupsSelected = filteredGroupedResponses.length > 0
+    && filteredGroupedResponses.every((group) => selectedGroups.has(group.id));
 
   if (!isAdmin) {
     return (
@@ -432,7 +438,7 @@ export function ArchivePage({
         </div>
       )}
 
-      {/* Two Clickable Blocks (Bento Cards) */}
+      {/* Archive section selectors */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {/* Block 1: Archived Survey */}
         <button
@@ -440,25 +446,25 @@ export function ArchivePage({
             setActiveTab('surveys');
             setSearchQuery('');
           }}
-          className={`panel p-6 flex items-start gap-4 text-left transition relative overflow-hidden cursor-pointer ${
+          className={`panel min-h-[120px] p-5 flex items-center gap-4 text-left transition relative overflow-hidden cursor-pointer ${
             activeTab === 'surveys'
-              ? 'ring-2 ring-[#0063a9] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
-              : 'hover:border-slate-300 hover:bg-slate-50/30'
+              ? '!border-[#0063a9] !bg-[#0063a9] text-white shadow-sm'
+              : 'bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:bg-slate-900'
           }`}
           id="btn-archive-surveys"
         >
           <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'surveys' ? 'bg-[#0063a9] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            activeTab === 'surveys' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
           }`}>
             <ClipboardList size={24} />
           </div>
           <div className="space-y-1 flex-1 pr-12">
-            <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Surveys</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+            <h3 className={`text-sm font-bold ${activeTab === 'surveys' ? 'text-white' : 'text-slate-900 dark:text-white'}`}>Archived Surveys</h3>
+            <p className={`text-xs line-clamp-2 ${activeTab === 'surveys' ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
               Form templates removed from active rotation. Can be restored back to the active registry.
             </p>
           </div>
-          <span className="absolute top-6 right-6 inline-flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-black text-slate-700 dark:text-slate-300">
+          <span className={`absolute top-5 right-5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black ${activeTab === 'surveys' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
             {archivedSurveys.length}
           </span>
         </button>
@@ -469,25 +475,25 @@ export function ArchivePage({
             setActiveTab('responses');
             setSearchQuery('');
           }}
-          className={`panel p-6 flex items-start gap-4 text-left transition relative overflow-hidden cursor-pointer ${
+          className={`panel min-h-[120px] p-5 flex items-center gap-4 text-left transition relative overflow-hidden cursor-pointer ${
             activeTab === 'responses'
-              ? 'ring-2 ring-[#0063a9] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
-              : 'hover:border-slate-300 hover:bg-slate-50/30'
+              ? '!border-[#0063a9] !bg-[#0063a9] text-white shadow-sm'
+              : 'bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:bg-slate-900'
           }`}
           id="btn-archive-responses"
         >
           <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'responses' ? 'bg-[#0063a9] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            activeTab === 'responses' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
           }`}>
             <FileText size={24} />
           </div>
           <div className="space-y-1 flex-1 pr-12">
-            <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Responses</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+            <h3 className={`text-sm font-bold ${activeTab === 'responses' ? 'text-white' : 'text-slate-900 dark:text-white'}`}>Archived Responses</h3>
+            <p className={`text-xs line-clamp-2 ${activeTab === 'responses' ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
               Submissions preserved from completed or reset evaluations. Keeps your live dashboards neat.
             </p>
           </div>
-          <span className="absolute top-6 right-6 inline-flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-black text-slate-700 dark:text-slate-300">
+          <span className={`absolute top-5 right-5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black ${activeTab === 'responses' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
             {groupedArchivedResponses.length}
           </span>
         </button>
@@ -499,25 +505,25 @@ export function ArchivePage({
             setSearchQuery('');
             setCompanyTypeFilter('All');
           }}
-          className={`panel p-6 flex items-start gap-4 text-left transition relative overflow-hidden cursor-pointer ${
+          className={`panel min-h-[120px] p-5 flex items-center gap-4 text-left transition relative overflow-hidden cursor-pointer ${
             activeTab === 'companies'
-              ? 'ring-2 ring-[#0063a9] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
-              : 'hover:border-slate-300 hover:bg-slate-50/30'
+              ? '!border-[#0063a9] !bg-[#0063a9] text-white shadow-sm'
+              : 'bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:bg-slate-900'
           }`}
           id="btn-archive-companies"
         >
           <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'companies' ? 'bg-[#0063a9] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            activeTab === 'companies' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
           }`}>
             <Building2 size={24} />
           </div>
           <div className="space-y-1 flex-1 pr-12">
-            <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Companies</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+            <h3 className={`text-sm font-bold ${activeTab === 'companies' ? 'text-white' : 'text-slate-900 dark:text-white'}`}>Archived Companies</h3>
+            <p className={`text-xs line-clamp-2 ${activeTab === 'companies' ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
               View archived partner records and restore companies to the active registry.
             </p>
           </div>
-          <span className="absolute top-6 right-6 inline-flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-black text-slate-700 dark:text-slate-300">
+          <span className={`absolute top-5 right-5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black ${activeTab === 'companies' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
             {archivedCompanies.length}
           </span>
         </button>
@@ -539,23 +545,6 @@ export function ArchivePage({
           </label>
           {activeTab === 'responses' && (
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                  ref={importFileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className="hidden"
-                  onChange={handleImportFileSelected}
-                />
-                <button
-                  type="button"
-                  onClick={() => importFileInputRef.current?.click()}
-                  disabled={isImporting}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer"
-                  title="Re-import a previously exported archived-responses file"
-                >
-                  {isImporting ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                  <span>{isImporting ? 'Importing…' : 'Import'}</span>
-                </button>
                 <button
                   type="button"
                   onClick={handleExportAll}
@@ -819,48 +808,67 @@ export function ArchivePage({
               </div>
             ) : (
               <div className="space-y-4">
-                {/* Bulk Actions Bar */}
-                {selectedGroups.size > 0 && (
-                  <div className="bg-[#0063a9]/10 border border-[#0063a9]/20 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-                    <span className="text-sm font-bold text-[#0063a9] dark:text-blue-400">
-                      {selectedGroups.size} group(s) selected
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <button onClick={handleExportSelected} className="px-3 py-1.5 text-xs font-bold rounded-lg border border-[#0063a9]/30 bg-white dark:bg-slate-900 text-[#0063a9] hover:bg-blue-50 dark:hover:bg-slate-800 transition cursor-pointer">
-                        Export Selected
+                {/* Compact bulk controls */}
+                <div className="flex items-center justify-end gap-2 py-1">
+                  {hasVisibleResponseGroupSelection && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleBulkRestore}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#0063a9] transition hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-400 dark:hover:bg-slate-800"
+                        title="Restore selected responses"
+                        aria-label={`Restore ${selectedGroups.size} selected response groups`}
+                      >
+                        <RefreshCw size={16} aria-hidden="true" />
                       </button>
-                      <button onClick={handleBulkRestore} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-[#0063a9] text-white hover:bg-[#00528c] transition cursor-pointer">
-                        Restore Selected
+                      <button
+                        type="button"
+                        onClick={handleBulkDelete}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                        title="Delete selected responses"
+                        aria-label={`Delete ${selectedGroups.size} selected response groups`}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
                       </button>
-                      <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition cursor-pointer">
-                        Delete Selected
-                      </button>
-                      <button onClick={() => setSelectedGroups(new Set())} className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer">
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Select All Checkbox */}
-                <div className="flex items-center gap-2 px-4 py-2 text-sm text-slate-600 dark:text-slate-400">
-                  <input
-                    type="checkbox"
-                    checked={selectedGroups.size === filteredGroupedResponses.length && filteredGroupedResponses.length > 0}
-                    onChange={selectAll}
-                    className="w-4 h-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
-                  />
-                  <span>Select All ({filteredGroupedResponses.length})</span>
+                    </>
+                  )}
+                  <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredResponseGroupsSelected}
+                      onChange={selectAll}
+                      className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                    />
+                    <span>Select All ({filteredGroupedResponses.length})</span>
+                  </label>
                 </div>
 
                 {filteredGroupedResponses.map((group) => {
                   const isExpanded = expandedGroups.has(group.id);
                   const isSelected = selectedGroups.has(group.id);
+                  const responseLogsById = new Map<string, SurveyResponse[]>();
+                  group.responses.forEach((response) => {
+                    const rows = responseLogsById.get(response.responseId) ?? [];
+                    rows.push(response);
+                    responseLogsById.set(response.responseId, rows);
+                  });
+                  const responseLogs = [...responseLogsById.entries()].map(([responseId, answers]) => ({
+                    responseId,
+                    answers,
+                    first: answers[0],
+                  }));
+                  const responseLogPage = Math.min(responseLogPages[group.id] ?? 0, Math.max(0, responseLogs.length - 1));
+                  const currentResponseLog = responseLogs[responseLogPage];
+                  const displayNames = group.sourceFileNames.length > 0
+                    ? group.sourceFileNames
+                    : group.surveyNames.length > 0
+                      ? group.surveyNames
+                      : [];
                   
                   return (
                     <div key={group.id} className={`rounded-xl border transition ${isSelected ? 'border-[#0063a9] bg-blue-50/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'}`}>
-                      <div className="p-4 flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
+                      <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -870,42 +878,16 @@ export function ArchivePage({
                           <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500">
                             <ClipboardList size={20} />
                           </div>
-                          <div>
-                            {editingSeriesId === group.seriesId && group.seriesId ? (
-                              <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="text"
-                                  value={editingLabel}
-                                  autoFocus
-                                  onChange={(e) => setEditingLabel(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') commitRenameSeries();
-                                    if (e.key === 'Escape') { setEditingSeriesId(null); setEditingLabel(''); }
-                                  }}
-                                  className="rounded-lg border border-[#0063a9] bg-white dark:bg-slate-950 px-2 py-1 text-sm font-bold text-slate-900 dark:text-white focus:outline-none"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={commitRenameSeries}
-                                  className="p-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer"
-                                  aria-label="Save period name"
-                                >
-                                  <Check size={14} />
-                                </button>
+                          <div className="min-w-0 flex-1">
+                            {displayNames.length > 0 ? (
+                              <div className="min-w-0 space-y-0.5" aria-label={group.sourceFileNames.length > 0 ? 'Imported source files' : 'Archived survey forms'}>
+                                {displayNames.map((fileName) => (
+                                  <p key={fileName} className="truncate text-sm font-bold leading-5 text-slate-900 dark:text-white" title={fileName}>{fileName}</p>
+                                ))}
                               </div>
                             ) : (
-                              <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                                {group.label}
-                                {group.seriesId && onRenameArchiveSeries && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); startRenameSeries(group.seriesId!, group.label); }}
-                                    className="text-slate-300 hover:text-[#0063a9] dark:text-slate-600 dark:hover:text-blue-400 cursor-pointer"
-                                    aria-label="Rename period"
-                                  >
-                                    <Pencil size={13} />
-                                  </button>
-                                )}
+                              <h4 className="font-bold text-slate-900 dark:text-white">
+                                {group.surveyTypes.join(', ') || 'Archived Evaluation'}
                               </h4>
                             )}
                             <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5 flex-wrap">
@@ -916,11 +898,11 @@ export function ArchivePage({
                               ))}
                               <span>•</span>
                               <Calendar size={12} />
-                              <span>{group.seriesId ? 'Period created' : 'Archived'}: {new Date(group.sortKey).toLocaleString()}</span>
+                              <span>Date archived: {new Date(group.sortKey).toLocaleString()}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex shrink-0 items-center gap-3 self-end sm:self-auto">
                           <div className="text-right">
                             <div className="text-lg font-black text-slate-900 dark:text-white">{group.responsesCount}</div>
                             <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Responses</div>
@@ -936,37 +918,50 @@ export function ArchivePage({
                       
                       {isExpanded && (
                         <div className="border-t border-slate-200 dark:border-slate-800 p-4 bg-slate-50 dark:bg-slate-950/50 space-y-4">
-                          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">Actual Logs & Scores</h5>
-                          <div className="space-y-3">
-                            {/* Group logs by responseId internally for display */}
-                            {Array.from(new Set(group.responses.map(r => r.responseId))).map(respId => {
-                              const answers = group.responses.filter(r => r.responseId === respId);
-                              const first = answers[0];
-                              return (
-                                <div key={respId} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-800 shadow-sm text-xs space-y-2">
-                                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-                                    <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                      <Building2 size={14} className="text-[#0063a9]" />
-                                      {first.company}
-                                    </div>
-                                    <div className="text-slate-500 flex items-center gap-1">
-                                      <UserCheck size={12} /> {first.respondentType}
-                                    </div>
-                                  </div>
-                                  <div className="divide-y divide-slate-50 dark:divide-slate-800/50">
-                                    {answers.map(ans => (
-                                      <div key={ans.questionId} className="py-1.5 flex justify-between gap-4">
-                                        <span className="text-slate-600 dark:text-slate-400 truncate max-w-sm">Q{ans.questionNumber}. {ans.question}</span>
-                                        <div className="text-right shrink-0">
-                                          <span className="font-bold text-[#0063a9]">{ans.rating}</span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-500">Response Preview</h5>
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <span>{responseLogPage + 1} of {responseLogs.length}</span>
+                              <button
+                                type="button"
+                                onClick={() => setResponseLogPages((current) => ({ ...current, [group.id]: Math.max(0, responseLogPage - 1) }))}
+                                disabled={responseLogPage === 0}
+                                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                              >
+                                Previous
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setResponseLogPages((current) => ({ ...current, [group.id]: Math.min(responseLogs.length - 1, responseLogPage + 1) }))}
+                                disabled={responseLogPage >= responseLogs.length - 1}
+                                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                              >
+                                Next
+                              </button>
+                            </div>
                           </div>
+                          {currentResponseLog && (
+                            <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 dark:border-slate-800">
+                                <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white">
+                                  <Building2 size={14} className="text-[#0063a9]" />
+                                  {currentResponseLog.first.company}
+                                </div>
+                                <div className="flex items-center gap-2 text-slate-500">
+                                  <span className="flex items-center gap-1"><UserCheck size={12} />{currentResponseLog.first.respondentType}</span>
+                                  <span>{new Date(currentResponseLog.first.submissionDate).toLocaleString()}</span>
+                                </div>
+                              </div>
+                              <div className="max-h-[55vh] divide-y divide-slate-50 overflow-y-auto dark:divide-slate-800/50">
+                                {currentResponseLog.answers.map((answer) => (
+                                  <div key={answer.questionId} className="flex justify-between gap-4 py-1.5">
+                                    <span className="min-w-0 truncate text-slate-600 dark:text-slate-400" title={`Q${answer.questionNumber}. ${answer.question}`}>Q{answer.questionNumber}. {answer.question}</span>
+                                    <span className="shrink-0 text-right font-bold text-[#0063a9]">{answer.rating}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

@@ -13,8 +13,9 @@ const PARTNER_TYPES = [...SURVEY_TYPES, 'Uncategorized'] as const;
 const PAGE_MODULES = [
   'dashboard', 'survey-forms', 'explorer', 'analytics', 'reports', 'present',
   'partner-companies', 'partners-feedback-hub', 'account-management', 'notifications',
-  'archive', 'import-evaluations', 'document-register', 'supplier-ranking', 'renew-documents',
+  'archive', 'import-evaluations', 'document-register', 'renew-documents',
 ] as const;
+const LEGACY_PAGE_MODULES = ['supplier-ranking'] as const;
 const PROFILE_DEPARTMENTS = [
   'Accounts Payable - Trade', 'Business Solutions Manager', 'Executive Office',
   'Logistics', 'Procurement Group', 'TASS',
@@ -103,7 +104,6 @@ function parsePartnerCompany(value: unknown, recordId: string, label: string): J
   optionalDate(candidate.registeredAt, `${label}.registeredAt`);
   optionalBoolean(candidate.isArchived, `${label}.isArchived`);
   optionalDate(candidate.archivedAt, `${label}.archivedAt`);
-  optionalNumber(candidate.evaluationRank, `${label}.evaluationRank`);
   if (candidate.branches !== undefined) {
     if (!Array.isArray(candidate.branches) || candidate.branches.length > 500) throw new Error(`${label}.branches must be a bounded list.`);
     candidate.branches.forEach((branch, index) => {
@@ -241,10 +241,10 @@ function parseDepartmentPermission(value: unknown, recordId: string, label: stri
     throw new Error(`${label}.department does not match its database record ID.`);
   }
   const pages = stringArray(candidate.pages, `${label}.pages`, 100);
-  pages.forEach((page, index) => oneOf(page, PAGE_MODULES, `${label}.pages[${index}]`));
+  pages.forEach((page, index) => oneOf(page, [...PAGE_MODULES, ...LEGACY_PAGE_MODULES], `${label}.pages[${index}]`));
   const surveyTypes = stringArray(candidate.surveyTypes, `${label}.surveyTypes`, 10);
   surveyTypes.forEach((type, index) => oneOf(type, SURVEY_TYPES, `${label}.surveyTypes[${index}]`));
-  return candidate;
+  return { ...candidate, pages: pages.filter((page) => page !== 'supplier-ranking') };
 }
 
 function parseCategoryLabels(value: unknown, recordId: string, label: string): JsonObject {

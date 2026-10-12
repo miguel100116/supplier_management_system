@@ -7,7 +7,6 @@ import { hydrateEmployeeNotificationStateFromSupabase } from '../utils/employeeN
 import { hydrateExportHistoryFromSupabase } from '../utils/exportHistory';
 import { hydrateFeedbackHubFromSupabase } from '../utils/feedbackHubStore';
 import { hydrateReminderSettingsFromSupabase } from '../utils/reminderSettings';
-import { hydrateSupplierRankingLogFromSupabase } from '../utils/supplierRankingLog';
 
 export interface SharedStoreHydrationAccess {
   userEmail: string;
@@ -26,7 +25,7 @@ export async function hydrateSharedClientStores(access: SharedStoreHydrationAcce
   ];
   if (access.canUseFeedbackHub) tasks.push(hydrateFeedbackHubFromSupabase());
   if (access.isAdmin) {
-    tasks.push(hydrateAdminActivityFromSupabase(), hydrateSupplierRankingLogFromSupabase());
+    tasks.push(hydrateAdminActivityFromSupabase());
   }
   await Promise.all(tasks);
 }
@@ -52,9 +51,6 @@ export async function hydrateChangedSharedStore(
       return;
     case 'export_history':
       await hydrateExportHistoryFromSupabase();
-      return;
-    case 'supplier_ranking_history':
-      if (access.isAdmin) await hydrateSupplierRankingLogFromSupabase();
       return;
     case 'employee_notification_state':
       await hydrateEmployeeNotificationStateFromSupabase(access.userEmail);

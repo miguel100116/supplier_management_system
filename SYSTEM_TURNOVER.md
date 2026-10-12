@@ -71,7 +71,6 @@ An Admin account has unrestricted access to every module in the system:
 | Partner Companies | Manage external courier, supplier, and subcontractor rosters |
 | Document Tracker | Categorized compliance-document table across all partner companies |
 | Renew Compliance Documents | Action permission: update document expiry/status in Partner Companies and the Document Tracker without needing full Account Management access |
-| Supplier Ranking | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys |
 | Account Management | Configure system roles, ranks, departments, and user permissions |
 | Notification Logs | Audit trail of incoming survey responses and document-expiry alerts |
 | Archive Center | Browse and restore archived feedback submissions |
@@ -135,7 +134,6 @@ The system is organized into modules, each shown or hidden in the navigation acc
 | Partner Companies | Manage external courier, supplier, and subcontractor rosters |
 | Document Tracker | Categorized compliance-document table across all partner companies |
 | Renew Compliance Documents | Action permission: update document expiry/status in Partner Companies and the Document Tracker without needing full Account Management access |
-| Supplier Ranking | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys |
 | Account Management | Configure system roles, ranks, departments, and user permissions |
 | Notification Logs | Audit trail of incoming survey responses and document-expiry alerts |
 | Archive Center | Browse and restore archived feedback submissions |

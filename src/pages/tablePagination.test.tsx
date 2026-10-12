@@ -3,9 +3,7 @@ import test from 'node:test';
 import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { CustomForm, SurveyResponse } from '../types/survey';
-import type { RankingLogEntry } from '../utils/supplierRankingLog';
 import { SurveyDetailsPage } from './SurveyDetailsPage';
-import { SupplierRankingPage } from './SupplierRankingPage';
 
 Object.assign(globalThis, { React });
 
@@ -27,28 +25,8 @@ function renderSubmissions(count: number) {
   }));
 }
 
-function renderLog(count: number) {
-  const entries: RankingLogEntry[] = Array.from({ length: count }, (_, index) => ({
-    id: `log-${index}`, actorEmail: `actor-${index + 1}@example.com`, changedCount: 1,
-    timestamp: new Date(Date.UTC(2026, 8, index + 1)).toISOString(), snapshot: [],
-  }));
-  const priorStorage = globalThis.localStorage;
-  globalThis.localStorage = {
-    getItem: (key: string) => key === 'survey_supplier_ranking_log_v1' ? JSON.stringify(entries) : null,
-  } as Storage;
-  try {
-    return renderToStaticMarkup(createElement(SupplierRankingPage, {
-      partnerCompanies: [], onUpdateCompaniesBulk: () => {}, surveys: [], responses: [],
-      currentUserEmail: 'admin@example.com',
-    }));
-  } finally {
-    globalThis.localStorage = priorStorage;
-  }
-}
-
 for (const [label, render, paginationLabel] of [
   ['Recent Form Submissions', renderSubmissions, 'Recent form submissions pagination'],
-  ['Modification Log', renderLog, 'Modification log pagination'],
 ] as const) {
   test(`${label} shows ten newest rows while keeping the full result count`, () => {
     const html = render(30);

@@ -4,13 +4,11 @@ import { ArchiveSeries, SurveyResponse, SurveyType } from '../../../types/survey
 import { formatCompositeScore } from '../../../data/questionWeights';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { getAnalyticsCompanyRankings } from '../domain/rankings';
-import { RankingMode } from '../../../utils/scoring';
 import { hasAnsweredItem } from '../../../utils/analytics';
 
 interface ArchivedCompanyRankingsProps {
   responses: SurveyResponse[];
   archiveSeries: ArchiveSeries[];
-  rankingMode: RankingMode;
 }
 
 interface ArchivedRankingPeriod {
@@ -47,16 +45,16 @@ function buildArchivedPeriods(responses: SurveyResponse[], archiveSeries: Archiv
   return [...periods.values()].sort((left, right) => right.sortDate.localeCompare(left.sortDate));
 }
 
-export function ArchivedCompanyRankings({ responses, archiveSeries, rankingMode }: ArchivedCompanyRankingsProps) {
+export function ArchivedCompanyRankings({ responses, archiveSeries }: ArchivedCompanyRankingsProps) {
   const [selectedPeriod, setSelectedPeriod] = useState<ArchivedRankingPeriod | null>(null);
   useModalEscape(Boolean(selectedPeriod), () => setSelectedPeriod(null));
 
   const periods = useMemo(() => buildArchivedPeriods(responses, archiveSeries), [responses, archiveSeries]);
   const rankedCompanies = useMemo(
     () => selectedPeriod
-      ? getAnalyticsCompanyRankings(selectedPeriod.responses, [selectedPeriod.surveyType], rankingMode)
+      ? getAnalyticsCompanyRankings(selectedPeriod.responses, [selectedPeriod.surveyType])
       : [],
-    [selectedPeriod, rankingMode],
+    [selectedPeriod],
   );
 
   return (

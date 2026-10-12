@@ -272,17 +272,19 @@ Evidence: `src/components/TableFilterBar.tsx`, `src/utils/tableFilters.ts`, oper
 
 Status: accepted
 
-Context: Analytics ranking logic was duplicated in the page, and the best/least-performing chart always used volume weighting even when users selected Pure Average. It could therefore sort by one value while displaying another.
+Context: Analytics ranking logic was duplicated in the page, and the best/least-performing chart could sort by one value while displaying another. The ranking-mode behavior documented in this historical entry was superseded on 2026-10-09.
 
-Decision: Keep company-ranking preparation in `src/features/analytics/domain/rankings.ts`. Every ranking consumer must pass the selected ranking mode, and charts must display the same score used for ordering. Scope calculations to the already filtered response slice and exclude all-N/A composites from ranked results.
+Decision: Keep company-ranking preparation in `src/features/analytics/domain/rankings.ts`. At the time of this entry, ranking consumers passed the selected ranking mode and charts displayed the same score used for ordering. Current rankings use volume-weighted scores only. Scope calculations to the already filtered response slice and exclude all-N/A composites from ranked results.
 
-Consequences: Champion cards, leaderboards, and best/least-performing charts consistently honor survey filters and ranking mode. Focused domain tests cover pure versus weighted ordering, displayed score selection, active survey types, and ranking direction.
+Consequences: Champion cards, leaderboards, and best/least-performing charts consistently honor survey filters and use the same ranking score. Focused domain tests cover volume-weighted ordering, displayed score selection, active survey types, and ranking direction.
 
 Evidence: `src/features/analytics/domain/rankings.ts`, `src/features/analytics/domain/rankings.test.ts`, `src/pages/AnalyticsPage.tsx`
 
 Correction (2026-10-06): Analytics' Company Leaderboard had drifted back to grouping submissions by display name and recalculating ranking scores in the page. It now uses canonical company aggregation, stable company identity grouping, and displays the selected ranking score. All-N/A companies remain outside scored Analytics ranks. Separate partner-type lists are normalized when the All categories view combines them. Evidence: `getAnalyticsCompanyRankings` in `src/features/analytics/domain/rankings.ts` and its consumer in `src/pages/AnalyticsPage.tsx`.
 
-Correction (2026-10-07, superseding the prior benchmark-5 note): Analytics volume-weighted scores use Bayesian confidence weighting. For each scored peer group, `C` is the unweighted mean of peer company averages and `m` is the median peer response count, with a minimum of 3; the score is `(R × v + C × m) / (v + m)`. Pure Average continues to rank by raw company average. Analytics current, archived, and performance rankings use the canonical `computeRankScore` path. Evidence: `src/utils/analytics.ts`, `src/utils/scoring.ts`, and `src/features/analytics/domain/rankings.ts`.
+Correction (2026-10-07, superseding the prior benchmark-5 note): Analytics volume-weighted scores use Bayesian confidence weighting. For each scored peer group, `C` is the unweighted mean of peer company averages and `m` is the median peer response count, with a minimum of 3; the score is `(R × v + C × m) / (v + m)`. Analytics current, archived, and performance rankings use the canonical `computeRankScore` path. Evidence: `src/utils/analytics.ts`, `src/utils/scoring.ts`, and `src/features/analytics/domain/rankings.ts`.
+
+Correction (2026-10-09): Pure Average ranking has been removed. Analytics current-period, archived-period, performance, and standalone company leaderboard rankings now use volume-weighted scores only; raw composite averages remain available for score and reporting metrics. Evidence: `src/features/analytics/domain/rankings.ts`, `src/utils/scoring.ts`, `src/pages/AnalyticsPage.tsx`, and `src/components/CompanyLeaderboardPanel.tsx`.
 
 Correction (2026-10-09): Reports now use `getAnalyticsCompanyRankings` for volume-weighted company ordering and score display, with the same official, globally filtered response slice supplied to Analytics. Company report summaries and PDF/DOCX exports label the adjusted value as Volume-Weighted Score; rubric-based `compositeScore` remains unchanged for score breakdowns. Evidence: `src/App.tsx`, `src/pages/ReportsPage.tsx`, report builders, `src/features/feedback-hub/reporting/companyReportData.ts`, and `src/utils/companyReportExport.ts`.
 
@@ -605,3 +607,9 @@ Evidence: `src/features/evaluation-imports/domain/evaluationBatch.ts`, `src/hook
 Decision: Open dialogs registered through useModalEscape share a reference-counted document scroll lock. The lock fixes the body at its current scroll position, compensates for scrollbar width, and restores the original inline styles and position when the last dialog closes. Popovers can opt out; the employee notification dropdown does so. Modal content remains independently scrollable with overscroll containment in the Active Companies, Settings, and Modify Settings views.
 
 Evidence: src/hooks/useModalScrollLock.ts, src/hooks/useModalEscape.ts, src/components/EmployeeNotificationBell.tsx, src/features/active-companies/components/ActiveCompaniesModal.tsx, src/App.tsx, src/pages/SurveyFormsPage.tsx, src/hooks/useModalScrollLock.test.ts.
+
+### 2026-10-09 - Evaluation company selection presets
+
+Decision: The Admin company picker offers active companies only. “Within the Top 20” is available for Courier, Supplier, and Subcontractor surveys. It follows the selected category's current official, volume-weighted Analytics leaderboard, then fills remaining spots with active unscored companies (alphabetically) until 20 companies are selected or the active registry is exhausted. “Active Companies” selects the full active list. The standalone Supplier Ranking module and curated `evaluationRank` fallback were removed. Surveys without a saved company selection include all active companies of their survey type. Explicit selections gate employee evaluation through `getSurveyEvaluationCompanies`; the leaderboard preset is saved as an ID snapshot so later score changes do not silently shift an active survey's company list.
+
+Evidence: `src/features/evaluations/domain/leaderboardSelection.ts`, `src/pages/SurveyFormsPage.tsx`, `src/utils/analytics.ts`, `src/pages/SurveyFillerPage.tsx`.
