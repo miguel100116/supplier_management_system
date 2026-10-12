@@ -28,6 +28,25 @@ dialog {
   margin: auto;
 }
 
+/* Confirmation dialogs share centered iconography and balanced, readable copy. */
+[role="alertdialog"] > :first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+[role="alertdialog"] > :first-child > :first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[role="alertdialog"] p,
+.fixed.inset-0 > :not(button) p {
+  text-wrap: balance;
+}
+
 @utility outline-none {
   outline: 2px solid transparent;
   outline-offset: 2px;

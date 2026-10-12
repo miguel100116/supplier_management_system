@@ -94,7 +94,7 @@ export function ArchivedCompanyRankings({ responses, archiveSeries }: ArchivedCo
 
       {selectedPeriod && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <button type="button" className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={() => setSelectedPeriod(null)} aria-label="Close archived ranking" />
+          <div aria-hidden="true" className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" />
           <section role="dialog" aria-modal="true" aria-labelledby="archived-ranking-title" className="relative z-10 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <header className="flex items-start justify-between gap-4 border-b border-slate-100 p-5 dark:border-slate-800">
               <div>

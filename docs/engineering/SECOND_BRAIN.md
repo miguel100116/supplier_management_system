@@ -1,6 +1,6 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-10-09
+Last verified: 2026-10-12
 
 This document preserves durable engineering context for maintainers and coding agents. It is a map, not a substitute for reading the relevant code. Verify details before making consequential changes.
 
@@ -25,6 +25,7 @@ Canonical product documentation:
 - Vercel static SPA deployments use the root `vercel.json` rewrite to serve `index.html` for frontend paths on direct requests and refreshes; `/api/*` is excluded and requires its own configured API host.
 - `server/index.js` is a second, overlapping server implementation and should be treated as legacy until its consumers are verified.
 - Main commands are declared in `package.json`: `dev`, `build`, `start`, `preview`, and `lint`.
+- Modal lifecycle behavior is centralized in `src/hooks/useModalEscape.ts`: dialogs register Escape handling, backdrop dismissal, nested priority, scroll lock, and focus restoration there. Escape and direct backdrop pointer-downs invoke the same request-close callback for every modal; dirty editors use guarded callbacks, confirmation dialogs only dismiss, and pointer-downs inside dialog content do not close it. New modal implementations must use this hook.
 
 ### External boundaries
 
@@ -619,3 +620,15 @@ Evidence: src/hooks/useModalScrollLock.ts, src/hooks/useModalEscape.ts, src/comp
 Decision: The Admin company picker offers active companies only. “Within the Top 20” is available for Courier, Supplier, and Subcontractor surveys. It follows the selected category's current official, volume-weighted Analytics leaderboard, then fills remaining spots with active unscored companies (alphabetically) until 20 companies are selected or the active registry is exhausted. “Active Companies” selects the full active list. The standalone Supplier Ranking module and curated `evaluationRank` fallback were removed. Surveys without a saved company selection include all active companies of their survey type. Explicit selections gate employee evaluation through `getSurveyEvaluationCompanies`; the leaderboard preset is saved as an ID snapshot so later score changes do not silently shift an active survey's company list.
 
 Evidence: `src/features/evaluations/domain/leaderboardSelection.ts`, `src/pages/SurveyFormsPage.tsx`, `src/utils/analytics.ts`, `src/pages/SurveyFillerPage.tsx`.
+
+### 2026-10-12 - Document expiry notification accuracy
+
+Decision: Expiry status uses local calendar dates and the shared compliance calculator. Company summaries inspect each branch independently and retain exact affected document details. Missing or invalid dates for expiry-bearing document types are Missing; AFS continues to use its fiscal-year `For Update` rule and is reported separately from a date-expired document. The admin header bell and Notification Logs include document, branch, due date, and configured early-milestone details. The status calculation refreshes every minute while the app is open.
+
+Evidence: `src/utils/compliance.ts`, `src/hooks/useSurveyData.ts`, `src/components/NotificationBell.tsx`, and `src/pages/NotificationLogsPage.tsx`.
+
+### 2026-10-12 - Backdrop dismissal shares the modal Escape callback
+
+Decision: Every modal registered with `useModalEscape` closes through the same request-close callback when Escape is pressed or a pointer-down directly targets its backdrop. Clicks inside dialog content are ignored. Confirmation dialogs dismiss without invoking the confirmation action; nested dialogs use the existing priority stack.
+
+Evidence: `src/hooks/useModalEscape.ts`, `src/hooks/modalDismissal.ts`, and modal registrations across `src/`.

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash, ArrowLeft, Save, AlertCircle, FileText, ChevronDown } from 'lucide-react';
 import { SurveyType, CustomForm } from '../types/survey';
 import { isValidDDMMYYYY } from '../utils/time';
@@ -6,6 +6,7 @@ import { DEFAULT_CATEGORIES, OVERALL_CATEGORY } from '../data/questionCategories
 
 interface CreateSurveyPageProps {
   onBack: () => void;
+  onRequestCloseReady?: (requestClose: (() => void) | null) => void;
   onSave: (survey: Omit<CustomForm, 'id' | 'createdAt'>) => void;
   surveyToEdit?: CustomForm;
   categoryLabels?: Record<SurveyType, string[]>;
@@ -20,7 +21,7 @@ interface QuestionInput {
   validationRange?: { min: number; max: number; allowNa: boolean };
 }
 
-export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels = DEFAULT_CATEGORIES }: CreateSurveyPageProps) {
+export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyToEdit, categoryLabels = DEFAULT_CATEGORIES }: CreateSurveyPageProps) {
   const [title, setTitle] = useState(surveyToEdit ? surveyToEdit.title : '');
   const [surveyType, setSurveyType] = useState<SurveyType>(surveyToEdit ? surveyToEdit.surveyType : 'Courier');
   const [description, setDescription] = useState(surveyToEdit ? surveyToEdit.description : '');
@@ -40,6 +41,17 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
       : [{ question: '', questionCategory: OVERALL_CATEGORY }]
   );
   const [error, setError] = useState('');
+  const initialFormSnapshot = useRef(JSON.stringify({ title, surveyType, description, maxRating, deadlineDate, questions }));
+  const handleBack = useCallback(() => {
+    const currentSnapshot = JSON.stringify({ title, surveyType, description, maxRating, deadlineDate, questions });
+    if (currentSnapshot !== initialFormSnapshot.current && !window.confirm('Discard unsaved survey form changes?')) return;
+    onBack();
+  }, [deadlineDate, description, maxRating, onBack, questions, surveyType, title]);
+
+  useEffect(() => {
+    onRequestCloseReady?.(handleBack);
+    return () => onRequestCloseReady?.(null);
+  }, [handleBack, onRequestCloseReady]);
 
   // The 5 categories currently defined for this survey type (Categories
   // Manager), plus the fixed "Overall" bucket for whole-company feedback -
@@ -121,7 +133,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
     <div className="panel space-y-6" id="create-survey-page">
       <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
         <button
-          onClick={onBack}
+          onClick={handleBack}
           className="secondary-button"
           type="button"
           id="btn-back-to-surveys"
@@ -446,7 +458,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
 
         <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
           <button
-            onClick={onBack}
+            onClick={handleBack}
             className="secondary-button"
             type="button"
           >

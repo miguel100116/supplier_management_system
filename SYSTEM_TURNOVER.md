@@ -155,7 +155,7 @@ Open Partners Feedback Hub, select a completed survey, and use "Send Report to P
 Go to Survey Forms → Create, fill in the type, questions, deadline, and which departments/ranks/companies should see it, then Publish.
 
 **How do I check which compliance documents are expiring soon?**
-Open the Document Tracker for the full list, or check the Notification Bell / Notification Logs for active expiring/expired alerts.
+Open the Document Tracker for the full list, or check the Notification Bell and Notification Logs for current document alerts. Alerts include the affected document, branch, due date, configured early milestones, and AFS update status.
 
 **How do I request access for a new employee?**
 Follow the procedure in [Section 1.3](#13-procedure-for-requesting-new-user-access) of this document — it starts with your mgenesis IT/Entra ID request, then an Admin adds the account in Account Management.

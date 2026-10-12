@@ -324,14 +324,26 @@ export function NotificationLogsPage({
                       {item.designation === 'Document Alert' ? '⚠️ SYSTEM ALERT' : item.respondentEmail}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-semibold text-xs">
-                      {item.designation === 'Document Alert' ? (item.respondentType === 'Document Expired' ? 'Expired Document(s)' : 'Expiring Soon') : item.department}
+                      {item.designation === 'Document Alert' ? (
+                        <div>
+                          <div>{item.respondentType === 'Document Expired' ? 'Expired Document(s)' : item.respondentType === 'Document For Update' ? 'For Update' : item.documentDetails?.some((detail) => (detail.milestoneDays ?? 0) > 30) ? 'Early Reminder' : 'Expiring Soon'}</div>
+                          {item.documentDetails?.slice(0, 3).map((detail) => (
+                            <div key={`${detail.branchId ?? detail.branchCode}-${detail.documentName}-${detail.expiryDate}`} className="mt-1 max-w-[230px] truncate text-[10px] font-medium text-slate-500 dark:text-slate-400" title={`${detail.documentName}${detail.branchCode ? ` · ${detail.branchCode}` : ''} · ${detail.expiryDate ?? 'date unavailable'} · ${detail.status}${typeof detail.daysLeft === 'number' ? ` (${detail.daysLeft} days)` : ''}`}>
+                              {detail.documentName}{detail.branchCode ? ` · ${detail.branchCode}` : ''} · {detail.expiryDate ?? 'date unavailable'}{detail.milestoneDays ? ` · ${detail.daysLeft} days (${detail.milestoneDays}-day reminder)` : typeof detail.daysLeft === 'number' && detail.status === 'Expiring Soon' ? ` · ${detail.daysLeft} days left` : ''}
+                            </div>
+                          ))}
+                          {(item.documentDetails?.length ?? 0) > 3 && <div className="mt-1 text-[10px] font-medium">+{(item.documentDetails?.length ?? 0) - 3} more document(s)</div>}
+                        </div>
+                      ) : item.department}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 text-xs">
                       <span className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-extrabold ${
                         item.designation === 'Document Alert'
                           ? (item.respondentType === 'Document Expired'
                             ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400')
+                            : item.respondentType === 'Document For Update'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400')
                           : 'bg-slate-150 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
                       }`}>
                         {item.designation}

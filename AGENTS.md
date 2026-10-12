@@ -130,6 +130,28 @@ Apply these dependency rules:
 - Replace the current `localStorage`-first design incrementally; do not create another competing source of truth.
 - Do not mix a repository-wide rename, formatter pass, or dependency upgrade into an unrelated refactor.
 
+## UI/UX design consistency
+
+Treat the existing Supplier Management System as the design authority. UI work must extend the established Microgenesis visual language rather than introduce a separate design. Before changing an interface, inspect the affected screen and the closest comparable components; identify their colors, typography, spacing, control states, icon usage, responsive behavior, and interaction patterns. Reuse existing components and styles where practical.
+
+- Preserve the existing font family, type scale, heading hierarchy, compact enterprise layout, spacing, borders, radii, and responsive conventions.
+- Use the existing brand blue for primary actions and selected states, existing neutrals for secondary controls, and semantic colors only when they communicate status. Keep secondary filters and controls visually quieter; do not make every selected element use the strongest blue. Avoid arbitrary accent colors and gradients.
+- Establish hierarchy through color, spacing, typography, and alignment. Keep selected and focus states clear without overpowering nearby controls.
+- Change only the interface elements needed for the request. Do not redesign adjacent UI or add unrequested icons, badges, cards, banners, headings, filters, or navigation. Icons must use the established icon library and meanings.
+- Match existing patterns for tabs, segmented filters, buttons, bulk selection, tables, file actions, forms, and modals. Confirmation dialogs should be compact for simple actions and clearly explain consequences; preserve dismissal and accessibility behavior.
+- Keep functionality, validation, permissions, persistence, data relationships, error handling, and responsive behavior intact. Appearance must not override these contracts.
+- After a UI change, review desktop and mobile states when visual tooling is available. Check brand colors, typography, spacing, hierarchy, alignment, control states, accessibility, and unintended changes. If visual comparison is unavailable, state that limitation in the handoff.
+- When comparable patterns conflict, prefer the one used in the same module or workflow. If the choice would materially change the interface and remains ambiguous, ask before inventing a new pattern.
+
+### Modal and dialog contract
+
+- Every modal or dialog must register with the shared `useModalEscape` lifecycle in `src/hooks/useModalEscape.ts`. This provides Escape handling, backdrop dismissal, scroll locking, nested-modal priority, and focus restoration.
+- Backdrop dismissal is enabled for every modal. A pointer-down directly on the full-screen backdrop (or its explicit full-screen backdrop layer) must invoke the same request-close callback as Escape; pointer-downs inside the dialog must not close it.
+- Pass the modal's request-close callback to `useModalEscape`. If the modal has unsaved edits, that callback must ask whether to discard before closing; use the same guarded callback for Escape and the existing Close/Cancel controls.
+- Confirmation dialogs also close through their request-close callback on Escape or backdrop pointer-down. Closing a confirmation must never invoke its confirm, delete, archive, or other action; those actions run only from their explicit controls.
+- Do not implement per-dialog backdrop listeners. Preserve the existing overlay markup and styles; new dialogs inherit the shared behavior by registering with `useModalEscape`.
+- Add or update tests for direct backdrop pointer-down, inside pointer-down, Escape, guarded dirty-state close, confirmation dismissal without action, and nested-modal priority when changing modal behavior.
+
 ## Testing strategy
 
 Use a risk-based test pyramid:

@@ -1327,6 +1327,10 @@ export function PartnerCompaniesPage({
                     <div className="bg-slate-100 border border-slate-200 text-slate-600 p-3 rounded-lg text-xs font-medium">
                       This partner is archived. Archived partners are suspended and excluded from surveys/modifications.
                     </div>
+                  ) : selectedCompanyDocSummary.forUpdateCount > 0 && selectedCompanyDocSummary.expiredCount === 0 ? (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-lg text-xs font-medium dark:bg-blue-950/20 dark:border-blue-900 dark:text-blue-300">
+                      <strong>{selectedCompanyDocSummary.forUpdateCount} AFS filing{selectedCompanyDocSummary.forUpdateCount === 1 ? ' needs' : 's need'} update.</strong> This company is disabled from evaluation forms until the filing is updated.
+                    </div>
                   ) : selectedCompanyDocSummary.status === 'Expired' ? (
                     <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-lg text-xs font-medium dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400">
                       ⚠️ <strong>{selectedCompanyDocSummary.expiredCount} required document{selectedCompanyDocSummary.expiredCount === 1 ? ' is' : 's are'} EXPIRED.</strong> This company has been automatically disabled from evaluation forms. Renew the expired document(s) below to reactivate.
@@ -1363,6 +1367,10 @@ export function PartnerCompaniesPage({
                     <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
                       <span className="text-slate-400 font-medium block">Expired</span>
                       <strong className={`text-base ${selectedCompanyDocSummary.expiredCount > 0 ? 'text-rose-600' : 'text-slate-700 dark:text-slate-200'}`}>{selectedCompanyDocSummary.expiredCount}</strong>
+                    </div>
+                    <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
+                      <span className="text-slate-400 font-medium block">For Update</span>
+                      <strong className={`text-base ${selectedCompanyDocSummary.forUpdateCount > 0 ? 'text-blue-600' : 'text-slate-700 dark:text-slate-200'}`}>{selectedCompanyDocSummary.forUpdateCount}</strong>
                     </div>
                     <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
                       <span className="text-slate-400 font-medium block">Expiring Soon</span>

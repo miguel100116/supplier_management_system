@@ -56,14 +56,14 @@ const responseVolumeBandColors = {
 const leaderboardBandTextColors: Record<string, string> = {
   Excellent: 'text-green-700 dark:text-green-400',
   Satisfactory: 'text-blue-700 dark:text-blue-400',
-  Good: 'text-yellow-700 dark:text-yellow-400',
-  Unsatisfactory: 'text-red-700 dark:text-red-400',
+  Good: 'text-orange-700 dark:text-orange-300',
+  Unsatisfactory: 'text-red-800 dark:text-red-400',
 };
 const leaderboardBandDotColors: Record<string, string> = {
   Excellent: 'bg-green-500',
   Satisfactory: 'bg-blue-500',
-  Good: 'bg-yellow-400',
-  Unsatisfactory: 'bg-red-500',
+  Good: 'bg-orange-400',
+  Unsatisfactory: 'bg-red-600',
 };
 
 function PlaceholderButton({ children, title }: { children: ReactNode; title: string }) {
@@ -88,7 +88,8 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
   const [trendGranularity, setTrendGranularity] = useState<'monthly' | 'yearly' | 'series'>('monthly');
   const [leaderboardPage, setLeaderboardPage] = useState(0);
   const [questionPerformancePage, setQuestionPerformancePage] = useState(0);
-  useModalEscape(Boolean(selectedCompany), () => setSelectedCompany(null));
+  const closeSelectedCompany = () => setSelectedCompany(null);
+  useModalEscape(Boolean(selectedCompany), closeSelectedCompany);
 
   const selectedType = filters.surveyType.length === 1 ? filters.surveyType[0] : 'All';
   const totalSubmissions = useMemo(() => submissionCount(responses), [responses]);
@@ -187,12 +188,12 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
               <div>
                 <div className="flex items-center gap-2"><Trophy size={18} className="text-[#0078a8]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-base font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Compare evaluated partners and select a company to review its category performance.</p>
-                <div role="group" aria-label="Company leaderboard rating color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <span className="text-[10px] font-semibold text-slate-500">Rating:</span>
+                <div role="group" aria-label="Company leaderboard color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span className="text-[10px] font-semibold text-slate-500">Legend:</span>
                   <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-green-500" />Excellent</span>
                   <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-blue-500" />Satisfactory</span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-yellow-400" />Good</span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />Unsatisfactory</span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-orange-400" />Good</span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-600" />Unsatisfactory</span>
                 </div>
               </div>
           </div>
@@ -210,7 +211,10 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
               <ol key={columnIndex} start={column.startIndex + 1} className="min-w-0">
                 {column.items.map((company, index) => {
                   const style = typeStyles[company.type];
-                  const scoreBand = getBand(company.type, company.scorePercentage);
+                  // The row displays rankScore, so its rating and color must
+                  // use that same volume-weighted score rather than the raw
+                  // composite score stored in scorePercentage.
+                  const scoreBand = getBand(company.type, company.rankScore);
                   const scoreBandColor = leaderboardBandTextColors[scoreBand.label] ?? 'text-slate-700 dark:text-slate-200';
                   const rank = column.startIndex + index + 1;
                   return (
@@ -306,9 +310,9 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
       </section>
 
       {selectedCompany && (
-        <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/45 backdrop-blur-[1px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedCompany(null); }}>
+        <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/45 backdrop-blur-[1px]" role="presentation">
           <aside role="dialog" aria-modal="true" aria-labelledby="company-detail-title" className="h-full w-full max-w-md overflow-y-auto bg-white shadow-2xl dark:bg-slate-950">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><span className="text-xs font-semibold text-slate-400">Company performance</span><button type="button" onClick={() => setSelectedCompany(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close company details"><X size={18} /></button></div>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><span className="text-xs font-semibold text-slate-400">Company performance</span><button type="button" onClick={closeSelectedCompany} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close company details"><X size={18} /></button></div>
             <div className="space-y-6 p-5 sm:p-7">
               <div><h2 id="company-detail-title" className="text-xl font-bold text-slate-900 dark:text-white">{selectedCompany.name}</h2><div className="mt-3 flex items-end gap-2"><span className="text-4xl font-bold tracking-tight text-[#0078a8]">{formatCompositeScore(selectedCompany.type, selectedCompany.scorePercentage).valueText}</span><span className="pb-1 text-sm text-slate-400">/ {selectedCompany.type === 'Subcontractor' ? '2.0' : '100'}</span></div><div className="mt-3 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${typeStyles[selectedCompany.type].soft}`}>{selectedCompany.type}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{getBand(selectedCompany.type, selectedCompany.scorePercentage).label}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{selectedCompany.count} forms</span></div></div>
               <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Category results</h3><div className="mt-4 space-y-3">{selectedComposite?.sections.map((section) => (<div key={section.section}><div className="mb-1 flex justify-between gap-3 text-xs"><span className="truncate text-slate-600 dark:text-slate-300">{section.section}</span><span className="font-semibold tabular-nums">{section.percent.toFixed(0)}</span></div><div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800"><div className={`h-full rounded-full ${typeStyles[selectedCompany.type].bar}`} style={{ width: `${section.percent}%` }} /></div></div>))}</div></div>

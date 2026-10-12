@@ -8,6 +8,7 @@ import {
   markEvaluationImportReplaced,
   removeOrdinaryEvaluationImport,
   removeTestEvaluationImport,
+  restoreEvaluationImportArchive,
   saveEvaluationImportArchive,
 } from '../services/evaluationImportArchiveService';
 import type { EvaluationImportArchive } from '../domain/importArchive';
@@ -64,6 +65,12 @@ export function useEvaluationImportArchives(uploadedBy: string) {
     return updated;
   }, []);
 
+  const restoreArchive = useCallback(async (archive: EvaluationImportArchive) => {
+    const restored = await restoreEvaluationImportArchive(archive);
+    setArchives((current) => current.map((item) => item.id === restored.id ? restored : item));
+    return restored;
+  }, []);
+
   const discardPendingArchive = useCallback(async (archive: EvaluationImportArchive) => {
     await discardPendingEvaluationImportArchive(archive);
     setArchives((current) => current.filter((item) => item.id !== archive.id));
@@ -85,5 +92,5 @@ export function useEvaluationImportArchives(uploadedBy: string) {
     return result;
   }, []);
 
-  return { archives, isLoading, loadError, archiveSourceFile, discardPendingArchive, downloadSourceFile, removeTestImport, removeOrdinaryImport, recordReplacement, archiveImports };
+  return { archives, isLoading, loadError, archiveSourceFile, discardPendingArchive, downloadSourceFile, removeTestImport, removeOrdinaryImport, recordReplacement, archiveImports, restoreArchive };
 }

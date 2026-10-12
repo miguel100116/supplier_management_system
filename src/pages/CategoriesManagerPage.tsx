@@ -138,7 +138,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
       </div>
 
       {openType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs" onClick={(event) => { if (event.target === event.currentTarget) requestCloseEditor(); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div role="dialog" aria-modal="true" aria-labelledby="category-editor-title" className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 flex flex-col max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-5 py-4 shrink-0">
               <div>
