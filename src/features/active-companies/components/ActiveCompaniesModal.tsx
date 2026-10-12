@@ -112,9 +112,6 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
       role="dialog"
       aria-modal="true"
       aria-labelledby="active-companies-title"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">

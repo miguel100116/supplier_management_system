@@ -25,6 +25,7 @@ Canonical product documentation:
 - Vercel static SPA deployments use the root `vercel.json` rewrite to serve `index.html` for frontend paths on direct requests and refreshes; `/api/*` is excluded and requires its own configured API host.
 - `server/index.js` is a second, overlapping server implementation and should be treated as legacy until its consumers are verified.
 - Main commands are declared in `package.json`: `dev`, `build`, `start`, `preview`, and `lint`.
+- Modal lifecycle behavior is centralized in `src/hooks/useModalEscape.ts`: dialogs register Escape handling, backdrop dismissal, nested priority, scroll lock, and focus restoration there. Escape and direct backdrop clicks dismiss dialogs by default; dirty editors use guarded close callbacks, and critical confirmations disable backdrop dismissal. New modal implementations must use this hook.
 
 ### External boundaries
 
