@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { SurveyType } from '../../../types/survey';
 import {
+  archiveEvaluationImports,
   downloadEvaluationImportArchive,
   discardPendingEvaluationImportArchive,
   loadEvaluationImportArchives,
+  markEvaluationImportReplaced,
   removeOrdinaryEvaluationImport,
   removeTestEvaluationImport,
   saveEvaluationImportArchive,
@@ -45,6 +47,23 @@ export function useEvaluationImportArchives(uploadedBy: string) {
     return archive;
   }, [uploadedBy]);
 
+  const recordReplacement = useCallback(async (existing: EvaluationImportArchive, replacement: EvaluationImportArchive, originalResponseCount: number) => {
+    const historical = await markEvaluationImportReplaced(existing, replacement, originalResponseCount);
+    if (historical) {
+      setArchives((current) => current.map((archive) => archive.id === historical.id ? historical : archive));
+    }
+    return historical;
+  }, []);
+
+  const archiveImports = useCallback(async (selected: readonly EvaluationImportArchive[]) => {
+    const updated = await archiveEvaluationImports(selected);
+    if (updated.length > 0) {
+      const byId = new Map(updated.map((archive) => [archive.id, archive]));
+      setArchives((current) => current.map((archive) => byId.get(archive.id) ?? archive));
+    }
+    return updated;
+  }, []);
+
   const discardPendingArchive = useCallback(async (archive: EvaluationImportArchive) => {
     await discardPendingEvaluationImportArchive(archive);
     setArchives((current) => current.filter((item) => item.id !== archive.id));
@@ -66,5 +85,5 @@ export function useEvaluationImportArchives(uploadedBy: string) {
     return result;
   }, []);
 
-  return { archives, isLoading, loadError, archiveSourceFile, discardPendingArchive, downloadSourceFile, removeTestImport, removeOrdinaryImport };
+  return { archives, isLoading, loadError, archiveSourceFile, discardPendingArchive, downloadSourceFile, removeTestImport, removeOrdinaryImport, recordReplacement, archiveImports };
 }
