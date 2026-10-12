@@ -118,7 +118,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
 
   // Companies data
   const companyPerformance = useMemo(() => {
-    return getAnalyticsCompanyRankings(filteredRankingResponses, activeTypes, 'weighted').map((ranking) => ({
+    return getAnalyticsCompanyRankings(filteredRankingResponses, activeTypes).map((ranking) => ({
       company: ranking.name,
       surveyType: ranking.type,
       average: ranking.rankScore,

@@ -40,7 +40,7 @@ export function ReportsPage({ responses, rankingResponses = responses, companyRe
   const rankingTypes = (['Courier', 'Supplier', 'Subcontractor'] as SurveyType[]).filter((type) =>
     rankingResponses.some((response) => response.surveyType === type),
   );
-  const companyPerformance = getAnalyticsCompanyRankings(rankingResponses, rankingTypes, 'weighted').map((ranking) => ({
+  const companyPerformance = getAnalyticsCompanyRankings(rankingResponses, rankingTypes).map((ranking) => ({
     company: ranking.name,
     surveyType: ranking.type,
     score: ranking.rankScore,
