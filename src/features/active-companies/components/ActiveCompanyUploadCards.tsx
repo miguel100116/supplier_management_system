@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { CheckCircle2, Cog, FileSpreadsheet, Loader2, Package, Truck } from 'lucide-react';
+import { CheckCircle2, FileSpreadsheet, Layers, Loader2, PackageSearch, Truck } from 'lucide-react';
 import type { SurveyType } from '../../../types/survey';
 import {
   createActiveCompanySnapshot,
@@ -31,14 +31,14 @@ const UPLOAD_TYPE_CONFIGS: UploadTypeConfig[] = [
     type: 'Supplier',
     label: 'Supplier',
     expectedFileName: 'supplier.csv',
-    icon: Package,
+    icon: PackageSearch,
     iconStyle: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400',
   },
   {
     type: 'Subcontractor',
     label: 'Subcontractor',
     expectedFileName: 'subcontractor.csv',
-    icon: Cog,
+    icon: Layers,
     iconStyle: 'bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400',
   },
 ];
