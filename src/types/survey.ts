@@ -32,6 +32,18 @@ export interface ComplianceDocument {
   daysLeft?: number;
 }
 
+export type DocumentAlertStatus = 'Expired' | 'Expiring Soon' | 'For Update';
+
+export interface DocumentAlertDetail {
+  documentName: string;
+  branchId?: string;
+  branchCode?: string;
+  expiryDate?: string;
+  daysLeft?: number;
+  status: DocumentAlertStatus;
+  milestoneDays?: number;
+}
+
 // One per BP Code / accreditation entry. A company almost always has exactly
 // one branch, but a handful of companies have separate normal and "-NT" BP
 // Codes that merge onto the same PartnerCompany as distinct branches.
@@ -171,6 +183,7 @@ export interface ResponseNotification {
   respondentEmail?: string;
   department?: string;
   designation?: string;
+  documentDetails?: DocumentAlertDetail[];
 }
 
 export interface CustomForm {

@@ -1,5 +1,5 @@
-import { BranchRecord, ComplianceDocument, DocumentStatus, PartnerCompany } from '../types/survey';
-import { getRequiredDocumentKeys } from './documentRequirements';
+import { BranchRecord, ComplianceDocument, DocumentAlertDetail, DocumentStatus, PartnerCompany } from '../types/survey';
+import { getRequiredDocumentKeys, isExpiryDocument } from './documentRequirements';
 
 // "Expiring Soon" threshold matches the Master List's own legend (30 days left).
 export const EXPIRING_SOON_DAYS = 30;
@@ -18,9 +18,23 @@ function computeAfsFiscalYearStatus(expiryDate: string, referenceDate: Date): 'C
 }
 
 export function daysUntil(dateStr: string, referenceDate: Date = new Date()): number {
-  const target = new Date(dateStr + 'T00:00:00');
-  const ref = new Date(referenceDate.toISOString().split('T')[0] + 'T00:00:00');
-  return Math.round((target.getTime() - ref.getTime()) / (1000 * 60 * 60 * 24));
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+  if (!match || Number.isNaN(referenceDate.getTime())) return Number.NaN;
+
+  const [, yearValue, monthValue, dayValue] = match;
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const target = Date.UTC(year, month - 1, day);
+  const parsedTarget = new Date(target);
+  if (
+    parsedTarget.getUTCFullYear() !== year ||
+    parsedTarget.getUTCMonth() !== month - 1 ||
+    parsedTarget.getUTCDate() !== day
+  ) return Number.NaN;
+
+  const today = Date.UTC(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate());
+  return Math.round((target - today) / (1000 * 60 * 60 * 24));
 }
 
 // Always derives status/daysLeft from expiryDate rather than trusting any
@@ -32,9 +46,11 @@ export function computeDocumentStatus(
   docName?: string
 ): { status: DocumentStatus; daysLeft?: number } {
   if (!doc.expiryDate) {
-    return { status: doc.provided ? 'Current' : 'Missing' };
+    const expiryDateRequired = Boolean(docName && isExpiryDocument(docName));
+    return { status: doc.provided && !expiryDateRequired ? 'Current' : 'Missing' };
   }
   const daysLeft = daysUntil(doc.expiryDate, referenceDate);
+  if (!Number.isFinite(daysLeft)) return { status: 'Missing' };
   if (docName && AFS_FISCAL_YEAR_DOCUMENTS.has(docName)) {
     return { status: computeAfsFiscalYearStatus(doc.expiryDate, referenceDate), daysLeft };
   }
@@ -44,20 +60,19 @@ export function computeDocumentStatus(
 }
 
 // Company-wide status is never persisted - always rolled up live from the
-// documents required for this company's category (Local/Foreign suppliers
-// carry expiry-bearing docs; Couriers/Subcontractors only carry the common
-// flag checklist, so they can never land in Expired/Expiring Soon here).
-// 'Missing' means a required flag document was never provided at all - not
-// having submitted it is not compliance, so it must never fall through to
-// 'Current' just because nothing has actually expired.
+// documents required for every branch in this company's category.
+// 'Missing' means a required document or its required expiry date is absent;
+// it must never fall through to 'Current' just because no date can be checked.
 export type CompanyDocumentStatus = 'Current' | 'Expiring Soon' | 'Expired' | 'Missing';
 
 export interface CompanyDocumentSummary {
   status: CompanyDocumentStatus;
   expiredCount: number;
   expiringSoonCount: number;
+  forUpdateCount: number;
   missingCount: number;
   totalRequired: number;
+  issues: DocumentAlertDetail[];
 }
 
 export function computeCompanyDocumentSummary(
@@ -69,32 +84,50 @@ export function computeCompanyDocumentSummary(
 
   let expiredCount = 0;
   let expiringSoonCount = 0;
+  let forUpdateCount = 0;
   let missingCount = 0;
+  const issues: DocumentAlertDetail[] = [];
+  const branchesToCheck: Array<BranchRecord | undefined> = branches.length > 0 ? branches : [undefined];
 
-  requiredKeys.forEach((key) => {
-    // A company can have more than one branch (e.g. a normal + "-NT" BP
-    // Code); use whichever branch actually has data for this document.
-    let doc: ComplianceDocument | undefined;
-    for (const branch of branches) {
-      const candidate = branch.documents?.[key];
-      if (candidate && (candidate.provided || candidate.expiryDate)) {
-        doc = candidate;
-        break;
+  branchesToCheck.forEach((branch) => {
+    requiredKeys.forEach((key) => {
+      const doc: ComplianceDocument | undefined = branch?.documents?.[key];
+      const { status, daysLeft } = computeDocumentStatus(doc ?? {}, referenceDate, key);
+      if (status === 'Expired' || status === 'Expiring Soon' || status === 'For Update') {
+        issues.push({
+          documentName: key,
+          branchId: branch?.id,
+          branchCode: branch?.bpCode,
+          expiryDate: doc?.expiryDate,
+          daysLeft,
+          status,
+        });
       }
-    }
-    const { status } = computeDocumentStatus(doc ?? {}, referenceDate, key);
-    // 'For Update' (AFS outdated fiscal year) is grouped with Expired for the
-    // rollup - it's the same "needs action now" severity, just a different
-    // cause (outdated filing vs. a passed date).
-    if (status === 'Expired' || status === 'For Update') expiredCount++;
-    else if (status === 'Expiring Soon') expiringSoonCount++;
-    else if (status === 'Missing') missingCount++;
+      if (status === 'Expired') expiredCount++;
+      else if (status === 'Expiring Soon') expiringSoonCount++;
+      else if (status === 'For Update') forUpdateCount++;
+      else if (status === 'Missing') missingCount++;
+    });
   });
 
   const status: CompanyDocumentStatus =
-    expiredCount > 0 ? 'Expired' : missingCount > 0 ? 'Missing' : expiringSoonCount > 0 ? 'Expiring Soon' : 'Current';
+    expiredCount > 0 || forUpdateCount > 0
+      ? 'Expired'
+      : missingCount > 0
+        ? 'Missing'
+        : expiringSoonCount > 0
+          ? 'Expiring Soon'
+          : 'Current';
 
-  return { status, expiredCount, expiringSoonCount, missingCount, totalRequired: requiredKeys.length };
+  return {
+    status,
+    expiredCount,
+    expiringSoonCount,
+    forUpdateCount,
+    missingCount,
+    totalRequired: requiredKeys.length * branchesToCheck.length,
+    issues,
+  };
 }
 
 // A company can carry a normal BP Code and a separate "-NT" one (kept

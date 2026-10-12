@@ -16,6 +16,28 @@ const surveyTypeColors: Record<SurveyType, string> = {
   Subcontractor: '#7c3aed',
 };
 
+function documentAlertLabel(item: ResponseNotification): string {
+  if (item.respondentType === 'Document Expired') return 'Expired';
+  if (item.respondentType === 'Document For Update') return 'For update';
+  if (item.documentDetails?.some((detail) => (detail.milestoneDays ?? 0) > 30)) return 'Early reminder';
+  return 'Expiring soon';
+}
+
+function documentDetailLabel(detail: NonNullable<ResponseNotification['documentDetails']>[number]): string {
+  if (detail.status === 'Expired') return 'expired';
+  if (detail.status === 'For Update') return 'for update';
+  if (typeof detail.daysLeft !== 'number') return 'date unavailable';
+  if (detail.milestoneDays && detail.milestoneDays > 30) return `due in ${detail.daysLeft} days · early reminder`;
+  if (detail.daysLeft === 0) return 'due today';
+  return `due in ${detail.daysLeft} day${detail.daysLeft === 1 ? '' : 's'}`;
+}
+
+function formatExpiryDate(date?: string): string {
+  if (!date) return 'date unavailable';
+  const parsed = new Date(`${date.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? 'date unavailable' : parsed.toLocaleDateString();
+}
+
 export function NotificationBell({ notifications, unreadCount, onOpen, onViewAll }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [, forceTick] = useState(0);
@@ -78,32 +100,43 @@ export function NotificationBell({ notifications, unreadCount, onOpen, onViewAll
             </div>
           ) : (
             <ul className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-              {notifications.slice(0, 8).map((item) => (
-                <li key={item.id} className="flex items-start gap-3 px-4 py-3">
-                  <span
-                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full animate-pulse"
-                    style={{ backgroundColor: item.respondentType.includes('Document') ? (item.respondentType.includes('Expired') ? '#ef4444' : '#f59e0b') : surveyTypeColors[item.surveyType] }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{item.company}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                      {item.surveyType} &middot; <span className={item.respondentType.includes('Document') ? 'text-amber-600 dark:text-amber-400 font-bold' : ''}>{item.respondentType}</span>
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500 font-semibold italic truncate">
-                      {item.respondentType.includes('Document')
-                        ? (item.respondentType.includes('Expired')
-                          ? `⚠️ ${item.questionCount} document${item.questionCount === 1 ? '' : 's'} EXPIRED. Please renew.`
-                          : `⏳ ${item.questionCount} document${item.questionCount === 1 ? '' : 's'} expiring soon.`)
-                        : (item.questionCount > 1
-                          ? `Answered ${item.questionCount} questions`
-                          : 'Answered 1 question')}
-                    </p>
-                  </div>
-                  <span className="shrink-0 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">
-                    {formatRelativeTime(item.submissionDate)}
-                  </span>
-                </li>
-              ))}
+              {notifications.slice(0, 8).map((item) => {
+                const isDocumentAlert = item.designation === 'Document Alert';
+                return (
+                  <li key={item.id} className="flex items-start gap-3 px-4 py-3">
+                    <span
+                      className="mt-1.5 h-2 w-2 shrink-0 rounded-full animate-pulse"
+                      style={{ backgroundColor: isDocumentAlert ? (item.respondentType === 'Document Expired' ? '#ef4444' : item.respondentType === 'Document For Update' ? '#2563eb' : '#f59e0b') : surveyTypeColors[item.surveyType] }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{item.company}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                        {isDocumentAlert
+                          ? <span className="font-bold text-amber-600 dark:text-amber-400">{documentAlertLabel(item)}</span>
+                          : <>{item.surveyType} &middot; {item.respondentType}</>}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500 font-semibold italic truncate">
+                        {isDocumentAlert
+                          ? `${item.questionCount} document${item.questionCount === 1 ? '' : 's'} · ${documentAlertLabel(item)}`
+                          : item.questionCount > 1 ? `Answered ${item.questionCount} questions` : 'Answered 1 question'}
+                      </p>
+                      {item.documentDetails && item.documentDetails.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                          {item.documentDetails.slice(0, 2).map((detail) => (
+                            <li key={`${detail.branchId ?? detail.branchCode}-${detail.documentName}-${detail.expiryDate}`} className="truncate">
+                              {detail.documentName}{detail.branchCode ? ` · ${detail.branchCode}` : ''} · {formatExpiryDate(detail.expiryDate)} ({documentDetailLabel(detail)})
+                            </li>
+                          ))}
+                          {item.documentDetails.length > 2 && <li>+{item.documentDetails.length - 2} more document{item.documentDetails.length - 2 === 1 ? '' : 's'}</li>}
+                        </ul>
+                      )}
+                    </div>
+                    <span className="shrink-0 whitespace-nowrap text-xs text-slate-400 dark:text-slate-500">
+                      {formatRelativeTime(item.submissionDate)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
 

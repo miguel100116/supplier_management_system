@@ -91,7 +91,7 @@ export function AccountManagementPage({
   const [selectedDept, setSelectedDept] = useState<AccountProfile['department']>(DEPARTMENT_OPTIONS[0]);
   const [deptPages, setDeptPages] = useState<PageModuleKey[]>([]);
   const [deptSurveyTypes, setDeptSurveyTypes] = useState<SurveyType[]>([]);
-  useModalEscape(Boolean(pendingEditAccount), () => setPendingEditAccount(null), 60, true, false);
+  useModalEscape(Boolean(pendingEditAccount), () => setPendingEditAccount(null), 60);
   useModalEscape(isDeptOpen, () => setIsDeptOpen(false), 50);
   const closeAccountModal = () => {
     if (creationPending.current) return;

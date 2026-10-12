@@ -376,17 +376,6 @@ function formatShortDate(dateString?: string): string {
   }
 }
 
-// A document can be recorded on any of a company's branches (e.g. a normal +
-// "-NT" BP Code) - use whichever branch already has data for this key, else
-// fall back to the first branch as the renewal target.
-function pickBranchForDoc(company: PartnerCompany, docName: string): BranchRecord | undefined {
-  const branches = company.branches ?? [];
-  return branches.find((b) => {
-    const doc = b.documents?.[docName];
-    return doc && (doc.provided || doc.expiryDate);
-  }) ?? branches[0];
-}
-
 export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRenewDocument, canRenewDocuments, currentUserEmail = '', isAdmin = false }: DocumentRegisterPageProps) {
   const isMobile = useIsMobile();
   const [categoryKey, setCategoryKey] = useState<string>('supplier-local');
@@ -466,8 +455,8 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   useModalEscape(isNotificationSettingsOpen, () => setIsNotificationSettingsOpen(false), 50);
   useModalEscape(Boolean(renewalTarget), () => setRenewalTarget(null), 50);
-  useModalEscape(Boolean(flagFlow), () => setFlagFlow(null), 50, true, flagFlow?.step !== 'confirm');
-  useModalEscape(Boolean(expiryStatusTarget), () => setExpiryStatusTarget(null), 50, true, !expiryStatusTarget?.confirmingMissing);
+  useModalEscape(Boolean(flagFlow), () => setFlagFlow(null), 50);
+  useModalEscape(Boolean(expiryStatusTarget), () => setExpiryStatusTarget(null), 50);
   const [notificationRules, setNotificationRules] = useState<DocNotificationRule[]>(DEFAULT_NOTIFICATION_RULES);
   // Portals "Add Notification" into Shell's page-heading row (same slot
   // DashboardPage's header actions use) so it sits on the title line instead
@@ -908,33 +897,40 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
       const summary = computeCompanyDocumentSummary(c, effectiveNow);
       if (c.accreditationStatus === 'Accredited') activeAccreditation++;
       expiringSoonDocs += summary.expiringSoonCount;
-      expiredDocs += summary.expiredCount;
+      expiredDocs += summary.expiredCount + summary.forUpdateCount;
 
       getRequiredDocumentKeys(c.type, c.supplierOrigin).filter(isExpiryDocument).forEach((docName) => {
-        const branch = pickBranchForDoc(c, docName);
-        const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
-        const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName);
+        const branches = c.branches?.length ? c.branches : [undefined];
+        branches.forEach((branch) => {
+          const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
+          const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName);
 
-        if (status === 'Expiring Soon' || status === 'Expired' || status === 'For Update') {
-          if (!perDocAttention[docName]) perDocAttention[docName] = { expiringSoon: 0, expired: 0 };
-          if (status === 'Expiring Soon') perDocAttention[docName].expiringSoon++;
-          else perDocAttention[docName].expired++;
-        }
+          if (status === 'Expiring Soon' || status === 'Expired' || status === 'For Update') {
+            if (!perDocAttention[docName]) perDocAttention[docName] = { expiringSoon: 0, expired: 0 };
+            if (status === 'Expiring Soon') perDocAttention[docName].expiringSoon++;
+            else perDocAttention[docName].expired++;
+          }
 
-        if (!perDocStatus[docName]) perDocStatus[docName] = { current: 0, expiringSoon: 0, expiredOrForUpdate: 0, total: 0 };
-        perDocStatus[docName].total++;
-        if (status === 'Current') perDocStatus[docName].current++;
-        else if (status === 'Expiring Soon') perDocStatus[docName].expiringSoon++;
-        else if (status === 'Expired' || status === 'For Update') perDocStatus[docName].expiredOrForUpdate++;
+          if (!perDocStatus[docName]) perDocStatus[docName] = { current: 0, expiringSoon: 0, expiredOrForUpdate: 0, total: 0 };
+          perDocStatus[docName].total++;
+          if (status === 'Current') perDocStatus[docName].current++;
+          else if (status === 'Expiring Soon') perDocStatus[docName].expiringSoon++;
+          else if (status === 'Expired' || status === 'For Update') perDocStatus[docName].expiredOrForUpdate++;
 
-        if (typeof daysLeft === 'number') {
-          const bucket = AGING_BUCKETS.find((b) => b.match(daysLeft));
-          if (bucket) agingCounts[bucket.key] = (agingCounts[bucket.key] ?? 0) + 1;
-        }
+          if (typeof daysLeft === 'number') {
+            const bucket = AGING_BUCKETS.find((b) => b.match(daysLeft));
+            if (bucket) agingCounts[bucket.key] = (agingCounts[bucket.key] ?? 0) + 1;
+          }
 
-        if (status === 'Expiring Soon' && doc.expiryDate && typeof daysLeft === 'number') {
-          upcoming.push({ company: c.name, doc: docName, expiryDate: doc.expiryDate, daysLeft });
-        }
+          if (status === 'Expiring Soon' && doc.expiryDate && typeof daysLeft === 'number') {
+            upcoming.push({
+              company: branch?.bpCode ? `${c.name} (${branch.bpCode})` : c.name,
+              doc: docName,
+              expiryDate: doc.expiryDate,
+              daysLeft,
+            });
+          }
+        });
       });
     });
 

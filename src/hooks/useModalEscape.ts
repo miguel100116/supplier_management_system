@@ -1,24 +1,20 @@
 import { useEffect, useRef } from 'react';
 import { acquireModalScrollLock } from './useModalScrollLock';
-import { findModalBackdropRoot, isBackdropDismissalAllowed } from './modalDismissal';
+import { dismissModalFromBackdrop, getTopmostModalHandler } from './modalDismissal';
 
 interface ActiveEscapeHandler {
   id: symbol;
   callback: () => void;
   order: number;
   priority: number;
-  isModal: boolean;
-  dismissOnBackdrop: boolean;
 }
 
 const activeHandlers = new Map<symbol, ActiveEscapeHandler>();
 let nextOrder = 0;
 let listenerAttached = false;
 
-function topmostHandler(modalsOnly = false) {
-  return [...activeHandlers.values()]
-    .filter((handler) => !modalsOnly || handler.isModal)
-    .sort((a, b) => b.priority - a.priority || b.order - a.order)[0];
+function topmostHandler() {
+  return getTopmostModalHandler(activeHandlers.values());
 }
 
 function handleModalEscape(event: KeyboardEvent) {
@@ -30,15 +26,10 @@ function handleModalEscape(event: KeyboardEvent) {
   topmost.callback();
 }
 
-function handleModalBackdropClick(event: MouseEvent) {
-  const backdrop = findModalBackdropRoot(event.target);
-  if (!backdrop) return;
-  const topmost = topmostHandler(true);
+function handleModalBackdropPointerDown(event: PointerEvent) {
+  const topmost = topmostHandler();
   if (!topmost) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  if (!topmost.dismissOnBackdrop || !isBackdropDismissalAllowed(backdrop)) return;
-  topmost.callback();
+  dismissModalFromBackdrop(event, topmost.callback);
 }
 
 function registerHandler(handler: ActiveEscapeHandler, lockScroll: boolean) {
@@ -47,7 +38,7 @@ function registerHandler(handler: ActiveEscapeHandler, lockScroll: boolean) {
   activeHandlers.set(handler.id, handler);
   if (!listenerAttached) {
     window.addEventListener('keydown', handleModalEscape, true);
-    window.addEventListener('click', handleModalBackdropClick, true);
+    window.addEventListener('pointerdown', handleModalBackdropPointerDown, true);
     listenerAttached = true;
   }
 
@@ -57,23 +48,22 @@ function registerHandler(handler: ActiveEscapeHandler, lockScroll: boolean) {
     if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
     if (activeHandlers.size === 0 && listenerAttached) {
       window.removeEventListener('keydown', handleModalEscape, true);
-      window.removeEventListener('click', handleModalBackdropClick, true);
+      window.removeEventListener('pointerdown', handleModalBackdropPointerDown, true);
       listenerAttached = false;
     }
   };
 }
 
-/** Register an open modal's Escape action, backdrop dismissal, focus restoration, and scroll lock. Pass dismissOnBackdrop=false for critical or destructive confirmations. */
+/** Register an open modal's request-close action for Escape and direct backdrop pointer-down, plus focus restoration and optional scroll lock. */
 export function useModalEscape(
   isOpen: boolean,
-  onEscape: () => void,
+  onRequestClose: () => void,
   priority = 0,
   lockScroll = true,
-  dismissOnBackdrop = true,
 ) {
   const id = useRef(Symbol('modal-escape-handler'));
-  const callback = useRef(onEscape);
-  callback.current = onEscape;
+  const callback = useRef(onRequestClose);
+  callback.current = onRequestClose;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -82,8 +72,6 @@ export function useModalEscape(
       callback: () => callback.current(),
       order: ++nextOrder,
       priority,
-      isModal: lockScroll,
-      dismissOnBackdrop,
     }, lockScroll);
-  }, [isOpen, priority, lockScroll, dismissOnBackdrop]);
+  }, [isOpen, priority, lockScroll]);
 }

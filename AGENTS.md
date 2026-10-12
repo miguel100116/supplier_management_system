@@ -146,11 +146,11 @@ Treat the existing Supplier Management System as the design authority. UI work m
 ### Modal and dialog contract
 
 - Every modal or dialog must register with the shared `useModalEscape` lifecycle in `src/hooks/useModalEscape.ts`. This provides Escape handling, backdrop dismissal, scroll locking, nested-modal priority, and focus restoration.
-- Backdrop dismissal is enabled by default. It must close only when the click directly targets the full-screen backdrop (or its explicit full-screen backdrop button); clicks inside the dialog must not close it.
+- Backdrop dismissal is enabled for every modal. A pointer-down directly on the full-screen backdrop (or its explicit full-screen backdrop layer) must invoke the same request-close callback as Escape; pointer-downs inside the dialog must not close it.
 - Pass the modal's request-close callback to `useModalEscape`. If the modal has unsaved edits, that callback must ask whether to discard before closing; use the same guarded callback for Escape and the existing Close/Cancel controls.
-- Destructive or irreversible confirmation dialogs must opt out of backdrop dismissal with `dismissOnBackdrop = false` (the fifth `useModalEscape` argument) or `role="alertdialog"` / `data-modal-dismiss="none"` on the dialog. Backdrop clicks must never invoke the confirmation action.
+- Confirmation dialogs also close through their request-close callback on Escape or backdrop pointer-down. Closing a confirmation must never invoke its confirm, delete, archive, or other action; those actions run only from their explicit controls.
 - Do not implement per-dialog backdrop listeners. Preserve the existing overlay markup and styles; new dialogs inherit the shared behavior by registering with `useModalEscape`.
-- Add or update tests for direct backdrop clicks, inside clicks, Escape, dirty-state confirmation, critical-dialog opt-out, and nested-modal priority when changing modal behavior.
+- Add or update tests for direct backdrop pointer-down, inside pointer-down, Escape, guarded dirty-state close, confirmation dismissal without action, and nested-modal priority when changing modal behavior.
 
 ## Testing strategy
 

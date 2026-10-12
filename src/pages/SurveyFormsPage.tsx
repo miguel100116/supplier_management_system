@@ -171,13 +171,13 @@ export function SurveyFormsPage({
     if (previewEditCloseRequest.current) previewEditCloseRequest.current();
     else setPreviewEditSurveyId(null);
   };
-  useModalEscape(isArchiveConfirmOpen, () => setIsArchiveConfirmOpen(false), 60, true, false);
+  useModalEscape(isArchiveConfirmOpen, () => setIsArchiveConfirmOpen(false), 60);
   useModalEscape(isCompanyPickerOpen, () => setIsCompanyPickerOpen(false), 55);
   useModalEscape(isModifyOpen, () => setIsModifyOpen(false), 50);
   useModalEscape(isModalOpen, () => setIsModalOpen(false), 50);
   useModalEscape(accessPickerOpen, () => setAccessPickerOpen(false), 65);
   useModalEscape(Boolean(previewEditSurveyId), requestClosePreviewEdit, 75);
-  useModalEscape(Boolean(sendConfirmationSurveyId), () => setSendConfirmationSurveyId(null), 80, true, false);
+  useModalEscape(Boolean(sendConfirmationSurveyId), () => setSendConfirmationSurveyId(null), 80);
   useModalEscape(Boolean(previewSurveyId) && !previewEditSurveyId && !sendConfirmationSurveyId, () => setPreviewSurveyId(null), 70);
 
   useEffect(() => {
@@ -993,7 +993,7 @@ export function SurveyFormsPage({
 
       {isAdmin && accessPickerOpen && (
         <div className="fixed inset-0 z-[65] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="access-picker-title">
-          <button className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" aria-label="Close" onClick={() => setAccessPickerOpen(false)} />
+          <div aria-hidden="true" className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]" />
           <section className="relative flex max-h-[min(82vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <header className="flex items-start justify-between border-b border-slate-100 px-6 py-5 dark:border-slate-800">
               <div>
@@ -1059,7 +1059,7 @@ export function SurveyFormsPage({
       )}
       {previewSurvey && !previewEditSurveyId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="survey-preview-title">
-          <button className="absolute inset-0 bg-slate-950/45" aria-label="Close preview" onClick={() => setPreviewSurveyId(null)} />
+          <div aria-hidden="true" className="absolute inset-0 bg-slate-950/45" />
           <section className="relative flex max-h-[88vh] w-full max-w-[780px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             <header className="flex items-start justify-between border-b border-slate-100 px-6 py-5 dark:border-slate-800"><div><p className="text-xs font-bold uppercase tracking-wide text-[#0063a9]">Read-only preview · {previewSurvey.surveyType}</p><h2 id="survey-preview-title" className="mt-1 text-xl font-bold">{previewSurvey.title}</h2><p className="mt-1 text-sm text-slate-500">{previewSurvey.description}</p></div><button onClick={() => setPreviewSurveyId(null)} aria-label="Close preview"><X size={24}/></button></header>
             <div className="flex-1 space-y-3 overflow-y-auto p-5 sm:p-7">{previewSurvey.questions.slice().sort((a,b) => a.questionNumber-b.questionNumber).map((question, index) => <article key={question.questionId} className="rounded-xl border border-slate-200 p-5 dark:border-slate-700"><p className="text-xs font-semibold text-slate-500">{question.section ? `${question.section} · ` : ''}{question.questionCategory} · Question {question.questionNumber || index + 1}</p><h3 className="mt-2 font-semibold text-slate-800 dark:text-slate-100">{question.question}</h3>{question.inputType === 'checkbox' || question.inputType === 'select' ? <div className="mt-3 space-y-2">{(question.options ?? []).map((option) => <div key={option} className="flex items-center gap-3 text-sm text-slate-600"><span className="h-4 w-4 rounded border border-slate-300"/>{option}</div>)}</div> : question.inputType === 'matrix' ? <div className="mt-3 space-y-2">{(question.subQuestions ?? []).map((item) => <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800"><b>{item.label}</b>{item.description && <p className="text-xs text-slate-500">{item.description}</p>}</div>)}</div> : <div className="mt-3 max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-400">{question.inputType === 'typed-rating' ? `Enter a number from ${question.validationRange?.min ?? 0} to ${question.validationRange?.max ?? previewSurvey.maxRating ?? 100}${question.validationRange?.allowNa ? ' or N/A' : ''}` : question.inputType === 'date-range' ? 'Select date range' : question.inputType === 'text' ? 'Enter your response' : `Rating scale: 0 to ${previewSurvey.maxRating ?? 100}`}</div>}</article>)}</div>
@@ -1076,7 +1076,7 @@ export function SurveyFormsPage({
 
       {sendConfirmationSurvey && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="send-form-title">
-          <button className="absolute inset-0 bg-slate-950/50" aria-label="Cancel send" onClick={() => setSendConfirmationSurveyId(null)} />
+          <div aria-hidden="true" className="absolute inset-0 bg-slate-950/50" />
             <section className="relative w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><header className="mb-3"><h2 id="send-form-title" className="text-lg font-bold">Confirm form distribution</h2><p className="text-sm text-slate-500">{sendConfirmationSurvey.title} · {sendConfirmationSurvey.surveyType}</p><p className="mt-2 text-sm"><b>{eligibleRecipients.length}</b> eligible employee{eligibleRecipients.length === 1 ? '' : 's'} based on category permissions and this form’s access settings.</p></header><div className="max-h-[45vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2">Employee</th><th className="p-2">Department</th><th className="p-2">Designation</th></tr></thead><tbody>{eligibleRecipients.map((recipient) => <tr key={recipient.email} className="border-t border-slate-100 dark:border-slate-800"><td className="p-2">{recipient.email}</td><td className="p-2">{recipient.department}</td><td className="p-2">{recipient.designation}</td></tr>)}</tbody></table>{eligibleRecipients.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No eligible employees match the current access settings.</p>}</div>{sendDeadlineExpired && <p className="mt-3 text-sm text-rose-600">The deadline has passed. Update it in Manage Access before sending.</p>}<footer className="mt-4 flex justify-end gap-2"><button onClick={() => setSendConfirmationSurveyId(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button><button onClick={handleConfirmSend} disabled={isSendingForm || !eligibleRecipients.length || sendDeadlineExpired} className="rounded-lg bg-[#0063a9] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSendingForm ? 'Sending…' : getSurveyStatus(sendConfirmationSurvey) === 'Running' ? 'Already Available' : 'Confirm & Make Available'}</button></footer></section>
         </div>
       )}
@@ -1087,7 +1087,6 @@ export function SurveyFormsPage({
           {/* Overlay */}
           <div
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
-            onClick={() => setIsModalOpen(false)}
           />
           
           {/* Modal Panel */}
@@ -1281,7 +1280,6 @@ export function SurveyFormsPage({
               {/* Darkened Backdrop */}
               <div 
                 className="fixed inset-0 bg-slate-950/40 backdrop-blur-[1px] transition-opacity"
-                onClick={resetModifyState}
               />
 
               {/* Centered Modal Container */}
@@ -1599,7 +1597,6 @@ export function SurveyFormsPage({
               <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
                 <div
                   className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity"
-                  onClick={() => setIsCompanyPickerOpen(false)}
                 />
                 <div className="relative w-full max-w-2xl h-[85vh] max-h-[85vh] rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                   <div className="border-b border-slate-100 dark:border-slate-800 p-5 flex justify-between items-center shrink-0">
@@ -1724,14 +1721,7 @@ export function SurveyFormsPage({
           {/* Custom Archive Confirmation Modal */}
           {isArchiveConfirmOpen && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="archive-form-title">
-              <button
-                type="button"
-                aria-label="Close archive confirmation"
-                className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]"
-                onClick={() => {
-                  if (!isArchiving) setIsArchiveConfirmOpen(false);
-                }}
-              />
+              <div aria-hidden="true" className="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" />
               <section className="relative z-10 w-full max-w-[440px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
                 <header className="flex items-start justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
                   <div className="flex items-center gap-3">

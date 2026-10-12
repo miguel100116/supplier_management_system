@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument } from '../types/survey';
+import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
 import { surveyQuestions } from '../data/questions';
 import { importMasterListFromFile, ImportResult } from '../utils/masterListImport';
 import { importArchivedResponsesFromFile, ArchiveImportResult } from '../utils/archiveResponseTransfer';
@@ -78,6 +78,15 @@ function loadCachedNotificationReadState(userEmail: string): NotificationReadSta
 function cacheNotificationReadState(state: NotificationReadState): void {
   safeSetItem(notificationReadStateStorageKey(state.userEmail), JSON.stringify(state));
 }
+
+function documentAlertId(kind: string, companyId: string, details: DocumentAlertDetail[]): string {
+  const signature = details
+    .map((detail) => [detail.branchId ?? detail.branchCode ?? '', detail.documentName, detail.expiryDate ?? '', detail.milestoneDays ?? ''].join(':'))
+    .sort()
+    .join('|');
+  return `document-${kind}-${companyId}-${encodeURIComponent(signature)}`;
+}
+
 const ALL_SURVEY_ACCESS_ROLES = ['Rank & File', 'Supervisory', 'Managerial', 'Director', 'Executive'] as const;
 
 function normalizeSurveyType(value: unknown): SurveyType {
@@ -397,7 +406,23 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const [unreadNotificationIds, setUnreadNotificationIds] = useState<Set<string>>(() => new Set());
   const knownSystemNotificationIdsRef = useRef<Set<string>>(new Set());
   const readNotificationIdsRef = useRef<Set<string>>(new Set());
+  const systemNotificationDetectedAtRef = useRef<Map<string, string>>(new Map());
+  const notificationOwnerRef = useRef<string | null>(currentUserEmail?.trim().toLowerCase() ?? null);
   const notificationPersistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const [documentClock, setDocumentClock] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setDocumentClock(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const detectedAtForNotification = (id: string, currentDate: Date): string => {
+    const existing = systemNotificationDetectedAtRef.current.get(id);
+    if (existing) return existing;
+    const detectedAt = currentDate.toISOString();
+    systemNotificationDetectedAtRef.current.set(id, detectedAt);
+    return detectedAt;
+  };
 
   const persistRemoteAsync = async (operation: Promise<void>): Promise<void> => {
     if (!isSupabaseConfigured) return;
@@ -1352,6 +1377,11 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // alerts run. The local record is an authenticated browser cache;
   // hydration below reconciles it with the owner's Supabase record.
   useEffect(() => {
+    const owner = currentUserEmail?.trim().toLowerCase() ?? null;
+    if (notificationOwnerRef.current !== owner) {
+      notificationOwnerRef.current = owner;
+      systemNotificationDetectedAtRef.current.clear();
+    }
     knownSystemNotificationIdsRef.current = new Set();
     setUnreadNotificationIds(new Set());
     if (!currentUserEmail) {
@@ -2340,48 +2370,41 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     return partnerCompanies.map((c) => c.name).sort();
   }, [partnerCompanies]);
 
-  // Dynamic compliance-document warnings/expirations for admin notifications.
-  // One notification per company (not per document) so this stays the same
-  // shape/cardinality the old per-company contract alerts had - see
-  // computeCompanyDocumentSummary for how "Expired" is rolled up across a
-  // company's required documents (Business Permit, AFS, SIF, etc.).
+  // Dynamic compliance-document alerts are grouped by company and status,
+  // while retaining the exact branch/document/date in each notification.
   const documentNotifications = useMemo<ResponseNotification[]>(() => {
-    const currentDate = new Date();
+    const currentDate = documentClock;
     const list: ResponseNotification[] = [];
 
     partnerCompanies.forEach((c) => {
       if (c.isArchived) return;
       const summary = computeCompanyDocumentSummary(c, currentDate);
+      const groups: Array<{ kind: string; respondentType: string; details: DocumentAlertDetail[] }> = [
+        { kind: 'expired', respondentType: 'Document Expired', details: summary.issues.filter((item) => item.status === 'Expired') },
+        { kind: 'expiring-soon', respondentType: 'Document Expiring Soon', details: summary.issues.filter((item) => item.status === 'Expiring Soon') },
+        { kind: 'for-update', respondentType: 'Document For Update', details: summary.issues.filter((item) => item.status === 'For Update') },
+      ];
 
-      if (summary.status === 'Expired') {
+      groups.forEach(({ kind, respondentType, details }) => {
+        if (details.length === 0) return;
+        const id = documentAlertId(kind, c.id, details);
         list.push({
-          id: `document-expired-${c.id}`,
+          id,
           company: c.name,
           surveyType: c.type as SurveyType,
-          respondentType: 'Document Expired',
-          submissionDate: new Date(currentDate.getTime() - 12 * 60 * 60 * 1000).toISOString(),
-          questionCount: summary.expiredCount,
+          respondentType,
+          submissionDate: detectedAtForNotification(id, currentDate),
+          questionCount: details.length,
           respondentEmail: 'system@mgenesis.com',
           department: 'Logistics',
-          designation: 'Document Alert'
+          designation: 'Document Alert',
+          documentDetails: details,
         });
-      } else if (summary.status === 'Expiring Soon') {
-        list.push({
-          id: `document-warning-${c.id}`,
-          company: c.name,
-          surveyType: c.type as SurveyType,
-          respondentType: 'Document Expiring Soon',
-          submissionDate: new Date(currentDate.getTime() - 2 * 60 * 60 * 1000).toISOString(),
-          questionCount: summary.expiringSoonCount,
-          respondentEmail: 'system@mgenesis.com',
-          department: 'Logistics',
-          designation: 'Document Alert'
-        });
-      }
+      });
     });
 
     return list;
-  }, [partnerCompanies]);
+  }, [partnerCompanies, documentClock]);
 
   // Extra early heads-up notifications, per document type, configured via
   // the Document Register's "Add Notification" settings screen (see
@@ -2399,7 +2422,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   }, []);
 
   const earlyMilestoneNotifications = useMemo<ResponseNotification[]>(() => {
-    const currentDate = new Date();
+    const currentDate = documentClock;
     const list: ResponseNotification[] = [];
     const rules = getNotificationSettings().filter(
       (r) => r.enabled && r.mode === 'day-milestones' && r.earlyMilestoneDays.length > 0
@@ -2412,38 +2435,49 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
       rules.forEach((rule) => {
         if (!requiredKeys.includes(rule.docName)) return;
-        const doc = (c.branches ?? [])
-          .map((b) => b.documents?.[rule.docName])
-          .find((d) => d && (d.provided || d.expiryDate));
-        if (!doc) return;
+        const details = (c.branches ?? []).flatMap((branch) => {
+          const doc = branch.documents?.[rule.docName];
+          if (!doc || (!doc.provided && !doc.expiryDate)) return [];
 
-        const { status, daysLeft } = computeDocumentStatus(doc, currentDate, rule.docName);
-        if (status !== 'Current' || typeof daysLeft !== 'number') return;
-        // Fire on the earliest-crossed early milestone only - once inside 30
-        // days the document already surfaces via the standard "Document
-        // Expiring Soon" alert, so only thresholds above that count here.
-        const milestone = rule.earlyMilestoneDays
-          .filter((d) => d > EXPIRING_SOON_DAYS)
-          .sort((a, b) => a - b)
-          .find((d) => daysLeft <= d);
-        if (milestone === undefined) return;
+          const { status, daysLeft } = computeDocumentStatus(doc, currentDate, rule.docName);
+          if (status !== 'Current' || typeof daysLeft !== 'number') return [];
+          // Inside 30 days the standard alert takes over. For longer
+          // thresholds, include every matching branch's copy of the document.
+          const milestone = rule.earlyMilestoneDays
+            .filter((days) => days > EXPIRING_SOON_DAYS)
+            .sort((a, b) => a - b)
+            .find((days) => daysLeft <= days);
+          if (milestone === undefined) return [];
+          return [{
+            documentName: rule.docName,
+            branchId: branch.id,
+            branchCode: branch.bpCode,
+            expiryDate: doc.expiryDate,
+            daysLeft,
+            status: 'Expiring Soon' as const,
+            milestoneDays: milestone,
+          }];
+        });
+        if (details.length === 0) return;
 
+        const id = documentAlertId(`milestone-${rule.docName}`, c.id, details);
         list.push({
-          id: `early-milestone-${rule.docName}-${c.id}`,
+          id,
           company: c.name,
           surveyType: c.type as SurveyType,
           respondentType: 'Document Expiring Soon',
-          submissionDate: new Date(currentDate.getTime() - 1 * 60 * 60 * 1000).toISOString(),
-          questionCount: 1,
+          submissionDate: detectedAtForNotification(id, currentDate),
+          questionCount: details.length,
           respondentEmail: 'system@mgenesis.com',
           department: 'Logistics',
           designation: 'Document Alert',
+          documentDetails: details,
         });
       });
     });
 
     return list;
-  }, [partnerCompanies, notificationSettingsVersion]);
+  }, [partnerCompanies, notificationSettingsVersion, documentClock]);
 
   const combinedNotifications = useMemo(() => {
     const list = [...documentNotifications, ...earlyMilestoneNotifications, ...notifications];
@@ -2452,10 +2486,11 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
   useEffect(() => {
     const systemNotifications = [...documentNotifications, ...earlyMilestoneNotifications];
+    const currentIds = new Set(systemNotifications.map((notification) => notification.id));
     const newSystemIds = systemNotifications
       .map((notification) => notification.id)
       .filter((id) => !knownSystemNotificationIdsRef.current.has(id) && !readNotificationIdsRef.current.has(id));
-    systemNotifications.forEach((notification) => knownSystemNotificationIdsRef.current.add(notification.id));
+    knownSystemNotificationIdsRef.current = currentIds;
     if (newSystemIds.length === 0) return;
 
     setUnreadNotificationIds((current) => {

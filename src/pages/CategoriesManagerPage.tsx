@@ -26,7 +26,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
   const [draftLabels, setDraftLabels] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<'save' | 'restore' | null>(null);
   const [validationError, setValidationError] = useState('');
-  useModalEscape(Boolean(pendingAction), () => setPendingAction(null), 60, true, false);
+  useModalEscape(Boolean(pendingAction), () => setPendingAction(null), 60);
 
   const openEditor = (type: SurveyType) => {
     setOpenType(type);

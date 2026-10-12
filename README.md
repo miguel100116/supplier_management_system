@@ -145,7 +145,7 @@ A **Data Scope** toggle further switches between *Current* (active period), *All
 | **Renew Compliance Documents** | Action permission: update document expiry/status without full Account Management access. |
 | **Partners Feedback Hub** | Send report cards to partner companies (single or bulk email via Microsoft Graph). |
 | **Account Management** | Create company-domain logins with a generated or customized initial password, and configure roles, ranks, departments, and per-user/per-department permissions. |
-| **Notifications** | Audit trail of incoming survey responses and document-expiry alerts, opened as a modal from the header bell rather than a separate sidebar destination. |
+| **Notifications** | Admin header bell and logs show document-specific expiry alerts, including the affected branch, due date, configured early milestones, and AFS update status. |
 | **Archive Center** | Browse and restore archived feedback submissions and series. |
 | **Import Evaluation Responses** | Admins select multiple CSV or Excel exports across Supplier, Subcontractor, and Courier, including multiple files for one category. The system detects each form, matches companies against the full Partner Registry, and imports the selected files together. Each original file is stored in a private Supabase Storage archive with Admin-only download access. |
 | **Categories Manager** | Rename the display labels of scoring categories per survey type. |

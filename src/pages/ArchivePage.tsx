@@ -327,7 +327,7 @@ export function ArchivePage({
   const [importResult, setImportResult] = useState<ArchiveImportResult | null>(null);
   const [importError, setImportError] = useState('');
   useModalEscape(Boolean(confirmBulkRestoreState), () => setConfirmBulkRestoreState(null), 53);
-  useModalEscape(confirmDeleteState.isOpen, () => setConfirmDeleteState({ isOpen: false }), 52, true, false);
+  useModalEscape(confirmDeleteState.isOpen, () => setConfirmDeleteState({ isOpen: false }), 52);
   useModalEscape(Boolean(confirmResponseGroup), () => setConfirmResponseGroup(null), 51);
   useModalEscape(Boolean(confirmSurvey), () => setConfirmSurvey(null), 50);
   useModalEscape(Boolean(confirmPartnerCompany), () => setConfirmPartnerCompany(null), 49);
