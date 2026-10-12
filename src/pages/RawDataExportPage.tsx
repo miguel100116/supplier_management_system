@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, HardHat, Package, Table2, Truck } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, Layers, PackageSearch, Table2, Truck } from 'lucide-react';
 import { SurveyResponse, SurveyType } from '../types/survey';
 import { exportRawResponsesAsCSV, exportRawResponsesAsExcel, exportRawResponsesAsPDF } from '../utils/rawResponseExport';
 
@@ -13,8 +13,8 @@ type RawExportFormat = 'csv' | 'excel' | 'pdf';
 
 const CATEGORY_CONFIG: { type: SurveyType; icon: typeof Truck; description: string }[] = [
   { type: 'Courier', icon: Truck, description: 'Raw evaluation submissions for courier partners, one merged sheet sorted by submission date.' },
-  { type: 'Supplier', icon: Package, description: 'Raw evaluation submissions for suppliers, one merged sheet sorted by submission date.' },
-  { type: 'Subcontractor', icon: HardHat, description: 'Raw evaluation submissions for subcontractors, one merged sheet sorted by submission date.' },
+  { type: 'Supplier', icon: PackageSearch, description: 'Raw evaluation submissions for suppliers, one merged sheet sorted by submission date.' },
+  { type: 'Subcontractor', icon: Layers, description: 'Raw evaluation submissions for subcontractors, one merged sheet sorted by submission date.' },
 ];
 
 export function RawDataExportPage({ responses, canExport = false, onBack }: RawDataExportPageProps) {

@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Download,
   FileSpreadsheet,
-  HardHat,
+  Layers,
   Loader2,
   LockKeyhole,
-  Package,
+  PackageSearch,
   Truck,
   UploadCloud,
   X,
@@ -36,9 +35,9 @@ const STORED_SOURCE_FILE_FILTERS: Array<{ id: StoredArchiveFilter; label: string
   { id: 'Supplier', label: 'Supplier' },
   { id: 'Subcontractor', label: 'Subcontractor' },
 ];
-const FORM_CARDS: Array<{ surveyType: SurveyType; title: string; formLabel: string; icon: typeof Package }> = [
-  { surveyType: 'Supplier', title: 'Supplier', formLabel: 'Form 20-002, Form 2', icon: Package },
-  { surveyType: 'Subcontractor', title: 'Subcontractor', formLabel: 'Form 20-002, Form 3', icon: HardHat },
+const FORM_CARDS: Array<{ surveyType: SurveyType; title: string; formLabel: string; icon: typeof PackageSearch }> = [
+  { surveyType: 'Supplier', title: 'Supplier', formLabel: 'Form 20-002, Form 2', icon: PackageSearch },
+  { surveyType: 'Subcontractor', title: 'Subcontractor', formLabel: 'Form 20-002, Form 3', icon: Layers },
   { surveyType: 'Courier', title: 'Courier', formLabel: 'Form 20-002, Form 4', icon: Truck },
 ];
 
