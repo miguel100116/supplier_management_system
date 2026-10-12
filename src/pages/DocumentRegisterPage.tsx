@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalEscape } from '../hooks/useModalEscape';
-import { Search, Globe, MapPin, Truck, Package, Briefcase, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, BellPlus, Plus, SlidersHorizontal, Trash2, Filter } from 'lucide-react';
+import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, BellPlus, Plus, SlidersHorizontal, Trash2, Filter } from 'lucide-react';
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin } from '../types/survey';
 import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isNTBranch } from '../utils/compliance';
@@ -193,7 +193,7 @@ const CATEGORIES: { key: string; label: string; type: PartnerCompanyType; origin
   { key: 'supplier-local', label: 'Supplier (Local)', type: 'Supplier', origin: 'Local', icon: MapPin },
   { key: 'supplier-foreign', label: 'Supplier (Foreign)', type: 'Supplier', origin: 'Foreign', icon: Globe },
   { key: 'courier', label: 'Courier', type: 'Courier', icon: Truck },
-  { key: 'subcontractor', label: 'Subcontractor', type: 'Subcontractor', icon: Briefcase },
+  { key: 'subcontractor', label: 'Subcontractor', type: 'Subcontractor', icon: Layers },
 ];
 
 // Pseudo-category: aggregates the Compliance Overview (KPIs/charts) across

@@ -14,6 +14,11 @@ export interface EvaluationImportArchive {
   contentType: string;
   fileSize: number;
   importBatchId: string;
+  importStatus?: 'active' | 'historical';
+  historicalStatus?: 'Replaced' | 'Superseded' | 'Archived' | 'Historical';
+  replacedAt?: string;
+  replacedByArchiveId?: string;
+  originalResponseCount?: number;
 }
 
 const MIME_TYPE_BY_EXTENSION: Record<string, string> = {
@@ -49,6 +54,15 @@ export function parseEvaluationImportArchive(value: unknown): EvaluationImportAr
     && Number.isInteger(candidate.fileSize)
     && candidate.fileSize > 0
     && candidate.fileSize <= MAX_EVALUATION_IMPORT_FILE_BYTES;
+  const validImportStatus = candidate.importStatus === undefined || candidate.importStatus === 'active' || candidate.importStatus === 'historical';
+  const validHistoryStatus = candidate.historicalStatus === undefined
+    || ['Replaced', 'Superseded', 'Archived', 'Historical'].includes(candidate.historicalStatus);
+  const validReplacedAt = candidate.replacedAt === undefined
+    || (typeof candidate.replacedAt === 'string' && !Number.isNaN(Date.parse(candidate.replacedAt)));
+  const validReplacementId = candidate.replacedByArchiveId === undefined
+    || (typeof candidate.replacedByArchiveId === 'string' && candidate.replacedByArchiveId.length > 0 && candidate.replacedByArchiveId.length <= 500);
+  const validOriginalResponseCount = candidate.originalResponseCount === undefined
+    || (Number.isInteger(candidate.originalResponseCount) && candidate.originalResponseCount >= 0);
 
   if (
     typeof candidate.id !== 'string'
@@ -71,6 +85,11 @@ export function parseEvaluationImportArchive(value: unknown): EvaluationImportAr
     || typeof candidate.importBatchId !== 'string'
     || !candidate.importBatchId.trim()
     || candidate.importBatchId.length > 2_000
+    || !validImportStatus
+    || !validHistoryStatus
+    || !validReplacedAt
+    || !validReplacementId
+    || !validOriginalResponseCount
   ) {
     throw new Error('An evaluation import archive has an invalid stored shape.');
   }
