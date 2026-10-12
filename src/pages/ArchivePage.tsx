@@ -316,11 +316,17 @@ export function ArchivePage({
   };
 
   const [confirmDeleteState, setConfirmDeleteState] = useState<{isOpen: boolean}>({ isOpen: false });
+  const [confirmBulkRestoreState, setConfirmBulkRestoreState] = useState<{
+    eventKeys: { archivedAt: string; surveyId: string }[];
+    groupCount: number;
+    surveyTypes: SurveyType[];
+  } | null>(null);
 
   // Export/import of raw archived response data (see archiveResponseTransfer.ts)
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ArchiveImportResult | null>(null);
   const [importError, setImportError] = useState('');
+  useModalEscape(Boolean(confirmBulkRestoreState), () => setConfirmBulkRestoreState(null), 53);
   useModalEscape(confirmDeleteState.isOpen, () => setConfirmDeleteState({ isOpen: false }), 52, true, false);
   useModalEscape(Boolean(confirmResponseGroup), () => setConfirmResponseGroup(null), 51);
   useModalEscape(Boolean(confirmSurvey), () => setConfirmSurvey(null), 50);
@@ -361,21 +367,31 @@ export function ArchivePage({
     URL.revokeObjectURL(url);
   };
 
-  const handleBulkRestore = async () => {
+  const handleBulkRestore = () => {
     if (selectedGroups.size === 0 || !onRestoreArchivedResponseGroups) return;
-    const groups = filteredGroupedResponses
-      .filter(g => selectedGroups.has(g.id))
-      .flatMap(g => g.eventKeys);
+    const selected = filteredGroupedResponses.filter((group) => selectedGroups.has(group.id));
+    if (selected.length === 0) return;
 
     setMutationError(null);
+    setConfirmBulkRestoreState({
+      eventKeys: selected.flatMap((group) => group.eventKeys),
+      groupCount: selected.length,
+      surveyTypes: [...new Set(selected.flatMap((group) => group.surveyTypes))],
+    });
+  };
+
+  const confirmBulkRestore = async () => {
+    if (!confirmBulkRestoreState || !onRestoreArchivedResponseGroups) return;
+    setMutationError(null);
     try {
-      await onRestoreArchivedResponseGroups(groups);
+      await onRestoreArchivedResponseGroups(confirmBulkRestoreState.eventKeys);
     } catch (error) {
       setMutationError(error instanceof Error ? error.message : 'Unable to restore the archived responses.');
       return;
     }
     setSelectedGroups(new Set());
-    setSuccessMessage('Selected archived forms have been restored to live dataset!');
+    setConfirmBulkRestoreState(null);
+    setSuccessMessage(`Restored ${confirmBulkRestoreState.groupCount} archived response ${confirmBulkRestoreState.groupCount === 1 ? 'group' : 'groups'} to the live dataset.`);
     setTimeout(() => setSuccessMessage(null), 4000);
   };
 
@@ -1068,6 +1084,45 @@ export function ArchivePage({
                 onClick={executeRestoreResponseGroup}
                 className="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer transition"
                 id="btn-confirm-restore-responses"
+              >
+                Confirm Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmBulkRestoreState && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="confirm-bulk-restore-responses-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-bulk-restore-responses-title">
+          <div className="bg-white dark:bg-slate-950 rounded-2xl max-w-md w-full border border-slate-100 dark:border-slate-800/80 p-6 shadow-xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-[#0063a9] dark:text-blue-400 rounded-xl shrink-0">
+                <RefreshCw size={24} />
+              </div>
+              <div className="space-y-1">
+                <h3 id="confirm-bulk-restore-responses-title" className="text-base font-bold text-slate-900 dark:text-white">Restore Archived Responses?</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Restore {confirmBulkRestoreState.groupCount} selected archived response {confirmBulkRestoreState.groupCount === 1 ? 'group' : 'groups'} to the live dataset? These submissions will be included in live charts and dashboards.
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 pt-1">
+                  Partner categories: {confirmBulkRestoreState.surveyTypes.join(', ') || 'Unspecified'}.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setConfirmBulkRestoreState(null)}
+                className="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer transition"
+                id="btn-cancel-bulk-restore-responses"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmBulkRestore}
+                className="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl bg-[#0063a9] hover:bg-[#00528c] text-white cursor-pointer transition"
+                id="btn-confirm-bulk-restore-responses"
               >
                 Confirm Restore
               </button>
