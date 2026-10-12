@@ -148,7 +148,7 @@ export function ExecutiveSummaryReportBuilderPage({
   
   // Company ranking lists
   const companyPerformance = useMemo(
-    () => getAnalyticsCompanyRankings(filteredRankingResponses, activeTypes, 'weighted').map((ranking) => ({
+    () => getAnalyticsCompanyRankings(filteredRankingResponses, activeTypes).map((ranking) => ({
       company: ranking.name,
       surveyType: ranking.type,
       average: ranking.rankScore,
