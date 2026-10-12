@@ -12,6 +12,7 @@ import {
   Loader2,
   LockKeyhole,
   PackageSearch,
+  RotateCcw,
   Trash2,
   Truck,
   UploadCloud,
@@ -84,7 +85,7 @@ function sourceResponseCount(archive: EvaluationImportArchive, archives: readonl
 }
 
 export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBatch }: ImportEvaluationsPageProps) {
-  const { archives, isLoading: isLoadingArchives, loadError: archiveLoadError, archiveSourceFile, discardPendingArchive, downloadSourceFile, removeTestImport, removeOrdinaryImport, recordReplacement, archiveImports } = useEvaluationImportArchives(currentUserEmail);
+  const { archives, isLoading: isLoadingArchives, loadError: archiveLoadError, archiveSourceFile, discardPendingArchive, downloadSourceFile, removeTestImport, removeOrdinaryImport, recordReplacement, archiveImports, restoreArchive } = useEvaluationImportArchives(currentUserEmail);
   const fileInput = useRef<HTMLInputElement>(null);
   const selectAllArchiveRef = useRef<HTMLInputElement>(null);
   const archiveRemovalInFlightRef = useRef(false);
@@ -106,6 +107,8 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
   const [archivesToRemove, setArchivesToRemove] = useState<EvaluationImportArchive[] | null>(null);
   const [archivesToMarkHistory, setArchivesToMarkHistory] = useState<EvaluationImportArchive[] | null>(null);
   const [isArchivingImports, setIsArchivingImports] = useState(false);
+  const [archiveToRestore, setArchiveToRestore] = useState<EvaluationImportArchive | null>(null);
+  const [isRestoringArchive, setIsRestoringArchive] = useState(false);
   const [isRemovingArchives, setIsRemovingArchives] = useState(false);
   const [archiveFilter, setArchiveFilter] = useState<StoredArchiveFilter>('all');
   const [archivePage, setArchivePage] = useState(1);
@@ -521,10 +524,37 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
     }
   };
 
-  useModalEscape(isReviewingCompanies, () => setIsReviewingCompanies(false));
-  useModalEscape(Boolean(archivesToRemove) && !isRemovingArchives, () => setArchivesToRemove(null), 20);
-  useModalEscape(Boolean(archivesToMarkHistory) && !isArchivingImports, () => setArchivesToMarkHistory(null), 25);
-  useModalEscape(Boolean(activeDuplicate), cancelDuplicateUpload);
+  const confirmRestoreArchive = async () => {
+    if (!archiveToRestore || isRestoringArchive) return;
+    setIsRestoringArchive(true);
+    setArchiveActionError('');
+    setArchiveActionSuccess('');
+    try {
+      await restoreArchive(archiveToRestore);
+      setArchiveToRestore(null);
+      setSelectedArchiveIds(new Set());
+      setArchiveTab('active');
+      setArchivePage(1);
+      setArchiveActionSuccess('Restored to Active Imports. Evaluation responses were not changed.');
+    } catch (restoreError) {
+      setArchiveActionError(restoreError instanceof Error ? restoreError.message : 'Unable to restore the source file. Refresh and try again.');
+    } finally {
+      setIsRestoringArchive(false);
+    }
+  };
+
+  const closeCompanyReview = () => {
+    const hasReviewChanges = SURVEY_TYPES.some((surveyType) =>
+      Object.values(decisions[surveyType]).some((decision) => decision !== 'add-as-partner'),
+    );
+    if (hasReviewChanges && !window.confirm('Close this review? Your company matching decisions will remain available if you reopen it.')) return;
+    setIsReviewingCompanies(false);
+  };
+  useModalEscape(isReviewingCompanies, closeCompanyReview);
+  useModalEscape(Boolean(archivesToRemove) && !isRemovingArchives, () => setArchivesToRemove(null), 20, true);
+  useModalEscape(Boolean(archivesToMarkHistory) && !isArchivingImports, () => setArchivesToMarkHistory(null), 25, true);
+  useModalEscape(Boolean(archiveToRestore) && !isRestoringArchive, () => setArchiveToRestore(null), 30, true);
+  useModalEscape(Boolean(activeDuplicate), cancelDuplicateUpload, 0, true);
 
   return (
     <div className="space-y-6">
@@ -732,7 +762,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
                     setArchivePage(1);
                     setSelectedArchiveIds(new Set());
                   }}
-                  className={`min-h-9 min-w-0 whitespace-nowrap rounded-lg px-1.5 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] sm:px-3 sm:text-xs ${archiveFilter === filter.id ? 'bg-white text-[#005b9f] shadow-sm ring-1 ring-inset ring-slate-200 dark:bg-slate-700 dark:text-blue-200 dark:ring-slate-600' : 'text-slate-600 hover:bg-white/70 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+                  className={`min-h-9 min-w-0 whitespace-nowrap rounded-lg px-1.5 text-[10px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] sm:px-3 sm:text-xs ${archiveFilter === filter.id ? 'bg-[#0063a9] text-white shadow-sm dark:bg-blue-600' : 'text-slate-600 hover:bg-white/70 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'}`}
                 >
                   {filter.label}
                 </button>
@@ -760,6 +790,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
                 <li key={archive.id} className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3"><input type="checkbox" checked={selectedArchiveIds.has(archive.id)} onChange={(event) => { const selected = event.currentTarget.checked; setSelectedArchiveIds((current) => { const next = new Set(current); if (selected) next.add(archive.id); else next.delete(archive.id); return next; }); }} disabled={isRemovingArchives || removingArchiveId !== null || downloadingArchiveId !== null} aria-label={"Select " + archive.sourceFileName} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9] disabled:opacity-60" /><FileSpreadsheet size={16} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" /><div className="min-w-0"><div className="flex min-w-0 items-center gap-2"><p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={archive.sourceFileName}>{archive.sourceFileName}</p>{archiveTab === 'active' && <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Active</span>}</div><p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{isTestImportArchive(archive) ? 'Test import' : archive.surveyType === 'Combined' ? 'All evaluation categories' : archive.surveyType} · {formatFileSize(archive.fileSize)} · {new Date(archive.uploadedAt).toLocaleString()} · {archive.uploadedBy}</p></div></div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {archiveTab === 'history' && <button type="button" onClick={() => setArchiveToRestore(archive)} disabled={isRestoringArchive || removingArchiveId !== null || downloadingArchiveId !== null || isRemovingArchives} title="Restore to Active Imports" aria-label={`Restore ${archive.sourceFileName} to Active Imports`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><RotateCcw size={15} aria-hidden="true" /></button>}
                     <button type="button" onClick={() => void handleDownloadArchive(archive)} disabled={downloadingArchiveId !== null || removingArchiveId !== null || isRemovingArchives} title="Download file" aria-label={`Download ${archive.sourceFileName}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
                       {downloadingArchiveId === archive.id ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Download size={15} aria-hidden="true" />}
                     </button>
@@ -842,7 +873,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
       {isReviewingCompanies && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div role="dialog" aria-modal="true" aria-labelledby="company-match-review-title" className="relative flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-            <button type="button" onClick={() => setIsReviewingCompanies(false)} className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-white" title="Close review"><X size={18} /></button>
+            <button type="button" onClick={closeCompanyReview} className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-white" title="Close review"><X size={18} /></button>
             <div className="flex items-center gap-3 text-amber-600"><span className="rounded-lg bg-amber-50 p-2 dark:bg-amber-950/30"><AlertTriangle size={20} /></span><div><h3 id="company-match-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review unmatched companies</h3><p className="text-xs text-slate-500">These names appear in the selected files but were not found in the Partner Registry.</p></div></div>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
               <button type="button" onClick={() => setDecisions((current) => ({ ...current, ...Object.fromEntries(SURVEY_TYPES.map((surveyType) => [surveyType, Object.fromEntries(Object.keys(current[surveyType]).map((name) => [name, 'add-as-partner' as CompanyDecision]))])) }))} className="text-[11px] font-bold text-[#0063a9] hover:underline dark:text-blue-400">Add all as partners</button>
@@ -859,7 +890,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
               ))}
             </ul>
             <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <button type="button" onClick={() => setIsReviewingCompanies(false)} className="secondary-button min-h-10 px-4 text-xs">Cancel</button>
+              <button type="button" onClick={closeCompanyReview} className="secondary-button min-h-10 px-4 text-xs">Cancel</button>
               <button type="button" onClick={() => void runBatchImport(importMode)} disabled={isImporting} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0063a9] px-4 text-xs font-bold text-white hover:bg-[#00528c] disabled:opacity-60">
                 {isImporting && <Loader2 size={14} className="animate-spin" />}{importMode === 'test' ? 'Confirm test import' : 'Confirm and import files'}
               </button>
@@ -875,45 +906,35 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
             aria-modal="true"
             aria-labelledby="remove-import-title"
             aria-describedby="remove-import-description"
-            className="max-h-[85vh] w-full max-w-md space-y-4 overflow-y-auto rounded-2xl border border-rose-100 bg-white p-6 shadow-xl dark:border-rose-900/30 dark:bg-slate-950"
+            className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-950"
           >
-            <div className="flex items-start gap-3">
-              <div className="shrink-0 rounded-xl bg-rose-50 p-3 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
-                <AlertTriangle size={22} aria-hidden="true" />
-              </div>
-              <div className="space-y-1">
-                <h3 id="remove-import-title" className="text-base font-bold text-slate-900 dark:text-white">
-                  {archivesToRemove.length === 1
-                    ? isTestImportArchive(archivesToRemove[0]) ? 'Permanently Remove Test Import? ' : 'Permanently Remove File?'
-                    : 'Permanently Remove ' + archivesToRemove.length + ' Files?'}
+            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-3 text-center">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400">
+                <AlertTriangle size={20} aria-hidden="true" />
+              </span>
+              <div className="w-full space-y-1">
+                <h3 id="remove-import-title" className="text-sm font-semibold leading-5 text-slate-900 dark:text-white">
+                  {archivesToRemove.length === 1 ? 'Remove this file?' : `Remove ${archivesToRemove.length} files?`}
                 </h3>
-                <p id="remove-import-description" className="text-sm text-slate-500 dark:text-slate-400">
-                  Are you sure you want to permanently remove{' '}
+                <p id="remove-import-description" className="text-sm leading-5 text-slate-600 dark:text-slate-400">
                   {archivesToRemove.length === 1
-                    ? <strong className="break-all text-slate-700 dark:text-slate-200">{archivesToRemove[0].sourceFileName}</strong>
-                    : archivesToRemove.length + ' selected archived files'}? This action cannot be undone.
+                    ? isTestImportArchive(archivesToRemove[0])
+                      ? 'This test import and its responses and temporary partners will be permanently removed.'
+                      : 'This file will be permanently removed. Evaluation responses and any other copies will be kept.'
+                    : archivesToRemove.some(isTestImportArchive) && archivesToRemove.some((archive) => !isTestImportArchive(archive))
+                      ? 'Normal import responses and other copies will be kept. Test responses and temporary partners will be removed.'
+                      : archivesToRemove.some(isTestImportArchive)
+                        ? 'These test imports, their responses, and temporary partners will be permanently removed.'
+                        : 'These files will be permanently removed. Evaluation responses and any other copies will be kept.'}
                 </p>
               </div>
             </div>
-            {archivesToRemove.length > 1 && (
-              <ul aria-label="Files selected for removal" className="max-h-32 space-y-1 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                {archivesToRemove.map((archive) => <li key={archive.id} className="break-all">{archive.sourceFileName}</li>)}
-              </ul>
-            )}
-            {archivesToRemove.some((archive) => !isTestImportArchive(archive)) && (
-              <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300">Only the archived source file record is removed. Evaluation responses and any other active or historical copy are kept.</p>
-            )}
-            {archivesToRemove.some(isTestImportArchive) && (
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Permanently removing test imports also removes their submissions and temporary partner records.
-              </p>
-            )}
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="mx-auto flex w-full max-w-sm justify-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setArchivesToRemove(null)}
                 disabled={isRemovingArchives}
-                className="min-h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold uppercase tracking-wider text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
               >
                 Keep file{archivesToRemove.length === 1 ? '' : 's'}
               </button>
@@ -921,13 +942,11 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
                 type="button"
                 onClick={() => void confirmArchiveRemoval()}
                 disabled={isRemovingArchives}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-rose-600 px-4 text-xs font-bold uppercase tracking-wider text-white transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-rose-600 px-3 text-sm font-medium text-white transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"
               >
                 {isRemovingArchives ? (
-                  <><Loader2 size={14} className="animate-spin" aria-hidden="true" />Removing files…</>
-                ) : archivesToRemove.length > 1 ? (
-                  'Permanently remove ' + archivesToRemove.length + ' files'
-                ) : isTestImportArchive(archivesToRemove[0]) ? 'Permanently remove test import' : 'Permanently remove file'}
+                  <><Loader2 size={14} className="animate-spin" aria-hidden="true" />Removing…</>
+                ) : archivesToRemove.length > 1 ? `Permanently remove ${archivesToRemove.length} files` : 'Permanently remove'}
               </button>
             </div>
           </section>
@@ -940,13 +959,34 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
               <div className="shrink-0 rounded-xl bg-blue-50 p-3 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-400"><Archive size={22} aria-hidden="true" /></div>
               <div className="space-y-1">
                 <h3 id="archive-imports-title" className="text-base font-bold text-slate-900 dark:text-white">Move {archivesToMarkHistory.length} import{archivesToMarkHistory.length === 1 ? '' : 's'} to History?</h3>
-                <p id="archive-imports-description" className="text-sm text-slate-500 dark:text-slate-400">The selected imports will no longer appear under Active Imports. Their source files and evaluation responses will be kept.</p>
+                <p id="archive-imports-description" className="text-justify text-sm text-slate-500 dark:text-slate-400">The selected imports will no longer appear under Active Imports. Their source files and evaluation responses will be kept.</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setArchivesToMarkHistory(null)} disabled={isArchivingImports} className="min-h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800">Cancel</button>
               <button type="button" onClick={() => void confirmArchiveImports()} disabled={isArchivingImports} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0063a9] px-4 text-xs font-bold text-white transition hover:bg-[#00528c] disabled:cursor-wait disabled:opacity-60">
                 {isArchivingImports ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" />Archiving…</> : `Archive ${archivesToMarkHistory.length} import${archivesToMarkHistory.length === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {archiveToRestore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs animate-fade-in">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="restore-import-title" aria-describedby="restore-import-description" className="w-full max-w-md space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-3 text-center">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300">
+                <RotateCcw size={20} aria-hidden="true" />
+              </span>
+              <div className="w-full space-y-1">
+                <h3 id="restore-import-title" className="text-sm font-semibold leading-5 text-slate-900 dark:text-white">Restore this file?</h3>
+                <p id="restore-import-description" className="text-sm leading-5 text-balance text-slate-600 dark:text-slate-400">It will return to Active Imports. Evaluation responses will not be changed.</p>
+              </div>
+            </div>
+            <div className="mx-auto flex w-full max-w-sm justify-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <button type="button" onClick={() => setArchiveToRestore(null)} disabled={isRestoringArchive} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Keep in History</button>
+              <button type="button" onClick={() => void confirmRestoreArchive()} disabled={isRestoringArchive} className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-[#0063a9] px-3 text-sm font-medium text-white transition hover:bg-[#00528c] disabled:cursor-wait disabled:opacity-60">
+                {isRestoringArchive ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" />Restoring…</> : 'Restore file'}
               </button>
             </div>
           </section>

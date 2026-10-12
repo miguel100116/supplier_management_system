@@ -1486,9 +1486,6 @@ export default function App() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="notification-center-title"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setIsNotificationModalOpen(false);
-          }}
         >
           <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950" style={{ width: '100%', maxWidth: '80rem', maxHeight: '92vh', backgroundColor: darkMode ? '#020617' : '#f8fafc' }}>
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
@@ -1605,9 +1602,6 @@ export default function App() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="settings-modal-title"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setIsSettingsModalOpen(false);
-          }}
         >
           <div className="flex max-h-[95vh] w-[96vw] max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">

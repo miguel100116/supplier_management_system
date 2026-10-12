@@ -466,8 +466,8 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   useModalEscape(isNotificationSettingsOpen, () => setIsNotificationSettingsOpen(false), 50);
   useModalEscape(Boolean(renewalTarget), () => setRenewalTarget(null), 50);
-  useModalEscape(Boolean(flagFlow), () => setFlagFlow(null), 50);
-  useModalEscape(Boolean(expiryStatusTarget), () => setExpiryStatusTarget(null), 50);
+  useModalEscape(Boolean(flagFlow), () => setFlagFlow(null), 50, true, flagFlow?.step !== 'confirm');
+  useModalEscape(Boolean(expiryStatusTarget), () => setExpiryStatusTarget(null), 50, true, !expiryStatusTarget?.confirmingMissing);
   const [notificationRules, setNotificationRules] = useState<DocNotificationRule[]>(DEFAULT_NOTIFICATION_RULES);
   // Portals "Add Notification" into Shell's page-heading row (same slot
   // DashboardPage's header actions use) so it sits on the title line instead

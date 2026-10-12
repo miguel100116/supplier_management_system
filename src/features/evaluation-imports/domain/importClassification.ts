@@ -8,6 +8,7 @@ export function classifyEvaluationImport(
   responseCounts: ReadonlyMap<string, number>,
 ): EvaluationImportTab {
   if (archive.importStatus === 'historical') return 'history';
+  if (archive.importStatus === 'active') return 'active';
   return (responseCounts.get(archive.importBatchId) ?? 0) > 0 ? 'active' : 'history';
 }
 

@@ -306,7 +306,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
       </section>
 
       {selectedCompany && (
-        <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/45 backdrop-blur-[1px]" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedCompany(null); }}>
+        <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/45 backdrop-blur-[1px]" role="presentation">
           <aside role="dialog" aria-modal="true" aria-labelledby="company-detail-title" className="h-full w-full max-w-md overflow-y-auto bg-white shadow-2xl dark:bg-slate-950">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><span className="text-xs font-semibold text-slate-400">Company performance</span><button type="button" onClick={() => setSelectedCompany(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close company details"><X size={18} /></button></div>
             <div className="space-y-6 p-5 sm:p-7">

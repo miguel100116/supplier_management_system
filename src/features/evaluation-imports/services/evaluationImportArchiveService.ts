@@ -106,6 +106,30 @@ export async function archiveEvaluationImports(
   return changedArchives;
 }
 
+/** Restore archived source records to Active Imports without changing evaluation responses. */
+export async function restoreEvaluationImportArchive(
+  selectedArchive: EvaluationImportArchive,
+): Promise<EvaluationImportArchive> {
+  if (!isSupabaseConfigured) throw new Error('Supabase is not configured.');
+  const current = (await loadEvaluationImportArchives()).find((archive) => archive.id === selectedArchive.id);
+  if (!current || current.importBatchId !== selectedArchive.importBatchId || current.storagePath !== selectedArchive.storagePath) {
+    throw new Error('This source file changed. Refresh Stored Source Files and try again.');
+  }
+  if (current.importStatus === 'active') {
+    throw new Error('This source file is no longer in Import History. Refresh Stored Source Files.');
+  }
+  const restored: EvaluationImportArchive = { ...current, importStatus: 'active' };
+  delete restored.historicalStatus;
+  delete restored.replacedAt;
+  delete restored.replacedByArchiveId;
+  delete restored.originalResponseCount;
+  await upsertApplicationRecords('evaluation_import_archive', [restored], (archive) => archive.id);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, { detail: { recordType: 'evaluation_import_archive' } }));
+  }
+  return restored;
+}
+
 export async function saveEvaluationImportArchive(
   file: File,
   surveyType: SurveyType | 'Combined',

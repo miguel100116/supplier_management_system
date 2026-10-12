@@ -258,10 +258,10 @@ export function PartnerCompaniesPage({
   // until they click "Apply Update" on the review modal below.
   const [importPreview, setImportPreview] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState('');
-  useModalEscape(Boolean(flagConfirmTarget), () => setFlagConfirmTarget(null), 60);
+  useModalEscape(Boolean(flagConfirmTarget), () => setFlagConfirmTarget(null), 60, true, false);
   useModalEscape(Boolean(renewalTarget && selectedCompany), () => setRenewalTarget(null), 60);
-  useModalEscape(Boolean(companyToDelete), () => setCompanyToDelete(null), 60);
-  useModalEscape(Boolean(companyToArchive), () => setCompanyToArchive(null), 60);
+  useModalEscape(Boolean(companyToDelete), () => setCompanyToDelete(null), 60, true, false);
+  useModalEscape(Boolean(companyToArchive), () => setCompanyToArchive(null), 60, true, false);
   useModalEscape(Boolean(importPreview), () => setImportPreview(null), 50);
   useModalEscape(Boolean(importResult), () => setImportResult(null), 50);
   useModalEscape(isRegisterOpen, () => setIsRegisterOpen(false), 50);

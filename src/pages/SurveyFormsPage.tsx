@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { ClipboardList, Search, Eye, FormInput, X, Check, Award, Building2, CalendarClock, ArrowLeft, Archive, Send, Pencil, CircleCheck, Clock3, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CustomForm, SurveyType, PartnerCompany, SurveyAccessRole } from '../types/survey';
@@ -163,13 +163,21 @@ export function SurveyFormsPage({
   // Destructive-action confirmation modals. Authorization is enforced by the
   // authenticated Admin route and Supabase RLS, not a browser-side passcode.
   const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
-  useModalEscape(isArchiveConfirmOpen, () => setIsArchiveConfirmOpen(false), 60);
+  const previewEditCloseRequest = useRef<(() => void) | null>(null);
+  const registerPreviewEditCloseRequest = useCallback((requestClose: (() => void) | null) => {
+    previewEditCloseRequest.current = requestClose;
+  }, []);
+  const requestClosePreviewEdit = () => {
+    if (previewEditCloseRequest.current) previewEditCloseRequest.current();
+    else setPreviewEditSurveyId(null);
+  };
+  useModalEscape(isArchiveConfirmOpen, () => setIsArchiveConfirmOpen(false), 60, true, false);
   useModalEscape(isCompanyPickerOpen, () => setIsCompanyPickerOpen(false), 55);
   useModalEscape(isModifyOpen, () => setIsModifyOpen(false), 50);
   useModalEscape(isModalOpen, () => setIsModalOpen(false), 50);
   useModalEscape(accessPickerOpen, () => setAccessPickerOpen(false), 65);
-  useModalEscape(Boolean(previewEditSurveyId), () => setPreviewEditSurveyId(null), 75);
-  useModalEscape(Boolean(sendConfirmationSurveyId), () => setSendConfirmationSurveyId(null), 80);
+  useModalEscape(Boolean(previewEditSurveyId), requestClosePreviewEdit, 75);
+  useModalEscape(Boolean(sendConfirmationSurveyId), () => setSendConfirmationSurveyId(null), 80, true, false);
   useModalEscape(Boolean(previewSurveyId) && !previewEditSurveyId && !sendConfirmationSurveyId, () => setPreviewSurveyId(null), 70);
 
   useEffect(() => {
@@ -1062,7 +1070,7 @@ export function SurveyFormsPage({
 
       {previewEditSurvey && (
         <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/45 p-2 sm:p-5" role="dialog" aria-modal="true" aria-label="Edit survey form">
-          <section className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-900 sm:p-6"><div className="mb-3 flex justify-end"><button onClick={() => setPreviewEditSurveyId(null)} aria-label="Close editor"><X size={20}/></button></div>{previewEditError && <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{previewEditError}</p>}<CreateSurveyPage key={previewEditSurvey.id} surveyToEdit={previewEditSurvey} onBack={() => setPreviewEditSurveyId(null)} onSave={handleSavePreviewEdit}/>{isSavingPreviewEdit && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/25"><p className="rounded-lg bg-white px-5 py-3 font-semibold shadow">Saving form…</p></div>}</section>
+          <section className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-900 sm:p-6"><div className="mb-3 flex justify-end"><button onClick={requestClosePreviewEdit} aria-label="Close editor"><X size={20}/></button></div>{previewEditError && <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{previewEditError}</p>}<CreateSurveyPage key={previewEditSurvey.id} surveyToEdit={previewEditSurvey} onBack={() => setPreviewEditSurveyId(null)} onRequestCloseReady={registerPreviewEditCloseRequest} onSave={handleSavePreviewEdit}/>{isSavingPreviewEdit && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/25"><p className="rounded-lg bg-white px-5 py-3 font-semibold shadow">Saving form…</p></div>}</section>
         </div>
       )}
 
