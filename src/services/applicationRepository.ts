@@ -430,7 +430,6 @@ export function subscribeToApplicationChanges(): () => void {
     'admin_activity',
     'document_modification',
     'export_history',
-    'supplier_ranking_history',
     'employee_notification_state',
     'reminder_settings',
     'compliance_snapshot',

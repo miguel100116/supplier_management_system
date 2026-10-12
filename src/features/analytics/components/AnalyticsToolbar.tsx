@@ -1,14 +1,11 @@
 import { SlidersHorizontal } from 'lucide-react';
 import { ArchiveSeries } from '../../../types/survey';
-import { RankingMode } from '../../../utils/scoring';
 
 type DataScope = 'current' | 'all-time' | 'custom';
 
 interface AnalyticsToolbarProps {
   dataScope: DataScope;
   onChangeDataScope?: (scope: DataScope) => void;
-  rankingMode: RankingMode;
-  onChangeRankingMode: (mode: RankingMode) => void;
   archiveSeries: ArchiveSeries[];
   selectedSeriesIds: string[];
   onToggleSeries: (id: string) => void;
@@ -20,16 +17,9 @@ const dataScopeOptions = [
   { value: 'custom', label: 'Custom', description: 'Shows analytics only from the archived periods you select below.' },
 ] as const;
 
-const rankingOptions: ReadonlyArray<{ value: RankingMode; label: string; description: string }> = [
-  { value: 'weighted', label: 'Volume-Weighted', description: 'Uses Bayesian weighting toward the peer mean, with a benchmark based on the median response count (minimum 3).' },
-  { value: 'pure', label: 'Pure Average', description: 'Ranks partner standings by unadjusted average score, using evaluation count to break ties.' },
-];
-
 export function AnalyticsToolbar({
   dataScope,
   onChangeDataScope,
-  rankingMode,
-  onChangeRankingMode,
   archiveSeries,
   selectedSeriesIds,
   onToggleSeries,
@@ -71,24 +61,10 @@ export function AnalyticsToolbar({
             </fieldset>
           )}
 
-          <fieldset className="min-w-0">
-            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Company ranking</legend>
-            <div className="segmented-control w-full xl:w-auto">
-              {rankingOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => onChangeRankingMode(option.value)}
-                  title={option.description}
-                  aria-label={`${option.label}. ${option.description}`}
-                  aria-pressed={rankingMode === option.value}
-                  className={rankingMode === option.value ? 'segmented-active' : ''}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </fieldset>
+          <div className="min-w-0">
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Company ranking</p>
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200" title="Bayesian weighting adjusts company averages toward the peer mean based on evaluation count.">Volume-Weighted Based</p>
+          </div>
         </div>
       </div>
 

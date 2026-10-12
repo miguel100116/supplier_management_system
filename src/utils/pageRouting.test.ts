@@ -26,7 +26,6 @@ test('uses the visible sidebar module names as canonical routes and keeps old ro
   const routes = [
     ['partner-companies', '/partners'],
     ['document-register', '/document-tracker'],
-    ['supplier-ranking', '/supplier-ranking'],
     ['partners-feedback-hub', '/feedback-hub'],
     ['survey-forms', '/evaluation-workspace'],
     ['archive', '/archive-center'],

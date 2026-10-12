@@ -5,7 +5,7 @@ import type { PartnerCompany, SurveyResponse, SurveyType } from '../../../types/
 import { isOfficialAnalyticsResponse } from '../../analytics/domain/responseProvenance';
 import { hasAnsweredItem, submissionCount, submissionScores } from '../../../utils/analytics';
 import { commitRawEvaluationImport, EvaluationFormMismatchError, FORM_SPECS, previewRawEvaluationImport } from '../../../utils/rawEvaluationImport';
-import { getPureAverageLeaderboard } from '../../../utils/scoring';
+import { getLeaderboard } from '../../../utils/scoring';
 import type { EvaluationImportArchive } from './importArchive';
 import { detectEvaluationPreviews, normalizeEvaluationFile } from './evaluationFilePreview';
 import { archiveEvaluationBatch, reconcileEvaluationBatchPartners, validateEvaluationBatchPreviews } from './evaluationBatch';
@@ -198,7 +198,7 @@ test('uploaded file answer contents drive countable forms after import', async (
   assert.equal(imported.summary.imported, 4);
   assert.equal(submissionCount(imported.responses), 3);
 
-  const leaderboard = new Map(getPureAverageLeaderboard(imported.responses, 'Courier').map((company) => [company.company, company]));
+  const leaderboard = new Map(getLeaderboard(imported.responses, 'Courier').map((company) => [company.company, company]));
   assert.equal(leaderboard.get('Mixed Answer Partner')?.evaluationCount, 1);
   assert.equal(leaderboard.get('N/A Only Partner')?.evaluationCount, 0);
   assert.equal(leaderboard.get('Fully Answered Partner')?.evaluationCount, 1);

@@ -89,7 +89,7 @@ Each survey type's questions are grouped into **5 scored categories** plus a fix
 
 - **Weighted rubric:** Each question carries a point value validated against the company's original paper evaluation forms (`src/data/questionWeights.ts`). Answers are scored, summed per category, and normalized so **every survey type shares one 0–100 composite axis** (`src/utils/scoring.ts`).
 - **Score bands:** Composite scores map to labeled bands (e.g. Critical → Excellent). Companies with no scoreable answers yet get a distinct "No Score Yet" band instead of being mislabeled as failing.
-- **Ranking:** Analytics and company-ranking reports use Bayesian volume-weighted scoring: `(R × v + C × m) / (v + m)`, where `C` is the unweighted mean of peer company averages and `m` is the median peer response count (minimum 3) for the same partner type and reporting scope. Analytics also offers Pure Average for unadjusted ranking. Reports label the adjusted value **Volume-Weighted Score**; the rubric-based Composite Score remains unchanged.
+- **Ranking:** Analytics and company-ranking reports use Bayesian volume-weighted scoring: `(R × v + C × m) / (v + m)`, where `C` is the unweighted mean of peer company averages and `m` is the median peer response count (minimum 3) for the same partner type and reporting scope. Reports label the adjusted value **Volume-Weighted Score**; the rubric-based Composite Score remains unchanged.
 - **Renaming vs. rubric:** Admins can **rename** a category's display label via the **Categories Manager** without ever touching the underlying point values — display names are translated by slot position, keeping the validated rubric intact.
 
 - **Counted forms:** A unique submission counts when at least one evaluation rating or designated remark has a real answer. Numeric zero counts; blank, N/A, none, dash, and nil markers do not. Metadata such as Period Covered never counts. Blank/N/A-only forms are excluded from totals and completion counts; score averages still use numeric ratings.
@@ -143,7 +143,6 @@ A **Data Scope** toggle further switches between *Current* (active period), *All
 | **Partner Companies** | Manage external courier, supplier, and subcontractor rosters, branches, documents, and the Admin-only dated Active Companies upload history. |
 | **Document Tracker** | Categorized compliance-document register across all partner companies. |
 | **Renew Compliance Documents** | Action permission: update document expiry/status without full Account Management access. |
-| **Supplier Ranking** | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys. |
 | **Partners Feedback Hub** | Send report cards to partner companies (single or bulk email via Microsoft Graph). |
 | **Account Management** | Create company-domain logins with a generated or customized initial password, and configure roles, ranks, departments, and per-user/per-department permissions. |
 | **Notifications** | Audit trail of incoming survey responses and document-expiry alerts, opened as a modal from the header bell rather than a separate sidebar destination. |
@@ -152,7 +151,7 @@ A **Data Scope** toggle further switches between *Current* (active period), *All
 | **Categories Manager** | Rename the display labels of scoring categories per survey type. |
 | **Settings / Profile** | A large modal opened from the account-session dropdown. Employees retain their full profile, impact, recent-submission, preference, and session view; Admins retain the complete Settings view with activity, import, and cache-management tools. |
 
-Form details show **Recent Form Submissions** in pages of 10. The Supplier Ranking **Modification Log** also shows 10 entries per page. Both display the visible range and provide Previous/Next controls when needed; changing filters or sorting returns to the first page.
+Form details show **Recent Form Submissions** in pages of 10, with the visible range and Previous/Next controls when needed.
 
 Select or drop one or more `.csv`, `.xlsx`, or `.xls` response exports on the Import Evaluation Responses page. Each file may contain one or more recognized forms; the normal **Import selected files** action accepts any category mix. Choose non-overlapping exports: duplicate source response IDs in one batch are rejected to prevent silent replacement. To check a batch without replacing existing evaluations, use **Test import**. Its responses appear in Analytics under the files' submission dates. After an import, **Remove file** or **Remove test file** appears beside each uploaded file and remains available in **Stored Source Files** after a page refresh. The selection X is shown only before importing. Both per-file removal actions delete responses still tagged to the selected file's import batch, the stored object, and its archive record. Test removal also deletes temporary partner records. Ordinary imports may have replaced earlier responses; those earlier values cannot be restored by removing the current file, and ordinary partner records remain in the registry. If a temporary partner has since been referenced by another evaluation, test removal stops before deleting data.
 
@@ -214,7 +213,7 @@ Supplier_Management_System/
 
 ## 7. Data Storage & Persistence
 
-**Current state:** Authenticated staging users load and save profiles, department permissions, surveys, Partner Companies/documents, evaluation responses, archives, category labels, Feedback Hub data, notification/reminder settings, compliance snapshots, ranking history, activity/modification logs, export history, and employee notification state through Supabase. Existing eligible browser records are migrated once, after which the remote record set is authoritative. `localStorage` is retained as an authenticated startup cache and for intentionally device-specific state such as in-progress survey drafts and layout preferences.
+**Current state:** Authenticated staging users load and save profiles, department permissions, surveys, Partner Companies/documents, evaluation responses, archives, category labels, Feedback Hub data, notification/reminder settings, compliance snapshots, activity/modification logs, export history, and employee notification state through Supabase. Legacy Supplier Ranking history rows remain stored in Supabase but are no longer loaded or updated by the application. Existing eligible browser records are migrated once, after which the remote record set is authoritative. `localStorage` is retained as an authenticated startup cache and for intentionally device-specific state such as in-progress survey drafts and layout preferences.
 
 > **Implication:** Authenticated shared business data is available across devices through staging Supabase. Clearing browser storage removes only the local cache and device-specific drafts/preferences; it does not delete the shared backend records.
 

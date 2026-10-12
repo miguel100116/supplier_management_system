@@ -9,44 +9,30 @@ import { getQuestionMaxPoints, isScoredQuestion } from '../data/questionWeights'
  *   with incomplete/expired documents is still evaluable. Document status
  *   is tracked independently (see computeCompanyDocumentSummary) and shown
  *   in the Document Tracker, it just doesn't gate survey eligibility.
- * - Supplier is the one type with a curated default pool: only the
- *   admin-ranked Top 20 (`evaluationRank` 1-20, set via the Supplier
- *   Ranking page) count by default. Courier/Subcontractor have no such
- *   curation - every non-archived company of type counts.
  * - If the survey has no custom selection (`evaluationCompanyIds` unset/empty),
- *   every company in that default pool counts (the default "select all").
- * - If the survey has a custom selection, only companies from that default
- *   pool whose ID is still present in `evaluationCompanyIds` count. Companies
- *   that were removed from the registry (or, for Supplier, dropped out of
- *   the Top 20) drop out automatically.
+ *   every active registered company of that survey type counts. Supplier Top
+ *   20 is a survey-specific selection made in the Evaluation Workspace.
+ * - If the survey has a custom selection, only active companies whose ID is
+ *   present in `evaluationCompanyIds` count. Companies removed or archived
+ *   from the registry drop out automatically.
  */
 export function getSurveyEvaluationCompanies(
   survey: Pick<CustomForm, 'surveyType' | 'evaluationCompanyIds'>,
   partnerCompanies: PartnerCompany[],
   currentDateStr: string = new Date().toISOString().slice(0, 10)
 ): PartnerCompany[] {
-  const companiesOfType = partnerCompanies.filter((c) => {
-    if (c.type !== survey.surveyType) return false;
-    if (c.isArchived) return false;
-    if (survey.surveyType === 'Supplier' && !(c.evaluationRank && c.evaluationRank >= 1 && c.evaluationRank <= 20)) {
-      return false;
-    }
-    return true;
-  });
+  const activeCompaniesOfType = partnerCompanies.filter((c) => c.type === survey.surveyType && !c.isArchived);
   if (!survey.evaluationCompanyIds || survey.evaluationCompanyIds.length === 0) {
-    return companiesOfType;
+    return activeCompaniesOfType;
   }
   const selectedIds = new Set(survey.evaluationCompanyIds);
-  return companiesOfType.filter((c) => selectedIds.has(c.id));
+  return activeCompaniesOfType.filter((c) => selectedIds.has(c.id));
 }
 
 /**
- * Every non-archived company of a given type, ignoring Supplier's Top 20
- * curation entirely. Used only by the "Modify Companies to Evaluate" picker
- * so the admin can see (and, if they choose, opt into evaluating) the full
- * Supplier universe rather than just the current Top 20 - unlike
- * getSurveyEvaluationCompanies, which is what actually gates evaluation
- * eligibility everywhere else.
+ * Every active company of a given type. Used by the "Modify Companies to
+ * Evaluate" picker so the admin can choose any active supplier, including
+ * companies outside the current leaderboard Top 20.
  */
 export function getAllCompaniesOfType(
   surveyType: SurveyType,

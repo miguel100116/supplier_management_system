@@ -14,7 +14,6 @@ export type PageModuleKey =
   | 'archive'
   | 'import-evaluations'
   | 'document-register'
-  | 'supplier-ranking'
   // Action permission (not a nav page): allowed to update compliance
   // document expiry/renewal in Partner Companies and the Document Register.
   | 'renew-documents';

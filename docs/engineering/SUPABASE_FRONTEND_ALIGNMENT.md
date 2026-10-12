@@ -204,7 +204,7 @@ The frontend must not write normalized import tables. Import tooling and reviewe
 | `compliance_snapshot` | snapshot ID | confirmed authenticated users | Admin only |
 | `active_company_snapshot` | type/timestamp/UUID | Admin only | Admin only |
 
-The canonical list is exported as `APPLICATION_RECORD_TYPES` from `applicationRepository.ts`. A focused automated test compares it with the latest migration constraint.
+The canonical list is exported as `APPLICATION_RECORD_TYPES` from `applicationRepository.ts`. A focused automated test compares it with the latest migration constraint. `supplier_ranking_history` is a legacy record type retained for existing rows; the removed Supplier Ranking module no longer hydrates or writes it.
 
 ## Feature-to-service alignment
 

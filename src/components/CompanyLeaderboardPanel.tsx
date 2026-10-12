@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react';
 import { Building2, Trophy, Truck, UsersRound } from 'lucide-react';
 import { SurveyResponse, SurveyType } from '../types/survey';
 import { surveyTypeDisplayLabel, formatCompositeScore, getRemarkText } from '../data/questionWeights';
-import { getLeaderboard, getPureAverageLeaderboard, RankingMode } from '../utils/scoring';
+import { getLeaderboard } from '../utils/scoring';
 
 interface CompanyLeaderboardPanelProps {
   responses: SurveyResponse[];
-  rankingMode: RankingMode;
 }
 
 const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
@@ -30,12 +29,12 @@ function rankIndicatorClass(rank: number): string {
   return 'border-slate-200 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400';
 }
 
-export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeaderboardPanelProps) {
+export function CompanyLeaderboardPanel({ responses }: CompanyLeaderboardPanelProps) {
   const [surveyType, setSurveyType] = useState<SurveyType>('Courier');
 
   const leaderboard = useMemo(
-    () => rankingMode === 'weighted' ? getLeaderboard(responses, surveyType) : getPureAverageLeaderboard(responses, surveyType),
-    [responses, surveyType, rankingMode]
+    () => getLeaderboard(responses, surveyType),
+    [responses, surveyType]
   );
 
   // Split the ranked list into two even columns, preserving rank order
@@ -45,10 +44,8 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
     return [leaderboard.slice(0, midpoint), leaderboard.slice(midpoint)];
   }, [leaderboard]);
 
-  const metricLabel = rankingMode === 'weighted' ? 'Weighted score' : 'Average score';
-  const leaderboardDescription = rankingMode === 'weighted'
-    ? 'Top performing companies based on weighted scores.'
-    : 'Top performing companies based on average scores.';
+  const metricLabel = 'Weighted score';
+  const leaderboardDescription = 'Top performing companies based on volume-weighted scores.';
 
   const renderColumn = (items: typeof leaderboard, startIndex: number) => (
     <div className={items.length === 0 ? 'hidden xl:block' : 'min-w-0'}>
@@ -59,7 +56,7 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
       </div>
       <ol className="divide-y divide-slate-100 dark:divide-slate-800" aria-label={`${surveyType} company rankings by ${metricLabel.toLowerCase()}`}>
         {items.map((composite, i) => {
-          const rank = composite.displayRank ?? startIndex + i + 1;
+          const rank = startIndex + i + 1;
           const score = composite.hasScore
             ? formatCompositeScore(composite.surveyType, composite.rankScore)
             : null;
@@ -136,9 +133,7 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
             <h3 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">Company Leaderboards</h3>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-            {rankingMode === 'weighted'
-              ? 'Composite scores weighted to match each form\'s actual point values, ranked within their own peer group and adjusted for evaluation volume so a handful of reviews can\'t outrank dozens.'
-              : 'Ranked purely by actual average score regardless of evaluation count. Ties broken by number of evaluations — more respondents rank higher. Companies with an identical score and submission count share the same rank.'}
+            Composite scores respect each form's actual point values, rank within each partner peer group, and adjust for evaluation volume so a handful of reviews cannot outrank dozens.
           </p>
         </div>
 

@@ -35,9 +35,9 @@ const PROFILE_PAGE_MODULES = [
   'archive',
   'import-evaluations',
   'document-register',
-  'supplier-ranking',
   'renew-documents',
 ] as const satisfies readonly PageModuleKey[];
+const LEGACY_PROFILE_PAGE_MODULES = ['supplier-ranking'] as const;
 const PROFILE_SURVEY_TYPES = ['Courier', 'Supplier', 'Subcontractor'] as const satisfies readonly SurveyType[];
 
 function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
@@ -65,7 +65,14 @@ export function parsePersistedProfile(value: unknown, label = 'profile'): Persis
   if (!isOneOf(record.designation, PROFILE_DESIGNATIONS)) throw new Error(`${label}.designation is invalid.`);
   if (!isOneOf(record.department, PROFILE_DEPARTMENTS)) throw new Error(`${label}.department is invalid.`);
 
-  const pages = parseOptionalEnumArray(record.permission_pages, PROFILE_PAGE_MODULES, `${label}.permission_pages`);
+  const storedPages = parseOptionalEnumArray(
+    record.permission_pages,
+    [...PROFILE_PAGE_MODULES, ...LEGACY_PROFILE_PAGE_MODULES],
+    `${label}.permission_pages`,
+  );
+  // Older persisted profiles may still contain the removed module key. Accept
+  // it at the storage boundary but never expose it as an active permission.
+  const pages = storedPages?.filter((page): page is PageModuleKey => page !== 'supplier-ranking');
   const surveyTypes = parseOptionalEnumArray(
     record.permission_survey_types,
     PROFILE_SURVEY_TYPES,

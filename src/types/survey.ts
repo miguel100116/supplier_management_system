@@ -75,15 +75,6 @@ export interface PartnerCompany {
   // Set when the record is archived and cleared when it is restored.
   archivedAt?: string;
   accreditationStatus?: AccreditationStatus;
-  // Only meaningful when type === 'Supplier'. 1-20, admin-curated via the
-  // Supplier Ranking page - determines which 20 of the non-archived
-  // Suppliers are evaluable by default (see getSurveyEvaluationCompanies in
-  // analytics.ts). Unset/out-of-range means "not in the Top 20".
-  // NOT the same field as BranchRecord.supplierRank below (a per-branch
-  // 'Major'/'Regular' tier classification, edited from the Document
-  // Register and unrelated to evaluation eligibility) - always label this
-  // one "Evaluation Rank" in UI copy to avoid confusing the two.
-  evaluationRank?: number;
   // 1..n; almost always 1. Absent/empty means "not yet migrated" — callers
   // should treat that the same as a single minimal branch.
   branches?: BranchRecord[];

@@ -52,7 +52,6 @@ const SurveyDetailsPage = lazy(() => import('./pages/SurveyDetailsPage').then(({
 const SurveyFillerPage = lazy(() => import('./pages/SurveyFillerPage').then(({ SurveyFillerPage }) => ({ default: SurveyFillerPage })));
 const PartnerCompaniesPage = lazy(() => import('./pages/PartnerCompaniesPage').then(({ PartnerCompaniesPage }) => ({ default: PartnerCompaniesPage })));
 const DocumentRegisterPage = lazy(() => import('./pages/DocumentRegisterPage').then(({ DocumentRegisterPage }) => ({ default: DocumentRegisterPage })));
-const SupplierRankingPage = lazy(() => import('./pages/SupplierRankingPage').then(({ SupplierRankingPage }) => ({ default: SupplierRankingPage })));
 const SurveyFormsPage = lazy(() => import('./pages/SurveyFormsPage').then(({ SurveyFormsPage }) => ({ default: SurveyFormsPage })));
 const PresentPage = lazy(() => import('./pages/PresentPage').then(({ PresentPage }) => ({ default: PresentPage })));
 const ArchivePage = lazy(() => import('./pages/ArchivePage').then(({ ArchivePage }) => ({ default: ArchivePage })));
@@ -140,7 +139,6 @@ const adminNavItems: NavItem<PageKey>[] = [
     children: [
       { key: 'partner-companies', label: 'Partners' },
       { key: 'document-register', label: 'Document Tracker' },
-      { key: 'supplier-ranking', label: 'Supplier Ranking' },
       { key: 'partners-feedback-hub', label: 'Feedback Hub' },
     ],
   },
@@ -343,7 +341,7 @@ export default function App() {
       return {
         pages: [
           'dashboard', 'survey-forms', 'explorer', 'analytics', 'reports', 'present',
-          'partner-companies', 'document-register', 'renew-documents', 'supplier-ranking', 'partners-feedback-hub', 'account-management', 'notifications', 'archive', 'import-evaluations',
+          'partner-companies', 'document-register', 'renew-documents', 'partners-feedback-hub', 'account-management', 'notifications', 'archive', 'import-evaluations',
         ] as PageModuleKey[],
         surveyTypes: ['Courier', 'Supplier', 'Subcontractor'] as SurveyType[]
       };
@@ -373,7 +371,6 @@ export default function App() {
     responses,
     archivedResponses,
     archiveSeries,
-    renameArchiveSeries,
     archiveResponsesForSurveys,
     archiveResponsesForSurveyTypes,
     restoreResponseGroup,
@@ -389,7 +386,6 @@ export default function App() {
     partnerCompanies,
     addPartnerCompany,
     updatePartnerCompany,
-    updatePartnerCompaniesBulk,
     updatePartnerDocument,
     removePartnerCompany,
     previewMasterListImport,
@@ -1086,15 +1082,6 @@ export default function App() {
         isAdmin={isAdmin}
       />
     ),
-    'supplier-ranking': (
-      <SupplierRankingPage
-        partnerCompanies={partnerCompanies}
-        onUpdateCompaniesBulk={updatePartnerCompaniesBulk}
-        surveys={surveys}
-        responses={responses}
-        currentUserEmail={account || ''}
-      />
-    ),
     'partners-feedback-hub': (
       <PartnersFeedbackHubPage
         surveys={userAccessibleSurveys}
@@ -1317,7 +1304,6 @@ export default function App() {
         partnerCompanies={partnerCompanies}
         archivedResponses={archivedResponses}
         archiveSeries={archiveSeries}
-        onRenameArchiveSeries={renameArchiveSeries}
         onUpdateSurvey={updateSurvey}
         onUpdatePartnerCompany={updatePartnerCompany}
         onRestoreResponseGroup={restoreResponseGroup}
@@ -1325,6 +1311,7 @@ export default function App() {
         onDeleteArchivedResponseGroups={deleteArchivedResponseGroups}
         onRestoreArchivedResponseGroups={restoreArchivedResponseGroups}
         onImportArchivedResponses={importArchivedResponses}
+        currentUserEmail={account || ''}
         isAdmin={isAdmin}
       />
     ),

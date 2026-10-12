@@ -7,7 +7,7 @@ import { StateMessage } from '../components/StateMessage';
 import { formatCompositeScore, getBand } from '../data/questionWeights';
 import { ArchiveSeries, FilterState, PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { formatNumber, hasAnsweredItem, monthlyTrend, questionPerformance, responseVolume, seriesTrend, submissionCount, submissionScores, yearlyTrend } from '../utils/analytics';
-import { computeCompanyComposite, RankingMode } from '../utils/scoring';
+import { computeCompanyComposite } from '../utils/scoring';
 import { getAnalyticsCompanyRankings, paginateAnalyticsItems, paginateCompanyRankings } from '../features/analytics/domain/rankings';
 import { QuestionPerformanceRow } from '../features/analytics/components/QuestionPerformanceRow';
 import { AnalyticsDateRangeControls } from '../features/analytics/components/AnalyticsDateRangeControls';
@@ -65,7 +65,6 @@ function AnalyticsTooltip({ text }: { text: string }) {
 }
 
 export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilters, dataScope = 'current', onChangeDataScope, archiveSeries = [], selectedSeriesIds = [], onChangeSelectedSeriesIds, dateRange = { from: '', to: '' }, onChangeDateRange, partnerCompanies = [], archivedResponses = [] }: AnalyticsPageProps) {
-  const [rankingMode, setRankingMode] = useState<RankingMode>('weighted');
   const [selectedCompany, setSelectedCompany] = useState<CompanySummary | null>(null);
   const [trendGranularity, setTrendGranularity] = useState<'monthly' | 'yearly' | 'series'>('monthly');
   const [leaderboardPage, setLeaderboardPage] = useState(0);
@@ -78,8 +77,8 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
   const averageScore = scoredSubmissions.length ? scoredSubmissions.reduce((sum, submission) => sum + submission.score, 0) / scoredSubmissions.length : 0;
 
   const companySummaries = useMemo(() => {
-    return getAnalyticsCompanyRankings(responses, activeSurveyTypes, rankingMode) as CompanySummary[];
-  }, [responses, activeSurveyTypes, rankingMode]);
+    return getAnalyticsCompanyRankings(responses, activeSurveyTypes) as CompanySummary[];
+  }, [responses, activeSurveyTypes]);
 
   const visibleCompanies = useMemo(() => selectedType === 'All' ? companySummaries : companySummaries.filter((company) => company.type === selectedType), [companySummaries, selectedType]);
   const paginatedCompanies = useMemo(
@@ -123,7 +122,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
 
   const analyticsHeader = (
     <>
-      <AnalyticsHeader dataScope={dataScope} onChangeDataScope={onChangeDataScope} rankingMode={rankingMode} onChangeRankingMode={setRankingMode} />
+      <AnalyticsHeader dataScope={dataScope} onChangeDataScope={onChangeDataScope} />
       {dataScope === 'custom' && (
         <AnalyticsDateRangeControls value={dateRange} onChange={(range) => {
           setLeaderboardPage(0);
@@ -179,7 +178,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
         </div>
 
         <div className="px-4 py-3 sm:px-6">
-          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem] border-b border-slate-100 px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:border-slate-800 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]"><span>Rank</span><span>Company</span><span className="text-right">{rankingMode === 'weighted' ? 'Rank score' : 'Average score'}</span><span className="hidden text-right sm:block">Forms</span></div>
+          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem] border-b border-slate-100 px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:border-slate-800 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]"><span>Rank</span><span>Company</span><span className="text-right">Rank score</span><span className="hidden text-right sm:block">Forms</span></div>
           <div className="grid min-w-0 gap-x-5 xl:grid-cols-2">
             {leaderboardColumns.map((column, columnIndex) => (
               <ol key={columnIndex} start={column.startIndex + 1} className="min-w-0">
@@ -275,7 +274,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
   );
 }
 
-function AnalyticsHeader({ dataScope, onChangeDataScope, rankingMode, onChangeRankingMode }: { dataScope: 'current' | 'all-time' | 'custom'; onChangeDataScope?: (scope: 'current' | 'all-time' | 'custom') => void; rankingMode: RankingMode; onChangeRankingMode: (mode: RankingMode) => void }) {
+function AnalyticsHeader({ dataScope, onChangeDataScope }: { dataScope: 'current' | 'all-time' | 'custom'; onChangeDataScope?: (scope: 'current' | 'all-time' | 'custom') => void }) {
   return (
     <header className="space-y-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -283,7 +282,7 @@ function AnalyticsHeader({ dataScope, onChangeDataScope, rankingMode, onChangeRa
           <PageDescription>Review evaluation results, identify performance gaps, and compare partner companies.</PageDescription>
         </div>
       </div>
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"><div className="grid grid-cols-3 rounded-lg bg-slate-100 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-4 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-[#0078a8] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><label className="flex items-center gap-2 text-xs font-semibold text-slate-500">Company ranking<select aria-label="Company ranking formula" title={rankingMode === 'weighted' ? 'Bayesian weighted score = (company average × responses + peer average × benchmark) ÷ (responses + benchmark). Benchmark is the peer median response count, with a minimum of 3.' : 'Pure average uses the company average without Bayesian weighting.'} value={rankingMode} onChange={(event) => onChangeRankingMode(event.target.value as RankingMode)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><option value="weighted">Volume-weighted</option><option value="pure">Pure average</option></select></label></div>
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"><div className="grid grid-cols-3 rounded-lg bg-slate-100 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-4 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-[#0078a8] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-Weighted Based</span></div></div>
     </header>
   );
 }

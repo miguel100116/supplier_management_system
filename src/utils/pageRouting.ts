@@ -3,7 +3,6 @@ export type PageKey =
   | 'dashboard'
   | 'partner-companies'
   | 'document-register'
-  | 'supplier-ranking'
   | 'partners-feedback-hub'
   | 'account-management'
   | 'survey-forms'
@@ -44,7 +43,6 @@ const PAGE_KEYS = new Set<PageKey>([
   'dashboard',
   'partner-companies',
   'document-register',
-  'supplier-ranking',
   'partners-feedback-hub',
   'account-management',
   'survey-forms',
@@ -71,7 +69,6 @@ const PAGE_PATH_SEGMENTS: Record<PageKey, string> = {
   dashboard: 'dashboard',
   'partner-companies': 'partners',
   'document-register': 'document-tracker',
-  'supplier-ranking': 'supplier-ranking',
   'partners-feedback-hub': 'feedback-hub',
   'account-management': 'employees-users',
   'survey-forms': 'evaluation-workspace',
