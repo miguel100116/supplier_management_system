@@ -4,45 +4,54 @@ import test from 'node:test';
 import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PartnerCompaniesFilterToolbar } from './PartnerCompaniesFilterToolbar';
+import { PartnerRegistryOverview } from './PartnerRegistryOverview';
 
 const PARTNER_COMPANIES_SOURCE = readFileSync(
   new URL('../../../pages/PartnerCompaniesPage.tsx', import.meta.url),
   'utf8',
 );
-const FILTER_TOOLBAR_SOURCE = readFileSync(
-  new URL('./PartnerCompaniesFilterToolbar.tsx', import.meta.url),
-  'utf8',
-);
+const FILTER_TOOLBAR_SOURCE = readFileSync(new URL('./PartnerCompaniesFilterToolbar.tsx', import.meta.url), 'utf8');
 
-test('category and supplier-rank tables fit their cards without horizontal scrolling', () => {
-  const breakdown = PARTNER_COMPANIES_SOURCE.match(
-    /\{\/\* Category & Supplier Rank Breakdown[\s\S]*?<PartnerCompaniesFilterToolbar/,
-  )?.[0];
+test('registry overview presents live status counts and branch category/rank distributions', () => {
+  const overview = renderToStaticMarkup(createElement(PartnerRegistryOverview, {
+    categorySummary: {
+      buckets: {
+        'Supplier-Local': 3,
+        'Supplier-Foreign': 2,
+        Courier: 1,
+        Subcontractor: 0,
+        'Supplier-Local-NT': 1,
+        'Supplier-Foreign-NT': 0,
+        'Courier-NT': 0,
+        'Subcontractor-NT': 0,
+      },
+      total: 7,
+      major: 2,
+      regular: 5,
+    },
+    branchCount: 8,
+    activeCount: 6,
+    incompleteCount: 2,
+    expiredCount: 1,
+    archivedCount: 3,
+    expanded: true,
+    onToggleExpanded: () => {},
+    onStatusChange: () => {},
+    status: 'Active',
+    isAdmin: true,
+    onOpenActiveCompanies: () => {},
+    onOpenRegister: () => {},
+  }));
 
-  assert.ok(breakdown);
-  assert.doesNotMatch(breakdown, /overflow-x-auto/);
-  assert.doesNotMatch(breakdown, /min-w-\[480px\]/);
-  assert.equal(breakdown.match(/w-full table-fixed text-sm/g)?.length, 2);
-  assert.equal(breakdown.match(/w-20 px-3 py-2 text-right sm:w-24 sm:px-4">Branches/g)?.length, 2);
+  for (const text of ['Active Companies by Type', 'Register New Partner', '6', '7 Accredited Branches Mapped', 'Supplier – Local', 'Standard', 'Non-Trade (NT)', 'Regular Rank', 'Major Rank', '88% Rank Mapping Coverage']) {
+    assert.ok(overview.includes(text), text);
+  }
+  assert.match(overview, /aria-pressed="true"/);
+  assert.match(overview, /role="group" aria-label="Filter by partner status"/);
+  assert.match(PARTNER_COMPANIES_SOURCE, /onStatusChange=\{setStatusTab\}/);
 });
 
-test('SMS-22 groups registry controls into compact selects and one advanced filter disclosure', () => {
-  assert.match(PARTNER_COMPANIES_SOURCE, /<PartnerCompaniesFilterToolbar/);
-  assert.match(PARTNER_COMPANIES_SOURCE, /Click row to edit or renew/);
-  assert.ok(PARTNER_COMPANIES_SOURCE.indexOf('<PartnerCompaniesFilterToolbar') < PARTNER_COMPANIES_SOURCE.indexOf('Click row to edit or renew'));
-
-  assert.match(FILTER_TOOLBAR_SOURCE, /Filter partners by status/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /Filter partners by category/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /Register New Partner/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /placeholder="Search by name or BP Code\.\.\."/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /aria-controls="partner-company-advanced-filters"/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /advancedFilterCount/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /Reset all partner filters/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /Registration date/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /Document expiration/);
-});
-
-test('SMS-65 shows only active filter chips and keeps reset out of the default toolbar', () => {
+test('registry filters keep search, category, origin, sorting, date, expiration, and reset controls visible', () => {
   const noop = () => {};
   const base: ComponentProps<typeof PartnerCompaniesFilterToolbar> = {
     statusTab: 'Active',
@@ -55,14 +64,7 @@ test('SMS-65 shows only active filter chips and keeps reset out of the default t
     searchQuery: '',
     onSearchChange: noop,
     onSearchClear: noop,
-    isAdmin: true,
-    importFileInputRef: { current: null },
-    onImportFileSelected: noop,
-    onOpenActiveCompanies: noop,
-    onOpenRegister: noop,
-    isAdvancedFiltersOpen: true,
-    onToggleAdvancedFilters: noop,
-    advancedFilterCount: 0,
+    resultCount: 3,
     sortOptions: [{ value: 'default', label: 'Default order' }, { value: 'name-desc', label: 'Company: Z-A' }],
     sortValue: 'default',
     onSortChange: noop,
@@ -75,11 +77,10 @@ test('SMS-65 shows only active filter chips and keeps reset out of the default t
     onReset: noop,
   };
   const defaultMarkup = renderToStaticMarkup(createElement(PartnerCompaniesFilterToolbar, base));
-  assert.match(defaultMarkup, /Search by name or BP Code/);
-  assert.match(defaultMarkup, /Status: Active/);
-  assert.match(defaultMarkup, /Active by Type/);
-  assert.doesNotMatch(defaultMarkup, /Clear all/);
-  assert.doesNotMatch(defaultMarkup, /Reset all partner filters/);
+  for (const label of ['Search company name or BP code', 'All categories', 'Couriers', 'Suppliers', 'Subcontractors', 'Uncategorized', 'Sort', 'Date range', 'Expiration', '3 partners found', 'Reset']) {
+    assert.ok(defaultMarkup.includes(label), label);
+  }
+  assert.doesNotMatch(defaultMarkup, /partner-company-advanced-filters/);
 
   const activeMarkup = renderToStaticMarkup(createElement(PartnerCompaniesFilterToolbar, {
     ...base,
@@ -90,25 +91,17 @@ test('SMS-65 shows only active filter chips and keeps reset out of the default t
     sortValue: 'name-desc',
     registeredFrom: '2026-01-01',
     documentFilter: 'expired',
-    advancedFilterCount: 3,
   }));
   for (const label of ['Search: Acme', 'Status: Expired', 'Category: Suppliers', 'Origin: Foreign', 'Sort: Company: Z-A', 'Registered from: 2026-01-01', 'Documents: Expired / for update']) {
     assert.ok(activeMarkup.includes(label), label);
   }
-  assert.match(activeMarkup, /Clear all/);
-  assert.match(activeMarkup, /Reset all partner filters/);
+  assert.match(activeMarkup, /Filter suppliers by origin/);
   assert.match(activeMarkup, /Clear partner search/);
 });
 
 test('archived partners record and display the archive date and time', () => {
-  const surveyTypesSource = readFileSync(
-    new URL('../../../types/survey.ts', import.meta.url),
-    'utf8',
-  );
-  const recordSchemasSource = readFileSync(
-    new URL('../../../services/applicationRecordSchemas.ts', import.meta.url),
-    'utf8',
-  );
+  const surveyTypesSource = readFileSync(new URL('../../../types/survey.ts', import.meta.url), 'utf8');
+  const recordSchemasSource = readFileSync(new URL('../../../services/applicationRecordSchemas.ts', import.meta.url), 'utf8');
 
   assert.match(surveyTypesSource, /archivedAt\?: string/);
   assert.match(recordSchemasSource, /optionalDate\(candidate\.archivedAt, `\$\{label\}\.archivedAt`\)/);

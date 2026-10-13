@@ -1,5 +1,4 @@
-import React, { type ChangeEvent, type RefObject } from 'react';
-import { ArrowUpDown, Building, CalendarRange, ChevronDown, Plus, RotateCcw, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowUpDown, CalendarRange, RotateCcw, Search, X } from 'lucide-react';
 import type { PartnerCompanyType, SupplierOrigin } from '../../../types/survey';
 import type { TableSortOption } from '../../../components/TableFilterBar';
 
@@ -18,14 +17,7 @@ interface PartnerCompaniesFilterToolbarProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onSearchClear: () => void;
-  isAdmin?: boolean;
-  importFileInputRef: RefObject<HTMLInputElement>;
-  onImportFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
-  onOpenActiveCompanies: () => void;
-  onOpenRegister: () => void;
-  isAdvancedFiltersOpen: boolean;
-  onToggleAdvancedFilters: () => void;
-  advancedFilterCount: number;
+  resultCount: number;
   sortOptions: TableSortOption<string>[];
   sortValue: string;
   onSortChange: (value: string) => void;
@@ -65,14 +57,7 @@ export function PartnerCompaniesFilterToolbar({
   searchQuery,
   onSearchChange,
   onSearchClear,
-  isAdmin,
-  importFileInputRef,
-  onImportFileSelected,
-  onOpenActiveCompanies,
-  onOpenRegister,
-  isAdvancedFiltersOpen,
-  onToggleAdvancedFilters,
-  advancedFilterCount,
+  resultCount,
   sortOptions,
   sortValue,
   onSortChange,
@@ -95,99 +80,63 @@ export function PartnerCompaniesFilterToolbar({
   if (documentFilter !== 'all') chips.push({ key: 'document', label: 'Documents: ' + DOCUMENT_LABELS[documentFilter], onRemove: () => onDocumentFilterChange('all') });
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-        <div className="relative w-full min-w-0 sm:min-w-[250px] sm:flex-[2]">
-          <label htmlFor="partner-company-search" className="sr-only">Search partners by name or BP Code</label>
-          <input
-            id="partner-company-search"
-            type="text"
-            value={searchQuery}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Search by name or BP Code..."
-            className="field !mt-0 w-full py-2 pl-3 pr-9 text-xs"
-          />
-          {searchQuery && (
-            <button type="button" onClick={onSearchClear} aria-label="Clear partner search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-              <X size={15} aria-hidden="true" />
-            </button>
-          )}
+    <div className="@container space-y-2">
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950 @min-[600px]:p-4 @min-[900px]:space-y-4">
+        <div className="flex min-w-0 flex-col gap-3 @min-[1100px]:flex-row @min-[1100px]:items-center">
+          <div className="relative min-w-0 flex-1">
+            <label htmlFor="partner-company-search" className="sr-only">Search partners by name or BP Code</label>
+            <Search size={15} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              id="partner-company-search"
+              type="text"
+              value={searchQuery}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="       Search company name or BP code..."
+              className="field !mt-0 w-full py-2 pl-9 pr-9 text-xs"
+            />
+            {searchQuery && <button type="button" onClick={onSearchClear} aria-label="Clear partner search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"><X size={15} aria-hidden="true" /></button>}
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-lg bg-slate-50 p-1.5 dark:bg-slate-900" role="group" aria-label="Filter by partner category">
+            {CATEGORY_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => onCategoryChange(option.value)} aria-pressed={categoryTab === option.value} className={`min-h-8 shrink-0 whitespace-nowrap rounded-md px-2.5 text-[10px] font-semibold transition sm:px-3 ${categoryTab === option.value ? 'bg-white text-slate-800 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}>{option.label}</button>)}
+          </div>
         </div>
 
-        <select value={statusTab} onChange={(event) => onStatusChange(event.target.value as PartnerStatusTab)} className="field !mt-0 !w-auto min-w-[135px] flex-1 py-2 text-xs sm:flex-none" aria-label="Filter partners by status">
-          {(Object.keys(statusLabels) as PartnerStatusTab[]).map((value) => (
-            <option key={value} value={value}>Status: {statusLabels[value]}</option>
-          ))}
-        </select>
+        <div className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-4 border-t border-slate-100 pt-4 dark:border-slate-800 @min-[640px]:grid-cols-2 @min-[900px]:grid-cols-[minmax(170px,0.85fr)_minmax(260px,1.2fr)_minmax(200px,0.95fr)] @min-[900px]:items-end">
+          <label className="min-w-0">
+            <span className="mb-1 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400"><ArrowUpDown size={11} aria-hidden="true" /> Sort</span>
+            <select value={sortValue} onChange={(event) => onSortChange(event.target.value)} className="field !mt-0 w-full py-2 text-xs" aria-label="Sort partner registry">
+              {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
 
-        <select value={categoryTab} onChange={(event) => onCategoryChange(event.target.value as PartnerCategoryTab)} className="field !mt-0 !w-auto min-w-[145px] flex-1 py-2 text-xs sm:flex-none" aria-label="Filter partners by category">
-          {CATEGORY_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+          <fieldset className="min-w-0">
+            <legend className="mb-1 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400"><CalendarRange size={11} aria-hidden="true" /> Date range</legend>
+            <div className="flex min-w-0 items-center gap-2">
+              <input type="date" value={registeredFrom} max={registeredTo || undefined} onChange={(event) => onRegisteredFromChange(event.target.value)} className="field !mt-0 min-w-0 flex-1 py-2 text-[11px]" aria-label="Registration date from" />
+              <span className="text-[10px] text-slate-400">to</span>
+              <input type="date" value={registeredTo} min={registeredFrom || undefined} onChange={(event) => onRegisteredToChange(event.target.value)} className="field !mt-0 min-w-0 flex-1 py-2 text-[11px]" aria-label="Registration date to" />
+            </div>
+          </fieldset>
 
-        {categoryTab === 'Supplier' && (
-          <select value={originFilter} onChange={(event) => onOriginChange(event.target.value as 'All' | SupplierOrigin)} className="field !mt-0 !w-auto min-w-[125px] flex-1 py-2 text-xs sm:flex-none" aria-label="Filter suppliers by origin">
-            <option value="All">All origins</option>
-            <option value="Local">Local</option>
-            <option value="Foreign">Foreign</option>
-          </select>
-        )}
+          <label className="min-w-0">
+            <span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Expiration</span>
+            <select value={documentFilter} onChange={(event) => onDocumentFilterChange(event.target.value as PartnerDocumentFilter)} className="field !mt-0 w-full py-2 text-xs" aria-label="Filter by document expiration">
+              {(Object.keys(DOCUMENT_LABELS) as PartnerDocumentFilter[]).map((value) => <option key={value} value={value}>{DOCUMENT_LABELS[value]}</option>)}
+            </select>
+          </label>
 
-        <button type="button" onClick={onToggleAdvancedFilters} className={'secondary-button min-h-10 justify-center gap-1.5 px-3 text-xs font-bold ' + (isAdvancedFiltersOpen ? 'ring-2 ring-[#0063a9]/20' : '')} aria-expanded={isAdvancedFiltersOpen} aria-controls="partner-company-advanced-filters">
-          <SlidersHorizontal size={14} aria-hidden="true" />
-          Filters
-          {advancedFilterCount > 0 && <span className="rounded-full bg-[#0063a9] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={advancedFilterCount + ' active filters'}>{advancedFilterCount}</span>}
-          <ChevronDown size={14} className={'transition-transform ' + (isAdvancedFiltersOpen ? 'rotate-180' : '')} aria-hidden="true" />
-        </button>
+          {categoryTab === 'Supplier' && <label className="min-w-0"><span className="mb-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400">Supplier origin</span><select value={originFilter} onChange={(event) => onOriginChange(event.target.value as 'All' | SupplierOrigin)} className="field !mt-0 w-full py-2 text-xs" aria-label="Filter suppliers by origin"><option value="All">All origins</option><option value="Local">Local</option><option value="Foreign">Foreign</option></select></label>}
 
-        {isAdmin && (
-          <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
-            <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={onImportFileSelected} />
-            <button type="button" onClick={onOpenActiveCompanies} className="secondary-button min-h-10 flex-1 gap-1.5 px-3 text-xs font-bold sm:flex-none" title="View active companies by type">
-              <Building size={14} aria-hidden="true" /> Active by Type
-            </button>
-            <button type="button" onClick={onOpenRegister} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0063a9] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition duration-150 hover:bg-[#00528c] sm:flex-none">
-              <Plus size={15} aria-hidden="true" /> <span>Register New Partner</span>
-            </button>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 @min-[640px]:col-span-2 @min-[900px]:col-span-3">
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{resultCount.toLocaleString()} partners found</span>
+            <button type="button" onClick={onReset} className="secondary-button min-h-10 shrink-0 justify-center gap-1.5 px-3 text-xs font-semibold"><RotateCcw size={13} aria-hidden="true" /> Reset</button>
           </div>
-        )}
+        </div>
       </div>
 
       {chips.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 px-1" aria-label="Active partner filters">
-          {chips.map((chip) => (
-            <button key={chip.key} type="button" onClick={chip.onRemove} className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={'Remove ' + chip.label + ' filter'}>
-              <span className="truncate">{chip.label}</span><X size={12} className="shrink-0" aria-hidden="true" />
-            </button>
-          ))}
-          <button type="button" onClick={onReset} className="text-xs font-semibold text-[#0063a9] underline dark:text-blue-400">Clear all</button>
-        </div>
-      )}
-
-      {isAdvancedFiltersOpen && (
-        <div id="partner-company-advanced-filters" className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/40 sm:flex-row sm:flex-wrap sm:items-end">
-          <label className="min-w-0 flex-1 sm:min-w-[190px] sm:flex-none">
-            <span className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"><ArrowUpDown size={12} aria-hidden="true" /> Sort</span>
-            <select value={sortValue} onChange={(event) => onSortChange(event.target.value)} className="field !mt-0 w-full py-2 text-xs sm:min-w-[190px]" aria-label="Sort partner registry">
-              {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-          </label>
-          <fieldset className="flex min-w-0 flex-1 flex-wrap items-end gap-2 sm:flex-none">
-            <legend className="mb-1 flex w-full items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400"><CalendarRange size={12} aria-hidden="true" /> Registration date</legend>
-            <label className="min-w-[135px] flex-1 sm:flex-none"><span className="sr-only">Registration date from</span><input type="date" value={registeredFrom} max={registeredTo || undefined} onChange={(event) => onRegisteredFromChange(event.target.value)} className="field !mt-0 w-full py-2 text-xs" aria-label="Registration date from" /></label>
-            <span className="self-center pb-2 text-xs text-slate-400">to</span>
-            <label className="min-w-[135px] flex-1 sm:flex-none"><span className="sr-only">Registration date to</span><input type="date" value={registeredTo} min={registeredFrom || undefined} onChange={(event) => onRegisteredToChange(event.target.value)} className="field !mt-0 w-full py-2 text-xs" aria-label="Registration date to" /></label>
-          </fieldset>
-          <label className="min-w-0 flex-1 sm:min-w-[190px] sm:flex-none">
-            <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Document expiration</span>
-            <select value={documentFilter} onChange={(event) => onDocumentFilterChange(event.target.value as PartnerDocumentFilter)} className="field !mt-0 w-full py-2 text-xs sm:min-w-[190px]" aria-label="Filter by document expiration">
-              {(Object.keys(DOCUMENT_LABELS) as PartnerDocumentFilter[]).map((value) => <option key={value} value={value}>{DOCUMENT_LABELS[value]}</option>)}
-            </select>
-          </label>
-          {chips.length > 0 && (
-            <button type="button" onClick={onReset} className="secondary-button gap-1.5 px-2.5 py-2 text-xs sm:ml-auto" title="Reset all partner filters"><RotateCcw size={13} aria-hidden="true" /> Reset</button>
-          )}
+          {chips.map((chip) => <button key={chip.key} type="button" onClick={chip.onRemove} className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={'Remove ' + chip.label + ' filter'}><span className="truncate">{chip.label}</span><X size={12} className="shrink-0" aria-hidden="true" /></button>)}
         </div>
       )}
     </div>

@@ -47,6 +47,7 @@ interface ShellProps<T extends string> {
   action: ReactNode;
   children: ReactNode;
   pageHeading?: string;
+  hidePageHeading?: boolean;
   hideModuleContext?: boolean;
   compactPageHeader?: boolean;
   sidebarExtra?: (isCollapsed: boolean) => ReactNode;
@@ -70,6 +71,7 @@ export function Shell<T extends string>({
   action,
   children,
   pageHeading,
+  hidePageHeading = false,
   hideModuleContext = false,
   compactPageHeader = false,
   sidebarExtra,
@@ -361,17 +363,19 @@ export function Shell<T extends string>({
         {/* Page Content - Below Header */}
         <main className="min-w-0 flex-1 transition-colors duration-300 dark:bg-slate-900">
           <div className="px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
-            <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${compactPageHeader ? 'mb-3' : 'mb-6'}`}>
-              <div className="min-w-0">
-                {showModuleContext && (
-                  <p className="mb-1 break-words text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 sm:text-xs">
-                    {moduleLabel}
-                  </p>
-                )}
-                <h2 className="break-words text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">{contentHeading}</h2>
+            {!hidePageHeading && (
+              <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${compactPageHeader ? 'mb-3' : 'mb-6'}`}>
+                <div className="min-w-0">
+                  {showModuleContext && (
+                    <p className="mb-1 break-words text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 sm:text-xs">
+                      {moduleLabel}
+                    </p>
+                  )}
+                  <h2 className="break-words text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">{contentHeading}</h2>
+                </div>
+                <div id="shell-header-action"></div>
               </div>
-              <div id="shell-header-action"></div>
-            </div>
+            )}
             {children}
           </div>
         </main>

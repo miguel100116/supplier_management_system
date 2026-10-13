@@ -34,6 +34,7 @@ import {
 } from '../utils/analytics';
 import { computeCategoryRankSummary } from '../utils/categorySummary';
 import { formatCompositeScore } from '../data/questionWeights';
+import { selectSurveyResponses } from '../features/evaluations/domain/surveyResponses';
 
 // ----------------------------------------------------
 // TYPES & WIDGET DEFINITIONS
@@ -73,6 +74,7 @@ interface DashboardPageProps {
   surveys?: any[];
   isAdmin?: boolean;
   userEmail?: string;
+  onOpenSurveyResponses?: (surveyId: string) => void;
 }
 
 const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defaultSpan: 1 | 2 | 3; category: 'Analytics' | 'Surveys' | 'Submissions' }[] = [
@@ -156,7 +158,8 @@ export function DashboardPage({
   surveyTypeFilter = [],
   surveys = [],
   isAdmin = false,
-  userEmail = ''
+  userEmail = '',
+  onOpenSurveyResponses
 }: DashboardPageProps) {
   const effectiveHistoryResponses = historyResponses ?? allResponses;
   
@@ -883,19 +886,30 @@ export function DashboardPage({
                           </div>
                         ) : (
                           surveys.slice(0, 3).map((survey) => {
-                            // Responses aren't tagged with the specific form's ID, so match on
-                            // survey type (as the rest of the app does) and count unique
+                            // Use the Explorer's form-specific selector, then count unique
                             // respondent submissions rather than raw per-question answer rows.
-                            const count = submissionCount(allResponses.filter(r => r.surveyType === survey.surveyType));
+                            const count = submissionCount(selectSurveyResponses(survey, surveys, allResponses));
                             return (
                               <div key={survey.id} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 text-sm">
                                 <div className="min-w-0 flex-1 pr-2">
                                   <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{survey.title}</p>
                                   <p className="text-xs text-slate-400 mt-1">Due: {survey.deadlineDate || 'No close date'}</p>
                                 </div>
-                                <span className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 font-bold text-blue-600 dark:text-blue-400 text-xs">
-                                  {count} respondents
-                                </span>
+                                {isAdmin && onOpenSurveyResponses ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => onOpenSurveyResponses(survey.id)}
+                                    disabled={count === 0}
+                                    aria-label={`View ${count} responses for ${survey.title}`}
+                                    className="shrink-0 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default disabled:opacity-60 dark:border-blue-900/30 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-950/50"
+                                  >
+                                    {count} respondents
+                                  </button>
+                                ) : (
+                                  <span className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 font-bold text-blue-600 dark:text-blue-400 text-xs">
+                                    {count} respondents
+                                  </span>
+                                )}
                               </div>
                             );
                           })
