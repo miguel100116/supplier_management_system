@@ -1049,6 +1049,7 @@ export default function App() {
         surveys={userAccessibleSurveys}
         isAdmin={isAdmin}
         userEmail={account || ''}
+        onOpenSurveyResponses={(surveyId) => navigateTo('explorer', { surveyId })}
       />
     ),
     'partner-companies': (
@@ -1357,6 +1358,7 @@ export default function App() {
         }}
         title={activeTitle}
         pageHeading={pageHeading}
+        hidePageHeading={activePage === 'partner-companies'}
         hideModuleContext={activePage === 'dashboard' || activePage === 'account-management' || activePage === 'partner-companies'}
         compactPageHeader={activePage === 'analytics'}
         action={

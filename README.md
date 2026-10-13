@@ -347,12 +347,12 @@ The system now uses explicit Supabase repository and adapter boundaries for shar
 
 ## 14. User Manuals
 
-Full, standalone user documentation lives in the [`docs/`](docs) folder as Word documents:
+Plain-language guides for the current interface are available in the [`docs/`](docs) folder. Each guide includes a screenshot for every module it covers:
 
-- **[`docs/Admin_Manual.docx`](docs/Admin_Manual.docx)** — the complete administrator guide (account management, surveys, reports, compliance, imports, settings).
-- **[`docs/Employee_Manual.docx`](docs/Employee_Manual.docx)** — the complete employee guide (filling evaluations, submissions, notifications, profile).
+- [Administrator User Guide](docs/ADMIN_USER_GUIDE.md) — partner records, evaluations, archives, imports, reports, and employee access.
+- [Employee User Guide](docs/EMPLOYEE_USER_GUIDE.md) — assigned evaluations, submissions, reminders, and profile settings.
 
-Both manuals are generated from source via the scripts in [`docs/_build/`](docs/_build) (`build-admin.cjs` / `build-employee.cjs`), so they can be regenerated if content changes.
+Screenshots are stored in [`docs/screenshots/`](docs/screenshots). The older Word manuals remain available, though some menu names may differ from the current interface.
 
 For a condensed reference (roles matrix, workflow diagrams, FAQ), see [`SYSTEM_TURNOVER.md`](SYSTEM_TURNOVER.md).
 

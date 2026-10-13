@@ -24,7 +24,6 @@ import {
   ChevronRight,
   Upload,
   Loader2,
-  Search,
   Globe,
   MapPin,
   Tag,
@@ -38,7 +37,7 @@ import { getMaxRatingForResponses } from '../utils/analytics';
 import { computeCompanyComposite } from '../utils/scoring';
 import { formatCompositeScore } from '../data/questionWeights';
 import { branchAwareCompanyLabel, computeDocumentStatus, computeCompanyDocumentSummary, CompanyDocumentSummary, isNTBranch } from '../utils/compliance';
-import { CATEGORY_BUCKET_KEYS, computeCategoryRankSummary } from '../utils/categorySummary';
+import { computeCategoryRankSummary } from '../utils/categorySummary';
 import { getRequiredDocumentKeys, isExpiryDocument } from '../utils/documentRequirements';
 import { findMissingProfileFields, MISSING_FIELD_LABELS, MissingProfileField } from '../utils/dataCompleteness';
 import { ImportResult } from '../utils/masterListImport';
@@ -46,6 +45,7 @@ import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
 import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';
 import { PartnerCompaniesFilterToolbar } from '../features/partner-companies/components/PartnerCompaniesFilterToolbar';
+import { PartnerRegistryOverview } from '../features/partner-companies/components/PartnerRegistryOverview';
 
 const MISSING_FIELD_ICONS: Record<MissingProfileField, typeof MapPin> = {
   address: MapPin,
@@ -196,7 +196,6 @@ export function PartnerCompaniesPage({
   const [registeredFrom, setRegisteredFrom] = useState('');
   const [registeredTo, setRegisteredTo] = useState('');
   const [documentFilter, setDocumentFilter] = useState<'all' | 'current' | 'expiring' | 'expired' | 'missing'>('all');
-  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [isCategorySummaryOpen, setIsCategorySummaryOpen] = useState(true);
   const [importReplace, setImportReplace] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -643,13 +642,6 @@ export function PartnerCompaniesPage({
     setCurrentPage(1);
   }, [statusTab, activeTab, originFilter, debouncedSearchQuery, sortConfig, registeredFrom, registeredTo, documentFilter]);
 
-  const advancedFilterCount = [
-    sortConfig !== null,
-    registeredFrom,
-    registeredTo,
-    documentFilter !== 'all',
-  ].filter(Boolean).length;
-
   const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / COMPANIES_PAGE_SIZE));
   // Clamp defensively (e.g. the list shrinks from a delete while on a later
   // page) so pagination stays correct without waiting for the effect above.
@@ -812,72 +804,22 @@ export function PartnerCompaniesPage({
         </div>
       )}
 
-      {/* Category & Supplier Rank Breakdown - mirrors the Master List's own
-          legend blocks (Category Summary / Supplier Rank Summary), counted
-          per branch/BP Code with NT as a fully separate category. */}
-      <div className="panel p-0 overflow-hidden">
-        <button
-          type="button"
-          onClick={() => setIsCategorySummaryOpen((v) => !v)}
-          className="flex w-full items-center justify-between px-5 py-3.5 text-left cursor-pointer"
-        >
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Category &amp; Supplier Rank Breakdown</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">Every accredited branch (BP Code) — NT counted as its own category, same as the Master List</p>
-          </div>
-          {isCategorySummaryOpen ? <ChevronUp size={16} className="shrink-0 text-slate-400" /> : <ChevronDown size={16} className="shrink-0 text-slate-400" />}
-        </button>
-
-        {isCategorySummaryOpen && (
-          <div className="grid min-w-0 grid-cols-1 lg:grid-cols-2 gap-4 border-t border-slate-100 dark:border-slate-800 p-4">
-            <div className="min-w-0 overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
-              <table className="w-full table-fixed text-sm">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900/50 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="px-3 py-2 sm:px-4">Category</th>
-                    <th className="w-20 px-3 py-2 text-right sm:w-24 sm:px-4">Branches</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {CATEGORY_BUCKET_KEYS.map((key) => (
-                    <tr key={key}>
-                      <td className="break-words px-3 py-2 font-medium text-slate-600 dark:text-slate-300 sm:px-4">{key}</td>
-                      <td className="px-3 py-2 text-right font-bold tabular-nums text-slate-800 dark:text-slate-100 sm:px-4">{categoryRankSummary.buckets[key] ?? 0}</td>
-                    </tr>
-                  ))}
-                  <tr className="bg-slate-50 dark:bg-slate-900/40">
-                    <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-200 sm:px-4">Total</td>
-                    <td className="px-3 py-2 text-right font-black tabular-nums text-[#0063a9] sm:px-4">{categoryRankSummary.total}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="min-w-0 self-start overflow-hidden rounded-xl border border-slate-100 dark:border-slate-800">
-              <table className="w-full table-fixed text-sm">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900/50 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    <th className="px-3 py-2 sm:px-4">Supplier Rank</th>
-                    <th className="w-20 px-3 py-2 text-right sm:w-24 sm:px-4">Branches</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  <tr>
-                    <td className="px-3 py-2 font-medium text-slate-600 dark:text-slate-300 sm:px-4">Major</td>
-                    <td className="px-3 py-2 text-right font-bold tabular-nums text-slate-800 dark:text-slate-100 sm:px-4">{categoryRankSummary.major}</td>
-                  </tr>
-                  <tr>
-                    <td className="px-3 py-2 font-medium text-slate-600 dark:text-slate-300 sm:px-4">Regular</td>
-                    <td className="px-3 py-2 text-right font-bold tabular-nums text-slate-800 dark:text-slate-100 sm:px-4">{categoryRankSummary.regular}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p className="px-4 py-2 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800">Every branch's Supplier Rank field, company-wide.</p>
-            </div>
-          </div>
-        )}
-      </div>
-
+      <PartnerRegistryOverview
+        categorySummary={categoryRankSummary}
+        branchCount={partnerCompanies.reduce((total, company) => total + (company.branches?.length ?? 0), 0)}
+        activeCount={classifiedCompanies.active.length}
+        incompleteCount={incompleteCompanies.length}
+        expiredCount={classifiedCompanies.expired.length}
+        archivedCount={classifiedCompanies.archived.length}
+        expanded={isCategorySummaryOpen}
+        onToggleExpanded={() => setIsCategorySummaryOpen((value) => !value)}
+        onStatusChange={setStatusTab}
+        status={statusTab}
+        isAdmin={isAdmin}
+        onOpenActiveCompanies={() => setIsActiveCompaniesOpen(true)}
+        onOpenRegister={() => { setErrorMessage(''); setRegisterModalTab('manual'); setIsRegisterOpen(true); }}
+      />
+      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFileSelected} />
       <PartnerCompaniesFilterToolbar
         statusTab={statusTab}
         statusLabels={STATUS_TAB_LABELS}
@@ -889,18 +831,7 @@ export function PartnerCompaniesPage({
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onSearchClear={() => { setSearchQuery(''); setDebouncedSearchQuery(''); }}
-        isAdmin={isAdmin}
-        importFileInputRef={importFileInputRef}
-        onImportFileSelected={handleImportFileSelected}
-        onOpenActiveCompanies={() => setIsActiveCompaniesOpen(true)}
-        onOpenRegister={() => {
-          setErrorMessage('');
-          setRegisterModalTab('manual');
-          setIsRegisterOpen(true);
-        }}
-        isAdvancedFiltersOpen={isAdvancedFiltersOpen}
-        onToggleAdvancedFilters={() => setIsAdvancedFiltersOpen((open) => !open)}
-        advancedFilterCount={advancedFilterCount}
+        resultCount={filteredCompanies.length}
         sortOptions={[
           { value: 'default', label: 'Default order' },
           { value: 'name-asc', label: 'Company: A–Z' },
@@ -949,13 +880,6 @@ export function PartnerCompaniesPage({
           <span>{importError}</span>
         </div>
       )}
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-slate-500 dark:text-slate-400">
-        <span className="font-semibold">
-          {filteredCompanies.length.toLocaleString()} {statusTab === 'Incomplete' ? 'incomplete profiles' : statusTab.toLowerCase() + ' partners'}
-        </span>
-        <span>Click row to edit or renew</span>
-      </div>
 
       {/*
       <TableFilterBar
@@ -1029,7 +953,7 @@ export function PartnerCompaniesPage({
                     onClick={() => handleSort('name')}
                   >
                     <div className="flex items-center gap-1">
-                      Company Name
+                      Company Name &amp; Identifier
                       {sortConfig?.key === 'name' && (
                         sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
                       )}
@@ -1076,8 +1000,9 @@ export function PartnerCompaniesPage({
                       <td className="px-5 py-3.5 align-top font-semibold text-slate-800 dark:text-slate-100 group-hover:text-[#0063a9] dark:group-hover:text-blue-400 max-w-[280px]">
                         <div className="flex min-w-0 items-center gap-2">
                           <Building size={14} className="shrink-0 text-slate-400 group-hover:text-[#0063a9]" />
-                          <span className="truncate" title={c.name}>{c.name}</span>
+                          <span className="truncate text-[10px] font-bold uppercase tracking-wide" title={c.name}>{c.name}</span>
                         </div>
+                        {primaryBranch(c)?.bpCode && <p className="ml-6 mt-1 text-[9px] font-medium text-slate-400">BP Code: {primaryBranch(c)?.bpCode}</p>}
                         {missingProfileFields.length > 0 && (
                           <span
                             title={`Missing ${missingProfileFields.map((f) => MISSING_FIELD_LABELS[f]).join(', ')}`}

@@ -20,7 +20,7 @@ interface SurveyExplorerPageProps {
 const PAGE_SIZE = 10;
 
 export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPageProps) {
-  const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null);
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('surveyId'));
   const [selectedResponseId, setSelectedResponseId] = useState<string | null>(null);
   const [emailSearch, setEmailSearch] = useState('');
   const [exportScope, setExportScope] = useState<'all' | 'filtered'>('filtered');
