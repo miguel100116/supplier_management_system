@@ -1,3 +1,4 @@
+import React from 'react';
 import { ArrowUpDown, CalendarRange, RotateCcw, Search, X } from 'lucide-react';
 import type { PartnerCompanyType, SupplierOrigin } from '../../../types/survey';
 import type { TableSortOption } from '../../../components/TableFilterBar';

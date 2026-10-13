@@ -1,3 +1,4 @@
+import React from 'react';
 import { Building, Check, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import type { CategoryRankSummary } from '../../../utils/categorySummary';
 

@@ -46,8 +46,8 @@ test('registry overview presents live status counts and branch category/rank dis
   for (const text of ['Active Companies by Type', 'Register New Partner', '6', '7 Accredited Branches Mapped', 'Supplier – Local', 'Standard', 'Non-Trade (NT)', 'Regular Rank', 'Major Rank', '88% Rank Mapping Coverage']) {
     assert.ok(overview.includes(text), text);
   }
-  assert.match(overview, /aria-pressed="true"/);
-  assert.match(overview, /role="group" aria-label="Filter by partner status"/);
+  assert.match(overview, /role="tablist" aria-labelledby="partner-status-heading"/);
+  assert.match(overview, /aria-selected="true"/);
   assert.match(PARTNER_COMPANIES_SOURCE, /onStatusChange=\{setStatusTab\}/);
 });
 
