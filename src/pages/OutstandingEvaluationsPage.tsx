@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ClipboardList } from 'lucide-react';
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { getSurveyEvaluationCompanies, hasAnsweredItem } from '../utils/analytics';
@@ -11,6 +11,7 @@ interface OutstandingEvaluationsPageProps {
 }
 
 const SURVEY_TYPES: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
+const SUPPLIER_PAGE_SIZE = 10;
 
 const typeColors: Record<SurveyType, string> = {
   Courier: '#2563eb',
@@ -19,6 +20,7 @@ const typeColors: Record<SurveyType, string> = {
 };
 
 export function OutstandingEvaluationsPage({ surveys, partnerCompanies, responses }: OutstandingEvaluationsPageProps) {
+  const [supplierPage, setSupplierPage] = useState(1);
   const groups = useMemo(() => {
     return SURVEY_TYPES.map((type) => {
       const activeSurveys = surveys.filter((s) => s.status !== 'Archived' && s.surveyType === type);
@@ -32,6 +34,9 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
 
       const evaluatedNames = new Set(responses.filter((r) => r.surveyType === type && hasAnsweredItem(r)).map((r) => r.company));
       const outstanding = allCompanies.filter((c) => !evaluatedNames.has(c.name));
+      if (type === 'Supplier') {
+        outstanding.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base', numeric: true }));
+      }
 
       const total = allCompanies.length;
       const answered = total - outstanding.length;
@@ -40,6 +45,12 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
       return { type, total, answered, pct, outstanding, hasAssignedForm };
     });
   }, [surveys, partnerCompanies, responses]);
+  const supplierOutstandingCount = groups.find((group) => group.type === 'Supplier')?.outstanding.length ?? 0;
+  const supplierTotalPages = Math.max(1, Math.ceil(supplierOutstandingCount / SUPPLIER_PAGE_SIZE));
+
+  useEffect(() => {
+    setSupplierPage((page) => Math.min(page, supplierTotalPages));
+  }, [supplierTotalPages]);
 
   return (
     <div className="space-y-5">
@@ -70,9 +81,18 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
         ))}
       </section>
 
-      {groups.map(
-        (group) =>
-          group.hasAssignedForm && (
+      {groups.map((group) => {
+        if (!group.hasAssignedForm) return null;
+
+        const isSupplier = group.type === 'Supplier';
+        const totalPages = isSupplier ? supplierTotalPages : 1;
+        const currentPage = isSupplier ? Math.min(supplierPage, totalPages) : 1;
+        const firstVisibleIndex = (currentPage - 1) * SUPPLIER_PAGE_SIZE;
+        const visibleCompanies = isSupplier
+          ? group.outstanding.slice(firstVisibleIndex, firstVisibleIndex + SUPPLIER_PAGE_SIZE)
+          : group.outstanding;
+
+        return (
             <section key={group.type} className="panel">
               <div className={"flex items-center gap-2 " + (group.outstanding.length === 0 ? "mb-1" : "mb-4")}>
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: typeColors[group.type] }} />
@@ -88,7 +108,7 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
                 <StateMessage compact title="Fully covered" message={`Every ${group.type.toLowerCase()} partner has at least one evaluation this period.`} />
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.outstanding.map((company) => (
+                  {visibleCompanies.map((company) => (
                     <div
                       key={company.id}
                       className="flex items-center gap-2.5 rounded-lg border border-slate-200 dark:border-slate-800 px-3.5 py-2.5"
@@ -99,9 +119,35 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
                   ))}
                 </div>
               )}
+              {isSupplier && totalPages > 1 && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Showing {firstVisibleIndex + 1}–{Math.min(firstVisibleIndex + visibleCompanies.length, group.outstanding.length)} of {group.outstanding.length} companies
+                  </span>
+                  <div className="flex items-center gap-2" role="group" aria-label="Supplier awaiting evaluation pages">
+                    <button
+                      type="button"
+                      onClick={() => setSupplierPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      Previous
+                    </button>
+                    <span className="px-1 text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-200">Page {currentPage} of {totalPages}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSupplierPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
-          )
-      )}
+        );
+      })}
 
       {groups.every((g) => !g.hasAssignedForm) && (
         <StateMessage
