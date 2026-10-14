@@ -4,6 +4,7 @@ export const EVALUATION_WORKSPACE_TABS = [
   { key: 'survey-forms', label: 'Forms', description: 'Create and manage evaluation forms, assigned companies, deadlines, and access.' },
   { key: 'explorer', label: 'Responses', description: 'Select a form to review or export its submissions.' },
   { key: 'pending-review', label: 'Coverage', description: 'See which assigned companies have evaluations in the current response records.' },
+  { key: 'categories-manager', label: 'Category Labels', description: 'Change the displayed scoring category names for each survey type.' },
 ] as const;
 
 export type EvaluationWorkspacePage = typeof EVALUATION_WORKSPACE_TABS[number]['key'];
@@ -19,7 +20,7 @@ export function EvaluationWorkspace({ activePage, onNavigate, children }: {
 }) {
   return (
     <div className="space-y-6">
-      <p className="-mt-3 text-base text-slate-500 dark:text-slate-400">Create and manage evaluation forms, assigned companies, deadlines, and access.</p>
+      <p className="-mt-3 text-base text-slate-500 dark:text-slate-400">{activePage === 'categories-manager' ? 'Change the displayed scoring category names for each survey type.' : 'Create and manage evaluation forms, assigned companies, deadlines, and access.'}</p>
       {activePage === 'pending-review' ? (
         <section className="panel space-y-3">
           <nav aria-label="Evaluation workspace views" className="flex flex-wrap gap-2">

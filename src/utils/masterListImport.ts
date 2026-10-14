@@ -402,6 +402,47 @@ export interface ImportResult {
   };
 }
 
+export interface MasterListSourceFile {
+  id: string;
+  fileName: string;
+  rows: RawMasterListRow[];
+}
+
+export interface MasterListImportReview {
+  files: MasterListSourceFile[];
+  excludedRowKeys: string[];
+  result: ImportResult;
+}
+
+export function masterListRowKey(fileId: string, sourceRow: number): string {
+  return `${fileId}:${sourceRow}`;
+}
+
+export async function prepareMasterListSourceFiles(files: File[]): Promise<MasterListSourceFile[]> {
+  return Promise.all(files.map(async (file, index) => {
+    try {
+      const rows = parseMasterListWorkbook(await file.arrayBuffer());
+      return { id: `file-${index}`, fileName: file.name, rows };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to read this workbook.';
+      throw new Error(`${file.name}: ${message}`);
+    }
+  }));
+}
+
+export function mergeMasterListSourceFiles(
+  files: MasterListSourceFile[],
+  excludedRowKeys: string[],
+  existingCompanies: PartnerCompany[],
+  options?: ImportOptions,
+): ImportResult {
+  const excluded = new Set(excludedRowKeys);
+  const rows = files.flatMap((file) => file.rows.filter(
+    (row) => !excluded.has(masterListRowKey(file.id, row.sourceRow)),
+  ));
+  return mergeRowsIntoCompanies(rows, existingCompanies, options);
+}
+
 function categoryBucketKey(category: CategoryResolution): string {
   return category.type === 'Supplier' ? `Supplier-${category.supplierOrigin ?? 'Local'}` : category.type;
 }

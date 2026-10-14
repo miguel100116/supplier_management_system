@@ -393,4 +393,4 @@ This system is **pre-production**. The most important open items (verified again
 
 ### Admin evaluation navigation
 
-Admins open Evaluations > Evaluation Workspace and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), and Coverage (company evaluation coverage). Archive Center and Import Evaluation Responses remain separate destinations. Evaluation Settings contains Category Labels. Existing route permissions and persistence contracts are unchanged.
+Admins open Evaluations > Evaluation Workspace and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), Coverage (company evaluation coverage), and Category Labels (display names for scoring categories). Archive Center and Import Evaluation Responses remain separate destinations. Existing route permissions and persistence contracts are unchanged.

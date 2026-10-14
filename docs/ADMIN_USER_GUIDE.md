@@ -113,9 +113,9 @@ If the system finds a duplicate source file, it may ask you to choose what shoul
 
 ![Import Evaluation Responses](screenshots/admin/import-evaluation-responses.png)
 
-## Evaluation Settings
+## Evaluation Category Labels
 
-Use **Evaluations** → **Evaluation Settings** to change the displayed names of the scoring categories for each survey type.
+Use **Evaluations** → **Evaluation Workspace** → **Category Labels** to change the displayed names of the scoring categories for each survey type.
 
 1. Select Courier, Supplier, or Subcontractor.
 2. Edit the category names.

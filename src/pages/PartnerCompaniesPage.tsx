@@ -40,7 +40,12 @@ import { branchAwareCompanyLabel, computeDocumentStatus, computeCompanyDocumentS
 import { computeCategoryRankSummary } from '../utils/categorySummary';
 import { getRequiredDocumentKeys, isExpiryDocument } from '../utils/documentRequirements';
 import { findMissingProfileFields, MISSING_FIELD_LABELS, MissingProfileField } from '../utils/dataCompleteness';
-import { ImportResult } from '../utils/masterListImport';
+import {
+  ImportResult,
+  MasterListImportReview,
+  MasterListSourceFile,
+  masterListRowKey,
+} from '../utils/masterListImport';
 import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
 import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';
@@ -153,7 +158,12 @@ interface PartnerCompaniesPageProps {
     expectedDocument: ComplianceDocument,
     nextDocument: Pick<ComplianceDocument, 'provided' | 'expiryDate'>,
   ) => Promise<PartnerCompany>;
-  onPreviewMasterListImport?: (file: File, options?: { replace?: boolean }) => Promise<ImportResult>;
+  onPreviewMasterListImport?: (files: File[], options?: { replace?: boolean }) => Promise<MasterListImportReview>;
+  onRebuildMasterListImport?: (
+    files: MasterListSourceFile[],
+    excludedRowKeys: string[],
+    options?: { replace?: boolean },
+  ) => ImportResult;
   onCommitMasterListImport?: (result: ImportResult) => Promise<void>;
   isAdmin?: boolean;
   /** Distinct from isAdmin - can be granted to a role without full Admin access (Account Management -> "Renew Compliance Documents"). */
@@ -172,6 +182,7 @@ export function PartnerCompaniesPage({
   onUpdateCompany,
   onRenewDocument,
   onPreviewMasterListImport,
+  onRebuildMasterListImport,
   onCommitMasterListImport,
   isAdmin,
   canRenewDocuments,
@@ -255,7 +266,7 @@ export function PartnerCompaniesPage({
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   // Parsed + merged result awaiting admin confirmation - nothing is saved
   // until they click "Apply Update" on the review modal below.
-  const [importPreview, setImportPreview] = useState<ImportResult | null>(null);
+  const [importPreview, setImportPreview] = useState<MasterListImportReview | null>(null);
   const [importError, setImportError] = useState('');
   useModalEscape(Boolean(flagConfirmTarget), () => setFlagConfirmTarget(null), 60);
   useModalEscape(Boolean(renewalTarget && selectedCompany), () => setRenewalTarget(null), 60);
@@ -455,9 +466,9 @@ export function PartnerCompaniesPage({
   };
 
   const handleImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = ''; // allow re-selecting the same file next time
-    if (!file || !onPreviewMasterListImport) return;
+    if (!files.length || !onPreviewMasterListImport) return;
 
     setIsImporting(true);
     setImportError('');
@@ -465,8 +476,8 @@ export function PartnerCompaniesPage({
     try {
       // Parse + merge only - nothing is saved until the admin reviews the
       // changes and confirms via applyImportPreview.
-      const result = await onPreviewMasterListImport(file, { replace: importReplace });
-      setImportPreview(result);
+      const review = await onPreviewMasterListImport(files, { replace: importReplace });
+      setImportPreview(review);
       setIsRegisterOpen(false);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Failed to import the Master List file.');
@@ -479,12 +490,22 @@ export function PartnerCompaniesPage({
     if (!importPreview || !onCommitMasterListImport) return;
     setImportError('');
     try {
-      await onCommitMasterListImport(importPreview);
-      setImportResult(importPreview);
+      await onCommitMasterListImport(importPreview.result);
+      setImportResult(importPreview.result);
       setImportPreview(null);
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'Unable to apply the Master List import.');
     }
+  };
+
+  const toggleImportRow = (fileId: string, sourceRow: number, excluded: boolean) => {
+    if (!importPreview || !onRebuildMasterListImport) return;
+    const key = masterListRowKey(fileId, sourceRow);
+    const excludedRowKeys = excluded
+      ? [...importPreview.excludedRowKeys, key]
+      : importPreview.excludedRowKeys.filter((rowKey) => rowKey !== key);
+    const result = onRebuildMasterListImport(importPreview.files, excludedRowKeys, { replace: importReplace });
+    setImportPreview({ ...importPreview, excludedRowKeys, result });
   };
 
   const cancelImportPreview = () => setImportPreview(null);
@@ -819,7 +840,7 @@ export function PartnerCompaniesPage({
         onOpenActiveCompanies={() => setIsActiveCompaniesOpen(true)}
         onOpenRegister={() => { setErrorMessage(''); setRegisterModalTab('manual'); setIsRegisterOpen(true); }}
       />
-      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFileSelected} />
+      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleImportFileSelected} />
       <PartnerCompaniesFilterToolbar
         statusTab={statusTab}
         statusLabels={STATUS_TAB_LABELS}
@@ -1874,10 +1895,9 @@ export function PartnerCompaniesPage({
                     className="mt-0.5 rounded border-slate-300"
                   />
                   <span className="text-xs">
-                    <span className="font-bold text-slate-700 dark:text-slate-200">Replace the entire registry with this file</span>
+                    <span className="font-bold text-slate-700 dark:text-slate-200">Replace the entire registry with these files</span>
                     <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Clears every existing partner first, so the registry mirrors this file exactly (its category and rank
-                      totals will match the sheet). Leave unchecked to merge into the current registry instead.
+                      Clears every existing partner first, so the registry mirrors the selected files. Leave unchecked to merge into the current registry instead.
                     </span>
                   </span>
                 </label>
@@ -1896,8 +1916,11 @@ export function PartnerCompaniesPage({
                   className="w-full bg-[#0063a9] hover:bg-[#00528c] text-white flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                 >
                   {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                  <span>{isImporting ? 'Importing…' : importReplace ? 'Choose File & Replace Registry' : 'Choose Excel File (.xlsx)'}</span>
+                  <span>{isImporting ? 'Reading files…' : importReplace ? 'Choose Excel Files & Replace Registry' : 'Choose Excel File(s) (.xlsx)'}</span>
                 </button>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
+                  You can select multiple Excel files. Review each file and choose which companies to skip before applying the update.
+                </p>
 
                 <div className="flex items-center justify-end border-t border-slate-100 dark:border-slate-800 pt-4">
                   <button
@@ -2086,8 +2109,52 @@ export function PartnerCompaniesPage({
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">Review Master List Import</h3>
                 <p className="text-xs text-slate-500">
-                  {importPreview.stats.totalRows} rows parsed &bull; nothing has been saved yet
+                  {importPreview.files.reduce((total, file) => total + file.rows.length, 0)} companies found in {importPreview.files.length} file{importPreview.files.length === 1 ? '' : 's'} &bull; nothing has been saved yet
                 </p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+              <div className="bg-slate-50 dark:bg-slate-900/60 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">Companies to review</h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Check a company to skip it. Files are grouped below so you can review each workbook separately.
+                  {importPreview.excludedRowKeys.length > 0 && ` ${importPreview.excludedRowKeys.length} selected to skip.`}
+                </p>
+              </div>
+              <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                {importPreview.files.map((file) => (
+                  <section key={file.id}>
+                    <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-slate-100/95 dark:bg-slate-900/95 px-4 py-2 border-b border-slate-100 dark:border-slate-800">
+                      <span className="min-w-0 truncate text-xs font-bold text-slate-700 dark:text-slate-200" title={file.fileName}>{file.fileName}</span>
+                      <span className="shrink-0 text-[10px] text-slate-500 dark:text-slate-400">{file.rows.length} compan{file.rows.length === 1 ? 'y' : 'ies'}</span>
+                    </div>
+                    {file.rows.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-slate-500">No company rows found in this file.</p>
+                    ) : file.rows.map((row) => {
+                      const excluded = importPreview.excludedRowKeys.includes(masterListRowKey(file.id, row.sourceRow));
+                      return (
+                        <label key={masterListRowKey(file.id, row.sourceRow)} className={`flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/40 ${excluded ? 'opacity-60' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={excluded}
+                            onChange={(event) => toggleImportRow(file.id, row.sourceRow, event.target.checked)}
+                            className="mt-0.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                            aria-label={`Skip ${row.bpName}`}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className={`block text-xs font-semibold ${excluded ? 'line-through text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>{row.bpName}</span>
+                            <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400">
+                              {row.bpCode ? `BP Code: ${row.bpCode}` : `Excel row ${row.sourceRow}`}
+                              {row.category ? ` · ${row.category}` : ''}
+                            </span>
+                          </span>
+                          <span className="shrink-0 pt-0.5 text-[10px] text-slate-500">{excluded ? 'Skipped' : 'Include'}</span>
+                        </label>
+                      );
+                    })}
+                  </section>
+                ))}
               </div>
             </div>
 
@@ -2099,7 +2166,7 @@ export function PartnerCompaniesPage({
               <div className="rounded-xl border border-slate-100 dark:border-slate-800 overflow-hidden">
                 <table className="w-full text-xs">
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {Object.entries(importPreview.stats.categoryBreakdown)
+                    {Object.entries(importPreview.result.stats.categoryBreakdown)
                       .sort((a, b) => b[1] - a[1])
                       .map(([cat, count]) => (
                         <tr key={cat}>
@@ -2115,29 +2182,29 @@ export function PartnerCompaniesPage({
             <div className="mt-4 grid grid-cols-1 gap-3 text-xs min-[420px]:grid-cols-2">
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                 <span className="text-slate-400 font-medium block">New companies to create</span>
-                <strong className="text-slate-800 dark:text-slate-100 text-lg">{importPreview.stats.createdCompanies}</strong>
+                <strong className="text-slate-800 dark:text-slate-100 text-lg">{importPreview.result.stats.createdCompanies}</strong>
               </div>
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                 <span className="text-slate-400 font-medium block">New branches to merge</span>
-                <strong className="text-slate-800 dark:text-slate-100 text-lg">{importPreview.stats.mergedAsBranch}</strong>
+                <strong className="text-slate-800 dark:text-slate-100 text-lg">{importPreview.result.stats.mergedAsBranch}</strong>
               </div>
-              {importPreview.stats.skipped > 0 && (
+              {importPreview.result.stats.skipped > 0 && (
                 <div className="bg-rose-50 dark:bg-rose-950/20 p-3 rounded-lg border border-rose-100 dark:border-rose-900 col-span-2">
                   <span className="text-rose-600 font-medium block">Rows skipped</span>
-                  <strong className="text-rose-700 dark:text-rose-300 text-lg">{importPreview.stats.skipped}</strong>
+                  <strong className="text-rose-700 dark:text-rose-300 text-lg">{importPreview.result.stats.skipped}</strong>
                 </div>
               )}
             </div>
 
             {/* Existing companies whose category/documents would change -
                 the "override" preview the admin can accept or cancel. */}
-            {importPreview.changes.length > 0 && (
+            {importPreview.result.changes.length > 0 && (
               <div className="mt-5">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                  Existing companies that will be updated ({importPreview.changes.length})
+                  Existing companies that will be updated ({importPreview.result.changes.length})
                 </h4>
                 <div className="max-h-56 overflow-y-auto rounded-xl border border-amber-200 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/10 divide-y divide-amber-100 dark:divide-amber-900/30">
-                  {importPreview.changes.map((c) => (
+                  {importPreview.result.changes.map((c) => (
                     <div key={c.companyId} className="px-3 py-2 text-xs">
                       <div className="font-bold text-slate-800 dark:text-slate-100">{c.companyName}</div>
                       <div className="mt-0.5 text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-1.5 gap-y-1">

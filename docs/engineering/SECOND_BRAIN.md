@@ -580,7 +580,7 @@ Exact next step:
 
 ### 2026-10-01 - Admin evaluation workspace navigation
 
-Decision: Group existing `survey-forms`, `explorer`, and `pending-review` routes under one Admin sidebar destination with Forms, Responses, and Coverage view buttons. Retain the existing route keys and authorization checks. Evaluation Settings reuses `categories-manager` with a Category Labels section; archive/import remain separate. This is a navigation change, with existing response matching and coverage rules retained.
+Decision: Group existing `survey-forms`, `explorer`, `pending-review`, and `categories-manager` routes under one Admin sidebar destination with Forms, Responses, Coverage, and Category Labels view buttons. Retain the existing route keys and authorization checks; archive/import remain separate. This is a navigation change, with existing response matching and coverage rules retained.
 
 Evidence: `src/App.tsx`, `src/features/evaluations/components/EvaluationWorkspace.tsx`, `src/pages/CategoriesManagerPage.tsx`.
 

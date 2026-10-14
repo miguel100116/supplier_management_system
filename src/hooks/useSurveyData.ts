@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
 import { surveyQuestions } from '../data/questions';
-import { importMasterListFromFile, ImportResult } from '../utils/masterListImport';
+import {
+  ImportResult,
+  MasterListImportReview,
+  MasterListSourceFile,
+  mergeMasterListSourceFiles,
+  prepareMasterListSourceFiles,
+} from '../utils/masterListImport';
 import { importArchivedResponsesFromFile, ArchiveImportResult } from '../utils/archiveResponseTransfer';
 import {
   previewRawEvaluationImport as previewRawEvaluationImportFile,
@@ -1915,12 +1921,24 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // commitMasterListImport, so the admin can see exactly which existing
   // companies would change (category, documents) before anything is
   // overwritten.
-  const previewMasterListImport = async (file: File, options?: { replace?: boolean }): Promise<ImportResult> => {
+  const previewMasterListImport = async (files: File[], options?: { replace?: boolean }): Promise<MasterListImportReview> => {
     // Replace mode starts from an empty registry so the result mirrors the file
     // exactly (its category/rank totals match the sheet), instead of merging
     // the file's rows on top of whatever is already loaded.
     const base = options?.replace ? [] : partnerCompanies;
-    return importMasterListFromFile(file, base);
+    const sourceFiles = await prepareMasterListSourceFiles(files);
+    const excludedRowKeys: string[] = [];
+    const result = mergeMasterListSourceFiles(sourceFiles, excludedRowKeys, base);
+    return { files: sourceFiles, excludedRowKeys, result };
+  };
+
+  const rebuildMasterListImportPreview = (
+    files: MasterListSourceFile[],
+    excludedRowKeys: string[],
+    options?: { replace?: boolean },
+  ): ImportResult => {
+    const base = options?.replace ? [] : partnerCompanies;
+    return mergeMasterListSourceFiles(files, excludedRowKeys, base);
   };
 
   // Applies a previously-previewed import result to the live registry.
@@ -2530,6 +2548,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     updatePartnerDocument,
     removePartnerCompany,
     previewMasterListImport,
+    rebuildMasterListImportPreview,
     commitMasterListImport,
     isLoading,
     isRefreshing,

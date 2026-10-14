@@ -4,6 +4,7 @@ import test from 'node:test';
 import { scrollModuleToTop } from './Shell';
 
 const APP_SOURCE = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+const EVALUATION_WORKSPACE_SOURCE = readFileSync(new URL('../features/evaluations/components/EvaluationWorkspace.tsx', import.meta.url), 'utf8');
 const SURVEY_DATA_SOURCE = readFileSync(new URL('../hooks/useSurveyData.ts', import.meta.url), 'utf8');
 
 test('module navigation resets the shared page scroll position', () => {
@@ -43,7 +44,8 @@ test('realtime refreshes load only the application record type that changed', ()
 test('Admin evaluation navigation groups the existing routes into one workspace', () => {
   const group = APP_SOURCE.slice(APP_SOURCE.indexOf("id: 'group-evaluations'"), APP_SOURCE.indexOf('// Single page already covers'));
   assert.match(group, /key: 'survey-forms', label: 'Evaluation Workspace'/);
-  assert.match(group, /key: 'categories-manager', label: 'Evaluation Settings'/);
+  assert.doesNotMatch(group, /key: 'categories-manager'/);
   assert.doesNotMatch(group, /key: 'explorer'|key: 'pending-review'/);
   assert.match(APP_SOURCE, /activePage=\{isAdminEvaluationWorkspace \? 'survey-forms' : activePage\}/);
+  assert.match(EVALUATION_WORKSPACE_SOURCE, /key: 'categories-manager', label: 'Category Labels'/);
 });
