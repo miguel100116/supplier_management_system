@@ -151,7 +151,6 @@ const adminNavItems: NavItem<PageKey>[] = [
       { key: 'survey-forms', label: 'Evaluation Workspace' },
       { key: 'archive', label: 'Archive Center' },
       { key: 'import-evaluations', label: 'Import Evaluation Responses' },
-      { key: 'categories-manager', label: 'Evaluation Settings' },
     ],
   },
   // Single page already covers trends + company comparisons together, so
@@ -389,6 +388,7 @@ export default function App() {
     updatePartnerDocument,
     removePartnerCompany,
     previewMasterListImport,
+    rebuildMasterListImportPreview,
     commitMasterListImport,
     isLoading,
     isRefreshing,
@@ -1065,6 +1065,7 @@ export default function App() {
         onUpdateCompany={updatePartnerCompany}
         onRenewDocument={updatePartnerDocument}
         onPreviewMasterListImport={previewMasterListImport}
+        onRebuildMasterListImport={rebuildMasterListImportPreview}
         onCommitMasterListImport={commitMasterListImport}
         isAdmin={isAdmin}
         canRenewDocuments={canRenewDocuments}
