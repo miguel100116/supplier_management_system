@@ -1,6 +1,6 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-10-12
+Last verified: 2026-10-14
 
 This document preserves durable engineering context for maintainers and coding agents. It is a map, not a substitute for reading the relevant code. Verify details before making consequential changes.
 
@@ -632,3 +632,9 @@ Evidence: `src/utils/compliance.ts`, `src/hooks/useSurveyData.ts`, `src/componen
 Decision: Every modal registered with `useModalEscape` closes through the same request-close callback when Escape is pressed or a pointer-down directly targets its backdrop. Clicks inside dialog content are ignored. Confirmation dialogs dismiss without invoking the confirmation action; nested dialogs use the existing priority stack.
 
 Evidence: `src/hooks/useModalEscape.ts`, `src/hooks/modalDismissal.ts`, and modal registrations across `src/`.
+
+### 2026-10-14 - Employee experience UI replacement
+
+Decision: Employee Home, Evaluations, and My submissions use the Figma-generated presentation in `src/features/employee-experience/`; the existing App data, access-scoped survey/partner/response inputs, route state, and submission handlers remain the source of behavior. The shared survey filler opts into the Figma wizard only for Employee sessions; Admin keeps its existing presentation. New employee dialogs register with `useModalEscape`.
+
+Evidence: `src/features/employee-experience/components/EmployeeExperienceShell.tsx`, `EmployeeWorkspacePage.tsx`, `employeeExperience.css`, `src/App.tsx`, and `src/pages/SurveyFillerPage.tsx`.

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { configureMsal } from './services/msalAuth';
 import './styles.css';
+import './features/employee-experience/components/employeeExperience.css';
 
 async function startApp() {
   try {

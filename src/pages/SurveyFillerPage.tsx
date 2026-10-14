@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useModalEscape } from '../hooks/useModalEscape';
-import { CheckCircle, Info, Shield, ArrowRight, ClipboardCopy, Send, UserCheck, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Info, Shield, ArrowRight, ClipboardCopy, Send, UserCheck, ArrowLeft, X } from 'lucide-react';
 import { CustomForm, Rating, PartnerCompany } from '../types/survey';
 import { formatSurveyDateRange, validateSurveyDateRange } from '../features/evaluations/domain/surveyDates';
 import { SurveyDateRangeQuestion } from '../features/evaluations/components/SurveyDateRangeQuestion';
+import { RatingScale } from '../features/evaluations/components/RatingScale';
 import { resolveSelectableSurveyId } from '../features/evaluations/domain/surveySelection';
 import { getQuestionMaxPoints } from '../data/questionWeights';
 import { getSurveyEvaluationCompanies } from '../utils/analytics';
+import { EmployeeCompanyIcon } from '../features/employee-experience/components/EmployeeCompanyIcon';
 
 // Exposed to parent components (via ref) so that navigation triggered from
 // OUTSIDE this page — e.g. clicking the sidebar Home logo or another nav
@@ -34,6 +36,8 @@ interface SurveyFillerPageProps {
   surveys: CustomForm[];
   partnerCompanies: PartnerCompany[];
   initialSurveyId?: string | null;
+  initialCompanyName?: string;
+  employeeExperience?: boolean;
   userEmail: string;
   defaultDepartment?: string;
   defaultRespondentType?: string;
@@ -51,12 +55,14 @@ interface SurveyFillerPageProps {
 }
 
 export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageProps>(function SurveyFillerPage(
-  { surveys, partnerCompanies = [], initialSurveyId, userEmail, defaultDepartment, defaultRespondentType, responses, onSubmitted, onCancel },
+  { surveys, partnerCompanies = [], initialSurveyId, initialCompanyName = '', employeeExperience = false, userEmail, defaultDepartment, defaultRespondentType, responses, onSubmitted, onCancel },
   ref
 ) {
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>(() => resolveSelectableSurveyId(surveys, initialSurveyId));
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Info, 2: Questions, 3: Success
+  const [showReview, setShowReview] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
+  const [draftSaveError, setDraftSaveError] = useState('');
   // True once the respondent has entered the Questions Form at least once for
   // this session. Lets us tell apart the *first* transition into step 2
   // (where answers should be freshly initialized from any saved draft) from
@@ -100,6 +106,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     setValidationErrors({});
     setError('');
     setHasStartedForm(false);
+    setShowReview(false);
     startTimeRef.current = null;
   }, [surveys, selectedSurveyId]);
 
@@ -129,6 +136,12 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   const hasEvaluatedAll = useMemo(() => {
     return allCompaniesOfThisType.length > 0 && matchingCompanies.length === 0;
   }, [allCompaniesOfThisType, matchingCompanies]);
+
+  const selectedPartnerCompany = matchingCompanies.find((item) => item.name === company)
+    ?? allCompaniesOfThisType.find((item) => item.name === company);
+  const selectedCompanyAddress = selectedPartnerCompany?.branches
+    ?.map((branch) => branch.address?.trim())
+    .find((branchAddress): branchAddress is string => Boolean(branchAddress)) ?? '';
 
   // This employee's most recent full submission for the currently selected survey
   // type (regardless of which company it was for). Lets a new evaluation start
@@ -180,11 +193,17 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   // Sync company with selected survey type
   useEffect(() => {
     if (matchingCompanies.length > 0) {
-      setCompany(matchingCompanies[0].name);
+      setCompany(matchingCompanies.some((item) => item.name === initialCompanyName)
+        ? initialCompanyName
+        : matchingCompanies[0].name);
     } else {
       setCompany('');
     }
-  }, [matchingCompanies]);
+  }, [matchingCompanies, initialCompanyName]);
+
+  useEffect(() => {
+    if (employeeExperience) setAddress(selectedCompanyAddress);
+  }, [employeeExperience, selectedCompanyAddress]);
 
   useImperativeHandle(ref, () => ({
     attemptExit: (onAllowed: () => void, onCancelled?: () => void) => {
@@ -192,6 +211,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
         // Mid-survey: don't let external navigation (Home, sidebar, etc.)
         // silently wipe in-progress answers - surface the same draft warning.
         pendingExitRef.current = { onAllowed, onCancelled };
+        setDraftSaveError('');
         setShowDraftModal(true);
       } else {
         onAllowed();
@@ -325,8 +345,13 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       respondentType,
       address,
     };
-    localStorage.setItem(draftKey, JSON.stringify(draftData));
-    finishExit();
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(draftData));
+      setDraftSaveError('');
+      finishExit();
+    } catch {
+      setDraftSaveError('Your draft could not be saved. Check your browser storage and try again. Your answers are still open in this evaluation.');
+    }
   };
 
   const handleExitWithoutSaving = () => {
@@ -342,6 +367,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     // navigation instead of letting it fire later.
     const pendingExit = pendingExitRef.current;
     pendingExitRef.current = null;
+    setDraftSaveError('');
     setShowDraftModal(false);
     pendingExit?.onCancelled?.();
   };
@@ -387,82 +413,6 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
   const handleCommentChange = (qId: string, value: string) => {
     setComments((prev) => ({ ...prev, [qId]: value }));
-  };
-
-  // Moves focus to the next question card after a keyboard-driven rating action,
-  // so Tab/Enter can hop between questions without tabbing through every
-  // individual rating button.
-  const focusNextQuestion = (currentOrder: number) => {
-    requestAnimationFrame(() => {
-      const next = document.querySelector<HTMLElement>(`[data-question-order="${currentOrder + 1}"]`);
-      if (!next) return;
-      const focusable = next.querySelector<HTMLElement>('[tabindex="0"], input, select, textarea, button:not([tabindex="-1"])');
-      focusable?.focus();
-    });
-  };
-
-  // Keyboard shortcuts for the number-scale rating buttons: digit keys jump
-  // straight to that score, arrow keys step through the scale, and Enter moves
-  // on to the next question. Tab already moves to the next question on its own
-  // because only the currently-selected button in each group stays in the tab
-  // order (a "roving tabindex" - see the tabIndex logic where these buttons render).
-  const handleRatingKeyDown = (
-    e: React.KeyboardEvent<HTMLButtonElement>,
-    questionId: string,
-    order: number,
-    optionValues: Array<number | 'N/A'>,
-  ) => {
-    const focusOption = (value: number | 'N/A') => {
-      requestAnimationFrame(() => {
-        document.getElementById(`rating-btn-${questionId}-${value}`)?.focus();
-      });
-    };
-
-    if (/^[0-9]$/.test(e.key)) {
-      const digit = Number(e.key);
-      if (optionValues.includes(digit)) {
-        e.preventDefault();
-        handleRatingChange(questionId, digit);
-        focusOption(digit);
-      }
-      return;
-    }
-
-    if (e.key === 'n' || e.key === 'N') {
-      if (optionValues.includes('N/A')) {
-        e.preventDefault();
-        handleRatingChange(questionId, 'N/A');
-        focusOption('N/A');
-      }
-      return;
-    }
-
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      const current = ratings[questionId];
-      const currentIdx = optionValues.findIndex((v) => v.toString() === (current ?? '').toString());
-      const nextIdx = Math.min(optionValues.length - 1, (currentIdx === -1 ? -1 : currentIdx) + 1);
-      const nextVal = optionValues[nextIdx];
-      handleRatingChange(questionId, nextVal);
-      focusOption(nextVal);
-      return;
-    }
-
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      const current = ratings[questionId];
-      const currentIdx = optionValues.findIndex((v) => v.toString() === (current ?? '').toString());
-      const prevIdx = Math.max(0, (currentIdx === -1 ? optionValues.length : currentIdx) - 1);
-      const prevVal = optionValues[prevIdx];
-      handleRatingChange(questionId, prevVal);
-      focusOption(prevVal);
-      return;
-    }
-
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      focusNextQuestion(order);
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -542,6 +492,11 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     setError('');
     setValidationErrors({});
 
+    if (employeeExperience && !showReview) {
+      setShowReview(true);
+      return;
+    }
+
     const formattedAnswers = activeSurvey.questions.flatMap((q) => {
       const qMax = getQuestionMaxPoints(activeSurvey.surveyType, q.questionId);
       const val = ratings[q.questionId];
@@ -589,7 +544,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
         const drStr = formatSurveyDateRange({ from: val?.from || '', to: val?.to || '' });
         finalComment = drStr + (finalComment ? ` | Comment detail: ${finalComment}` : '');
       } else {
-        ratingVal = typeof ratings[q.questionId] === 'number' ? ratings[q.questionId] : qMax;
+        ratingVal = ratings[q.questionId] === 'N/A'
+          ? 'N/A'
+          : typeof ratings[q.questionId] === 'number' ? ratings[q.questionId] : qMax;
       }
 
       return [{
@@ -629,13 +586,14 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     setValidationErrors({});
     setError('');
     setHasStartedForm(false);
+    setShowReview(false);
     startTimeRef.current = null;
     setStep(1);
   };
 
   if (!activeSurvey && surveys.length === 0) {
     return (
-      <div className="panel mx-auto max-w-2xl p-6 text-center sm:p-12" id="survey-filler-empty">
+      <div className="employee-survey-empty panel mx-auto max-w-2xl p-6 text-center sm:p-12" id="survey-filler-empty">
         <Info size={40} className="mx-auto text-amber-500 mb-4" />
         <h3 className="text-xl font-bold">No Surveys Available</h3>
         <p className="text-slate-500 dark:text-slate-400 mt-2">No survey forms are available for your account right now.</p>
@@ -644,12 +602,14 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6" id="survey-filler-container">
-      {step === 2 && (
+    <div className={`employee-survey-filler ${employeeExperience ? 'form-workspace' : 'max-w-3xl mx-auto space-y-6'}`} id="survey-filler-container">
+      {employeeExperience && step < 3 && (
+        <section className="evaluation-progress-panel" aria-label="Evaluation workflow">
+        {step === 2 && !showReview && (
         <div className="flex items-center justify-between pb-2">
           <button
-            onClick={() => setStep(1)}
-            className="secondary-button flex items-center gap-2 text-xs py-1.5 px-3"
+            onClick={() => { setShowReview(false); setStep(1); }}
+            className="secondary-button back-link flex items-center gap-2 text-xs py-1.5 px-3"
             type="button"
           >
             <ArrowLeft size={14} />
@@ -657,34 +617,56 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
           </button>
         </div>
       )}
+        <div className="workflow-steps" aria-label="Evaluation progress">
+          <div className={step === 1 ? 'current' : 'completed'}><span>{step === 1 ? '1' : <CheckCircle size={14} aria-label="Completed" />}</span>Evaluation details<i /></div>
+          <div className={step === 2 && !showReview ? 'current' : showReview ? 'completed' : ''}><span>{showReview ? <CheckCircle size={14} aria-label="Completed" /> : '2'}</span>Your feedback<i /></div>
+          <div className={showReview ? 'current' : ''}><span>3</span>Review &amp; submit</div>
+        </div>
+        </section>
+      )}
 
-      {/* Step Progress bar */}
-      <div className="flex items-center justify-between gap-2 px-1 sm:px-2">
-        <div className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 1 ? 'bg-[#0063a9] text-white' : 'bg-slate-200 text-slate-500'}`}>1</span>
-          <span className={`hidden min-[420px]:inline ${step >= 1 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400'}`}>Respondent Info</span>
+      {!employeeExperience && step === 2 && !showReview && (
+        <div className="flex items-center justify-between pb-2">
+          <button onClick={() => { setShowReview(false); setStep(1); }} className="secondary-button flex items-center gap-2 text-xs py-1.5 px-3" type="button">
+            <ArrowLeft size={14} /><span>Return</span>
+          </button>
         </div>
+      )}
+
+      {!employeeExperience && <div className="flex items-center justify-between gap-2 px-1 sm:px-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold"><span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 1 ? 'bg-[#0063a9] text-white' : 'bg-slate-200 text-slate-500'}`}>1</span><span>Respondent Info</span></div>
         <div className="mx-1 h-px flex-1 bg-slate-200 dark:bg-slate-800 sm:mx-4" />
-        <div className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 2 ? 'bg-[#0063a9] text-white' : 'bg-slate-200 text-slate-500'}`}>2</span>
-          <span className={`hidden min-[420px]:inline ${step >= 2 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400'}`}>Questions Form</span>
-        </div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold"><span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 2 ? 'bg-[#0063a9] text-white' : 'bg-slate-200 text-slate-500'}`}>2</span><span>Questions Form</span></div>
         <div className="mx-1 h-px flex-1 bg-slate-200 dark:bg-slate-800 sm:mx-4" />
-        <div className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 3 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>3</span>
-          <span className={`hidden min-[420px]:inline ${step >= 3 ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>Success</span>
-        </div>
-      </div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold"><span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 3 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>3</span><span>Success</span></div>
+      </div>}
+
+      {employeeExperience && step < 3 && activeSurvey && (
+        <section className="evaluation-context" aria-label="Selected evaluation">
+          <div className={`company-avatar ${activeSurvey.surveyType === 'Courier' ? 'avatar-blue' : 'avatar-purple'}`} aria-hidden="true"><EmployeeCompanyIcon type={activeSurvey.surveyType} size={23} /></div>
+          <div>
+            <span className="type-tag">{activeSurvey.surveyType}</span>
+            <h1>{company || activeSurvey.title}</h1>
+            <p>{activeSurvey.title}{periodCovered ? ` · ${periodCovered}` : ''}</p>
+          </div>
+        </section>
+      )}
 
       {step === 1 && (
-        <div className="panel space-y-6 p-4 min-[420px]:p-6 sm:p-10" id="survey-filler-step-1">
-          <div className="text-center max-w-xl mx-auto space-y-2">
-            <p className="text-[10px] uppercase tracking-widest text-[#0063a9] font-bold dark:text-blue-300">Microsoft Forms Ingress</p>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Stakeholder Feedback Form</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Provide your details and complete the official MBS stakeholder evaluation survey. Your feedback directly impacts operations.
-            </p>
-          </div>
+        <div className={`panel ${employeeExperience ? 'form-panel space-y-6' : 'space-y-6 p-4 min-[420px]:p-6 sm:p-10'}`} id="survey-filler-step-1">
+          {!employeeExperience ? <div className="text-center max-w-xl mx-auto space-y-2"><p className="text-[10px] uppercase tracking-widest text-[#0063a9] font-bold">Microsoft Forms Ingress</p><h2 className="text-2xl font-bold">Stakeholder Feedback Form</h2><p className="text-sm text-slate-500">Provide your details and complete the official MBS stakeholder evaluation survey. Your feedback directly impacts operations.</p></div> : null}
+          {employeeExperience && <div className="form-section-heading"><h2>Evaluation details</h2><p>Confirm the partner and evaluation details before sharing your feedback.</p></div>}
+
+          {employeeExperience && <div className="respondent-summary">
+            <div><span>RESPONDENT</span><strong>{userEmail || 'Signed-in employee'}</strong></div>
+            <div><span>DEPARTMENT</span><strong>{department || 'Not assigned'}</strong></div>
+            <div><span>DESIGNATION</span><strong>{respondentType || 'Not assigned'}</strong></div>
+          </div>}
+
+          {employeeExperience && <div className="evaluation-guidance">
+            <Info size={17} />
+            <p>Answer based on your own experience with <strong>{company}</strong>. You’ll have a chance to review everything before submitting.</p>
+          </div>}
 
           {hasEvaluatedAll && (
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-5 text-sm text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/40 flex items-start gap-3 shadow-xs">
@@ -705,12 +687,10 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             </div>
           )}
 
-          <form onSubmit={handleStartForm} className="space-y-5 border-t border-slate-100 pt-6 dark:border-slate-800">
-            <div className="bg-[#0063a9]/10 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300 font-bold px-4 py-2.5 rounded-lg text-sm uppercase tracking-wider border border-[#0063a9]/10 shadow-xs mb-6">
-              Section 1: Details
-            </div>
+          <form onSubmit={handleStartForm} className={employeeExperience ? 'space-y-5' : 'space-y-5 border-t border-slate-100 pt-6 dark:border-slate-800'}>
+            {!employeeExperience && <div className="bg-[#0063a9]/10 text-[#0063a9] font-bold px-4 py-2.5 rounded-lg text-sm uppercase tracking-wider border border-[#0063a9]/10 shadow-xs mb-6">Section 1: Details</div>}
 
-            {surveys.length > 1 ? (
+            {!employeeExperience && surveys.length > 1 ? (
               <div>
                 <label htmlFor="filler-survey" className="field-label">Survey Form to Answer *</label>
                 <select
@@ -726,7 +706,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                   ))}
                 </select>
               </div>
-            ) : activeSurvey && (
+            ) : !employeeExperience && activeSurvey && (
               <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-2.5 text-xs text-slate-500 dark:bg-slate-900/40 dark:border-slate-800">
                 Survey Form: <strong className="text-slate-700 dark:text-slate-200">{activeSurvey.title}</strong> ({activeSurvey.surveyType})
               </div>
@@ -734,7 +714,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
             {!hasEvaluatedAll ? (
               <>
-                <div className="grid gap-4 sm:grid-cols-2 mb-5">
+                {!employeeExperience && <div className="grid gap-4 sm:grid-cols-2 mb-5">
                   <div>
                     <label htmlFor="filler-dept" className="field-label">Associated Department</label>
                     <input
@@ -758,15 +738,15 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                       aria-readonly="true"
                     />
                   </div>
-                </div>
+                </div>}
 
-                {!hasOrganizationalProfile && (
+                {!employeeExperience && !hasOrganizationalProfile && (
                   <p className="mb-5 text-sm text-amber-700 dark:text-amber-400" role="status">
                     Your Department and Designation are not assigned. Please contact an administrator before submitting an evaluation.
                   </p>
                 )}
 
-                <div>
+                {!employeeExperience && <div>
                   <label htmlFor="filler-company" className="field-label">Select Partner Company to Evaluate *</label>
                   {matchingCompanies.length > 0 ? (
                     <select
@@ -794,7 +774,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                       required
                     />
                   )}
-                </div>
+                </div>}
 
                 <div>
                   <label htmlFor="filler-address" className="field-label">Address</label>
@@ -802,8 +782,10 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                     id="filler-address"
                     type="text"
                     className="field"
-                    placeholder="Enter Company Address"
                     value={address}
+                    readOnly={employeeExperience}
+                    aria-readonly={employeeExperience || undefined}
+                    placeholder={employeeExperience ? 'Address not available' : 'Enter Company Address'}
                     onChange={(e) => setAddress(e.target.value)}
                   />
                 </div>
@@ -855,7 +837,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
               </div>
             )}
 
-            <div className="flex justify-end border-t border-slate-100 pt-5 dark:border-slate-800">
+            <div className={employeeExperience ? 'form-bottom' : 'flex justify-end border-t border-slate-100 pt-5 dark:border-slate-800'}>
               {!hasEvaluatedAll && (
                 <button
                   type="submit"
@@ -873,35 +855,61 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       )}
 
       {step === 2 && activeSurvey && (
-        <form onSubmit={handleSubmit} className="space-y-6" id="survey-filler-step-2">
+        <form onSubmit={handleSubmit} className={employeeExperience ? 'panel form-panel feedback-panel space-y-6' : 'space-y-6'} id="survey-filler-step-2">
           {/* Form Header Info card */}
-          <div className="panel bg-[#0063a9]/5 border-blue-100 dark:border-blue-900/30">
-            <h3 className="text-lg font-bold text-[#0063a9] dark:text-blue-300">{activeSurvey.title}</h3>
-            <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{activeSurvey.description}</p>
-            <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-blue-400/10">
-              <div>
-                Company: <strong className="text-slate-700 dark:text-slate-200">{company}</strong>
-              </div>
-              <div className="hidden sm:inline text-slate-300">|</div>
-              <div>
-                Department: <strong className="text-slate-700 dark:text-slate-200">{department}</strong>
-              </div>
-              <div className="hidden sm:inline text-slate-300">|</div>
-              <div>
-                Role: <strong className="text-slate-700 dark:text-slate-200">{respondentType}</strong>
-              </div>
+          {employeeExperience ? <div className="form-section-heading"><h2>{showReview ? 'Review your evaluation' : 'Your feedback'}</h2><p>{showReview ? 'Check your responses before submitting this evaluation.' : activeSurvey.description}</p></div> : <div className="panel bg-[#0063a9]/5 border-blue-100 dark:border-blue-900/30"><h3 className="text-lg font-bold text-[#0063a9] dark:text-blue-300">{activeSurvey.title}</h3><p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{activeSurvey.description}</p><div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-blue-400/10"><div>Company: <strong className="text-slate-700 dark:text-slate-200">{company}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Department: <strong className="text-slate-700 dark:text-slate-200">{department}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Role: <strong className="text-slate-700 dark:text-slate-200">{respondentType}</strong></div></div></div>}
+
+          {employeeExperience && !showReview && (
+            <div className="draft-warning" role="note">
+              <Info size={16} aria-hidden="true" />
+              <span>Answers are not saved when you leave this evaluation.</span>
             </div>
-          </div>
+          )}
+
+          {employeeExperience && showReview && (
+            <div className="respondent-summary">
+              <div><span>PARTNER</span><strong>{company}</strong></div>
+              <div><span>DEPARTMENT</span><strong>{department || 'Not assigned'}</strong></div>
+              <div><span>DESIGNATION</span><strong>{respondentType || 'Not assigned'}</strong></div>
+            </div>
+          )}
 
           {error && (
-            <div className="rounded-lg bg-rose-50 border border-rose-200 px-4 py-2.5 text-sm text-rose dark:bg-rose-950/30 dark:border-rose-900 flex items-center gap-2">
+            <div className="validation-error flex items-center gap-2" role="alert">
               <Info size={16} />
               <span>{error}</span>
             </div>
           )}
 
+          {showReview && (
+            <section className="review-summary" aria-label="Evaluation answers">
+              {activeSurvey.questions.filter((question) => question.question !== 'Period Covered').map((question, index) => {
+                const answer = ratings[question.questionId];
+                const answerText = answer == null || answer === ''
+                  ? 'Not answered'
+                  : Array.isArray(answer)
+                    ? answer.join(', ')
+                    : typeof answer === 'object'
+                      ? question.inputType === 'matrix' && question.subQuestions
+                        ? question.subQuestions.map((sub) => `${sub.label}: ${answer[sub.id] || 'Not answered'}`).join(' · ')
+                        : Object.entries(answer).map(([key, value]) => `${key}: ${value || '—'}`).join(' · ')
+                      : String(answer);
+                return (
+                  <div className="answer-row" key={question.questionId}>
+                    <div>
+                      <span>QUESTION {index + 1}</span>
+                      <p>{question.question}</p>
+                      <p>{answerText}</p>
+                      {comments[question.questionId] && <p>Comment: {comments[question.questionId]}</p>}
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          )}
+
           {/* Form questions list */}
-          <div className="space-y-5">
+          {(!employeeExperience || !showReview) && <div className="space-y-5">
             {(() => {
               let currentSection = '';
               const questionsToRender = activeSurvey.questions.filter(q => q.question !== 'Period Covered');
@@ -912,6 +920,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 }
 
                 const maxVal = getQuestionMaxPoints(activeSurvey.surveyType, q.questionId);
+                const ratingMin = q.inputType === 'typed-rating' ? (q.validationRange?.min ?? 0) : 0;
+                const ratingMax = q.inputType === 'typed-rating' ? (q.validationRange?.max ?? 100) : maxVal;
+                const ratingAllowsNa = q.inputType === 'typed-rating' ? (q.validationRange?.allowNa ?? true) : true;
                 const currentRating = ratings[q.questionId] !== undefined ? ratings[q.questionId] : maxVal;
 
                 return (
@@ -927,11 +938,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                     <div
                       id={`q-container-${q.questionId}`}
                       data-question-order={idx}
-                      className={`panel p-5 space-y-4 shadow-sm hover:shadow-md transition duration-200 border-l-4 ${
-                        validationErrors[q.questionId]
-                          ? 'border-l-rose-500 bg-rose-50/10 ring-1 ring-rose-300 dark:border-l-rose-500 dark:bg-rose-950/5 dark:ring-rose-900/30'
-                          : 'border-l-[#0063a9] dark:border-l-blue-400'
-                      }`}
+                      className={employeeExperience
+                        ? `question space-y-4 ${validationErrors[q.questionId] ? 'validation-error' : ''}`
+                        : `panel p-5 space-y-4 shadow-sm hover:shadow-md transition duration-200 border-l-4 ${validationErrors[q.questionId] ? 'border-l-rose-500 bg-rose-50/10 ring-1 ring-rose-300' : 'border-l-[#0063a9]'}`}
                     >
                       <div className="space-y-1">
                         <div className="flex items-start justify-between gap-4">
@@ -939,9 +948,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                             <span className="text-slate-400 font-bold mr-1.5">{idx + 1}.</span>
                             {q.question} <span className="text-rose-500 font-bold">*</span>
                           </h4>
-                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          {!employeeExperience && <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                             {q.questionCategory}
-                          </span>
+                          </span>}
                         </div>
                       </div>
 
@@ -1071,111 +1080,39 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                             </tbody>
                           </table>
                         </div>
-                      ) : q.inputType === 'typed-rating' ? (
+                      ) : (
                         <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
-                            Type Rating (Value: {q.validationRange ? `${q.validationRange.min}-${q.validationRange.max}` : '0-100'}{(q.validationRange?.allowNa ?? true) ? ' or "N/A"' : ''}): <span className="text-rose-500 font-bold">*</span>
-                          </span>
-                          <input
-                            type="text"
-                            placeholder={
-                              (q.validationRange?.allowNa ?? true)
-                                ? `Enter N/A or number from ${q.validationRange?.min || 0} to ${q.validationRange?.max || 100}`
-                                : `Enter a number from ${q.validationRange?.min || 0} to ${q.validationRange?.max || 100}`
-                            }
-                            className={`field w-full max-w-sm ${validationErrors[q.questionId] ? 'border-rose-400 focus:ring-rose-200' : ''}`}
-                            value={ratings[q.questionId] !== undefined ? ratings[q.questionId].toString() : ''}
-                            onChange={(e) => {
-                              handleRatingChange(q.questionId, e.target.value);
+                          <RatingScale
+                            questionId={q.questionId}
+                            questionOrder={idx}
+                            min={ratingMin}
+                            max={ratingMax}
+                            allowNa={ratingAllowsNa}
+                            value={q.inputType === 'typed-rating'
+                              ? (ratings[q.questionId] === 'N/A'
+                                ? 'N/A'
+                                : ratings[q.questionId] !== undefined && ratings[q.questionId] !== '' && Number.isInteger(Number(ratings[q.questionId]))
+                                  ? Number(ratings[q.questionId])
+                                  : undefined)
+                              : currentRating}
+                            label={`Rating for question ${idx + 1}`}
+                            onChange={(value) => {
+                              handleRatingChange(q.questionId, value);
                               if (validationErrors[q.questionId]) {
-                                setValidationErrors(prev => {
-                                  const copy = { ...prev };
-                                  delete copy[q.questionId];
-                                  return copy;
+                                setValidationErrors((previous) => {
+                                  const next = { ...previous };
+                                  delete next[q.questionId];
+                                  return next;
                                 });
                               }
                             }}
                           />
                           {validationErrors[q.questionId] && (
-                            <p className="text-xs text-rose-500 font-semibold mt-1 flex items-center gap-1">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                            <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-rose-500" role="alert">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />
                               {validationErrors[q.questionId]}
                             </p>
                           )}
-                        </div>
-                      ) : (
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-2">Select Performance Rating:</span>
-                          <div className="flex flex-wrap items-center gap-2">
-                            {(() => {
-                              // Options in scale order (used for arrow-key stepping and the
-                              // roving tabIndex below, so Tab exits the group in one hop).
-                              const optionValues: Array<number | 'N/A'> = [
-                                ...Array.from({ length: maxVal + 1 }, (_, i) => i),
-                                'N/A',
-                              ];
-
-                              return Array.from({ length: maxVal + 1 }, (_, i) => i).map((r) => {
-                                const isSelected = currentRating === r;
-                                const ratio = maxVal > 0 ? r / maxVal : 1;
-
-                                let btnStyle = 'border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900';
-                                if (isSelected) {
-                                  if (ratio <= 0.3) {
-                                    btnStyle = 'bg-rose-50 border-rose-500 text-rose-600 ring-2 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:ring-rose-900/30';
-                                  } else if (ratio < 0.75) {
-                                    btnStyle = 'bg-amber-50 border-amber-500 text-amber-600 ring-2 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:ring-amber-900/30';
-                                  } else {
-                                    btnStyle = 'bg-emerald-50 border-emerald-500 text-emerald-600 ring-2 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:ring-emerald-900/30';
-                                  }
-                                }
-
-                                let label = '';
-                                if (r === 0) label = 'Poor';
-                                else if (r === maxVal) label = 'Excellent';
-                                else if (r === Math.round(maxVal / 2)) label = 'Fair';
-
-                                return (
-                                  <button
-                                    key={r}
-                                    id={`rating-btn-${q.questionId}-${r}`}
-                                    type="button"
-                                    tabIndex={isSelected ? 0 : -1}
-                                    onClick={() => handleRatingChange(q.questionId, r)}
-                                    onKeyDown={(e) => handleRatingKeyDown(e, q.questionId, idx, optionValues)}
-                                    className={`flex-1 min-w-[42px] h-11 rounded-lg border text-sm font-bold flex flex-col items-center justify-center transition duration-150 cursor-pointer ${btnStyle}`}
-                                  >
-                                    <span className="text-base leading-none">{r}</span>
-                                    {label && (
-                                      <span className="text-[8px] font-semibold mt-0.5 tracking-tight uppercase opacity-70">
-                                        {label}
-                                      </span>
-                                    )}
-                                  </button>
-                                );
-                              }).concat(
-                                <button
-                                  key="na"
-                                  id={`rating-btn-${q.questionId}-N/A`}
-                                  type="button"
-                                  tabIndex={currentRating === 'N/A' ? 0 : -1}
-                                  onClick={() => handleRatingChange(q.questionId, 'N/A')}
-                                  onKeyDown={(e) => handleRatingKeyDown(e, q.questionId, idx, optionValues)}
-                                  className={`min-w-16 h-11 rounded-lg border text-sm font-bold flex flex-col items-center justify-center transition duration-150 cursor-pointer ${
-                                    currentRating === 'N/A'
-                                      ? 'bg-slate-100 border-slate-400 text-slate-700 ring-2 ring-slate-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300'
-                                      : 'border-slate-200 text-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900'
-                                  }`}
-                                >
-                                  <span className="text-sm leading-none">N/A</span>
-                                  <span className="text-[8px] font-semibold mt-0.5 uppercase tracking-tight opacity-70">Not App</span>
-                                </button>
-                              );
-                            })()}
-                          </div>
-                          <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">
-                            Tip: with a rating focused, press 0–{maxVal} or the arrow keys to change it, then Enter to jump to the next question.
-                          </p>
                         </div>
                       )}
                     </div>
@@ -1183,77 +1120,60 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 );
               });
             })()}
-          </div>
+          </div>}
 
           {/* Form Footer */}
-          <div className="panel flex flex-col-reverse gap-3 p-4 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:p-5">
+          <div className={employeeExperience ? 'form-bottom' : 'panel flex flex-col-reverse gap-3 p-4 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:p-5'}>
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setStep(1)}
-                className="secondary-button flex w-full items-center gap-1.5 px-3 py-2 text-xs min-[420px]:w-auto"
+                onClick={() => employeeExperience && showReview ? setShowReview(false) : setStep(1)}
+                className="secondary-button flex items-center gap-1.5"
               >
                 <ArrowLeft size={14} />
-                <span>Return</span>
+                <span>{employeeExperience && showReview ? 'Edit answers' : 'Return'}</span>
               </button>
             </div>
             
             <button
               type="submit"
-              className="primary-button w-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 min-[420px]:w-auto"
+              className={employeeExperience ? 'primary-button' : 'primary-button w-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 min-[420px]:w-auto'}
               id="btn-filler-submit"
             >
-              <Send size={14} />
-              <span>Submit Evaluation</span>
+              {employeeExperience && showReview ? <Send size={14} /> : employeeExperience ? <ArrowRight size={14} /> : <Send size={14} />}
+              <span>{employeeExperience ? showReview ? 'Submit evaluation' : 'Review answers' : 'Submit Evaluation'}</span>
             </button>
           </div>
         </form>
       )}
 
       {step === 3 && (
-        <div className="panel space-y-6 p-6 text-center sm:p-16" id="survey-filler-success">
-          <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-400">
+        <div className={employeeExperience ? 'panel confirmation' : 'panel space-y-6 p-6 text-center sm:p-16'} id="survey-filler-success">
+          <div className={employeeExperience ? 'success-mark' : 'inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-400'}>
             <CheckCircle size={36} />
           </div>
 
-          <div className="space-y-2 max-w-md mx-auto">
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Submission Successful</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Thank you! Your ratings and comments have been registered in our database. The central administrator has been notified.
-            </p>
-          </div>
+          {employeeExperience ? <><h1>Thank you for your feedback</h1><p>Your evaluation for <strong>{company}</strong> has been submitted.</p></> : <div className="space-y-2 max-w-md mx-auto"><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Submission Successful</h2><p className="text-sm text-slate-500 dark:text-slate-400">Thank you! Your ratings and comments have been registered in our database. The central administrator has been notified.</p></div>}
 
-          <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-5 max-w-sm mx-auto text-left text-xs space-y-2">
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">Respondent:</span>
-              <span className="text-slate-700 dark:text-slate-300 font-bold">{company}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">Audience Segment:</span>
-              <span className="text-slate-700 dark:text-slate-300 font-bold">{activeSurvey?.surveyType}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">Date Registered:</span>
-              <span className="text-slate-700 dark:text-slate-300 font-bold">{new Date().toLocaleString()}</span>
-            </div>
-          </div>
+          {employeeExperience ? <div className="confirmation-meta"><CheckCircle size={16} /><span>{activeSurvey?.title} — {new Date().toLocaleDateString()}</span></div> : <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-5 max-w-sm mx-auto text-left text-xs space-y-2"><div className="flex justify-between"><span className="text-slate-400 font-semibold">Respondent:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{company}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Audience Segment:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{activeSurvey?.surveyType}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Date Registered:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{new Date().toLocaleString()}</span></div></div>}
+          {employeeExperience && <small>Your response is recorded with your employee account.</small>}
 
-          <div className="pt-4 flex items-center justify-center gap-3">
+          <div className={employeeExperience ? 'confirmation-actions' : 'pt-4 flex items-center justify-center gap-3'}>
             <button
               onClick={handleReset}
               className="secondary-button"
               type="button"
               id="btn-submit-another"
             >
-              <span>Submit Another Evaluation</span>
+                <span>{employeeExperience ? 'Start another evaluation' : 'Submit Another Evaluation'}</span>
             </button>
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="primary-button bg-[#0063a9] hover:bg-[#00528c]"
+                className={employeeExperience ? 'primary-button' : 'primary-button bg-[#0063a9] hover:bg-[#00528c]'}
                 type="button"
               >
-                Return to Directory
+                {employeeExperience ? 'Return to Evaluations' : 'Return to Directory'}
               </button>
             )}
           </div>
@@ -1262,36 +1182,35 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
       {/* Draft Save Confirmation Modal */}
       {showDraftModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-md w-full border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3 text-amber-500">
-                <Info size={24} className="shrink-0" />
-                <h3 className="text-lg font-bold text-slate-950 dark:text-white">Save Progress Draft?</h3>
+          <div className={employeeExperience ? 'fixed inset-0 modal-backdrop' : 'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-200'}>
+          <div className={employeeExperience ? 'modal draft-confirmation-modal' : 'bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-md w-full border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-200'} role="dialog" aria-modal="true" aria-labelledby="draft-modal-title" aria-describedby="draft-modal-description">
+            {employeeExperience && <button type="button" className="draft-modal-close" aria-label="Close save progress dialog" onClick={handleCancelDraftModal}><X size={18} aria-hidden="true" /></button>}
+            <div className={employeeExperience ? 'draft-modal-content' : 'p-6 space-y-4'}>
+              <div className="draft-modal-heading">
+                <h2 id="draft-modal-title">Save your progress?</h2>
               </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                You're about to leave this survey before submitting it. Would you like to save your completed answers as a draft so you can resume later, or exit without saving?
+              <p className="modal-subtitle" id="draft-modal-description">
+                You have an unfinished evaluation. Save your answers as a draft to continue later, or leave without saving.
               </p>
+              {draftSaveError && <p className="draft-save-error" role="alert">{draftSaveError}</p>}
             </div>
-            <div className="bg-slate-50 dark:bg-slate-950/60 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:justify-end border-t border-slate-100 dark:border-slate-800/50">
-              <button
+            <div className={employeeExperience ? 'confirmation-actions' : 'bg-slate-50 dark:bg-slate-950/60 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:justify-end border-t border-slate-100 dark:border-slate-800/50'}>
+              {!employeeExperience && <button
                 type="button"
                 onClick={handleCancelDraftModal}
                 className="secondary-button order-last sm:order-none text-xs py-2"
-              >
-                Cancel
-              </button>
+              >Cancel</button>}
               <button
                 type="button"
                 onClick={handleExitWithoutSaving}
-                className="px-4 py-2 text-xs font-semibold rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-100 dark:text-rose-400 dark:bg-rose-950/30 dark:hover:bg-rose-950/60 dark:border-rose-900/40"
+                className={employeeExperience ? 'secondary-button exit-without-saving' : 'px-4 py-2 text-xs font-semibold rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-100 dark:text-rose-400 dark:bg-rose-950/30 dark:hover:bg-rose-950/60 dark:border-rose-900/40'}
               >
                 Exit Without Saving
               </button>
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                className="px-4 py-2 text-xs font-bold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+                className={employeeExperience ? 'primary-button' : 'px-4 py-2 text-xs font-bold rounded-lg text-white bg-[#2187CD] hover:bg-[#176FAE] shadow-sm'}
               >
                 Save Draft & Exit
               </button>

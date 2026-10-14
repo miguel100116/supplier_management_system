@@ -1,5 +1,6 @@
 import { LucideIcon, Menu, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
+import { EmployeeExperienceShell } from '../features/employee-experience/components/EmployeeExperienceShell';
 
 interface NavChild<T extends string> {
   key: T;
@@ -51,6 +52,9 @@ interface ShellProps<T extends string> {
   hideModuleContext?: boolean;
   compactPageHeader?: boolean;
   sidebarExtra?: (isCollapsed: boolean) => ReactNode;
+  adminMode?: boolean;
+  navigationLabel?: string;
+  employeeMode?: boolean;
 }
 
 // Flattens groups so we can look up the active item's label/icon regardless
@@ -75,6 +79,9 @@ export function Shell<T extends string>({
   hideModuleContext = false,
   compactPageHeader = false,
   sidebarExtra,
+  adminMode = false,
+  navigationLabel,
+  employeeMode = false,
 }: ShellProps<T>) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -103,6 +110,20 @@ export function Shell<T extends string>({
     scrollModuleToTop();
   }, [activePage]);
 
+  if (employeeMode) {
+    return (
+      <EmployeeExperienceShell
+        pages={pages}
+        activePage={activePage}
+        onPageChange={onPageChange}
+        title={title}
+        action={action}
+      >
+        {children}
+      </EmployeeExperienceShell>
+    );
+  }
+
   const toggleGroup = (id: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
@@ -115,10 +136,10 @@ export function Shell<T extends string>({
   return (
     <div className="min-h-screen bg-cloud text-ink dark:bg-slate-950 dark:text-slate-100 flex flex-col">
       {/* Top Header Layer */}
-      <header className="sticky top-0 z-40 h-20 border-b border-[#00528c] bg-[#0063a9] flex items-center justify-between w-full lg:pr-8 shadow-sm">
+      <header className={`sticky top-0 z-40 h-20 border-b flex items-center justify-between w-full lg:pr-8 ${adminMode ? 'border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950' : 'border-[#00528c] bg-[#0063a9] shadow-sm'}`}>
         <div className="flex items-center h-full flex-1 min-w-0">
           {/* Brand Box / Logo Area - Fixed Width, unaffected by collapsing */}
-          <div className="relative z-10 flex h-full w-[92px] shrink-0 items-center justify-center bg-[#0063a9] px-2 min-[380px]:w-[116px] sm:w-[180px] sm:px-4 lg:w-[220px]">
+          <div className={`relative z-10 flex h-full shrink-0 items-center justify-center px-2 min-[380px]:px-3 sm:px-4 ${adminMode ? 'w-[92px] min-[380px]:w-[116px] sm:w-[180px] lg:w-[264px] bg-white dark:bg-slate-950' : 'w-[92px] min-[380px]:w-[116px] sm:w-[180px] lg:w-[220px] bg-[#0063a9]'}`}>
             <button
                onClick={() => {
                  const homePage = pages.find((p) => p.type !== 'group' && (p as NavLeaf<T>).key === ('dashboard' as any));
@@ -131,18 +152,20 @@ export function Shell<T extends string>({
               <img
                 src="/microgenesis_logo.png"
                 alt="Microgenesis Logo"
-                className="h-8 max-w-full shrink-0 object-contain brightness-0 invert transition duration-200 group-hover:opacity-90 sm:h-10"
+                className={`max-w-full shrink-0 object-contain transition duration-200 group-hover:opacity-90 ${adminMode ? 'h-7 sm:h-8' : 'h-8 brightness-0 invert sm:h-10'}`}
                 referrerPolicy="no-referrer"
               />
             </button>
           </div>
 
           {/* Title Area */}
-          <div className="hidden sm:flex min-w-0 flex-1 items-center pl-6" />
+          <div className={`hidden sm:flex min-w-0 flex-1 items-center pl-6 ${adminMode ? 'gap-2 text-xs text-slate-400 dark:text-slate-500' : ''}`}>
+            {adminMode && <><span>Workspace</span><ChevronRight size={14} /><span className="text-slate-700 dark:text-slate-200">{contentHeading}</span></>}
+          </div>
         </div>
 
         {/* Header Actions */}
-        <div className="flex shrink-0 items-center gap-0.5 px-1 min-[380px]:gap-1 min-[380px]:px-2 sm:gap-3 sm:px-4">
+        <div className={`flex shrink-0 items-center gap-0.5 px-1 min-[380px]:gap-1 min-[380px]:px-2 sm:gap-3 sm:px-4 ${adminMode ? 'text-slate-600 dark:text-slate-300' : ''}`}>
           {action}
         </div>
       </header>
@@ -236,7 +259,7 @@ export function Shell<T extends string>({
       {/* Main layout below header */}
       <div className="flex flex-1">
         {/* Sidebar - Below Header */}
-        <div className={`relative sticky top-20 h-[calc(100vh-80px)] hidden border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 lg:block transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'w-16' : 'w-[220px]'}`}>
+        <div className={`relative sticky top-20 h-[calc(100vh-80px)] hidden border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 lg:block transition-all duration-300 shrink-0 ${isSidebarCollapsed ? 'w-16' : adminMode ? 'w-[264px]' : 'w-[220px]'}`}>
           {/* Toggle Sidebar Button on the right border - centered on the sidebar's
               own height (not a fixed pixel offset), so it stays vertically
               centered regardless of viewport height (1366x768, 1920x1080, etc). */}
@@ -250,6 +273,9 @@ export function Shell<T extends string>({
 
           <aside className={`h-full flex flex-col justify-between py-6 transition-all duration-300 ${isSidebarCollapsed ? 'px-2' : 'px-3'} overflow-hidden`}>
             <nav className="space-y-1 overflow-y-auto pr-1 flex-1">
+              {navigationLabel && !isSidebarCollapsed && (
+                <p className="px-3 pb-3 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">{navigationLabel}</p>
+              )}
               {pages.map((page) => {
                 if (page.type === 'group') {
                   const GroupIcon = page.icon;
@@ -362,7 +388,7 @@ export function Shell<T extends string>({
 
         {/* Page Content - Below Header */}
         <main className="min-w-0 flex-1 transition-colors duration-300 dark:bg-slate-900">
-          <div className="px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
+          <div className={`px-3 py-4 sm:px-4 sm:py-6 ${adminMode ? 'lg:px-10' : 'lg:px-8'}`}>
             {!hidePageHeading && (
               <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${compactPageHeader ? 'mb-3' : 'mb-6'}`}>
                 <div className="min-w-0">

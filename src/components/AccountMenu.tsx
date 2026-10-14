@@ -8,10 +8,11 @@ interface AccountMenuProps {
   role?: string;
   onOpenSettings: () => void;
   onLogout: () => void;
+  appearance?: 'brand' | 'neutral' | 'employee';
 }
 
 
-export function AccountMenu({ email, designation, department, role, onOpenSettings, onLogout }: AccountMenuProps) {
+export function AccountMenu({ email, designation, department, role, onOpenSettings, onLogout, appearance = 'brand' }: AccountMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -36,25 +37,25 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
     .slice(0, 2) || 'AD';
 
   return (
-    <div className="relative" ref={menuRef} id="account-menu-container">
+    <div className={`relative ${appearance === 'employee' ? 'account-wrap' : ''}`} ref={menuRef} id="account-menu-container">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 rounded-lg border border-blue-400/25 bg-[#00528c]/40 px-1.5 py-1.5 text-sm font-medium text-white outline-none transition hover:bg-[#00528c]/60 min-[380px]:gap-2 min-[380px]:px-2 sm:px-3 cursor-pointer animate-fade-in"
+        className={appearance === 'employee' ? 'account-button' : `flex items-center gap-1 rounded-lg px-1.5 py-1.5 text-sm font-medium outline-none transition min-[380px]:gap-2 min-[380px]:px-2 sm:px-3 cursor-pointer animate-fade-in ${appearance === 'neutral' ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800' : 'border border-blue-400/25 bg-[#00528c]/40 text-white hover:bg-[#00528c]/60'}`}
         type="button"
         id="account-menu-trigger"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[#0063a9] font-bold text-xs shadow-sm shrink-0">
+        <div className={appearance === 'employee' ? 'avatar' : 'flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[#0063a9] font-bold text-xs shadow-sm shrink-0'}>
           {initials}
         </div>
-        <span className="hidden md:inline truncate max-w-28 text-blue-100 group-hover:text-white">
-          {email}
+        <span className={appearance === 'employee' ? 'account-name' : `hidden md:inline truncate max-w-28 ${appearance === 'neutral' ? 'text-slate-600 dark:text-slate-300' : 'text-blue-100 group-hover:text-white'}`}>
+          {email}{appearance === 'employee' && <span>{designation || role || 'Employee'}</span>}
         </span>
-        <ChevronDown size={14} className={`text-blue-200 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`transition-transform duration-200 ${appearance === 'neutral' ? 'text-slate-400 dark:text-slate-500' : appearance === 'employee' ? 'text-slate-400' : 'text-blue-200'} ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
         <div
-          className="absolute right-0 z-50 mt-2 w-[calc(100vw-1rem)] max-w-64 origin-top-right rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5 focus:outline-none dark:border-slate-800 dark:bg-slate-950 animate-in fade-in slide-in-from-top-1 duration-150"
+          className={appearance === 'employee' ? 'account-menu' : 'absolute right-0 z-50 mt-2 w-[calc(100vw-1rem)] max-w-64 origin-top-right rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5 focus:outline-none dark:border-slate-800 dark:bg-slate-950 animate-in fade-in slide-in-from-top-1 duration-150'}
           id="account-menu-dropdown"
         >
           <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
@@ -67,7 +68,7 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
           <div className="mt-1 divide-y divide-slate-100 dark:divide-slate-800">
             <div className="flex flex-col gap-2 px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex items-center gap-2">
-                <User size={13} className="text-[#0063a9] dark:text-blue-400" />
+                <User size={13} className={appearance === 'employee' ? 'text-[#2187CD]' : 'text-[#0063a9] dark:text-blue-400'} />
                 <span className="font-bold text-slate-700 dark:text-slate-300">
                   {role === 'Admin' ? 'System Administrator' : 'Employee Access'}
                 </span>

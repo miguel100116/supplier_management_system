@@ -5,6 +5,7 @@ import { EvaluationWorkspace, isEvaluationWorkspacePage } from './features/evalu
 import { AccountMenu } from './components/AccountMenu';
 import { NotificationBell } from './components/NotificationBell';
 import { EmployeeNotificationBell } from './components/EmployeeNotificationBell';
+import { EmployeeWorkspacePage } from './features/employee-experience/components/EmployeeWorkspacePage';
 import { Shell, NavItem } from './layouts/Shell';
 import { LoginPage, MicrosoftAuth } from './pages/LoginPage';
 import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage';
@@ -449,6 +450,14 @@ export default function App() {
     const routeParams = new URLSearchParams(window.location.search);
     return routeParams.get('surveyId') ?? routeParams.get('editSurveyId');
   });
+  const [isEvaluationListOpen, setIsEvaluationListOpen] = useState(() => !new URLSearchParams(window.location.search).get('surveyId'));
+  const [selectedEvaluationCompany, setSelectedEvaluationCompany] = useState('');
+  useEffect(() => {
+    if (activePage !== 'fill-form') {
+      setIsEvaluationListOpen(true);
+      setSelectedEvaluationCompany('');
+    }
+  }, [activePage]);
   const surveyFillerRef = useRef<SurveyFillerHandle>(null);
 
   // Any navigation away from the survey-filling page (sidebar Home logo, a
@@ -702,15 +711,15 @@ export default function App() {
   const activeSurveyTypes = filters.surveyType.length ? filters.surveyType : effectiveSurveyTypes;
 
 
-  // Employee sidebar: simple, task-focused, flat (no groups). Every
-  // authenticated employee gets the same 5 items regardless of rank -
+  // Employee sidebar: simple, task-focused, flat. Every
+  // authenticated employee gets the same 3 destinations regardless of rank -
   // deeper per-rank data scoping still applies to the pages themselves via
   // applyAccessFilter/userPermissions, just not to which nav items show.
   const employeeNavItems: NavItem<PageKey>[] = useMemo(
     () => [
-      { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { key: 'fill-form', label: 'New Evaluation', icon: FilePlus },
-      { key: 'my-submissions', label: 'My Submissions', icon: ClipboardList },
+      { key: 'dashboard', label: 'Home', icon: LayoutDashboard },
+      { key: 'fill-form', label: 'Evaluations', icon: FilePlus },
+      { key: 'my-submissions', label: 'My submissions', icon: ClipboardList },
     ],
     []
   );
@@ -1030,12 +1039,49 @@ export default function App() {
     submitResponse(surveyId, company, accountProfile.department, accountProfile.designation, address, answers, account || undefined, startTime);
   };
 
+  const navigateEmployeeWorkspace = (view: 'Home' | 'Evaluations' | 'My submissions') => {
+    if (view === 'Home') {
+      navigateTo('dashboard');
+    } else if (view === 'Evaluations') {
+      const showEvaluations = () => {
+        setIsEvaluationListOpen(true);
+        setSelectedEvaluationCompany('');
+        navigateTo('fill-form');
+      };
+      if (activePage === 'fill-form' && !isEvaluationListOpen && surveyFillerRef.current) {
+        surveyFillerRef.current.attemptExit(showEvaluations);
+      } else {
+        showEvaluations();
+      }
+    } else {
+      navigateTo('my-submissions');
+    }
+  };
+
+  const startEmployeeEvaluation = (surveyId: string, companyName: string) => {
+    setSelectedEvaluationCompany(companyName);
+    setIsEvaluationListOpen(false);
+    navigateTo('fill-form', { surveyId });
+  };
+
   // ----------------------------------------------------
   // ADMIN EXPERIENCE (ALL ANALYTICS SECURED HERE)
   // ----------------------------------------------------
   const pageContent = {
     login: null,
-    dashboard: (
+    dashboard: !isAdmin ? (
+      <EmployeeWorkspacePage
+        view="Home"
+        surveys={userAccessibleSurveys}
+        partnerCompanies={userAccessiblePartnerCompanies}
+        responses={userAccessibleAllResponses}
+        userEmail={account || ''}
+        isLoading={isLoading}
+        error={error}
+        onNavigate={navigateEmployeeWorkspace}
+        onStartEvaluation={startEmployeeEvaluation}
+      />
+    ) : (
       <DashboardPage
         responses={filteredResponses}
         allResponses={userAccessibleAllResponses}
@@ -1171,13 +1217,19 @@ export default function App() {
         responses={responses}
       />
     ),
-    'my-submissions': (
-      <MySubmissionsPage
+    'my-submissions': !isAdmin ? (
+      <EmployeeWorkspacePage
+        view="My submissions"
+        surveys={userAccessibleSurveys}
+        partnerCompanies={userAccessiblePartnerCompanies}
         responses={userAccessibleAllTimeResponses}
         userEmail={account || ''}
-        onFillForm={() => navigateTo('fill-form')}
+        isLoading={isLoading}
+        error={error}
+        onNavigate={navigateEmployeeWorkspace}
+        onStartEvaluation={startEmployeeEvaluation}
       />
-    ),
+    ) : <MySubmissionsPage responses={userAccessibleAllTimeResponses} userEmail={account || ''} onFillForm={() => navigateTo('fill-form')} />,
     'profile-settings': profile && (
       <ProfilePage
         email={account || ''}
@@ -1223,8 +1275,8 @@ export default function App() {
           surveys={surveys}
           partnerCompanies={partnerCompanies}
           responses={responses}
-          onFillForm={(id) => {
-            navigateTo('fill-form', { surveyId: id });
+          onFillForm={(id, companyName) => {
+            startEmployeeEvaluation(id, companyName ?? '');
           }}
         />
       )
@@ -1286,18 +1338,35 @@ export default function App() {
         />
       );
     })(),
-    'fill-form': (
+    'fill-form': !isAdmin && isEvaluationListOpen ? (
+      <EmployeeWorkspacePage
+        view="Evaluations"
+        surveys={userAccessibleSurveys}
+        partnerCompanies={userAccessiblePartnerCompanies}
+        responses={userAccessibleAllResponses}
+        userEmail={account || ''}
+        isLoading={isLoading}
+        error={error}
+        onNavigate={navigateEmployeeWorkspace}
+        onStartEvaluation={startEmployeeEvaluation}
+      />
+    ) : (
       <SurveyFillerPage
         ref={surveyFillerRef}
         surveys={userAccessibleSurveys}
         partnerCompanies={userAccessiblePartnerCompanies}
         initialSurveyId={selectedSurveyId}
+        initialCompanyName={selectedEvaluationCompany}
+        employeeExperience={!isAdmin}
         userEmail={account || ''}
         defaultDepartment={accountProfile?.department}
         defaultRespondentType={accountProfile?.designation}
         responses={userAccessibleResponses}
         onSubmitted={handleSurveySubmit}
-        onCancel={() => goToPreviousPage('survey-forms')}
+        onCancel={() => {
+          if (!isAdmin) setIsEvaluationListOpen(true);
+          else goToPreviousPage('survey-forms');
+        }}
       />
     ),
     archive: (
@@ -1354,16 +1423,20 @@ export default function App() {
         activePage={isAdminEvaluationWorkspace ? 'survey-forms' : activePage}
         onPageChange={(page) => {
           const targetPage = page as PageKey;
+          if (!isAdmin && targetPage === 'fill-form' && activePage !== 'fill-form') setIsEvaluationListOpen(true);
           navigateTo(targetPage);
           if (targetPage === 'notifications') markNotificationsRead();
         }}
         title={activeTitle}
         pageHeading={pageHeading}
-        hidePageHeading={activePage === 'partner-companies'}
+        hidePageHeading={!isAdmin || activePage === 'partner-companies'}
         hideModuleContext={activePage === 'dashboard' || activePage === 'account-management' || activePage === 'partner-companies'}
         compactPageHeader={activePage === 'analytics'}
+        adminMode={isAdmin}
+        navigationLabel={isAdmin ? 'Administrator workspace' : undefined}
+        employeeMode={!isAdmin}
         action={
-          <div className="flex min-w-0 items-center divide-x divide-blue-400/25">
+          <div className={`flex min-w-0 items-center ${isAdmin ? 'divide-x divide-slate-200 dark:divide-slate-800' : 'employee-actions'}`}>
             {isAdmin ? (
               <div className="pr-1 sm:pr-3">
                 <NotificationBell
@@ -1371,6 +1444,7 @@ export default function App() {
                   unreadCount={unreadCount}
                   onOpen={() => undefined}
                   onViewAll={() => setIsNotificationModalOpen(true)}
+                  appearance="neutral"
                 />
               </div>
             ) : (
@@ -1381,6 +1455,10 @@ export default function App() {
                   partnerCompanies={partnerCompanies}
                   responses={responses}
                   onFillForm={(id) => {
+                    if (!isAdmin) {
+                      setSelectedEvaluationCompany('');
+                      setIsEvaluationListOpen(false);
+                    }
                     navigateTo('fill-form', { surveyId: id });
                   }}
                   onViewAll={() => setIsNotificationModalOpen(true)}
@@ -1388,10 +1466,10 @@ export default function App() {
                 />
               </div>
             )}
-            <div className="px-1 sm:px-3">
+            {isAdmin && <div className="px-1 sm:px-3">
               <button
                 className={`inline-flex h-10 w-10 items-center justify-center rounded-lg transition cursor-pointer ${
-                  darkMode ? 'bg-white/10 text-white' : 'text-blue-100 hover:text-white'
+                  'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                 }`}
                 type="button"
                 onClick={() => setDarkMode((value) => !value)}
@@ -1399,7 +1477,7 @@ export default function App() {
               >
                 {darkMode ? <Sun size={18} /> : <Moon size={18} />}
               </button>
-            </div>
+            </div>}
             <div className="pl-1 sm:pl-3">
               <AccountMenu
                 email={account}
@@ -1408,6 +1486,7 @@ export default function App() {
                 role={profile?.role}
                 onOpenSettings={() => setIsSettingsModalOpen(true)}
                 onLogout={handleLogout}
+                appearance={isAdmin ? 'neutral' : 'employee'}
               />
             </div>
           </div>
@@ -1490,14 +1569,14 @@ export default function App() {
           aria-modal="true"
           aria-labelledby="notification-center-title"
         >
-          <div className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950" style={{ width: '100%', maxWidth: '80rem', maxHeight: '92vh', backgroundColor: darkMode ? '#020617' : '#f8fafc' }}>
+          <div className={`flex w-full ${isAdmin ? 'max-h-[92vh] max-w-7xl rounded-2xl' : 'max-h-[84vh] max-w-4xl rounded-xl'} flex-col overflow-hidden border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950`} style={{ width: '100%', maxWidth: isAdmin ? '80rem' : '56rem', maxHeight: isAdmin ? '92vh' : '84vh', backgroundColor: darkMode ? '#020617' : '#f8fafc' }}>
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
               <div>
                 <h2 id="notification-center-title" className="text-lg font-bold text-slate-900 dark:text-white">
                   {isAdmin ? 'All Notifications' : 'All Reminders'}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {isAdmin ? 'Survey submissions and document alerts.' : 'Your pending survey evaluation reminders.'}
+                  {isAdmin ? 'Survey submissions and document alerts.' : 'Evaluations waiting for your feedback.'}
                 </p>
               </div>
               <button
@@ -1510,7 +1589,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+            <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${isAdmin ? 'p-4 sm:p-6' : 'p-3 sm:p-4'}`}>
               <Suspense
                 fallback={(
                   <div className="flex min-h-64 items-center justify-center" role="status" aria-live="polite">
@@ -1538,9 +1617,9 @@ export default function App() {
                       surveys={surveys}
                       partnerCompanies={partnerCompanies}
                       responses={responses}
-                      onFillForm={(id) => {
+                      onFillForm={(id, companyName) => {
                         setIsNotificationModalOpen(false);
-                        navigateTo('fill-form', { surveyId: id });
+                        startEmployeeEvaluation(id, companyName ?? '');
                       }}
                     />
                   )
