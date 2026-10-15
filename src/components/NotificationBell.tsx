@@ -8,6 +8,7 @@ interface NotificationBellProps {
   unreadCount: number;
   onOpen: () => void;
   onViewAll: () => void;
+  appearance?: 'brand' | 'neutral';
 }
 
 const surveyTypeColors: Record<SurveyType, string> = {
@@ -38,7 +39,7 @@ function formatExpiryDate(date?: string): string {
   return Number.isNaN(parsed.getTime()) ? 'date unavailable' : parsed.toLocaleDateString();
 }
 
-export function NotificationBell({ notifications, unreadCount, onOpen, onViewAll }: NotificationBellProps) {
+export function NotificationBell({ notifications, unreadCount, onOpen, onViewAll, appearance = 'brand' }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [, forceTick] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,13 +75,15 @@ export function NotificationBell({ notifications, unreadCount, onOpen, onViewAll
         type="button"
         onClick={handleToggle}
         className={`relative inline-flex h-10 w-10 items-center justify-center rounded-lg transition cursor-pointer ${
-          isOpen ? 'bg-white/10 text-white' : 'text-blue-100 hover:text-white'
+          appearance === 'neutral'
+            ? isOpen ? 'bg-slate-100 text-[#0063a9] dark:bg-slate-800 dark:text-blue-300' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+            : isOpen ? 'bg-white/10 text-white' : 'text-blue-100 hover:text-white'
         }`}
         title="Recent activity"
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0063a9] bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+          <span className={`absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 ${appearance === 'neutral' ? 'border-white dark:border-slate-950' : 'border-[#0063a9]'} bg-rose-500 px-1 text-[10px] font-bold leading-none text-white`}>
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
