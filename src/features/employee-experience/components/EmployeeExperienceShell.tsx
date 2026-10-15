@@ -90,18 +90,21 @@ export function EmployeeExperienceShell<T extends string>({ pages, activePage, o
       <div className="main-shell">
         <header className="topbar">
           <div className="breadcrumb">
-            <button
-              type="button"
-              className="breadcrumb-home"
-              onClick={() => homePage && onPageChange(homePage.key)}
-              aria-label="Go to Home"
-            >
-              Home
-            </button>
+            {activePage === homePage?.key ? (
+              <span aria-current="page">Home</span>
+            ) : (
+              <button
+                type="button"
+                className="breadcrumb-home"
+                onClick={() => homePage && onPageChange(homePage.key)}
+                aria-label="Go to Home"
+              >
+                Home
+              </button>
+            )}
             {activePage !== homePage?.key && <><Icon name="chevron" size={13} /><span>{pageTitle}</span></>}
           </div>
           <div className="topbar-right">
-            <button className="icon-button" aria-label="Open quick guide" type="button" onClick={() => setIsHelpOpen(true)}><Icon name="help" /></button>
             {action}
           </div>
         </header>

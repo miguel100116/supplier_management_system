@@ -13,7 +13,7 @@ function renderForm(isAdmin: boolean, surveys = forms, profile?: { department: s
   const previous = globals.React;
   globals.React = React;
   try {
-    return renderToStaticMarkup(<SurveyFillerPage surveys={getVisibleSurveyForms(surveys, isAdmin)} partnerCompanies={[]} initialSurveyId="1" employeeExperience={!isAdmin} userEmail="employee@example.com" defaultDepartment={profile?.department} defaultRespondentType={profile?.designation} responses={[]} onSubmitted={() => undefined} onCancel={() => undefined} />);
+    return renderToStaticMarkup(<SurveyFillerPage surveys={getVisibleSurveyForms(surveys, isAdmin)} partnerCompanies={[]} initialSurveyId="1" employeeExperience={!isAdmin} userEmail="employee@example.com" defaultDepartment={profile?.department} defaultRespondentType={profile?.designation} responses={[]} onSubmitted={() => 'test-response-id'} onCancel={() => undefined} />);
   } finally {
     if (previous === undefined) Reflect.deleteProperty(globals, 'React');
     else globals.React = previous;

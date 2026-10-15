@@ -6,6 +6,7 @@ import { AccountMenu } from './components/AccountMenu';
 import { NotificationBell } from './components/NotificationBell';
 import { EmployeeNotificationBell } from './components/EmployeeNotificationBell';
 import { EmployeeWorkspacePage } from './features/employee-experience/components/EmployeeWorkspacePage';
+import type { EmployeeEvaluationFilter } from './features/employee-experience/domain/pendingEvaluations';
 import { Shell, NavItem } from './layouts/Shell';
 import { LoginPage, MicrosoftAuth } from './pages/LoginPage';
 import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage';
@@ -452,6 +453,7 @@ export default function App() {
   });
   const [isEvaluationListOpen, setIsEvaluationListOpen] = useState(() => !new URLSearchParams(window.location.search).get('surveyId'));
   const [selectedEvaluationCompany, setSelectedEvaluationCompany] = useState('');
+  const [employeeEvaluationFilter, setEmployeeEvaluationFilter] = useState<EmployeeEvaluationFilter>('All evaluations');
   useEffect(() => {
     if (activePage !== 'fill-form') {
       setIsEvaluationListOpen(true);
@@ -1038,9 +1040,9 @@ export default function App() {
     address: string | undefined,
     answers: any[],
     startTime?: string
-  ) => {
-    if (!accountProfile) return;
-    submitResponse(surveyId, company, accountProfile.department, accountProfile.designation, address, answers, account || undefined, startTime);
+  ): string | null => {
+    if (!accountProfile) return null;
+    return submitResponse(surveyId, company, accountProfile.department, accountProfile.designation, address, answers, account || undefined, startTime);
   };
 
   const navigateEmployeeWorkspace = (view: 'Home' | 'Evaluations' | 'My submissions') => {
@@ -1084,6 +1086,8 @@ export default function App() {
         error={error}
         onNavigate={navigateEmployeeWorkspace}
         onStartEvaluation={startEmployeeEvaluation}
+        initialEvaluationFilter={employeeEvaluationFilter}
+        onEvaluationFilterChange={setEmployeeEvaluationFilter}
       />
     ) : (
       <DashboardPage
@@ -1353,6 +1357,8 @@ export default function App() {
         error={error}
         onNavigate={navigateEmployeeWorkspace}
         onStartEvaluation={startEmployeeEvaluation}
+        initialEvaluationFilter={employeeEvaluationFilter}
+        onEvaluationFilterChange={setEmployeeEvaluationFilter}
       />
     ) : (
       <SurveyFillerPage
@@ -1684,27 +1690,37 @@ export default function App() {
 
       {isSettingsModalOpen && profile && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm sm:p-4"
+          className={isAdmin
+            ? 'fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm sm:p-4'
+            : 'employee-profile-dialog-backdrop fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-5'}
           role="dialog"
           aria-modal="true"
           aria-labelledby="settings-modal-title"
         >
-          <div className="flex max-h-[95vh] w-[96vw] max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className={isAdmin
+            ? 'flex max-h-[95vh] w-[96vw] max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950'
+            : 'employee-profile-dialog flex max-h-[88vh] w-[min(94vw,680px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950'}>
+            <div className={isAdmin
+              ? 'flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900'
+              : 'employee-profile-dialog-header flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900'}>
               <div>
-                <h2 id="settings-modal-title" className="text-xl font-bold text-slate-900 dark:text-white">
+                <h2 id="settings-modal-title" className={isAdmin
+                  ? 'text-xl font-bold text-slate-900 dark:text-white'
+                  : 'text-lg font-bold text-slate-900 dark:text-white'}>
                   {isAdmin ? 'Settings' : 'Profile & Settings'}
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className={isAdmin ? 'text-xs text-slate-500 dark:text-slate-400' : 'mt-1 text-sm text-slate-500 dark:text-slate-400'}>
                   {isAdmin
                     ? 'Manage your account, appearance, session, and available system tools.'
-                    : 'View your profile, evaluation activity, preferences, and session.'}
+                    : 'Account details and preferences.'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsSettingsModalOpen(false)}
-                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                className={isAdmin
+                  ? 'inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+                  : 'employee-profile-dialog-close inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}
                 aria-label="Close settings"
               >
                 <X size={20} />
@@ -1721,7 +1737,9 @@ export default function App() {
                 </div>
               )}
             >
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+              <div className={isAdmin
+                ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6'
+                : 'employee-profile-dialog-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5'}>
                 {isAdmin ? (
                   <SettingsPage
                     email={account || ''}

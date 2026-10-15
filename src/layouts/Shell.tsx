@@ -89,6 +89,7 @@ export function Shell<T extends string>({
 
   const flatPages = flattenPages(pages);
   const activePageItem = flatPages.find((p) => p.key === activePage);
+  const homePage = flatPages.find((page) => page.key === ('dashboard' as T)) ?? flatPages[0];
   const ActiveIcon = activePageItem?.icon ?? Menu;
   const moduleLabel = activePageItem?.label ?? title;
   const contentHeading = pageHeading || title;
@@ -160,7 +161,18 @@ export function Shell<T extends string>({
 
           {/* Title Area */}
           <div className={`hidden sm:flex min-w-0 flex-1 items-center pl-6 ${adminMode ? 'gap-2 text-xs text-slate-400 dark:text-slate-500' : ''}`}>
-            {adminMode && <><span>Workspace</span><ChevronRight size={14} /><span className="text-slate-700 dark:text-slate-200">{contentHeading}</span></>}
+            {adminMode && <>
+              <button
+                type="button"
+                onClick={() => homePage && onPageChange(homePage.key)}
+                aria-label="Go to Home"
+                className="text-slate-400 dark:text-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+              >
+                Workspace
+              </button>
+              <ChevronRight size={14} />
+              <span className="text-slate-700 dark:text-slate-200" aria-current="page">{contentHeading}</span>
+            </>}
           </div>
         </div>
 
