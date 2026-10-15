@@ -19,8 +19,8 @@ export interface AnalyticsCompanySummary extends CompanyRankingCandidate {
 
 /**
  * Uses the canonical company aggregation and ranking rules for Analytics.
- * Each partner type gets its own peer group for volume weighting; displayed
- * ranks are then combined on the shared normalized score scale.
+ * Scores are the normalized rubric composites returned by the canonical
+ * scoring boundary. All categories therefore share one 0-100 ranking axis.
  */
 export function getAnalyticsCompanyRankings(
   responses: SurveyResponse[],
@@ -37,19 +37,14 @@ export function getAnalyticsCompanyRankings(
         average: company.compositeScore,
         scorePercentage: company.compositeScore,
         count: company.evaluationCount,
-        rankScore: company.rankScore,
+        rankScore: company.compositeScore,
       }));
   });
 
   return summaries.sort((left, right) => {
-    const leftDisplay = formatCompositeScore(left.type, left.rankScore);
-    const rightDisplay = formatCompositeScore(right.type, right.rankScore);
-    const leftNormalized = leftDisplay.value / leftDisplay.max;
-    const rightNormalized = rightDisplay.value / rightDisplay.max;
-    if (rightNormalized !== leftNormalized) return rightNormalized - leftNormalized;
-    if (right.count !== left.count) return right.count - left.count;
     if (right.rankScore !== left.rankScore) return right.rankScore - left.rankScore;
-    return left.type.localeCompare(right.type) || left.name.localeCompare(right.name);
+    if (right.count !== left.count) return right.count - left.count;
+    return left.name.localeCompare(right.name);
   });
 }
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { getBand } from '../../../data/questionWeights';
 import { SurveyResponse } from '../../../types/survey';
 import { getLeaderboard } from '../../../utils/scoring';
 import { getAnalyticsCompanyRankings, getCompanyPerformanceRanking, paginateAnalyticsItems, paginateCompanyRankings, rankCompanySummaries } from './rankings';
@@ -20,12 +21,12 @@ function courierResponse(company: string, responseId: string, rating: number): S
   };
 }
 
-function supplierResponse(company: string, responseId: string, rating: number): SurveyResponse {
+function subcontractorResponse(company: string, responseId: string, rating: number): SurveyResponse {
   return {
     ...courierResponse(company, responseId, rating),
-    surveyType: 'Supplier',
-    questionId: 'Q39',
-    questionCategory: 'Documentation',
+    surveyType: 'Subcontractor',
+    questionId: 'Q03',
+    questionCategory: 'Delivery / Timeliness',
   };
 }
 
@@ -85,24 +86,46 @@ test('company summaries always use volume-weighted ranking values', () => {
   assert.ok(Math.abs(weightedByName.get('Peer')! - 78.33333333333333) < 1e-10);
 });
 
-test('Analytics uses Bayesian peer mean and median response benchmark', () => {
-  // Supplier peer mean is (100 + 90 + 70) / 3 = 86.67; the median response
-  // count is 9. The unrelated Courier response must not enter this peer group.
+test('leaderboard ranks normalized rubric scores across categories and applies the rating bands', () => {
   const responses = [
-    supplierResponse('One Review', 'one-1', 4),
-    ...Array.from({ length: 9 }, (_, index) => supplierResponse('Established', `established-${index}`, 3.6)),
-    ...Array.from({ length: 10 }, (_, index) => supplierResponse('Peer', `peer-${index}`, 2.8)),
-    courierResponse('Other partner type', 'courier-1', 15),
+    courierResponse('PAX8 PHILIPPINES', 'pax8', 13.35), // 89.0
+    courierResponse('86.2 Company', 'score-862', 12.93),
+    courierResponse('85.8 Company', 'score-858', 12.87),
+    subcontractorResponse('ALVAREZ, GREG YAP', 'alvarez', 1.71), // 85.5 / 2.0
+    courierResponse('AIRSPEED INTERNATIONAL', 'airspeed', 11.97), // 79.8
+    subcontractorResponse('J & C OBENITA', 'jc', 1.56), // 78.0 / 2.0
+    subcontractorResponse('MTEKNIK', 'mteknik', 1.44), // 72.0 / 2.0
   ];
 
-  const weighted = getAnalyticsCompanyRankings(responses, ['Supplier']);
-  const weightedByName = new Map(weighted.map((item) => [item.name, item]));
-  assert.equal(weightedByName.get('One Review')?.count, 1);
-  assert.equal(weightedByName.get('Established')?.count, 9);
-  assert.equal(weightedByName.get('Peer')?.count, 10);
-  assert.ok(Math.abs(weightedByName.get('One Review')!.rankScore - 88) < 1e-10);
-  assert.ok(Math.abs(weightedByName.get('Established')!.rankScore - 88.33333333333333) < 1e-10);
-  assert.ok(Math.abs(weightedByName.get('Peer')!.rankScore - 77.89473684210526) < 1e-10);
+  const ranked = getAnalyticsCompanyRankings(responses, ['Courier', 'Subcontractor']);
+  assert.deepEqual(ranked.map((item) => item.name), [
+    'PAX8 PHILIPPINES',
+    '86.2 Company',
+    '85.8 Company',
+    'ALVAREZ, GREG YAP',
+    'AIRSPEED INTERNATIONAL',
+    'J & C OBENITA',
+    'MTEKNIK',
+  ]);
+  assert.equal(ranked.find((item) => item.name === 'ALVAREZ, GREG YAP')?.rankScore, 85.5);
+  assert.equal(getBand('Courier', 89).label, 'Good');
+  assert.equal(getBand('Courier', 79.8).label, 'Unsatisfactory');
+  assert.equal(getBand('Subcontractor', 85.5).label, 'Satisfactory');
+  assert.equal(getBand('Subcontractor', 78).label, 'Unsatisfactory');
+  assert.equal(getBand('Subcontractor', 72).label, 'Unsatisfactory');
+  assert.equal(getBand('Supplier', 79.96).label, 'Satisfactory');
+});
+
+test('leaderboard score ties use evaluation count and then company name', () => {
+  const responses = [
+    courierResponse('Zeta', 'zeta-1', 13.5),
+    courierResponse('Alpha', 'alpha-1', 13.5),
+    courierResponse('Alpha', 'alpha-2', 13.5),
+  ];
+
+  const ranked = getAnalyticsCompanyRankings(responses, ['Courier']);
+  assert.deepEqual(ranked.map(({ name }) => name), ['Alpha', 'Zeta']);
+  assert.deepEqual(ranked.map(({ count }) => count), [2, 1]);
 
 });
 

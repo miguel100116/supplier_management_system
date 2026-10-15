@@ -13,7 +13,7 @@ function renderForm(isAdmin: boolean, surveys = forms, profile?: { department: s
   const previous = globals.React;
   globals.React = React;
   try {
-    return renderToStaticMarkup(<SurveyFillerPage surveys={getVisibleSurveyForms(surveys, isAdmin)} partnerCompanies={[]} initialSurveyId="1" userEmail="employee@example.com" defaultDepartment={profile?.department} defaultRespondentType={profile?.designation} responses={[]} onSubmitted={() => undefined} onCancel={() => undefined} />);
+    return renderToStaticMarkup(<SurveyFillerPage surveys={getVisibleSurveyForms(surveys, isAdmin)} partnerCompanies={[]} initialSurveyId="1" employeeExperience={!isAdmin} userEmail="employee@example.com" defaultDepartment={profile?.department} defaultRespondentType={profile?.designation} responses={[]} onSubmitted={() => 'test-response-id'} onCancel={() => undefined} />);
   } finally {
     if (previous === undefined) Reflect.deleteProperty(globals, 'React');
     else globals.React = previous;
@@ -23,8 +23,8 @@ function renderForm(isAdmin: boolean, surveys = forms, profile?: { department: s
 test('employee New Evaluation removes test options and recovers a previously selected test form', () => {
   const markup = renderForm(false);
   for (const id of ['0', '1', '2', '3']) assert.doesNotMatch(markup, new RegExp(`<option value="${id}"`));
-  assert.match(markup, /<option value="4" selected="">Supplier Quality Evaluation/);
-  assert.match(markup, /<option value="5">Subcontractor Performance Survey/);
+  assert.match(markup, /<h1>Supplier Quality Evaluation<\/h1>/);
+  assert.doesNotMatch(markup, /<select[^>]*filler-survey/);
   assert.match(renderForm(true), /<option value="1" selected="">test 2/);
 });
 
@@ -35,32 +35,32 @@ test('employees see an account-specific empty state when only test forms exist',
   assert.doesNotMatch(markup, /id="filler-survey"/);
 });
 
-test('New Evaluation shows the account department and designation as read-only fields', () => {
+test('New Evaluation shows the account department and designation in the respondent summary', () => {
   const markup = renderForm(false, forms, { department: 'Procurement Group', designation: 'Managerial' });
-  assert.match(markup, /id="filler-dept"[^>]*readonly=""[^>]*value="Procurement Group"/);
-  assert.match(markup, /id="filler-role"[^>]*readonly=""[^>]*value="Managerial"/);
-  assert.doesNotMatch(markup, /id="filler-dept"[^>]*<option/);
+  assert.match(markup, /<span>DEPARTMENT<\/span><strong>Procurement Group<\/strong>/);
+  assert.match(markup, /<span>DESIGNATION<\/span><strong>Managerial<\/strong>/);
+  assert.doesNotMatch(markup, /id="filler-dept"|id="filler-role"/);
 });
 
 test('New Evaluation reflects each account profile independently, including updated Admin assignments', () => {
   const firstAccount = renderForm(false, forms, { department: 'Logistics', designation: 'Rank & File' });
   const secondAccount = renderForm(false, forms, { department: 'TASS', designation: 'Supervisory' });
-  assert.match(firstAccount, /id="filler-dept"[^>]*value="Logistics"/);
-  assert.match(firstAccount, /id="filler-role"[^>]*value="Rank &amp; File"/);
-  assert.match(secondAccount, /id="filler-dept"[^>]*value="TASS"/);
-  assert.match(secondAccount, /id="filler-role"[^>]*value="Supervisory"/);
+  assert.match(firstAccount, /<span>DEPARTMENT<\/span><strong>Logistics<\/strong>/);
+  assert.match(firstAccount, /<span>DESIGNATION<\/span><strong>Rank &amp; File<\/strong>/);
+  assert.match(secondAccount, /<span>DEPARTMENT<\/span><strong>TASS<\/strong>/);
+  assert.match(secondAccount, /<span>DESIGNATION<\/span><strong>Supervisory<\/strong>/);
 });
 
 test('New Evaluation does not invent organizational information for a missing account profile', () => {
   const markup = renderForm(false);
-  assert.match(markup, /id="filler-dept"[^>]*readonly=""[^>]*value="Not assigned"/);
-  assert.match(markup, /id="filler-role"[^>]*readonly=""[^>]*value="Not assigned"/);
+  assert.match(markup, /<span>DEPARTMENT<\/span><strong>Not assigned<\/strong>/);
+  assert.match(markup, /<span>DESIGNATION<\/span><strong>Not assigned<\/strong>/);
   assert.match(markup, /id="btn-filler-next"[^>]*disabled=""/);
 });
 
-test('SMS-73 respondent-info footer has only the right-aligned proceed action', () => {
-  for (const isAdmin of [false, true]) {
-    const markup = renderForm(isAdmin);
+test('Admin respondent-info footer retains its right-aligned proceed action', () => {
+  {
+    const markup = renderForm(true);
     const stepOne = markup.slice(markup.indexOf('id="survey-filler-step-1"'), markup.indexOf('</form>'));
     const footer = stepOne.match(/<div class="flex justify-end border-t[^>]*>([\s\S]*)<\/div>$/)?.[1];
     assert.ok(footer, 'respondent-info footer is right aligned');
@@ -74,13 +74,17 @@ test('SMS-73 respondent-info footer has only the right-aligned proceed action', 
   }
 });
 
-test('SMS-72 removes the top exit button and its empty row before the progress steps', () => {
-  for (const isAdmin of [false, true]) {
-    const markup = renderForm(isAdmin);
-    assert.doesNotMatch(markup, /Back to Form Management/);
-    assert.match(markup, /id="survey-filler-container"><div class="flex items-center justify-between gap-2 px-1 sm:px-2">/);
-    for (const label of ['Respondent Info', 'Questions Form', 'Success', 'Stakeholder Feedback Form', 'Proceed to Form Questions']) {
-      assert.ok(markup.includes(label), `${label} remains visible`);
-    }
+test('employee New Evaluation uses the Figma wizard while Admin keeps the existing form presentation', () => {
+  const employeeMarkup = renderForm(false);
+  assert.match(employeeMarkup, /id="survey-filler-container"><section class="evaluation-progress-panel"[^>]*><div class="workflow-steps"/);
+  for (const label of ['Evaluation details', 'Your feedback', 'Review &amp; submit', 'class="respondent-summary"', 'Proceed to Form Questions']) {
+    assert.ok(employeeMarkup.includes(label), `${label} remains visible`);
   }
+
+  const adminMarkup = renderForm(true);
+  assert.match(adminMarkup, /id="survey-filler-container"><div class="flex items-center justify-between gap-2 px-1 sm:px-2">/);
+  for (const label of ['Respondent Info', 'Questions Form', 'Success', 'Stakeholder Feedback Form', 'Proceed to Form Questions']) {
+    assert.ok(adminMarkup.includes(label), `${label} remains visible for Admin`);
+  }
+  assert.doesNotMatch(adminMarkup, /class="workflow-steps"/);
 });

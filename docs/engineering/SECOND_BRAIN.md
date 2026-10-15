@@ -1,6 +1,6 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-10-12
+Last verified: 2026-10-14
 
 This document preserves durable engineering context for maintainers and coding agents. It is a map, not a substitute for reading the relevant code. Verify details before making consequential changes.
 
@@ -632,3 +632,15 @@ Evidence: `src/utils/compliance.ts`, `src/hooks/useSurveyData.ts`, `src/componen
 Decision: Every modal registered with `useModalEscape` closes through the same request-close callback when Escape is pressed or a pointer-down directly targets its backdrop. Clicks inside dialog content are ignored. Confirmation dialogs dismiss without invoking the confirmation action; nested dialogs use the existing priority stack.
 
 Evidence: `src/hooks/useModalEscape.ts`, `src/hooks/modalDismissal.ts`, and modal registrations across `src/`.
+
+### 2026-10-14 - Employee experience UI replacement
+
+Decision: Employee Home, Evaluations, and My submissions use the Figma-generated presentation in `src/features/employee-experience/`; the existing App data, access-scoped survey/partner/response inputs, route state, and submission handlers remain the source of behavior. The shared survey filler opts into the Figma wizard only for Employee sessions; Admin keeps its existing presentation. New employee dialogs register with `useModalEscape`.
+
+Evidence: `src/features/employee-experience/components/EmployeeExperienceShell.tsx`, `EmployeeWorkspacePage.tsx`, `employeeExperience.css`, `src/App.tsx`, and `src/pages/SurveyFillerPage.tsx`.
+
+### 2026-10-15 - Shared dark theme tokens
+
+Decision: `src/darkTheme.css` is the semantic token layer for dark mode. It loads after the shared Tailwind styles and employee workspace stylesheet, maps the existing dark utility classes to a neutral charcoal surface hierarchy, and supplies semantic status colors. `App.tsx` mirrors the active theme class onto `body` so portals rendered outside the application wrapper inherit the same tokens. The employee workspace keeps its existing layout and uses dark-only component overrides; light token values preserve its current palette. Primary filled actions use a deeper brand-blue shade for white-text contrast, while brighter blue is reserved for restrained accents.
+
+Evidence: `src/darkTheme.css`, `src/main.tsx`, and the `darkMode: 'class'` wrapper in `src/App.tsx`. Browser review on 2026-10-15 covered employee Home, Evaluations, setup, and questions views in both themes at desktop size, plus responsive Home at mobile size. Review used temporary local fixture data because the browser session was not authenticated.

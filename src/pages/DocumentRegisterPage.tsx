@@ -2049,14 +2049,14 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
                               <select
                                 value={row.branch.supplierRank ?? ''}
                                 onChange={(e) => updateSupplierRank(row.company, row.branch!, e.target.value)}
-                                className={`appearance-none bg-transparent pr-3.5 text-xs font-bold cursor-pointer focus:outline-none ${supplierRankTextClasses(row.branch.supplierRank)}`}
+                                className={`appearance-none bg-transparent pr-8 text-xs font-bold cursor-pointer focus:outline-none ${supplierRankTextClasses(row.branch.supplierRank)}`}
                               >
                                 <option value="" disabled>Set rank</option>
                                 {SUPPLIER_RANK_OPTIONS.map((opt) => (
                                   <option key={opt} value={opt}>{opt}</option>
                                 ))}
                               </select>
-                              <ChevronDown size={11} className={`pointer-events-none absolute right-0 opacity-60 ${supplierRankTextClasses(row.branch.supplierRank)}`} />
+                              <ChevronDown size={11} className={`select-chevron pointer-events-none absolute opacity-60 ${supplierRankTextClasses(row.branch.supplierRank)}`} />
                             </div>
                           ) : (
                             <span className={`text-xs font-bold ${supplierRankTextClasses(row.branch.supplierRank)}`}>
