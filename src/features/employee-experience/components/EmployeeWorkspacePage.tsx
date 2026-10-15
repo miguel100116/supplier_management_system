@@ -2,11 +2,10 @@ import { useMemo, useState } from 'react';
 import { ArrowRight, Check, ClipboardList, FileText, History, LockKeyhole, Search } from 'lucide-react';
 import type { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { useModalEscape } from '../../../hooks/useModalEscape';
-import { getSurveyEvaluationCompanies } from '../../../utils/analytics';
+import { filterPendingEvaluations, getPendingEmployeeEvaluations, type EmployeeEvaluationFilter } from '../domain/pendingEvaluations';
 import { EmployeeCompanyIcon } from './EmployeeCompanyIcon';
 
 type WorkspaceView = 'Home' | 'Evaluations' | 'My submissions';
-type EvaluationItem = { id: string; surveyId: string; company: string; type: SurveyType; title: string; companyId: string };
 type SubmissionItem = { id: string; company: string; type: SurveyType; date: string; answers: { question: string; answer: string }[] };
 
 interface EmployeeWorkspacePageProps {
@@ -19,6 +18,8 @@ interface EmployeeWorkspacePageProps {
   error: string | null;
   onNavigate: (view: WorkspaceView) => void;
   onStartEvaluation: (surveyId: string, companyName: string) => void;
+  initialEvaluationFilter?: EmployeeEvaluationFilter;
+  onEvaluationFilterChange?: (filter: EmployeeEvaluationFilter) => void;
 }
 
 function formatDate(value: string) {
@@ -38,42 +39,24 @@ function formatDateTime(value: string) {
   return Number.isNaN(parsed.getTime()) ? 'Date unavailable' : parsed.toLocaleString();
 }
 
-export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, responses, userEmail, isLoading, error, onNavigate, onStartEvaluation }: EmployeeWorkspacePageProps) {
+export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, responses, userEmail, isLoading, error, onNavigate, onStartEvaluation, initialEvaluationFilter, onEvaluationFilterChange }: EmployeeWorkspacePageProps) {
   const [filter, setFilter] = useState<'All evaluations' | SurveyType>('All evaluations');
+  const [localEvaluationFilter, setLocalEvaluationFilter] = useState<EmployeeEvaluationFilter>(initialEvaluationFilter ?? 'All evaluations');
+  const evaluationFilter = initialEvaluationFilter ?? localEvaluationFilter;
   const [search, setSearch] = useState('');
   const [detail, setDetail] = useState<SubmissionItem | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [evaluationPage, setEvaluationPage] = useState(1);
   useModalEscape(Boolean(detail), () => setDetail(null));
 
-  const evaluations = useMemo<EvaluationItem[]>(() => {
-    const completed = new Map<SurveyType, Set<string>>();
-    responses
-      .filter((response) => response.respondentEmail?.trim().toLowerCase() === userEmail.trim().toLowerCase())
-      .forEach((response) => {
-        const companies = completed.get(response.surveyType) ?? new Set<string>();
-        companies.add(response.company.trim().toLowerCase());
-        completed.set(response.surveyType, companies);
-      });
-
-    return surveys
-      .filter((survey) => survey.status !== 'Archived')
-      .flatMap((survey) => getSurveyEvaluationCompanies(survey, partnerCompanies)
-        .filter((company) => !completed.get(survey.surveyType)?.has(company.name.trim().toLowerCase()))
-        .map((company) => ({
-          id: `${survey.id}:${company.id}`,
-          surveyId: survey.id,
-          company: company.name,
-          companyId: company.id,
-          type: survey.surveyType,
-          title: survey.title,
-        })));
-  }, [partnerCompanies, responses, surveys, userEmail]);
-
-  const visibleEvaluations = evaluations.filter((item) =>
-    (filter === 'All evaluations' || item.type === filter) &&
-    `${item.company} ${item.title}`.toLowerCase().includes(search.trim().toLowerCase()),
-  );
+  const evaluations = useMemo(() => getPendingEmployeeEvaluations(surveys, partnerCompanies, responses, userEmail), [partnerCompanies, responses, surveys, userEmail]);
+  const categoryEvaluations = useMemo(() => filterPendingEvaluations(evaluations, evaluationFilter), [evaluations, evaluationFilter]);
+  const categoryCounts = useMemo(() => {
+    const counts: Record<SurveyType, number> = { Courier: 0, Supplier: 0, Subcontractor: 0 };
+    evaluations.forEach(({ type }) => { counts[type] += 1; });
+    return counts;
+  }, [evaluations]);
+  const visibleEvaluations = useMemo(() => filterPendingEvaluations(evaluations, evaluationFilter, search), [evaluations, evaluationFilter, search]);
   const evaluationPageSize = 10;
   const evaluationPageCount = Math.max(1, Math.ceil(visibleEvaluations.length / evaluationPageSize));
   const activeEvaluationPage = Math.min(evaluationPage, evaluationPageCount);
@@ -112,14 +95,43 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
   const pageCount = Math.max(1, Math.ceil(visibleSubmissions.length / pageSize));
   const pagedSubmissions = visibleSubmissions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const visibleEvaluationRows = view === 'Home' ? visibleEvaluations.slice(0, 3) : visibleEvaluations;
-  const recentSubmissions = groupedSubmissions.slice(0, 2);
+  const visibleEvaluationRows = view === 'Home' ? categoryEvaluations.slice(0, 3) : pagedEvaluations;
+  const recentSubmissions = groupedSubmissions.slice(0, 3);
   const pageDescription = view === 'Home'
     ? 'Your next evaluation starts here. Let’s make every partnership better.'
     : view === 'Evaluations'
       ? 'Find a partner and share feedback on your experience.'
       : 'A clear record of the evaluations you’ve completed.';
   const firstName = getFirstNameFromEmail(userEmail);
+  const pendingCount = categoryEvaluations.length;
+  const categoryLabel = evaluationFilter === 'All evaluations' ? 'evaluation' : `${evaluationFilter.toLowerCase()} evaluation`;
+  const countLabel = `${pendingCount} pending ${categoryLabel}${pendingCount === 1 ? '' : 's'}${evaluationFilter === 'All evaluations' ? ' across all categories' : ''}`;
+  const updateEvaluationFilter = (nextFilter: EmployeeEvaluationFilter) => {
+    setLocalEvaluationFilter(nextFilter);
+    onEvaluationFilterChange?.(nextFilter);
+    setEvaluationPage(1);
+  };
+  const emptyTitle = search.trim()
+    ? 'No matching evaluations'
+    : pendingCount === 0 && evaluationFilter !== 'All evaluations' && evaluations.length > 0
+      ? `No pending ${evaluationFilter.toLowerCase()} evaluations`
+      : pendingCount === 0
+        ? 'You’re all caught up'
+        : 'No matching evaluations';
+  const emptyDescription = search.trim()
+    ? 'Try another partner name or evaluation title.'
+    : pendingCount === 0 && evaluationFilter !== 'All evaluations' && evaluations.length > 0
+      ? `${evaluations.length} pending evaluation${evaluations.length === 1 ? '' : 's'} remain across other categories.`
+      : 'There are no pending evaluations available to you right now.';
+  const summaryText = isLoading
+    ? 'Loading pending evaluations.'
+    : error
+      ? 'The current evaluation count is unavailable.'
+      : pendingCount === 0
+        ? emptyDescription
+        : view === 'Home'
+          ? `Showing up to 3 pending${evaluationFilter === 'All evaluations' ? '' : ` ${evaluationFilter.toLowerCase()}`} evaluations, nearest due first.`
+          : `${countLabel}. Search by partner name or evaluation title.`;
 
   return (
     <>
@@ -154,24 +166,24 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
           <div className="primary-column">
             <section className="panel evaluations-panel">
               <div className="panel-heading">
-                <div><h2>{view === 'Home' ? 'Ready for your feedback' : 'Available evaluations'}<span className="quiet-count">{evaluations.length}</span></h2><p>Choose a partner company to get started.</p></div>
-                {view === 'Home' && <button className="text-button" type="button" onClick={() => onNavigate('Evaluations')}>View all <ArrowRight size={16} /></button>}
+                <div><h2>{view === 'Home' ? 'Ready for your feedback' : 'Available evaluations'}<span className="quiet-count" aria-label={isLoading || error ? 'Pending evaluation count unavailable' : countLabel} title={isLoading || error ? 'Pending evaluation count unavailable' : countLabel}>{isLoading || error ? '—' : pendingCount}</span></h2><p>{summaryText}</p></div>
+                {view === 'Home' && <button className="text-button" type="button" aria-label={isLoading || error ? 'View all evaluations' : `View all ${countLabel}`} onClick={() => onNavigate('Evaluations')}>View all <ArrowRight size={16} /></button>}
               </div>
               <div className="list-tools">
-                <div className="filter-tabs" aria-label="Filter by evaluation type">
-                  {(['All evaluations', 'Courier', 'Supplier', 'Subcontractor'] as const).map((type) => <button key={type} type="button" className={filter === type ? 'selected' : ''} aria-pressed={filter === type} onClick={() => { setFilter(type); setCurrentPage(1); setEvaluationPage(1); }}>{type}</button>)}
+                <div className="filter-tabs" role="group" aria-label="Filter evaluations by type">
+                  {(['All evaluations', 'Courier', 'Supplier', 'Subcontractor'] as const).map((type) => <button key={type} type="button" className={evaluationFilter === type ? 'selected' : ''} aria-pressed={evaluationFilter === type} aria-label={type === 'All evaluations' ? type : `${type}: ${isLoading || error ? 'count unavailable' : `${categoryCounts[type]} pending`}`} onClick={() => updateEvaluationFilter(type)}>{type}{type !== 'All evaluations' && <span className="filter-count" aria-hidden="true">{isLoading || error ? '—' : categoryCounts[type]}</span>}</button>)}
                 </div>
-                {view === 'Evaluations' ? <label className="search-field"><Search size={17} /><input aria-label="Search partner companies" placeholder="Search a partner company…" value={search} onChange={(event) => { setSearch(event.target.value); setEvaluationPage(1); }} /></label> : <span className="list-access"><LockKeyhole size={12} /> Available to you</span>}
+                {view === 'Evaluations' ? <label className="search-field"><Search size={17} /><input aria-label="Search partner or evaluation title" placeholder="Search partner or evaluation title…" value={search} onChange={(event) => { setSearch(event.target.value); setEvaluationPage(1); }} /></label> : <span className="list-access"><LockKeyhole size={12} /> Available to you</span>}
               </div>
               {isLoading ? <div className="empty-state" role="status"><ClipboardList size={30} /><h3>Loading evaluations</h3><p>Your available forms will appear here.</p></div>
                 : error ? <div className="empty-state" role="alert"><ClipboardList size={30} /><h3>Evaluations are unavailable</h3><p>We couldn’t load your evaluation information.</p></div>
                   : <div className="evaluation-list">
-                    {(view === 'Home' ? visibleEvaluations.slice(0, 3) : pagedEvaluations).map((item) => <div className="evaluation-row" key={item.id}>
+                    {visibleEvaluationRows.map((item) => <div className="evaluation-row" key={item.id}>
                       <div className={`company-avatar ${item.type === 'Courier' ? 'avatar-blue' : 'avatar-purple'}`}><EmployeeCompanyIcon type={item.type} size={23} /></div>
-                      <div className="evaluation-text"><div className="company-line"><h3><button className="company-name-button" type="button" aria-label={`Start evaluation for ${item.company}`} onClick={() => onStartEvaluation(item.surveyId, item.company)}>{item.company}</button></h3><span className={`type-tag ${item.type.toLowerCase()}`}>{item.type}</span></div><p>{item.title}</p></div>
-                      <button className="start-button" type="button" onClick={() => onStartEvaluation(item.surveyId, item.company)}>Start evaluation <ArrowRight size={16} /></button>
+                      <div className="evaluation-text"><div className="company-line"><h3><button className="company-name-button" type="button" aria-label={`Start ${item.type.toLowerCase()} evaluation for ${item.company}`} onClick={() => onStartEvaluation(item.surveyId, item.company)}>{item.company}</button></h3><span className={`type-tag ${item.type.toLowerCase()}`}>{item.type}</span></div><p>{item.title}{item.deadline && <span className="evaluation-deadline"> · Due {item.deadline.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}</p></div>
+                      <button className="start-button" type="button" aria-label={`Start ${item.type.toLowerCase()} evaluation for ${item.company}`} onClick={() => onStartEvaluation(item.surveyId, item.company)}>Start evaluation <ArrowRight size={16} /></button>
                     </div>)}
-                    {visibleEvaluationRows.length === 0 && <div className="empty-state"><ClipboardList size={30} /><h3>{evaluations.length ? 'No matching evaluations' : 'You’re all caught up'}</h3><p>{evaluations.length ? 'Try another company name or evaluation type.' : 'There are no more evaluations available to you right now.'}</p>{evaluations.length > 0 && <button className="text-button" type="button" onClick={() => { setFilter('All evaluations'); setSearch(''); setEvaluationPage(1); }}>Clear filters</button>}</div>}
+                    {visibleEvaluationRows.length === 0 && <div className="empty-state" role="status"><ClipboardList size={30} /><h3>{emptyTitle}</h3><p>{emptyDescription}</p>{(evaluationFilter !== 'All evaluations' || search.trim()) && <button className="text-button" type="button" onClick={() => { updateEvaluationFilter('All evaluations'); setSearch(''); setEvaluationPage(1); }}>{view === 'Home' && evaluationFilter !== 'All evaluations' ? 'View all categories' : 'Clear filters'}</button>}</div>}
                   </div>}
               {!isLoading && !error && view === 'Evaluations' && visibleEvaluations.length > 0 && <nav className="employee-evaluation-pagination" aria-label="Evaluation pages">
                 <span>Showing {(activeEvaluationPage - 1) * evaluationPageSize + 1}–{Math.min(activeEvaluationPage * evaluationPageSize, visibleEvaluations.length)} of {visibleEvaluations.length}</span>

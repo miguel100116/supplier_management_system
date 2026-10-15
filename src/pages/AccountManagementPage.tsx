@@ -427,7 +427,7 @@ export function AccountManagementPage({
                 <option value="department-asc">Sort by: Department (A–Z)</option>
                 <option value="designation-asc">Sort by: Designation (A–Z)</option>
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 text-slate-500" size={14} />
+              <ChevronDown className="select-chevron pointer-events-none absolute text-slate-500" size={14} />
             </label>
             <label className="relative flex min-w-0 flex-1 items-center md:flex-none">
               <Building2 className="pointer-events-none absolute left-3 text-slate-600 dark:text-slate-300" size={16} />
@@ -435,7 +435,7 @@ export function AccountManagementPage({
                 <option value="All Departments">All Departments</option>
                 {DEPARTMENT_OPTIONS.map((departmentOption) => <option key={departmentOption} value={departmentOption}>{departmentOption}</option>)}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3 text-slate-500" size={14} />
+              <ChevronDown className="select-chevron pointer-events-none absolute text-slate-500" size={14} />
             </label>
             <button type="button" onClick={() => { setSearchTerm(''); setTableSort('email-asc'); setRoleFilter('All'); setDepartmentFilter('All Departments'); }} aria-label="Reset account filters" title="Reset filters" className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-lg bg-[#eef3ff] text-slate-700 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 md:self-auto">
               <RotateCcw size={16} aria-hidden="true" />

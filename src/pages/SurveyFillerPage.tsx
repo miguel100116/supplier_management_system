@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useModalEscape } from '../hooks/useModalEscape';
+import { motion, useReducedMotion } from 'motion/react';
 import { CheckCircle, Info, Shield, ArrowRight, ClipboardCopy, Send, UserCheck, ArrowLeft, X } from 'lucide-react';
 import { CustomForm, Rating, PartnerCompany } from '../types/survey';
 import { formatSurveyDateRange, validateSurveyDateRange } from '../features/evaluations/domain/surveyDates';
@@ -50,7 +51,7 @@ interface SurveyFillerPageProps {
     address: string | undefined,
     answers: { questionId: string; questionNumber: number; question: string; questionCategory: string; rating: Rating; comment: string }[],
     startTime?: string
-  ) => void;
+  ) => string | null;
   onCancel?: () => void;
 }
 
@@ -58,6 +59,38 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   { surveys, partnerCompanies = [], initialSurveyId, initialCompanyName = '', employeeExperience = false, userEmail, defaultDepartment, defaultRespondentType, responses, onSubmitted, onCancel },
   ref
 ) {
+  const shouldReduceMotion = useReducedMotion() ?? false;
+  const successContainerVariants = {
+    hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 8 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: shouldReduceMotion ? 0 : 0.42,
+        ease: 'easeOut' as const,
+        delayChildren: shouldReduceMotion ? 0 : 0.04,
+        staggerChildren: shouldReduceMotion ? 0 : 0.055,
+      },
+    },
+  };
+  const successItemVariants = {
+    hidden: { opacity: 0, y: shouldReduceMotion ? 0 : 7 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: shouldReduceMotion ? 0 : 0.3, ease: 'easeOut' as const },
+    },
+  };
+  const successCopyVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        delayChildren: shouldReduceMotion ? 0 : 0.025,
+        staggerChildren: shouldReduceMotion ? 0 : 0.045,
+      },
+    },
+  };
   const [selectedSurveyId, setSelectedSurveyId] = useState<string>(() => resolveSelectableSurveyId(surveys, initialSurveyId));
   const [step, setStep] = useState<1 | 2 | 3>(1); // 1: Info, 2: Questions, 3: Success
   const [showReview, setShowReview] = useState(false);
@@ -559,7 +592,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       }];
     });
 
-    onSubmitted(
+    const responseId = onSubmitted(
       selectedSurveyId,
       company.trim(),
       department,
@@ -568,6 +601,10 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       formattedAnswers,
       startTimeRef.current ?? undefined
     );
+    if (!responseId) {
+      setError('Your evaluation could not be submitted. Please try again.');
+      return;
+    }
 
     if (selectedSurveyId && company) {
       const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company.trim()}`;
@@ -855,16 +892,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       )}
 
       {step === 2 && activeSurvey && (
-        <form onSubmit={handleSubmit} className={employeeExperience ? 'panel form-panel feedback-panel space-y-6' : 'space-y-6'} id="survey-filler-step-2">
+        <form onSubmit={handleSubmit} className={employeeExperience ? 'panel form-panel feedback-panel space-y-4' : 'space-y-6'} id="survey-filler-step-2">
           {/* Form Header Info card */}
           {employeeExperience ? <div className="form-section-heading"><h2>{showReview ? 'Review your evaluation' : 'Your feedback'}</h2><p>{showReview ? 'Check your responses before submitting this evaluation.' : activeSurvey.description}</p></div> : <div className="panel bg-[#0063a9]/5 border-blue-100 dark:border-blue-900/30"><h3 className="text-lg font-bold text-[#0063a9] dark:text-blue-300">{activeSurvey.title}</h3><p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{activeSurvey.description}</p><div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-blue-400/10"><div>Company: <strong className="text-slate-700 dark:text-slate-200">{company}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Department: <strong className="text-slate-700 dark:text-slate-200">{department}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Role: <strong className="text-slate-700 dark:text-slate-200">{respondentType}</strong></div></div></div>}
-
-          {employeeExperience && !showReview && (
-            <div className="draft-warning" role="note">
-              <Info size={16} aria-hidden="true" />
-              <span>Answers are not saved when you leave this evaluation.</span>
-            </div>
-          )}
 
           {employeeExperience && showReview && (
             <div className="respondent-summary">
@@ -1148,17 +1178,43 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       )}
 
       {step === 3 && (
-        <div className={employeeExperience ? 'panel confirmation' : 'panel space-y-6 p-6 text-center sm:p-16'} id="survey-filler-success">
-          <div className={employeeExperience ? 'success-mark' : 'inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-400'}>
-            <CheckCircle size={36} />
-          </div>
+        <motion.div
+          className={`${employeeExperience ? 'panel confirmation' : 'panel space-y-6 p-6 text-center sm:p-16'} submission-success`}
+          id="survey-filler-success"
+          variants={successContainerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div
+            className={`${employeeExperience ? 'success-mark' : 'inline-flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-950/30 dark:text-emerald-400'} submission-success-icon`}
+            variants={{
+              hidden: { opacity: 0, scale: shouldReduceMotion ? 1 : 0.78 },
+              visible: {
+                opacity: 1,
+                scale: 1,
+                transition: shouldReduceMotion
+                  ? { duration: 0 }
+                  : { type: 'spring', stiffness: 300, damping: 24 },
+              },
+            }}
+          >
+            <svg aria-hidden="true" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <motion.path
+                d="m9 12 2 2 4-4"
+                initial={{ pathLength: shouldReduceMotion ? 1 : 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: shouldReduceMotion ? 0 : 0.28, delay: shouldReduceMotion ? 0 : 0.16, ease: 'easeOut' }}
+              />
+            </svg>
+          </motion.div>
 
-          {employeeExperience ? <><h1>Thank you for your feedback</h1><p>Your evaluation for <strong>{company}</strong> has been submitted.</p></> : <div className="space-y-2 max-w-md mx-auto"><h2 className="text-2xl font-bold text-slate-800 dark:text-white">Submission Successful</h2><p className="text-sm text-slate-500 dark:text-slate-400">Thank you! Your ratings and comments have been registered in our database. The central administrator has been notified.</p></div>}
+          {employeeExperience ? <><motion.h1 variants={successItemVariants}>Thank you for your feedback</motion.h1><motion.p variants={successItemVariants}>Your evaluation for <strong>{company}</strong> has been submitted.</motion.p></> : <motion.div className="space-y-2 max-w-md mx-auto" variants={successCopyVariants}><motion.h2 className="text-2xl font-bold text-slate-800 dark:text-white" variants={successItemVariants}>Submission Successful</motion.h2><motion.p className="text-sm text-slate-500 dark:text-slate-400" variants={successItemVariants}>Thank you! Your ratings and comments have been registered in our database. The central administrator has been notified.</motion.p></motion.div>}
 
-          {employeeExperience ? <div className="confirmation-meta"><CheckCircle size={16} /><span>{activeSurvey?.title} — {new Date().toLocaleDateString()}</span></div> : <div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-5 max-w-sm mx-auto text-left text-xs space-y-2"><div className="flex justify-between"><span className="text-slate-400 font-semibold">Respondent:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{company}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Audience Segment:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{activeSurvey?.surveyType}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Date Registered:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{new Date().toLocaleString()}</span></div></div>}
-          {employeeExperience && <small>Your response is recorded with your employee account.</small>}
+          {employeeExperience ? <motion.div className="confirmation-meta" variants={successItemVariants}><CheckCircle size={16} /><span>{activeSurvey?.title} — {new Date().toLocaleDateString()}</span></motion.div> : <motion.div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-5 max-w-sm mx-auto text-left text-xs space-y-2" variants={successItemVariants}><div className="flex justify-between"><span className="text-slate-400 font-semibold">Respondent:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{company}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Audience Segment:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{activeSurvey?.surveyType}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Date Registered:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{new Date().toLocaleString()}</span></div></motion.div>}
+          {employeeExperience && <motion.small variants={successItemVariants}>Your response is recorded with your employee account.</motion.small>}
 
-          <div className={employeeExperience ? 'confirmation-actions' : 'pt-4 flex items-center justify-center gap-3'}>
+          <motion.div className={employeeExperience ? 'confirmation-actions' : 'pt-4 flex items-center justify-center gap-3'} variants={successItemVariants}>
             <button
               onClick={handleReset}
               className="secondary-button"
@@ -1176,8 +1232,8 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 {employeeExperience ? 'Return to Evaluations' : 'Return to Directory'}
               </button>
             )}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
 
       {/* Draft Save Confirmation Modal */}

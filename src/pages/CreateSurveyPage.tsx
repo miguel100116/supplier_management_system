@@ -195,7 +195,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
                   <option value="Supplier">Supplier (Goods/Materials)</option>
                   <option value="Subcontractor">Subcontractor (On-Site/Execution)</option>
                 </select>
-                <ChevronDown aria-hidden="true" size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
+                <ChevronDown aria-hidden="true" size={16} className="select-chevron pointer-events-none absolute top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
               </div>
             </div>
 
@@ -326,7 +326,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
                             </option>
                           ))}
                         </select>
-                        <ChevronDown aria-hidden="true" size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
+                        <ChevronDown aria-hidden="true" size={15} className="select-chevron pointer-events-none absolute top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
                       </div>
                     </div>
                   </div>
@@ -371,7 +371,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
                         <option value="typed-rating">Typed Rating with Range Bounds (e.g. 0-15)</option>
                         <option value="text">Text Field Answer</option>
                         </select>
-                        <ChevronDown aria-hidden="true" size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
+                        <ChevronDown aria-hidden="true" size={15} className="select-chevron pointer-events-none absolute top-1/2 -translate-y-1/2 text-slate-700 dark:text-slate-300" />
                       </div>
                     </div>
 

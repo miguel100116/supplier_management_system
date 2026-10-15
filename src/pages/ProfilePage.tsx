@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Award, CalendarClock, ClipboardCheck, LogOut, Mail, MapPin, Moon, Sun, User } from 'lucide-react';
 import { SurveyResponse } from '../types/survey';
 import { hasAnsweredItem, submissionCount } from '../utils/analytics';
+import { EmployeeProfileSettings } from '../features/employee-experience/components/EmployeeProfileSettings';
 
 interface ProfilePageProps {
   email: string;
@@ -54,6 +55,21 @@ export function ProfilePage({
   const companiesCovered = useMemo(() => new Set(countableSubmissions.map((s) => s[0].company)).size, [countableSubmissions]);
   const lastSubmission = mySubmissions[0]?.[0]?.submissionDate;
   const recentSubmissions = mySubmissions.slice(0, 4);
+
+  if (role !== 'Admin') {
+    return (
+      <EmployeeProfileSettings
+        email={email}
+        displayName={displayName}
+        initials={initials}
+        designation={designation}
+        department={department}
+        darkMode={darkMode}
+        onToggleDarkMode={onToggleDarkMode}
+        onLogout={onLogout}
+      />
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
