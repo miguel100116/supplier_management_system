@@ -572,6 +572,10 @@ export default function App() {
   const [focusCompanyId, setFocusCompanyId] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [darkMode, setDarkMode] = useState(false);
+  useEffect(() => {
+    document.body.classList.toggle('dark', darkMode);
+    return () => document.body.classList.remove('dark');
+  }, [darkMode]);
 
   const handleResetAllData = () => {
     logAdminActivity('Cleared local frontend cache');
@@ -1563,13 +1567,13 @@ export default function App() {
 
       {isNotificationModalOpen && createPortal((
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-3 backdrop-blur-sm sm:p-6"
+          className={`fixed inset-0 z-[9999] flex items-center justify-center p-3 backdrop-blur-sm sm:p-6 ${darkMode ? 'dark' : ''}`}
           style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(2, 6, 23, 0.68)' }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="notification-center-title"
         >
-          <div className={`flex w-full ${isAdmin ? 'max-h-[92vh] max-w-7xl rounded-2xl' : 'max-h-[84vh] max-w-4xl rounded-xl'} flex-col overflow-hidden border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950`} style={{ width: '100%', maxWidth: isAdmin ? '80rem' : '56rem', maxHeight: isAdmin ? '92vh' : '84vh', backgroundColor: darkMode ? '#020617' : '#f8fafc' }}>
+          <div className={`flex w-full ${isAdmin ? 'max-h-[92vh] max-w-7xl rounded-2xl' : 'max-h-[84vh] max-w-4xl rounded-xl'} flex-col overflow-hidden border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950`} style={{ width: '100%', maxWidth: isAdmin ? '80rem' : '56rem', maxHeight: isAdmin ? '92vh' : '84vh', backgroundColor: darkMode ? 'var(--background)' : '#f8fafc' }}>
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
               <div>
                 <h2 id="notification-center-title" className="text-lg font-bold text-slate-900 dark:text-white">
