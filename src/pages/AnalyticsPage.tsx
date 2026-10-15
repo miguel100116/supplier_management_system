@@ -4,7 +4,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContaine
 import { CompanyAnalysisPanel } from '../components/CompanyAnalysisPanel';
 import { PageDescription } from '../components/PageDescription';
 import { StateMessage } from '../components/StateMessage';
-import { formatCompositeScore, getBand } from '../data/questionWeights';
+import { formatCompositeScore, getBand, ratingBands } from '../data/questionWeights';
 import { ArchiveSeries, FilterState, PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { formatNumber, hasAnsweredItem, monthlyTrend, questionPerformance, responseVolume, seriesTrend, submissionCount, submissionScores, yearlyTrend } from '../utils/analytics';
 import { computeCompanyComposite } from '../utils/scoring';
@@ -53,19 +53,6 @@ const responseVolumeBandColors = {
   orange: '#f97316',
   red: '#ef4444',
 };
-const leaderboardBandTextColors: Record<string, string> = {
-  Excellent: 'text-green-700 dark:text-green-400',
-  Satisfactory: 'text-blue-700 dark:text-blue-400',
-  Good: 'text-orange-700 dark:text-orange-300',
-  Unsatisfactory: 'text-red-800 dark:text-red-400',
-};
-const leaderboardBandDotColors: Record<string, string> = {
-  Excellent: 'bg-green-500',
-  Satisfactory: 'bg-blue-500',
-  Good: 'bg-orange-400',
-  Unsatisfactory: 'bg-red-600',
-};
-
 function PlaceholderButton({ children, title }: { children: ReactNode; title: string }) {
   return (
     <button type="button" aria-disabled="true" title={`${title} — coming soon`} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
@@ -92,6 +79,11 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
   useModalEscape(Boolean(selectedCompany), closeSelectedCompany);
 
   const selectedType = filters.surveyType.length === 1 ? filters.surveyType[0] : 'All';
+  const ratingScaleType: SurveyType = selectedType === 'All' ? 'Courier' : selectedType;
+  const ratingScale = ratingBands[ratingScaleType];
+  const ratingScaleText = ratingScale
+    .map((band, index) => `${band.label} ${band.min === 0 ? `≤${ratingScale[index - 1].min - 1}` : `${band.min}–${index === 0 ? 100 : ratingScale[index - 1].min - 1}`}`)
+    .join(' · ');
   const totalSubmissions = useMemo(() => submissionCount(responses), [responses]);
   const scoredSubmissions = useMemo(() => submissionScores(responses), [responses]);
   const averageScore = scoredSubmissions.length ? scoredSubmissions.reduce((sum, submission) => sum + submission.score, 0) / scoredSubmissions.length : 0;
@@ -188,12 +180,20 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
               <div>
                 <div className="flex items-center gap-2"><Trophy size={18} className="text-[#0078a8]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-base font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Compare evaluated partners and select a company to review its category performance.</p>
-                <div role="group" aria-label="Company leaderboard color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <span className="text-[10px] font-semibold text-slate-500">Legend:</span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-green-500" />Excellent</span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-blue-500" />Satisfactory</span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-orange-400" />Good</span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-600" />Unsatisfactory</span>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                  <div role="group" aria-label="Company leaderboard color legend" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="text-xs font-semibold text-slate-500">Legend:</span>
+                    {ratingScale.map((band) => (
+                      <span key={band.label} className="inline-flex items-center gap-2 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
+                        <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ backgroundColor: band.hex }} />
+                        {band.label}
+                      </span>
+                    ))}
+                  </div>
+                  <div aria-label="Company leaderboard rating scale" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:justify-end sm:text-right">
+                    <span className="font-semibold text-slate-500">Rating scale:</span>
+                    <span>{ratingScaleText}</span>
+                  </div>
                 </div>
               </div>
           </div>
@@ -211,18 +211,14 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
               <ol key={columnIndex} start={column.startIndex + 1} className="min-w-0">
                 {column.items.map((company, index) => {
                   const style = typeStyles[company.type];
-                  // The row displays rankScore, so its rating and color must
-                  // use that same volume-weighted score rather than the raw
-                  // composite score stored in scorePercentage.
                   const scoreBand = getBand(company.type, company.rankScore);
-                  const scoreBandColor = leaderboardBandTextColors[scoreBand.label] ?? 'text-slate-700 dark:text-slate-200';
                   const rank = column.startIndex + index + 1;
                   return (
                     <li key={`${company.type}:${company.name}`} className={`min-w-0 border-b border-slate-100 dark:border-slate-800/70 ${rank % 2 === 1 ? 'bg-slate-50 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}`}>
                       <button type="button" onClick={() => setSelectedCompany(company)} className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-center px-2 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900/70 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]">
                         <span className="flex h-7 w-8 items-center justify-center rounded-md bg-slate-200 text-xs font-extrabold text-slate-800 dark:bg-slate-700 dark:text-slate-100">{rank}</span>
-                        <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${leaderboardBandDotColors[scoreBand.label] ?? 'bg-slate-400'}`} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · <span className={scoreBandColor}>{scoreBand.label}</span></span></span>
-                        <span className={`flex items-center justify-end gap-1 text-xs font-bold tabular-nums ${scoreBandColor}`}>{formatCompositeScore(company.type, company.rankScore).valueText}<ChevronRight size={13} /></span>
+                        <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: scoreBand.hex }} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · <span style={{ color: scoreBand.hex }}>{scoreBand.label}</span></span></span>
+                        <span className="flex items-center justify-end gap-1 text-xs font-bold tabular-nums" style={{ color: scoreBand.hex }}>{company.rankScore.toFixed(1)}<ChevronRight size={13} /></span>
                         <span className="hidden text-right text-[11px] font-medium tabular-nums text-slate-400 sm:block">{company.count}</span>
                       </button>
                     </li>

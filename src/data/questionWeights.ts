@@ -86,18 +86,17 @@ export interface ScoreBand {
   correctiveAction?: boolean;
 }
 
-// The approved rating scale for all partner types is: 95-100 Excellent,
-// 89-94 Satisfactory, 80-88 Good, and 79-and-below Unsatisfactory. Scores
-// are compared on their shared normalized 0-100 composite scale.
-const APPROVED_RATING_BANDS: ScoreBand[] = [
-  { label: 'Excellent', min: 95, hex: '#0d6b3f' },       // Dark Green
-  { label: 'Satisfactory', min: 89, hex: '#1baf7a' },     // Green
-  { label: 'Good', min: 80, hex: '#eab308' },             // Yellow
+// All partner types use the approved shared scale on the normalized 0–100
+// composite score.
+export const APPROVED_RATING_BANDS: ScoreBand[] = [
+  { label: 'Excellent', min: 95, hex: '#22c55e' },       // Green
+  { label: 'Good', min: 89, hex: '#fb923c' },             // Orange
+  { label: 'Satisfactory', min: 80, hex: '#3b82f6' },     // Blue
   { label: 'Unsatisfactory', min: 0, hex: '#dc2626' },    // Red
 ];
 
 // Courier and Supplier retain their form-specific corrective-action remark;
-// Subcontractor uses the same rating names and ranges without that remark.
+// Subcontractor uses the same rating bands without that remark.
 const COURIER_SUPPLIER_BANDS: ScoreBand[] = APPROVED_RATING_BANDS.map((band) => (
   band.label === 'Unsatisfactory'
     ? { ...band, correctiveAction: true }
@@ -115,7 +114,8 @@ export const ratingBands: Record<SurveyType, ScoreBand[]> = {
 // survey type (see computeCompanyComposite in scoring.ts).
 export function getBand(surveyType: SurveyType, percentScore: number): ScoreBand {
   const bands = ratingBands[surveyType];
-  return bands.find((band) => percentScore >= band.min) ?? bands[bands.length - 1];
+  const roundedScore = Math.round((percentScore + Number.EPSILON) * 10) / 10;
+  return bands.find((band) => roundedScore >= band.min) ?? bands[bands.length - 1];
 }
 
 // Full remark text for a band - same as the label, except the Courier/
