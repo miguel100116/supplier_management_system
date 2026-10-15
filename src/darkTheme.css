@@ -1,0 +1,463 @@
+/* Semantic theme values. Light values match the current product palette; dark
+   values establish a neutral surface hierarchy with Microgenesis blue as an accent. */
+:root {
+  color-scheme: light;
+  --background: #f8f9fb;
+  --foreground: #23334a;
+  --surface: #ffffff;
+  --surface-app: #ffffff;
+  --surface-card: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-muted: #f5f7fa;
+  --surface-input: #fcfdff;
+  --surface-selected: #edf3fe;
+  --sidebar: #ffffff;
+  --border: #e9edf2;
+  --border-subtle: #eef1f5;
+  --border-strong: #dce5ef;
+  --muted-foreground: #7c8799;
+  --subtle-foreground: #8999ab;
+  --primary: #2187cd;
+  --primary-hover: #176fae;
+  --primary-active: #125b91;
+  --primary-foreground: #ffffff;
+  --accent: #2187cd;
+  --accent-muted: #edf6fc;
+  --accent-border: #cfe3f1;
+  --focus-ring: #2187cd;
+  --success: #2d9b70;
+  --success-surface: #eaf6ef;
+  --warning: #a8731b;
+  --warning-surface: #fff7e8;
+  --destructive: #c75b61;
+  --destructive-surface: #fcf0f1;
+  --info: #397aa7;
+  --info-surface: #eef6fb;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0d1117;
+  --foreground: #e6edf5;
+  --surface: #111821;
+  --surface-app: #111821;
+  --surface-card: #151e29;
+  --surface-elevated: #192431;
+  --surface-muted: #101720;
+  --surface-input: #101720;
+  --surface-selected: #192b3d;
+  --sidebar: #101720;
+  --border: #283442;
+  --border-subtle: #222d39;
+  --border-strong: #364657;
+  --muted-foreground: #a2b0c0;
+  --subtle-foreground: #8999ab;
+  --primary: #106eb5;
+  --primary-hover: #176fae;
+  --primary-active: #0e578e;
+  --primary-foreground: #ffffff;
+  --accent: #79bcf0;
+  --accent-muted: #162a3c;
+  --accent-border: #284b69;
+  --focus-ring: #4c9edc;
+  --success: #75c69a;
+  --success-surface: #172a23;
+  --success-strong: #267a57;
+  --warning: #e3b66c;
+  --warning-surface: #2b2418;
+  --warning-strong: #89601f;
+  --destructive: #ec8a8f;
+  --destructive-surface: #2c1c21;
+  --destructive-strong: #963f4a;
+  --info: #83b9df;
+  --info-surface: #172632;
+}
+
+/* Tailwind's existing dark utilities keep their component contracts while
+   drawing from the shared semantic palette. */
+.dark > .min-h-screen {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.dark [class~="dark:bg-slate-950"] { background-color: var(--surface-card); }
+.dark [class~="dark:bg-slate-900"] { background-color: var(--surface-app); }
+.dark [class~="dark:bg-slate-800"],
+.dark [class~="dark:bg-slate-600"] { background-color: var(--surface-elevated); }
+.dark [class~="dark:bg-slate-700"] { background-color: var(--surface-selected); }
+.dark [class~="dark:bg-slate-800/20"],
+.dark [class~="dark:bg-slate-800/40"],
+.dark [class~="dark:bg-slate-800/50"],
+.dark [class~="dark:bg-slate-800/60"],
+.dark [class~="dark:bg-slate-800/70"],
+.dark [class~="dark:bg-slate-800/80"] { background-color: color-mix(in srgb, var(--surface-elevated) 60%, transparent); }
+.dark [class~="dark:bg-slate-900/10"] { background-color: color-mix(in srgb, var(--surface-app) 10%, transparent); }
+.dark [class~="dark:bg-slate-900/20"] { background-color: color-mix(in srgb, var(--surface-app) 20%, transparent); }
+.dark [class~="dark:bg-slate-900/40"] { background-color: color-mix(in srgb, var(--surface-app) 40%, transparent); }
+.dark [class~="dark:bg-slate-900/50"] { background-color: color-mix(in srgb, var(--surface-app) 50%, transparent); }
+.dark [class~="dark:bg-slate-900/80"] { background-color: color-mix(in srgb, var(--surface-app) 80%, transparent); }
+.dark [class~="dark:bg-slate-950/20"] { background-color: color-mix(in srgb, var(--surface-card) 20%, transparent); }
+.dark [class~="dark:bg-slate-950/30"] { background-color: color-mix(in srgb, var(--surface-card) 30%, transparent); }
+.dark [class~="dark:bg-slate-950/50"] { background-color: color-mix(in srgb, var(--surface-card) 50%, transparent); }
+.dark [class~="dark:bg-slate-950/60"] { background-color: color-mix(in srgb, var(--surface-card) 60%, transparent); }
+.dark [class~="dark:bg-slate-900/95"] { background-color: color-mix(in srgb, var(--surface-app) 95%, transparent); }
+.dark [class~="dark:bg-slate-900/60"] { background-color: color-mix(in srgb, var(--surface-app) 60%, transparent); }
+.dark [class~="dark:bg-slate-900/30"] { background-color: color-mix(in srgb, var(--surface-app) 30%, transparent); }
+.dark [class~="dark:bg-slate-950/40"] { background-color: color-mix(in srgb, var(--surface-card) 40%, transparent); }
+.dark [class~="dark:bg-slate-950/95"] { background-color: color-mix(in srgb, var(--surface-card) 95%, transparent); }
+.dark [class~="dark:bg-blue-950"],
+.dark [class*="dark:bg-blue-950/"] { background-color: var(--accent-muted); }
+
+.dark [class*="dark:border-slate-"] { border-color: var(--border); }
+.dark [class~="dark:divide-slate-800"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-subtle); }
+.dark [class~="dark:text-slate-100"] { color: var(--foreground); }
+.dark [class~="dark:text-slate-200"] { color: #d2dce8; }
+.dark [class~="dark:text-slate-300"] { color: var(--muted-foreground); }
+.dark [class~="dark:text-slate-400"],
+.dark [class~="dark:text-slate-500"] { color: var(--subtle-foreground); }
+.dark [class~="dark:text-slate-550"],
+.dark [class~="dark:text-slate-600"],
+.dark [class~="dark:text-slate-700"],
+.dark [class~="dark:text-slate-750"] { color: var(--muted-foreground); }
+.dark [class~="dark:text-blue-200"],
+.dark [class~="dark:text-blue-300"],
+.dark [class~="dark:text-blue-400"] { color: var(--accent); }
+
+/* Preserve status meaning across the existing utility based components while
+   replacing their bright, palette specific dark fills with semantic colors. */
+.dark [class*="dark:bg-emerald-"],
+.dark [class*="dark:bg-green-"] { background-color: var(--success-surface); }
+.dark [class~="dark:bg-emerald-600"],
+.dark [class~="dark:bg-green-600"] { background-color: var(--success-strong); }
+.dark [class*="dark:text-emerald-"],
+.dark [class*="dark:text-green-"] { color: var(--success); }
+.dark [class*="dark:border-emerald-"],
+.dark [class*="dark:border-green-"] { border-color: color-mix(in srgb, var(--success) 28%, var(--border)); }
+
+.dark [class*="dark:bg-amber-"],
+.dark [class*="dark:bg-yellow-"],
+.dark [class*="dark:bg-orange-"] { background-color: var(--warning-surface); }
+.dark [class*="dark:bg-amber-600"],
+.dark [class*="dark:bg-yellow-600"],
+.dark [class*="dark:bg-orange-600"] { background-color: var(--warning-strong); }
+.dark [class*="dark:text-amber-"],
+.dark [class*="dark:text-yellow-"],
+.dark [class*="dark:text-orange-"] { color: var(--warning); }
+.dark [class*="dark:border-amber-"],
+.dark [class*="dark:border-yellow-"],
+.dark [class*="dark:border-orange-"] { border-color: color-mix(in srgb, var(--warning) 28%, var(--border)); }
+
+.dark [class*="dark:bg-red-"],
+.dark [class*="dark:bg-rose-"] { background-color: var(--destructive-surface); }
+.dark [class*="dark:bg-red-600"],
+.dark [class*="dark:bg-rose-600"] { background-color: var(--destructive-strong); }
+.dark [class*="dark:text-red-"],
+.dark [class*="dark:text-rose-"] { color: var(--destructive); }
+.dark [class*="dark:border-red-"],
+.dark [class*="dark:border-rose-"] { border-color: color-mix(in srgb, var(--destructive) 30%, var(--border)); }
+
+.dark [class*="dark:bg-sky-"],
+.dark [class*="dark:bg-cyan-"],
+.dark [class*="dark:bg-indigo-"] { background-color: var(--info-surface); }
+.dark [class*="dark:text-sky-"],
+.dark [class*="dark:text-cyan-"],
+.dark [class*="dark:text-indigo-"] { color: var(--info); }
+.dark [class*="dark:border-sky-"],
+.dark [class*="dark:border-cyan-"],
+.dark [class*="dark:border-indigo-"] { border-color: color-mix(in srgb, var(--info) 27%, var(--border)); }
+.dark [class*="dark:bg-violet-"],
+.dark [class*="dark:bg-purple-"] { background-color: var(--surface-elevated); }
+.dark [class*="dark:text-violet-"],
+.dark [class*="dark:text-purple-"] { color: var(--muted-foreground); }
+.dark [class*="dark:border-violet-"],
+.dark [class*="dark:border-purple-"] { border-color: var(--border); }
+
+.dark [class~="bg-[#0063a9]"] { background-color: var(--primary); }
+.dark [class~="hover:bg-[#00528c]"]:hover { background-color: var(--primary-hover); }
+.dark [class~="text-[#0063a9]"] { color: var(--accent); }
+.dark [class~="border-[#0063a9]"] { border-color: var(--accent-border); }
+.dark [class~="focus:ring-[#0063a9]"]:focus-visible { --tw-ring-color: var(--focus-ring); }
+
+.dark .recharts-cartesian-axis-tick-value,
+.dark .recharts-legend-item-text { fill: var(--muted-foreground); color: var(--muted-foreground) !important; }
+
+.dark .primary-button,
+.dark [class~="bg-[#0063a9]"]:is(button, [role="button"]) {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.dark .primary-button:hover,
+.dark [class~="bg-[#0063a9]"]:is(button, [role="button"]):hover {
+  background-color: var(--primary-hover);
+}
+.dark .primary-button:active,
+.dark [class~="bg-[#0063a9]"]:is(button, [role="button"]):active {
+  background-color: var(--primary-active);
+}
+.dark .primary-button:disabled,
+.dark [class~="bg-[#0063a9]"]:is(button, [role="button"]):disabled {
+  background-color: #31536d;
+  color: #c2d2df;
+}
+.dark .primary-button:focus-visible,
+.dark [class~="bg-[#0063a9]"]:is(button, [role="button"]):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.dark :is(input, textarea, select, [role="combobox"]):not([type="checkbox"]):not([type="radio"]) {
+  border-color: var(--border);
+  background-color: var(--surface-input);
+  color: var(--foreground);
+}
+.dark :is(input, textarea, select, [role="combobox"]):focus-visible {
+  border-color: var(--focus-ring);
+  outline-color: var(--focus-ring);
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: var(--subtle-foreground); }
+
+/* Employee workspace uses its own compact stylesheet. These overrides map its
+   existing components to the same semantic tokens without changing geometry. */
+.dark .employee-experience {
+  color: var(--foreground);
+  background: var(--background);
+  --brand: var(--primary);
+  --brand-hover: var(--primary-hover);
+  --ink: var(--foreground);
+  --muted: var(--muted-foreground);
+  --border: var(--border-subtle);
+  --surface: var(--surface-card);
+}
+.dark .employee-experience .sidebar,
+.dark .employee-experience .topbar { background: var(--sidebar); border-color: var(--border-subtle); }
+.dark .employee-experience .main-shell { min-height: 100vh; background: var(--background); }
+.dark .employee-experience .sidebar .brand img { filter: brightness(1.2); }
+.dark .employee-experience .brand { color: var(--foreground); }
+.dark .employee-experience .brand-mark span { background: var(--primary); }
+.dark .employee-experience .brand-mark span:nth-child(3) { background: #79bcf0; }
+.dark .employee-experience .workspace-label,
+.dark .employee-experience .sidebar-footer,
+.dark .employee-experience .breadcrumb,
+.dark .employee-experience .eyebrow,
+.dark .employee-experience .page-heading p,
+.dark .employee-experience .welcome-content p,
+.dark .employee-experience .evaluation-text p,
+.dark .employee-experience .panel-heading p,
+.dark .employee-experience .guide-step p,
+.dark .employee-experience .history-company > span,
+.dark .employee-experience .main-footer { color: var(--muted-foreground); }
+.dark .employee-experience .main-footer { border-color: var(--border-subtle); }
+.dark .employee-experience .nav-item { color: #a2b0c0; }
+.dark .employee-experience .nav-item:hover { background: #17212b; color: var(--foreground); }
+.dark .employee-experience .nav-item.active {
+  color: var(--accent);
+  background: var(--surface-selected);
+}
+.dark .employee-experience .nav-indicator { background: var(--primary); }
+.dark .employee-experience .sidebar-help,
+.dark .employee-experience .history-callout,
+.dark .employee-experience .how-it-works,
+.dark .employee-experience .recent-panel,
+.dark .employee-experience .panel,
+.dark .employee-experience .evaluations-panel,
+.dark .employee-experience .form-panel,
+.dark .employee-experience .evaluation-progress-panel,
+.dark .employee-experience .account-menu,
+.dark .employee-experience .modal,
+.dark .employee-experience .quick-guide-modal,
+.dark .employee-experience .draft-confirmation-modal {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+  color: var(--foreground);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.16);
+}
+.dark .employee-experience .sidebar-help { background: var(--surface-app); }
+.dark .employee-experience :is(.how-it-works, .history-callout) {
+  background: var(--surface-app);
+  box-shadow: none;
+}
+.dark .employee-experience .welcome-banner {
+  border-color: var(--border-subtle);
+  background: linear-gradient(110deg, #151e29 0%, #17212b 68%, #18232e 100%);
+}
+.dark .employee-experience :is(h1, h2, h3, h4, .account-name, .company-line h3, .history-company strong, .form-section-heading h2, .evaluation-context h1) { color: var(--foreground); }
+.dark .employee-experience .banner-eyebrow,
+.dark .employee-experience .banner-link,
+.dark .employee-experience .text-button,
+.dark .employee-experience .guide-link,
+.dark .employee-experience .breadcrumb-home:hover { color: var(--accent); }
+.dark .employee-experience .prototype-badge,
+.dark .employee-experience .quiet-count,
+.dark .employee-experience .filter-count,
+.dark .employee-experience .guide-step > span,
+.dark .employee-experience .history-icon,
+.dark .employee-experience .avatar {
+  background: var(--surface-elevated);
+  color: var(--muted-foreground);
+  border-color: var(--border);
+}
+.dark .employee-experience .evaluation-row,
+.dark .employee-experience .history-row { border-color: var(--border-subtle); }
+.dark .employee-experience .evaluation-row:hover,
+.dark .employee-experience .filter-tabs button:hover { background: #18232e; }
+.dark .employee-experience .company-name-button { color: var(--foreground); }
+.dark .employee-experience .company-name-button:hover { color: var(--accent); }
+.dark .employee-experience .panel-footnote,
+.dark .employee-experience .empty-state { background: var(--surface-app); color: var(--muted-foreground); }
+.dark .employee-experience .empty-state :is(h3, p) { color: inherit; }
+.dark .employee-experience .filter-tabs button.selected,
+.dark .employee-experience .filter-tabs button.selected .filter-count { background: var(--surface-selected); color: var(--accent); }
+.dark .employee-experience .type-tag,
+.dark .employee-experience .submitted-tag { background: var(--surface-elevated); color: var(--muted-foreground); }
+.dark .employee-experience .start-button,
+.dark .employee-experience .secondary-button,
+.dark .employee-experience .ghost-button {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--accent);
+}
+.dark .employee-experience .start-button:hover,
+.dark .employee-experience .secondary-button:hover,
+.dark .employee-experience .ghost-button:hover { background: var(--surface-selected); }
+.dark .employee-experience .respondent-summary,
+.dark .employee-experience .form-notice,
+.dark .employee-experience .quick-guide-note {
+  background: var(--surface-app);
+  border-color: var(--border-subtle);
+  color: var(--muted-foreground);
+}
+.dark .employee-experience .evaluation-guidance {
+  background: var(--info-surface);
+  border-color: var(--accent-border);
+  color: var(--muted-foreground);
+}
+.dark .employee-experience .evaluation-guidance strong { color: var(--accent); }
+.dark .employee-experience .field,
+.dark .employee-experience .account-menu select,
+.dark .employee-experience .search-field {
+  background: var(--surface-input);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+.dark .employee-experience .employee-survey-filler .field[readonly] { background: var(--surface-app); color: var(--muted-foreground); }
+.dark .employee-experience #survey-filler-container :is(.evaluation-context h1, .form-section-heading h2, .respondent-summary strong) { color: var(--foreground); }
+.dark .employee-experience #survey-filler-container .respondent-summary span { color: var(--subtle-foreground); }
+.dark .employee-experience .field-label,
+.dark .employee-experience .question h4,
+.dark .employee-experience .employee-survey-filler .field-label { color: var(--muted-foreground); }
+.dark .employee-experience .rating-scale-shell { background: var(--surface-app); border-color: var(--border); }
+.dark .employee-experience #survey-filler-container .rating-option,
+.dark .employee-experience #survey-filler-container .rating-options button {
+  background: var(--surface-input);
+  border-color: var(--border);
+  color: var(--muted-foreground);
+}
+.dark .employee-experience #survey-filler-container .rating-option:hover,
+.dark .employee-experience #survey-filler-container .rating-options button:hover { background: var(--accent-muted); border-color: var(--accent-border); color: var(--accent); }
+.dark .employee-experience #survey-filler-container .rating-option.selected,
+.dark .employee-experience #survey-filler-container .rating-options button[aria-pressed="true"] {
+  background: var(--surface-selected);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.dark .employee-experience .workflow-steps { color: var(--subtle-foreground); }
+.dark .employee-experience .workflow-steps .current,
+.dark .employee-experience .workflow-steps .current span { color: var(--accent); }
+.dark .employee-experience .workflow-steps span,
+.dark .employee-experience .workflow-steps .completed span { background: var(--surface-elevated); color: var(--muted-foreground); }
+.dark .employee-experience .workflow-steps i { background: var(--border); }
+.dark .employee-experience .success-mark { background: var(--success-surface); color: var(--success); }
+.dark .employee-experience .confirmation p,
+.dark .employee-experience .quick-guide-modal .modal-subtitle,
+.dark .employee-experience .quick-guide-steps p { color: var(--muted-foreground); }
+.dark .employee-experience :is(.account-name > span, .form-bottom > span, .quick-guide-steps li > span) { color: var(--subtle-foreground); }
+.dark .employee-experience .topbar-divider { background: var(--border); }
+.dark .employee-experience .rating-option:focus-visible,
+.dark .employee-experience :is(button, input, select, textarea):focus-visible {
+  outline-color: var(--focus-ring);
+}
+.dark .employee-experience :is(.draft-warning, .validation-error) { border-color: #69474a; background: var(--destructive-surface); color: var(--destructive); }
+.dark .employee-experience .draft-warning svg { color: var(--warning); }
+.dark .employee-experience .company-avatar { background: #1c2a38; color: var(--accent); border-color: var(--border); }
+.dark .employee-experience .hero-art :is(.art-sheet, .sheet, .sheet-one, .sheet-two, .sheet-three) { background: #1b2937; border-color: #2a3948; box-shadow: 0 14px 28px rgb(0 0 0 / 0.18); }
+.dark .employee-experience .hero-art :is(.art-sheet-sub, .art-line > span:last-child, .sheet-icon, .sheet-line) { background: #304457; }
+.dark .employee-experience .hero-art .art-check { background: #21384b; color: var(--accent); }
+.dark .employee-experience .hero-art .art-orbit { border-color: #2a3948; }
+.dark .employee-experience .hero-art .art-seal { background: var(--accent-muted); border-color: var(--accent-border); color: var(--accent); }
+
+.dark .employee-experience :is(.sidebar, .topbar, .panel, .form-panel, .evaluation-progress-panel, .account-menu, .modal, .quick-guide-modal) { border-color: var(--border-subtle); }
+
+.dark .employee-profile-dialog,
+.dark .employee-profile-settings { color: var(--foreground); }
+.dark .employee-profile-settings { --profile-muted: var(--muted-foreground); --profile-border: var(--border-subtle); --profile-surface: var(--surface-card); }
+.dark .employee-profile-identity-copy h2,
+.dark .employee-profile-section-heading h3,
+.dark .employee-profile-stats dd { color: var(--foreground); }
+.dark .employee-profile-details dd,
+.dark .employee-profile-submission-copy strong,
+.dark .employee-profile-preference-copy strong { color: #d2dce8; }
+.dark .employee-profile-preference-icon,
+.dark .employee-profile-avatar { background: var(--surface-elevated); border-color: var(--border); color: var(--accent); }
+.dark .employee-profile-submission-list li,
+.dark .employee-profile-preference-row { border-color: var(--border-subtle); }
+
+/* Keep fixed light-mode row surfaces and labels from leaking into employee dark mode. */
+.dark .employee-experience .history-row {
+  background: var(--surface-card);
+  border-color: var(--border-subtle);
+  color: var(--muted-foreground);
+}
+.dark .employee-experience .history-row:hover { background: var(--surface-elevated); }
+.dark .employee-experience .history-company strong,
+.dark .employee-experience .evaluation-row .company-name-button { color: var(--foreground); }
+.dark .employee-experience .history-company > span,
+.dark .employee-experience .history-date { color: var(--muted-foreground); }
+.dark .employee-experience .history-icon { background: var(--surface-elevated); color: var(--muted-foreground); }
+.dark .employee-experience .history-table-head {
+  background: var(--surface-app);
+  border-color: var(--border-subtle);
+  color: var(--subtle-foreground);
+}
+.dark .employee-experience .history-table-head + .history-row { border-color: var(--border-subtle); }
+.dark .employee-experience .panel-footnote {
+  background: var(--surface-app);
+  border-color: var(--border-subtle);
+  color: var(--muted-foreground);
+}
+.dark .employee-experience .type-tag,
+.dark .employee-experience .submitted-tag {
+  border-color: var(--border);
+  background: var(--surface-elevated);
+  color: var(--muted-foreground);
+}
+.dark .employee-experience .guide-link { border-color: var(--border-subtle); }
+.dark .employee-experience .guide-step::before { background: var(--border); }
+.dark .employee-experience .employee-history-pagination { border-color: var(--border-subtle); color: var(--muted-foreground); }
+.dark .employee-experience .modal-note,
+.dark .employee-experience .confirmation-meta {
+  background: var(--surface-app);
+  border-color: var(--border-subtle);
+  color: var(--muted-foreground);
+}
+.dark .employee-experience .answer-row { border-color: var(--border-subtle); }
+.dark .employee-experience .answer-row > div > span { color: var(--muted-foreground); }
+.dark .employee-experience .answer-row p { color: var(--foreground); }
+.dark .employee-experience #survey-filler-container .rating-option {
+  background: var(--surface-input);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+.dark .employee-experience #survey-filler-container .rating-option-description { color: var(--muted-foreground); }
+.dark .employee-experience #survey-filler-container .rating-option.not-applicable { color: var(--foreground); }
+.dark .employee-experience #survey-filler-container .rating-option.selected,
+.dark .employee-experience #survey-filler-container .rating-option[aria-checked="true"] {
+  background: var(--surface-selected);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+.dark .employee-experience #survey-filler-container .rating-option.selected .rating-option-description,
+.dark .employee-experience #survey-filler-container .rating-option[aria-checked="true"] .rating-option-description { color: var(--muted-foreground); }
+.dark .employee-experience .company-name-button,
+.dark .employee-experience .evaluation-context h1,
+.dark .employee-experience .form-section-heading h2 { color: var(--foreground); }
