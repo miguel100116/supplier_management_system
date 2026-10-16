@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalEscape } from '../hooks/useModalEscape';
-import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, BellPlus, Plus, SlidersHorizontal, Trash2, Filter } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
+import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, SlidersHorizontal, Trash2, Filter } from 'lucide-react';
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin } from '../types/survey';
 import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isNTBranch } from '../utils/compliance';
@@ -383,6 +384,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
   const [documentFilter, setDocumentFilter] = useState('all');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<DocumentStatusFilter>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DOCUMENT_ROWS_PER_PAGE);
   const [renewalTarget, setRenewalTarget] = useState<{ company: PartnerCompany; branchId: string; docName: string } | null>(null);
   const [renewalDate, setRenewalDate] = useState('');
   const [mutationError, setMutationError] = useState('');
@@ -839,11 +841,11 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
     });
   }, [displayRows, searchQuery, documentFilter, documentStatusFilter, customFilterRows, matrixCellData, sortKey, sortDirection]);
 
-  const pageCount = Math.max(1, Math.ceil(rows.length / DOCUMENT_ROWS_PER_PAGE));
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const paginatedRows = useMemo(() => {
-    const start = (currentPage - 1) * DOCUMENT_ROWS_PER_PAGE;
-    return rows.slice(start, start + DOCUMENT_ROWS_PER_PAGE);
-  }, [rows, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, currentPage, pageSize]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -853,11 +855,6 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
     setCurrentPage((page) => Math.min(page, pageCount));
   }, [pageCount]);
 
-  const visiblePageNumbers = useMemo(() => {
-    const start = Math.max(1, Math.min(currentPage - 2, pageCount - 4));
-    const end = Math.min(pageCount, start + 4);
-    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-  }, [currentPage, pageCount]);
 
   // Compliance Overview: one KPI/chart summary per selected view, computed
   // once per company (not per document cell) so it stays cheap even at
@@ -2120,42 +2117,9 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
             </table>
           </div>
 
-          <nav className="flex flex-col gap-3 border-t border-slate-100 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-center sm:justify-between" aria-label="Document tracker pagination">
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Showing <span className="font-semibold text-slate-700 dark:text-slate-200">{(currentPage - 1) * DOCUMENT_ROWS_PER_PAGE + 1}</span>–<span className="font-semibold text-slate-700 dark:text-slate-200">{Math.min(currentPage * DOCUMENT_ROWS_PER_PAGE, rows.length)}</span> of <span className="font-semibold text-slate-700 dark:text-slate-200">{rows.length}</span> rows
-            </p>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                disabled={currentPage === 1}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                aria-label="Previous page"
-              >
-                <ChevronLeft size={15} />
-              </button>
-              {visiblePageNumbers.map((page) => (
-                <button
-                  type="button"
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  aria-current={currentPage === page ? 'page' : undefined}
-                  className={`h-8 min-w-8 rounded-md px-2 text-xs font-semibold transition ${currentPage === page ? 'bg-[#0063a9] text-white' : 'border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'}`}
-                >
-                  {page}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
-                disabled={currentPage === pageCount}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                aria-label="Next page"
-              >
-                <ChevronRight size={15} />
-              </button>
-            </div>
-          </nav>
+          <Pagination page={currentPage} pageSize={pageSize} totalItems={rows.length}
+            onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
+            ariaLabel="Document tracker pagination" className="bg-white px-4 dark:bg-slate-950" />
 
           <div className="flex flex-wrap items-center gap-4 px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Legend:</span>

@@ -60,13 +60,14 @@ export interface PaginatedAnalyticsItems<T> {
 export function paginateAnalyticsItems<T>(
   items: T[],
   requestedPage: number,
+  pageSize = ANALYTICS_PAGE_SIZE,
 ): PaginatedAnalyticsItems<T> {
-  const totalPages = Math.max(1, Math.ceil(items.length / ANALYTICS_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const currentPage = Math.min(Math.max(0, requestedPage), totalPages - 1);
-  const startIndex = currentPage * ANALYTICS_PAGE_SIZE;
+  const startIndex = currentPage * pageSize;
 
   return {
-    items: items.slice(startIndex, startIndex + ANALYTICS_PAGE_SIZE),
+    items: items.slice(startIndex, startIndex + pageSize),
     currentPage,
     totalPages,
     startIndex,
@@ -76,8 +77,9 @@ export function paginateAnalyticsItems<T>(
 export function paginateCompanyRankings<T>(
   companies: T[],
   requestedPage: number,
+  pageSize = ANALYTICS_PAGE_SIZE,
 ): PaginatedAnalyticsItems<T> {
-  return paginateAnalyticsItems(companies, requestedPage);
+  return paginateAnalyticsItems(companies, requestedPage, pageSize);
 }
 
 /**

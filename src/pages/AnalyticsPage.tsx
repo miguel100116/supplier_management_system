@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { BarChart3, ChevronLeft, ChevronRight, Info, Trophy, X } from 'lucide-react';
+import { BarChart3, ChevronRight, Info, Trophy, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CompanyAnalysisPanel } from '../components/CompanyAnalysisPanel';
 import { PageDescription } from '../components/PageDescription';
@@ -14,6 +14,7 @@ import { getValueColorBand } from '../features/analytics/domain/valueColorBand';
 import { AnalyticsDateRangeControls } from '../features/analytics/components/AnalyticsDateRangeControls';
 import type { AnalyticsDateRange } from '../features/analytics/domain/dateRange';
 import { useModalEscape } from '../hooks/useModalEscape';
+import { Pagination } from '../components/Pagination';
 
 interface AnalyticsPageProps {
   responses: SurveyResponse[];
@@ -75,6 +76,8 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
   const [trendGranularity, setTrendGranularity] = useState<'monthly' | 'yearly' | 'series'>('monthly');
   const [leaderboardPage, setLeaderboardPage] = useState(0);
   const [questionPerformancePage, setQuestionPerformancePage] = useState(0);
+  const [leaderboardPageSize, setLeaderboardPageSize] = useState(20);
+  const [questionPerformancePageSize, setQuestionPerformancePageSize] = useState(20);
   const closeSelectedCompany = () => setSelectedCompany(null);
   useModalEscape(Boolean(selectedCompany), closeSelectedCompany);
 
@@ -94,8 +97,8 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
 
   const visibleCompanies = useMemo(() => selectedType === 'All' ? companySummaries : companySummaries.filter((company) => company.type === selectedType), [companySummaries, selectedType]);
   const paginatedCompanies = useMemo(
-    () => paginateCompanyRankings(visibleCompanies, leaderboardPage),
-    [visibleCompanies, leaderboardPage],
+    () => paginateCompanyRankings(visibleCompanies, leaderboardPage, leaderboardPageSize),
+    [visibleCompanies, leaderboardPage, leaderboardPageSize],
   );
   const leaderboardSplitIndex = Math.ceil(paginatedCompanies.items.length / 2);
   const leaderboardColumns = [
@@ -115,8 +118,8 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
   const volumeData = useMemo(() => responseVolume(responses, activeSurveyTypes), [responses, activeSurveyTypes]);
   const questionData = useMemo(() => questionPerformance(responses), [responses]);
   const paginatedQuestionData = useMemo(
-    () => paginateAnalyticsItems(questionData, questionPerformancePage),
-    [questionData, questionPerformancePage],
+    () => paginateAnalyticsItems(questionData, questionPerformancePage, questionPerformancePageSize),
+    [questionData, questionPerformancePage, questionPerformancePageSize],
   );
   const trendData = useMemo<Array<{ key: string; average: number | null; responses: number }>>(() => {
     if (trendGranularity === 'yearly') return yearlyTrend(responses).map((item) => ({ key: item.year, ...item }));
@@ -229,17 +232,11 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
           </div>
           {!visibleCompanies.length && <p className="py-10 text-center text-sm text-slate-500">No evaluated companies in this category.</p>}
           {visibleCompanies.length > 0 && (
-            <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[10px] text-slate-400">
-                Showing {paginatedCompanies.startIndex + 1}–{paginatedCompanies.startIndex + paginatedCompanies.items.length} of {visibleCompanies.length} evaluated companies · Select a row for details
-              </p>
-              {paginatedCompanies.totalPages > 1 && (
-                <nav className="flex items-center gap-2" aria-label="Company leaderboard pagination">
-                  <button type="button" onClick={() => setLeaderboardPage(paginatedCompanies.currentPage - 1)} disabled={paginatedCompanies.currentPage === 0} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900" aria-label="Previous leaderboard page"><ChevronLeft size={14} /> Previous</button>
-                  <span className="text-xs font-medium tabular-nums text-slate-500 dark:text-slate-400">Page {paginatedCompanies.currentPage + 1} of {paginatedCompanies.totalPages}</span>
-                  <button type="button" onClick={() => setLeaderboardPage(paginatedCompanies.currentPage + 1)} disabled={paginatedCompanies.currentPage === paginatedCompanies.totalPages - 1} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900" aria-label="Next leaderboard page">Next <ChevronRight size={14} /></button>
-                </nav>
-              )}
+            <div>
+              <Pagination page={paginatedCompanies.currentPage + 1} pageSize={leaderboardPageSize} totalItems={visibleCompanies.length}
+                onPageChange={(page) => setLeaderboardPage(page - 1)} onPageSizeChange={(size) => { setLeaderboardPageSize(size); setLeaderboardPage(0); }}
+                ariaLabel="Company leaderboard pagination" showPageControls={paginatedCompanies.totalPages > 1 || leaderboardPageSize !== 20} />
+              <p className="pb-2 text-[10px] text-slate-400">Select a row for details.</p>
             </div>
           )}
         </div>
@@ -291,16 +288,9 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
             ))}
           </ol>
           {questionData.length > 0 && (
-            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <p className="text-[10px] text-slate-400">Showing {paginatedQuestionData.startIndex + 1}–{paginatedQuestionData.startIndex + paginatedQuestionData.items.length} of {questionData.length} scored questions</p>
-              {paginatedQuestionData.totalPages > 1 && (
-                <nav className="flex items-center gap-2" aria-label="Question performance pagination">
-                  <button type="button" onClick={() => setQuestionPerformancePage(paginatedQuestionData.currentPage - 1)} disabled={paginatedQuestionData.currentPage === 0} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900" aria-label="Previous questions page"><ChevronLeft size={14} /> Previous</button>
-                  <span className="text-xs font-medium tabular-nums text-slate-500 dark:text-slate-400">Page {paginatedQuestionData.currentPage + 1} of {paginatedQuestionData.totalPages}</span>
-                  <button type="button" onClick={() => setQuestionPerformancePage(paginatedQuestionData.currentPage + 1)} disabled={paginatedQuestionData.currentPage === paginatedQuestionData.totalPages - 1} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900" aria-label="Next questions page">Next <ChevronRight size={14} /></button>
-                </nav>
-              )}
-            </div>
+            <Pagination page={paginatedQuestionData.currentPage + 1} pageSize={questionPerformancePageSize} totalItems={questionData.length}
+              onPageChange={(page) => setQuestionPerformancePage(page - 1)} onPageSizeChange={(size) => { setQuestionPerformancePageSize(size); setQuestionPerformancePage(0); }}
+              ariaLabel="Question performance pagination" showPageControls={paginatedQuestionData.totalPages > 1 || questionPerformancePageSize !== 20} className="px-4 sm:px-6" />
           )}
         </article>
       </section>

@@ -4,6 +4,7 @@ import type { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { filterPendingEvaluations, getPendingEmployeeEvaluations, type EmployeeEvaluationFilter } from '../domain/pendingEvaluations';
 import { EmployeeCompanyIcon } from './EmployeeCompanyIcon';
+import { Pagination } from '../../../components/Pagination';
 
 type WorkspaceView = 'Home' | 'Evaluations' | 'My submissions';
 type SubmissionItem = { id: string; company: string; type: SurveyType; date: string; answers: { question: string; answer: string }[] };
@@ -47,6 +48,8 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
   const [detail, setDetail] = useState<SubmissionItem | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [evaluationPage, setEvaluationPage] = useState(1);
+  const [evaluationPageSize, setEvaluationPageSize] = useState(10);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
   useModalEscape(Boolean(detail), () => setDetail(null));
 
   const evaluations = useMemo(() => getPendingEmployeeEvaluations(surveys, partnerCompanies, responses, userEmail), [partnerCompanies, responses, surveys, userEmail]);
@@ -57,7 +60,6 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
     return counts;
   }, [evaluations]);
   const visibleEvaluations = useMemo(() => filterPendingEvaluations(evaluations, evaluationFilter, search), [evaluations, evaluationFilter, search]);
-  const evaluationPageSize = 10;
   const evaluationPageCount = Math.max(1, Math.ceil(visibleEvaluations.length / evaluationPageSize));
   const activeEvaluationPage = Math.min(evaluationPage, evaluationPageCount);
   const pagedEvaluations = visibleEvaluations.slice(
@@ -91,7 +93,7 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
     (filter === 'All evaluations' || item.type === filter) &&
     `${item.company} ${item.type}`.toLowerCase().includes(search.trim().toLowerCase()),
   );
-  const pageSize = 10;
+  const pageSize = historyPageSize;
   const pageCount = Math.max(1, Math.ceil(visibleSubmissions.length / pageSize));
   const pagedSubmissions = visibleSubmissions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -185,10 +187,7 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
                     </div>)}
                     {visibleEvaluationRows.length === 0 && <div className="empty-state" role="status"><ClipboardList size={30} /><h3>{emptyTitle}</h3><p>{emptyDescription}</p>{(evaluationFilter !== 'All evaluations' || search.trim()) && <button className="text-button" type="button" onClick={() => { updateEvaluationFilter('All evaluations'); setSearch(''); setEvaluationPage(1); }}>{view === 'Home' && evaluationFilter !== 'All evaluations' ? 'View all categories' : 'Clear filters'}</button>}</div>}
                   </div>}
-              {!isLoading && !error && view === 'Evaluations' && visibleEvaluations.length > 0 && <nav className="employee-evaluation-pagination" aria-label="Evaluation pages">
-                <span>Showing {(activeEvaluationPage - 1) * evaluationPageSize + 1}–{Math.min(activeEvaluationPage * evaluationPageSize, visibleEvaluations.length)} of {visibleEvaluations.length}</span>
-                <div><button className="secondary-button" type="button" disabled={activeEvaluationPage <= 1} onClick={() => setEvaluationPage((page) => Math.max(1, page - 1))}>Previous</button><span>Page {activeEvaluationPage} of {evaluationPageCount}</span><button className="secondary-button" type="button" disabled={activeEvaluationPage >= evaluationPageCount} onClick={() => setEvaluationPage((page) => Math.min(evaluationPageCount, page + 1))}>Next</button></div>
-              </nav>}
+              {!isLoading && !error && view === 'Evaluations' && visibleEvaluations.length > 0 && <Pagination page={activeEvaluationPage} pageSize={evaluationPageSize} totalItems={visibleEvaluations.length} onPageChange={setEvaluationPage} onPageSizeChange={(size) => { setEvaluationPageSize(size); setEvaluationPage(1); }} ariaLabel="Evaluation pages" showPageControls={evaluationPageCount > 1 || evaluationPageSize !== 10} verticalPadding="comfortable" className="mt-6 px-[17px] min-[561px]:px-5" />}
               {view === 'Home' && <div className="panel-footnote"><LockKeyhole size={14} /> Only evaluations available to you appear here.</div>}
             </section>
             {view === 'Home' && <section className="panel recent-panel">
@@ -217,7 +216,7 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
           : error ? <div className="empty-state" role="alert"><History size={30} /><h3>Submissions are unavailable</h3><p>We couldn’t load your submission history.</p></div>
             : <HistoryRows items={pagedSubmissions} onSelect={setDetail} />}
         {!isLoading && !error && !visibleSubmissions.length && <div className="empty-state"><History size={30} /><h3>{groupedSubmissions.length ? 'No submissions found' : 'No submissions yet'}</h3><p>{groupedSubmissions.length ? 'Try another search or clear your filters.' : 'Your completed evaluations will appear here.'}</p>{groupedSubmissions.length > 0 && <button className="text-button" type="button" onClick={() => { setSearch(''); setFilter('All evaluations'); }}>Clear filters</button>}</div>}
-        {pageCount > 1 && <div className="employee-history-pagination"><button type="button" className="secondary-button" disabled={currentPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>Previous</button><span>Page {currentPage} of {pageCount}</span><button type="button" className="secondary-button" disabled={currentPage >= pageCount} onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}>Next</button></div>}
+        {!isLoading && !error && visibleSubmissions.length > 0 && <Pagination page={currentPage} pageSize={pageSize} totalItems={visibleSubmissions.length} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setHistoryPageSize(size); setCurrentPage(1); }} ariaLabel="Submission history pagination" showPageControls={pageCount > 1 || pageSize !== 10} />}
       </section>}
 
       {detail && <div className="fixed inset-0 modal-backdrop">

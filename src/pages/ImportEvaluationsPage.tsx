@@ -4,8 +4,6 @@ import {
   Archive,
   CalendarDays,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Download,
   FileSpreadsheet,
   Layers,
@@ -18,6 +16,7 @@ import {
   UploadCloud,
   X,
 } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
 import type { SurveyType } from '../types/survey';
 import type { CompanyDecision, RawEvalImportSummary, RawEvalPreview } from '../utils/rawEvaluationImport';
 import { archiveEvaluationBatch, validateEvaluationBatchPreviews } from '../features/evaluation-imports/domain/evaluationBatch';
@@ -112,6 +111,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
   const [isRemovingArchives, setIsRemovingArchives] = useState(false);
   const [archiveFilter, setArchiveFilter] = useState<StoredArchiveFilter>('all');
   const [archivePage, setArchivePage] = useState(1);
+  const [archivePageSize, setArchivePageSize] = useState(STORED_SOURCE_FILES_PAGE_SIZE);
   const [importMode, setImportMode] = useState<'normal' | 'test'>('normal');
   const [archiveTab, setArchiveTab] = useState<EvaluationImportTab>('active');
   const [archiveResponseCounts, setArchiveResponseCounts] = useState<Map<string, number>>(new Map());
@@ -154,10 +154,10 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
     if (archiveFilter === 'all') return true;
     return archive.surveyType === archiveFilter || archive.surveyType === 'Combined';
   });
-  const archiveTotalPages = Math.max(1, Math.ceil(filteredArchives.length / STORED_SOURCE_FILES_PAGE_SIZE));
+  const archiveTotalPages = Math.max(1, Math.ceil(filteredArchives.length / archivePageSize));
   const currentArchivePage = Math.min(archivePage, archiveTotalPages);
-  const archiveStartIndex = (currentArchivePage - 1) * STORED_SOURCE_FILES_PAGE_SIZE;
-  const visibleArchives = filteredArchives.slice(archiveStartIndex, archiveStartIndex + STORED_SOURCE_FILES_PAGE_SIZE);
+  const archiveStartIndex = (currentArchivePage - 1) * archivePageSize;
+  const visibleArchives = filteredArchives.slice(archiveStartIndex, archiveStartIndex + archivePageSize);
   const selectedFilteredArchiveCount = visibleArchives.filter((archive) => selectedArchiveIds.has(archive.id)).length;
   const allFilteredArchivesSelected = visibleArchives.length > 0 && selectedFilteredArchiveCount === visibleArchives.length;
   const activeArchiveFilterLabel = STORED_SOURCE_FILE_FILTERS.find((filter) => filter.id === archiveFilter)?.label ?? 'All categories';
@@ -805,38 +805,9 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
                 </li>
               ))}
             </ul>
-            <nav className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3 dark:border-slate-800" aria-label="Stored source files pagination">
-              <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-                Showing {archiveStartIndex + 1}–{archiveStartIndex + visibleArchives.length} of {filteredArchives.length} files
-              </p>
-              {archiveTotalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setArchivePage(currentArchivePage - 1)}
-                    disabled={currentArchivePage === 1}
-                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                    aria-label="Previous stored source files page"
-                  >
-                    <ChevronLeft size={15} aria-hidden="true" />
-                    Previous
-                  </button>
-                  <span className="min-w-20 text-center text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    Page {currentArchivePage} of {archiveTotalPages}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setArchivePage(currentArchivePage + 1)}
-                    disabled={currentArchivePage === archiveTotalPages}
-                    className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                    aria-label="Next stored source files page"
-                  >
-                    Next
-                    <ChevronRight size={15} aria-hidden="true" />
-                  </button>
-                </div>
-              )}
-            </nav>
+            <Pagination page={currentArchivePage} pageSize={archivePageSize} totalItems={filteredArchives.length}
+              onPageChange={setArchivePage} onPageSizeChange={(size) => { setArchivePageSize(size); setArchivePage(1); }}
+              ariaLabel="Stored source files pagination" className="px-5" showPageControls={archiveTotalPages > 1 || archivePageSize !== STORED_SOURCE_FILES_PAGE_SIZE} />
           </>
         )}
       </section>

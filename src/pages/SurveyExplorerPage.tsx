@@ -11,6 +11,7 @@ import {
   selectSurveyResponses,
   surveyResponseFilename,
 } from '../features/evaluations/domain/surveyResponses';
+import { Pagination } from '../components/Pagination';
 
 interface SurveyExplorerPageProps {
   responses: SurveyResponse[];
@@ -25,6 +26,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
   const [emailSearch, setEmailSearch] = useState('');
   const [exportScope, setExportScope] = useState<'all' | 'filtered'>('filtered');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -61,10 +63,10 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
       && (!dateFrom || (day && day >= dateFrom)) && (!dateTo || (day && day <= dateTo));
   }), [submissions, emailSearch, departments, designations, dateFrom, dateTo]);
   const selectedSubmission = submissions.find((submission) => submission.id === selectedResponseId);
-  const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const firstVisibleIndex = (currentPage - 1) * PAGE_SIZE;
-  const visibleSubmissions = filteredSubmissions.slice(firstVisibleIndex, firstVisibleIndex + PAGE_SIZE);
+  const firstVisibleIndex = (currentPage - 1) * pageSize;
+  const visibleSubmissions = filteredSubmissions.slice(firstVisibleIndex, firstVisibleIndex + pageSize);
   const exportSubmissions = exportScope === 'all' ? submissions : filteredSubmissions;
 
   function openSurvey(id: string) {
@@ -189,7 +191,6 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
               <p className="py-8 text-center text-slate-500">No responses match the selected filters.</p>
             ) : (
               <>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Showing {firstVisibleIndex + 1}-{firstVisibleIndex + visibleSubmissions.length} of {filteredSubmissions.length} submissions</p>
                 <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
                   <table className="min-w-[760px] w-full text-left text-xs">
                     <thead className="bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
@@ -209,13 +210,8 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                     </tbody>
                   </table>
                 </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-end gap-3">
-                    <button type="button" className="secondary-button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</button>
-                    <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                    <button type="button" className="secondary-button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)}>Next</button>
-                  </div>
-                )}
+                <Pagination page={currentPage} pageSize={pageSize} totalItems={filteredSubmissions.length}
+                  onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} ariaLabel="Survey submissions pagination" showPageControls={totalPages > 1 || pageSize !== PAGE_SIZE} />
               </>
             )}
           </>
