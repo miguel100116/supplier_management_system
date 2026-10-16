@@ -119,7 +119,7 @@ export function EmployeeNotificationBell({
           onClick={handleToggle}
           className={`relative inline-flex h-10 w-10 items-center justify-center rounded-lg transition cursor-pointer ${
             isOpen
-              ? 'bg-blue-50 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300'
+              ? 'bg-blue-50 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300'
               : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-white'
           }`}
           title={`Reminders (${unreadCount} unread)`}
@@ -152,7 +152,7 @@ export function EmployeeNotificationBell({
           onClick={handleToggle}
           className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition cursor-pointer ${
             isOpen
-              ? 'bg-blue-50 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300 font-bold'
+              ? 'bg-blue-50 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300 font-bold'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'
           }`}
         >
@@ -192,7 +192,7 @@ export function EmployeeNotificationBell({
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0063a9] bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0866B1] bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
             {unreadCount}
           </span>
         )}
@@ -386,7 +386,7 @@ export function EmployeeNotificationBell({
 
               <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
                 <p className="font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1.5">
-                  <CheckSquare size={14} className="text-[#0063a9] dark:text-blue-400" />
+                  <CheckSquare size={14} className="text-[#0866B1] dark:text-blue-400" />
                   <span>Remaining Partner Companies to Evaluate ({selectedNotification.pendingCompanies.length}):</span>
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -395,7 +395,7 @@ export function EmployeeNotificationBell({
                       key={c.id}
                       className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs font-semibold"
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#0063a9]" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#0866B1]" />
                       <span className="truncate">{c.name}</span>
                     </li>
                   ))}
@@ -423,7 +423,7 @@ export function EmployeeNotificationBell({
                 <button
                   type="button"
                   onClick={() => handleStartSurvey(selectedNotification.surveyId)}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#0063a9] hover:bg-[#00528c] text-white font-bold py-3 px-6 shadow-md hover:shadow-lg transition cursor-pointer text-sm"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-[#0866B1] hover:bg-[#07528E] text-white font-bold py-3 px-6 shadow-md hover:shadow-lg transition cursor-pointer text-sm"
                 >
                   <Award size={16} />
                   <span>Start Evaluation Now</span>

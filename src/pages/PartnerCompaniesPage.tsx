@@ -847,7 +847,7 @@ export function PartnerCompaniesPage({
                   ))}
                   <tr className="bg-slate-50 dark:bg-slate-900/40">
                     <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-200 sm:px-4">Total</td>
-                    <td className="px-3 py-2 text-right font-black tabular-nums text-[#0063a9] sm:px-4">{categoryRankSummary.total}</td>
+                    <td className="px-3 py-2 text-right font-black tabular-nums text-[#0866B1] sm:px-4">{categoryRankSummary.total}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1073,9 +1073,9 @@ export function PartnerCompaniesPage({
                       onClick={() => handleCompanyClick(c)}
                       className="hover:bg-slate-50/80 dark:hover:bg-slate-900/20 cursor-pointer group transition-colors"
                     >
-                      <td className="px-5 py-3.5 align-top font-semibold text-slate-800 dark:text-slate-100 group-hover:text-[#0063a9] dark:group-hover:text-blue-400 max-w-[280px]">
+                      <td className="px-5 py-3.5 align-top font-semibold text-slate-800 dark:text-slate-100 group-hover:text-[#0866B1] dark:group-hover:text-blue-400 max-w-[280px]">
                         <div className="flex min-w-0 items-center gap-2">
-                          <Building size={14} className="shrink-0 text-slate-400 group-hover:text-[#0063a9]" />
+                          <Building size={14} className="shrink-0 text-slate-400 group-hover:text-[#0866B1]" />
                           <span className="truncate" title={c.name}>{c.name}</span>
                         </div>
                         {missingProfileFields.length > 0 && (
@@ -1201,7 +1201,7 @@ export function PartnerCompaniesPage({
 
             {/* Modal Header */}
             <div className="flex items-start gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="rounded-xl bg-[#0063a9]/10 p-3 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-400 shrink-0 mt-1">
+              <div className="rounded-xl bg-[#0866B1]/10 p-3 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-400 shrink-0 mt-1">
                 <Building size={24} />
               </div>
               <div className="min-w-0">
@@ -1536,7 +1536,7 @@ export function PartnerCompaniesPage({
                                       ? (expiryBased ? 'Click to set an expiry date' : `Click to mark ${doc.provided ? 'not provided' : 'provided'}`)
                                       : docName
                                   }
-                                  className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold border transition ${DOCUMENT_STATUS_STYLES[status]} ${canRenew ? 'cursor-pointer hover:ring-2 hover:ring-[#0063a9]/40' : 'cursor-default'}`}
+                                  className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold border transition ${DOCUMENT_STATUS_STYLES[status]} ${canRenew ? 'cursor-pointer hover:ring-2 hover:ring-[#0866B1]/40' : 'cursor-default'}`}
                                 >
                                   {canRenew && <RefreshCw size={9} />}
                                   {docName}
@@ -1628,7 +1628,7 @@ export function PartnerCompaniesPage({
                     <div className="flex flex-col items-center">
                       <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold border transition-all duration-300 ${
                         isActive
-                          ? 'bg-[#0063a9] text-white border-[#0063a9] ring-4 ring-[#0063a9]/15 scale-110'
+                          ? 'bg-[#0866B1] text-white border-[#0866B1] ring-4 ring-[#0866B1]/15 scale-110'
                           : isCompleted
                           ? 'bg-emerald-600 text-white border-emerald-600'
                           : 'bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-750 dark:text-slate-500'
@@ -1636,7 +1636,7 @@ export function PartnerCompaniesPage({
                         {isCompleted ? <Check size={14} /> : step}
                       </div>
                       <span className={`text-[10px] font-bold mt-1.5 ${
-                        isActive ? 'text-[#0063a9] dark:text-blue-400' : isCompleted ? 'text-emerald-600' : 'text-slate-400 dark:text-slate-500'
+                        isActive ? 'text-[#0866B1] dark:text-blue-400' : isCompleted ? 'text-emerald-600' : 'text-slate-400 dark:text-slate-500'
                       }`}>
                         {stepLabel}
                       </span>
@@ -1664,7 +1664,7 @@ export function PartnerCompaniesPage({
                     >
                       &larr; Prev
                     </button>
-                    <span className="font-mono text-base font-extrabold text-[#0063a9] dark:text-blue-400">{renewalYear}</span>
+                    <span className="font-mono text-base font-extrabold text-[#0866B1] dark:text-blue-400">{renewalYear}</span>
                     <button 
                       type="button" 
                       onClick={() => setRenewalYear(y => Math.min(2035, y + 1))}
@@ -1694,7 +1694,7 @@ export function PartnerCompaniesPage({
                         }}
                         className={`py-1.5 text-center text-xs font-bold rounded-lg border transition-all cursor-pointer ${
                           renewalMonth === index
-                            ? 'bg-[#0063a9] text-white border-[#0063a9] shadow-xs'
+                            ? 'bg-[#0866B1] text-white border-[#0866B1] shadow-xs'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800'
                         }`}
                       >
@@ -1778,7 +1778,7 @@ export function PartnerCompaniesPage({
               {renewalStep < 4 ? (
                 <button
                   onClick={() => setRenewalStep((s) => (s + 1) as any)}
-                  className="inline-flex items-center justify-center rounded-lg bg-[#0063a9] hover:bg-[#00528c] px-5 py-2 text-sm font-bold text-white transition cursor-pointer shadow-xs"
+                  className="inline-flex items-center justify-center rounded-lg bg-[#0866B1] hover:bg-[#07528E] px-5 py-2 text-sm font-bold text-white transition cursor-pointer shadow-xs"
                   type="button"
                 >
                   Next &rarr;
@@ -1876,8 +1876,8 @@ export function PartnerCompaniesPage({
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-3 text-[#0063a9]">
-              <div className="rounded-lg bg-[#0063a9]/10 p-2 text-[#0063a9]">
+            <div className="flex items-center gap-3 text-[#0866B1]">
+              <div className="rounded-lg bg-[#0866B1]/10 p-2 text-[#0866B1]">
                 <Building size={20} />
               </div>
               <div>
@@ -1893,7 +1893,7 @@ export function PartnerCompaniesPage({
                 onClick={() => setRegisterModalTab('manual')}
                 className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                   registerModalTab === 'manual'
-                    ? 'bg-white dark:bg-slate-950 text-[#0063a9] shadow-xs'
+                    ? 'bg-white dark:bg-slate-950 text-[#0866B1] shadow-xs'
                     : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
@@ -1906,7 +1906,7 @@ export function PartnerCompaniesPage({
                   onClick={() => setRegisterModalTab('upload')}
                   className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                     registerModalTab === 'upload'
-                      ? 'bg-white dark:bg-slate-950 text-[#0063a9] shadow-xs'
+                      ? 'bg-white dark:bg-slate-950 text-[#0866B1] shadow-xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
@@ -1960,7 +1960,7 @@ export function PartnerCompaniesPage({
                   type="button"
                   onClick={() => importFileInputRef.current?.click()}
                   disabled={isImporting}
-                  className="w-full bg-[#0063a9] hover:bg-[#00528c] text-white flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+                  className="w-full bg-[#0866B1] hover:bg-[#07528E] text-white flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                 >
                   {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
                   <span>{isImporting ? 'Importing…' : importReplace ? 'Choose File & Replace Registry' : 'Choose Excel File (.xlsx)'}</span>
@@ -2060,7 +2060,7 @@ export function PartnerCompaniesPage({
                 </div>
 
                 <div className="flex items-end">
-                  <label className="flex w-full items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2.5 cursor-pointer hover:border-[#0063a9]/40 transition">
+                  <label className="flex w-full items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2.5 cursor-pointer hover:border-[#0866B1]/40 transition">
                     <input
                       type="checkbox"
                       checked={newHasNTBranch}
@@ -2113,7 +2113,7 @@ export function PartnerCompaniesPage({
                 </button>
                 <button
                   type="submit"
-                  className="bg-[#0063a9] hover:bg-[#00528c] text-white flex items-center justify-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-lg transition cursor-pointer"
+                  className="bg-[#0866B1] hover:bg-[#07528E] text-white flex items-center justify-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-lg transition cursor-pointer"
                 >
                   <Plus size={14} />
                   <span>Register Company</span>
@@ -2146,7 +2146,7 @@ export function PartnerCompaniesPage({
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-3 text-[#0063a9]">
+            <div className="flex items-center gap-3 text-[#0866B1]">
               <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-2">
                 <ClipboardList size={20} />
               </div>
@@ -2247,7 +2247,7 @@ export function PartnerCompaniesPage({
               </button>
               <button
                 onClick={applyImportPreview}
-                className="bg-[#0063a9] hover:bg-[#00528c] text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
+                className="bg-[#0866B1] hover:bg-[#07528E] text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
                 type="button"
               >
                 Apply Update
@@ -2327,7 +2327,7 @@ export function PartnerCompaniesPage({
               </button>
               <button
                 onClick={() => setImportResult(null)}
-                className="bg-[#0063a9] hover:bg-[#00528c] text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
+                className="bg-[#0866B1] hover:bg-[#07528E] text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
                 type="button"
               >
                 Done

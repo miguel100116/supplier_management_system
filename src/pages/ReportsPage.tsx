@@ -183,11 +183,11 @@ export function ReportsPage({ responses, partnerCompanies = [], canExport = fals
         />
       </section>
 
-      <section className="panel border-t-4 border-[#0063a9] bg-gradient-to-br from-white to-blue-50/20 dark:from-slate-950 dark:to-slate-950">
+      <section className="panel border-t-4 border-[#0866B1] bg-gradient-to-br from-white to-blue-50/20 dark:from-slate-950 dark:to-slate-950">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-[#0063a9] animate-pulse" />
+              <span className="inline-flex h-2 w-2 rounded-full bg-[#0866B1] animate-pulse" />
               <h3 className="text-base font-bold text-slate-800 dark:text-white">Executive Summary Dossier</h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Complete, integrated performance briefing combining summary KPIs and critical question diagnostics.</p>
@@ -206,7 +206,7 @@ export function ReportsPage({ responses, partnerCompanies = [], canExport = fals
               {questionRows.map((row) => (
                 <div key={row.question} className="flex items-center justify-between gap-4 text-xs">
                   <span className="text-slate-600 dark:text-slate-300 truncate max-w-[280px]" title={row.question}>{row.question}</span>
-                  <span className="font-mono font-bold text-[#0063a9] bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded text-[10px]">{formatNumber(row.average)}%</span>
+                  <span className="font-mono font-bold text-[#0866B1] bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.5 rounded text-[10px]">{formatNumber(row.average)}%</span>
                 </div>
               ))}
             </div>
@@ -218,7 +218,7 @@ export function ReportsPage({ responses, partnerCompanies = [], canExport = fals
                 Unlock strategic compliance highlights. Filter down evaluating questions below an adjustable critical percentage threshold, review automatically calculated strategic alerts, and add custom executive notes to compile a polished, presentation-ready briefing deck.
               </p>
             </div>
-            <button className="text-xs font-semibold text-[#0063a9] hover:underline inline-flex items-center gap-1 mt-3 self-start" onClick={() => setShowExecutiveBuilder(true)}>
+            <button className="text-xs font-semibold text-[#0866B1] hover:underline inline-flex items-center gap-1 mt-3 self-start" onClick={() => setShowExecutiveBuilder(true)}>
               Configure custom executive comments & threshold
               <ChevronRight size={12} />
             </button>
@@ -254,7 +254,7 @@ function ReportCard({
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') onOpenBuilder();
         }}
-        className="panel cursor-pointer transition-colors hover:border-[#0063a9]/40 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 flex flex-col items-center text-center"
+        className="panel cursor-pointer transition-colors hover:border-[#0866B1]/40 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 flex flex-col items-center text-center"
       >
         <div className="mb-6 flex h-28 w-28 items-center justify-center rounded-2xl bg-blue-50/80 dark:bg-blue-950/40">
           <Icon size={64} strokeWidth={1.5} className="text-blue-500 dark:text-blue-400" />

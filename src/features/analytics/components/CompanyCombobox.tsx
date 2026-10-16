@@ -17,8 +17,8 @@ interface CompanyComboboxProps {
 
 const toneStyles = {
   primary: {
-    focus: 'focus:border-[#0063a9] dark:focus:border-blue-500',
-    active: 'bg-blue-50 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300',
+    focus: 'focus:border-[#0866B1] dark:focus:border-blue-500',
+    active: 'bg-blue-50 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300',
   },
   compare: {
     focus: 'focus:border-orange-500 dark:focus:border-orange-400',

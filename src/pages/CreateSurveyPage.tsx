@@ -224,7 +224,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
             <div>
               <label htmlFor="max-rating" className="field-label flex items-center justify-between">
                 <span>Rating Scale Max (N) *</span>
-                <span className="font-bold text-[#0063a9] dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded text-xs">
+                <span className="font-bold text-[#0866B1] dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded text-xs">
                   0 to {maxRating}
                 </span>
               </label>
@@ -234,7 +234,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
                   type="range"
                   min="2"
                   max="10"
-                  className="w-full accent-[#0063a9] cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none"
+                  className="w-full accent-[#0866B1] cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none"
                   value={maxRating}
                   onChange={(e) => setMaxRating(Number(e.target.value))}
                 />
@@ -249,13 +249,13 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
         <div className="border-t border-slate-100 pt-6 dark:border-slate-800">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <FileText size={18} className="text-[#0063a9] dark:text-blue-400" />
+              <FileText size={18} className="text-[#0866B1] dark:text-blue-400" />
               <span>Survey Questions ({questions.length})</span>
             </h3>
             <button
               type="button"
               onClick={handleAddQuestion}
-              className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-blue-400/50 hover:border-[#0063a9] hover:bg-blue-50 text-[#0063a9] px-3 py-1.5 text-xs font-semibold dark:hover:bg-blue-950/40 dark:text-blue-300 transition"
+              className="inline-flex items-center gap-1.5 rounded-md border border-dashed border-blue-400/50 hover:border-[#0866B1] hover:bg-blue-50 text-[#0866B1] px-3 py-1.5 text-xs font-semibold dark:hover:bg-blue-950/40 dark:text-blue-300 transition"
               id="btn-add-question"
             >
               <Plus size={14} />
@@ -378,7 +378,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
                       <div className="space-y-2">
                         <div className="flex gap-2">
                           <div className="flex-1">
-                            <label className="text-[10px] font-bold text-[#0063a9] uppercase dark:text-blue-400">Min Score</label>
+                            <label className="text-[10px] font-bold text-[#0866B1] uppercase dark:text-blue-400">Min Score</label>
                             <input
                               type="number"
                               className="field mt-1 py-1 px-2.5 text-xs"
@@ -395,7 +395,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
                             />
                           </div>
                           <div className="flex-1">
-                            <label className="text-[10px] font-bold text-[#0063a9] uppercase dark:text-blue-400">Max Score</label>
+                            <label className="text-[10px] font-bold text-[#0866B1] uppercase dark:text-blue-400">Max Score</label>
                             <input
                               type="number"
                               className="field mt-1 py-1 px-2.5 text-xs"
@@ -415,7 +415,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
                         <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer">
                           <input
                             type="checkbox"
-                            className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                             checked={q.validationRange?.allowNa ?? true}
                             onChange={(e) => {
                               const next = [...questions];
@@ -448,7 +448,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
           </button>
           <button
             type="submit"
-            className="primary-button bg-[#0063a9] hover:bg-[#00528c]"
+            className="primary-button bg-[#0866B1] hover:bg-[#07528E]"
             id="btn-save-survey"
           >
             <Save size={16} />

@@ -58,7 +58,7 @@ export function NotificationBell({ notifications, unreadCount, onOpen, onViewAll
       >
         <Bell size={18} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0063a9] bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0866B1] bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

@@ -211,12 +211,12 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
             }}
             role="button"
             tabIndex={0}
-            className={`flex min-h-56 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${isDragOver ? 'border-[#0063a9] bg-blue-50/70 dark:bg-blue-950/30' : 'border-slate-200 hover:border-[#0063a9]/60 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900/60'}`}
+            className={`flex min-h-56 cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${isDragOver ? 'border-[#0866B1] bg-blue-50/70 dark:bg-blue-950/30' : 'border-slate-200 hover:border-[#0866B1]/60 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900/60'}`}
           >
             <FileSpreadsheet size={38} className="text-emerald-600" aria-hidden="true" />
             <div>
               <p className="text-sm font-bold text-slate-800 dark:text-white">Drop combined evaluation workbook here</p>
-              <p className="mt-1 text-xs text-slate-500">or <span className="font-semibold text-[#0063a9] dark:text-blue-400">browse file</span></p>
+              <p className="mt-1 text-xs text-slate-500">or <span className="font-semibold text-[#0866B1] dark:text-blue-400">browse file</span></p>
             </div>
             <p className="text-[11px] text-slate-400">Supported format: Excel workbook (.xlsx/.xls), up to 25 MB</p>
           </div>
@@ -254,7 +254,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
             return (
               <div key={surveyType} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                 <div className="flex items-start gap-3">
-                  <span className="rounded-lg bg-blue-50 p-2 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-400"><Icon size={19} /></span>
+                  <span className="rounded-lg bg-blue-50 p-2 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-400"><Icon size={19} /></span>
                   <div className="min-w-0 flex-1">
                     <h3 className="text-sm font-bold text-slate-800 dark:text-white">{title} Evaluations</h3>
                     <p className="mt-0.5 text-[11px] text-slate-400">{formLabel}</p>
@@ -286,14 +286,14 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
         {workbookReady && !summaries && (
           <div className="flex flex-col gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <CalendarDays size={16} className="text-[#0063a9]" />
+              <CalendarDays size={16} className="text-[#0866B1]" />
               <span>All three evaluation categories are ready to import together.</span>
             </div>
             <button
               type="button"
               onClick={handleImport}
               disabled={isImporting}
-              className="inline-flex min-h-11 items-center justify-center gap-2 self-end rounded-lg bg-[#0063a9] px-5 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-[#00528c] disabled:cursor-wait disabled:opacity-60 sm:self-auto"
+              className="inline-flex min-h-11 items-center justify-center gap-2 self-end rounded-lg bg-[#0866B1] px-5 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-[#07528E] disabled:cursor-wait disabled:opacity-60 sm:self-auto"
             >
               {isImporting ? <Loader2 size={15} className="animate-spin" /> : <UploadCloud size={15} />}
               {isImporting ? 'Importing all evaluations…' : 'Import all evaluations'}
@@ -309,7 +309,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby="evaluation-import-archive-title">
         <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
-          <div className="flex items-center gap-2"><LockKeyhole size={16} className="text-[#0063a9] dark:text-blue-400" aria-hidden="true" /><h3 id="evaluation-import-archive-title" className="text-sm font-bold text-slate-800 dark:text-slate-100">Stored Source Files</h3></div>
+          <div className="flex items-center gap-2"><LockKeyhole size={16} className="text-[#0866B1] dark:text-blue-400" aria-hidden="true" /><h3 id="evaluation-import-archive-title" className="text-sm font-bold text-slate-800 dark:text-slate-100">Stored Source Files</h3></div>
           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Original evaluation workbooks are stored in private Supabase Storage. Only Admins can view or download them.</p>
         </div>
         {archiveLoadError && <p role="alert" className="px-5 py-3 text-xs text-rose-600 dark:text-rose-400">{archiveLoadError}</p>}
@@ -338,7 +338,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
             <button type="button" onClick={() => setIsReviewingCompanies(false)} className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-white" title="Close review"><X size={18} /></button>
             <div className="flex items-center gap-3 text-amber-600"><span className="rounded-lg bg-amber-50 p-2 dark:bg-amber-950/30"><AlertTriangle size={20} /></span><div><h3 id="company-match-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review unmatched companies</h3><p className="text-xs text-slate-500">These names appear in the workbook but were not found in the Partner Registry.</p></div></div>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <button type="button" onClick={() => setDecisions((current) => ({ ...current, ...Object.fromEntries(SURVEY_TYPES.map((surveyType) => [surveyType, Object.fromEntries(Object.keys(current[surveyType]).map((name) => [name, 'add-as-partner' as CompanyDecision]))])) }))} className="text-[11px] font-bold text-[#0063a9] hover:underline dark:text-blue-400">Add all as partners</button>
+              <button type="button" onClick={() => setDecisions((current) => ({ ...current, ...Object.fromEntries(SURVEY_TYPES.map((surveyType) => [surveyType, Object.fromEntries(Object.keys(current[surveyType]).map((name) => [name, 'add-as-partner' as CompanyDecision]))])) }))} className="text-[11px] font-bold text-[#0866B1] hover:underline dark:text-blue-400">Add all as partners</button>
               <button type="button" onClick={() => setDecisions((current) => ({ ...current, ...Object.fromEntries(SURVEY_TYPES.map((surveyType) => [surveyType, Object.fromEntries(Object.keys(current[surveyType]).map((name) => [name, 'skip' as CompanyDecision]))])) }))} className="text-[11px] font-bold text-slate-500 hover:underline">Skip all</button>
             </div>
             <ul className="mt-3 flex-1 space-y-2 overflow-y-auto pr-1">
@@ -353,7 +353,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
             </ul>
             <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
               <button type="button" onClick={() => setIsReviewingCompanies(false)} className="secondary-button min-h-10 px-4 text-xs">Cancel</button>
-              <button type="button" onClick={() => void runBatchImport()} disabled={isImporting} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0063a9] px-4 text-xs font-bold text-white hover:bg-[#00528c] disabled:opacity-60">
+              <button type="button" onClick={() => void runBatchImport()} disabled={isImporting} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#0866B1] px-4 text-xs font-bold text-white hover:bg-[#07528E] disabled:opacity-60">
                 {isImporting && <Loader2 size={14} className="animate-spin" />}Confirm and import all
               </button>
             </div>

@@ -411,7 +411,7 @@ export function PartnersFeedbackHubPage({
             onClick={() => setActiveTab('current-forms')}
             className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition whitespace-nowrap ${
               activeTab === 'current-forms'
-                ? 'border-[#0063a9] text-[#0063a9] dark:border-blue-400 dark:text-blue-300'
+                ? 'border-[#0866B1] text-[#0866B1] dark:border-blue-400 dark:text-blue-300'
                 : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400'
             }`}
           >
@@ -426,7 +426,7 @@ export function PartnersFeedbackHubPage({
             onClick={() => setActiveTab('past-results')}
             className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition whitespace-nowrap ${
               activeTab === 'past-results'
-                ? 'border-[#0063a9] text-[#0063a9] dark:border-blue-400 dark:text-blue-300'
+                ? 'border-[#0866B1] text-[#0866B1] dark:border-blue-400 dark:text-blue-300'
                 : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400'
             }`}
           >
@@ -438,7 +438,7 @@ export function PartnersFeedbackHubPage({
             onClick={() => setActiveTab('sent-reports')}
             className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition whitespace-nowrap ${
               activeTab === 'sent-reports'
-                ? 'border-[#0063a9] text-[#0063a9] dark:border-blue-400 dark:text-blue-300'
+                ? 'border-[#0866B1] text-[#0866B1] dark:border-blue-400 dark:text-blue-300'
                 : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400'
             }`}
           >
@@ -472,7 +472,7 @@ export function PartnersFeedbackHubPage({
             disabled={!areAllSurveysCompleted}
             className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all shrink-0 ${
               areAllSurveysCompleted
-                ? 'bg-[#0063a9] hover:bg-blue-800 text-white shadow-sm'
+                ? 'bg-[#0866B1] hover:bg-blue-800 text-white shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
             }`}
             title={

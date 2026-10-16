@@ -94,7 +94,7 @@ export function SettingsPage({
 
   const activityIcon = (kind: ActivityRow['kind']) => {
     if (kind === 'reset') return <RotateCcw size={15} className="text-rose-500 shrink-0" />;
-    if (kind === 'export') return <Download size={15} className="text-[#0063a9] dark:text-blue-400 shrink-0" />;
+    if (kind === 'export') return <Download size={15} className="text-[#0866B1] dark:text-blue-400 shrink-0" />;
     return <UserCog size={15} className="text-emerald-500 shrink-0" />;
   };
 
@@ -141,7 +141,7 @@ export function SettingsPage({
       <section className="panel">
         <h3 className="text-base font-semibold mb-1">Account</h3>
         <div className="mt-3 flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0063a9]/10 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300 font-bold">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0866B1]/10 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300 font-bold">
             {initials}
           </div>
           <div className="min-w-0">
@@ -184,7 +184,7 @@ export function SettingsPage({
             type="button"
             role="switch"
             aria-checked={darkMode}
-            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition cursor-pointer ${darkMode ? 'bg-[#0063a9]' : 'bg-slate-300'}`}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition cursor-pointer ${darkMode ? 'bg-[#0866B1]' : 'bg-slate-300'}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
@@ -228,7 +228,7 @@ export function SettingsPage({
 
       <section className="panel">
         <div className="flex items-center gap-2 mb-1">
-          <History size={16} className="text-[#0063a9] dark:text-blue-400" />
+          <History size={16} className="text-[#0866B1] dark:text-blue-400" />
           <h3 className="text-base font-semibold">Recent Activity</h3>
         </div>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">

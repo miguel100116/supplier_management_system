@@ -38,7 +38,7 @@ export function TableFilterBar<T extends string>({
   return (
     <div className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/40">
       <label className="min-w-[190px] flex-1 sm:flex-none">
-        <span className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <span className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-text-secondary dark:text-slate-400">
           <ArrowUpDown size={12} aria-hidden="true" />
           Sort
         </span>
@@ -56,7 +56,7 @@ export function TableFilterBar<T extends string>({
 
       {hasDateRange && (
         <fieldset className="flex min-w-0 flex-1 flex-wrap items-end gap-2 sm:flex-none">
-          <legend className="mb-1 flex w-full items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <legend className="mb-1 flex w-full items-center gap-1.5 text-xs font-semibold text-text-secondary dark:text-slate-400">
             <CalendarRange size={12} aria-hidden="true" />
             {dateLabel}
           </legend>

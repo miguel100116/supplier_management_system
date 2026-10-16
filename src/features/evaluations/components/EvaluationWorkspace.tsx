@@ -1,9 +1,12 @@
-import React, { ReactNode } from 'react';
+import React, { type ReactNode } from 'react';
+import { ModuleWorkspace } from '../../../components/ModuleWorkspace';
 
 export const EVALUATION_WORKSPACE_TABS = [
-  { key: 'survey-forms', label: 'Forms', description: 'Create and manage evaluation forms, assigned companies, deadlines, and access.' },
-  { key: 'explorer', label: 'Responses', description: 'Select a form to review or export its submissions.' },
-  { key: 'pending-review', label: 'Coverage', description: 'See which assigned companies have evaluations in the current response records.' },
+  { key: 'survey-forms', label: 'Forms' },
+  { key: 'explorer', label: 'Responses' },
+  { key: 'pending-review', label: 'Coverage' },
+  { key: 'import-evaluations', label: 'Import Responses' },
+  { key: 'categories-manager', label: 'Settings' },
 ] as const;
 
 export type EvaluationWorkspacePage = typeof EVALUATION_WORKSPACE_TABS[number]['key'];
@@ -17,28 +20,9 @@ export function EvaluationWorkspace({ activePage, onNavigate, children }: {
   onNavigate: (page: EvaluationWorkspacePage) => void;
   children: ReactNode;
 }) {
-  const activeTab = EVALUATION_WORKSPACE_TABS.find((tab) => tab.key === activePage)!;
   return (
-    <div className="space-y-5">
-      <section className="panel space-y-3">
-        <nav aria-label="Evaluation workspace views" className="flex flex-wrap gap-2">
-          {EVALUATION_WORKSPACE_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              aria-current={activePage === tab.key ? 'page' : undefined}
-              onClick={() => onNavigate(tab.key)}
-              className={activePage === tab.key
-                ? 'rounded-lg bg-[#0063a9] px-4 py-2 text-sm font-semibold text-white dark:bg-blue-600'
-                : 'secondary-button px-4 py-2 text-sm font-semibold'}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{activeTab.description}</p>
-      </section>
+    <ModuleWorkspace activePage={activePage} views={EVALUATION_WORKSPACE_TABS} onNavigate={onNavigate} navigationLabel="Evaluation views">
       {children}
-    </div>
+    </ModuleWorkspace>
   );
 }

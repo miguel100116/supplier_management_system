@@ -520,3 +520,23 @@ Evidence: src/App.tsx, src/pages/SurveyExplorerPage.tsx, src/features/evaluation
 Decision: Open dialogs registered through useModalEscape share a reference-counted document scroll lock. The lock fixes the body at its current scroll position, compensates for scrollbar width, and restores the original inline styles and position when the last dialog closes. Popovers can opt out; the employee notification dropdown does so. Modal content remains independently scrollable with overscroll containment in the Active Companies, Settings, and Modify Settings views.
 
 Evidence: src/hooks/useModalScrollLock.ts, src/hooks/useModalEscape.ts, src/components/EmployeeNotificationBell.tsx, src/features/active-companies/components/ActiveCompaniesModal.tsx, src/App.tsx, src/pages/SurveyFormsPage.tsx, src/hooks/useModalScrollLock.test.ts.
+
+### 2026-10-16 - Task-focused admin navigation
+
+Status: implemented locally; visual browser review remains pending.
+
+Decision: The Admin sidebar exposes seven direct destinations: Dashboard, Partners, Evaluations, Analytics, Reports, Users & Access, and Archive. Related existing routes remain unchanged and are presented as contextual module views: partner directory/compliance/ranking/feedback, evaluation forms/responses/coverage/import/settings, and report creation/presentations/export history. Sidebar, page-heading, and account-permission terminology now use the same module names. Employee navigation is unchanged.
+
+Consequences: Primary Admin modules require one sidebar click instead of expanding a group first. Existing authorization and persistence boundaries are unchanged, and secondary route keys remain available for compatibility. The shared `ModuleWorkspace` presentation keeps concise contextual navigation consistent across workflows without repeating each view's function above the page content.
+
+Evidence: `src/App.tsx`, `src/components/ModuleWorkspace.tsx`, `src/features/evaluations/components/EvaluationWorkspace.tsx`, `src/pages/AccountManagementPage.tsx`, and focused navigation tests. All 131 tests, TypeScript checks, and the production build passed locally on 2026-10-16.
+
+### 2026-10-16 - Centralized application design system
+
+Status: implemented locally; rendered browser comparison remains pending.
+
+Decision: Standardize the interactive application on local Inter typography and semantic Tailwind tokens for the approved brand, surface, text, border, and status palette. Shared panels, buttons, fields, badges, tabs, page descriptions, KPI cards, chart cards, empty states, filter labels, and shell page headings now own the common visual contract. Existing dark mode, responsive behavior, chart/category colors, navigation, permissions, and persistence behavior remain in place.
+
+Consequences: The primary brand color and hover color are consistent across application and export surfaces, the shell uses the approved 28px page heading, shared KPI values use 30px bold type, and modules can migrate away from one-off utility combinations incrementally. Inter is bundled locally through `@fontsource-variable/inter`; no runtime font service is required.
+
+Evidence: `tailwind.config.js`, `src/styles.css`, `src/main.tsx`, `src/layouts/Shell.tsx`, shared presentation components under `src/components/`, analytics presentation components, and the repository-wide primary-color migration.

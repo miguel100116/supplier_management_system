@@ -139,12 +139,12 @@ function ScoreBadge({ label, hex }: { label: string; hex: string }) {
 function SlideBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -right-24 -top-32 h-80 w-80 rounded-full bg-[#0063a9]/[0.05] blur-3xl" />
-      <div className="absolute -bottom-28 -left-16 h-64 w-64 rounded-full bg-[#0063a9]/[0.04] blur-3xl" />
+      <div className="absolute -right-24 -top-32 h-80 w-80 rounded-full bg-[#0866B1]/[0.05] blur-3xl" />
+      <div className="absolute -bottom-28 -left-16 h-64 w-64 rounded-full bg-[#0866B1]/[0.04] blur-3xl" />
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: 'radial-gradient(circle, #0063a9 1px, transparent 1px)',
+          backgroundImage: 'radial-gradient(circle, #0866B1 1px, transparent 1px)',
           backgroundSize: '26px 26px',
         }}
       />
@@ -157,10 +157,10 @@ function SlideBackdrop() {
 function SlideHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
   return (
     <div className="relative shrink-0">
-      <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0063a9]">{eyebrow}</p>
+      <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0866B1]">{eyebrow}</p>
       <h2 className="mt-1.5 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
       {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
-      <div className="mt-3 h-1 w-14 rounded-full bg-gradient-to-r from-[#0063a9] to-[#0063a9]/30" />
+      <div className="mt-3 h-1 w-14 rounded-full bg-gradient-to-r from-[#0866B1] to-[#0866B1]/30" />
     </div>
   );
 }
@@ -184,7 +184,7 @@ function SlideToggle<T extends string>({
           type="button"
           onClick={() => onChange(opt.value)}
           className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-semibold transition ${
-            value === opt.value ? 'bg-white text-[#0063a9] shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            value === opt.value ? 'bg-white text-[#0866B1] shadow-xs' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           {opt.label}
@@ -200,7 +200,7 @@ function SlideToggle<T extends string>({
 
 function TitleSlide({ slide }: { slide: Extract<Slide, { kind: 'title' }> }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#0063a9] via-[#005793] to-[#00335a] px-10 text-center text-white">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#0866B1] via-[#005793] to-[#00335a] px-10 text-center text-white">
       {/* Decorative background flourishes */}
       <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-32 -right-16 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl" />
@@ -268,7 +268,7 @@ function AgendaSlide({ slide }: { slide: Extract<Slide, { kind: 'agenda' }> }) {
               transition={{ duration: 0.3, delay: index * 0.05 }}
               className="flex max-h-24 flex-1 items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/60 px-4"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0063a9] text-sm font-bold text-white">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0866B1] text-sm font-bold text-white">
                 {index + 1}
               </span>
               <div className="min-w-0 flex-1">
@@ -299,7 +299,7 @@ function OverviewSlide({
 
   const { radarData, trendData, bandColor } = useMemo(() => {
     if (!isSingleSurveyType || !slide.standout || !slide.standout.name || slide.standout.name === 'No data yet') {
-      return { radarData: [], trendData: [], bandColor: '#0063a9' };
+      return { radarData: [], trendData: [], bandColor: '#0866B1' };
     }
     const company = slide.standout.name;
     const surveyType = slide.standout.type as SurveyType;
@@ -323,7 +323,7 @@ function OverviewSlide({
     return {
       radarData: radar,
       trendData: trend,
-      bandColor: composite?.band.hex ?? '#0063a9',
+      bandColor: composite?.band.hex ?? '#0866B1',
     };
   }, [isSingleSurveyType, slide.standout, responses]);
 
@@ -350,7 +350,7 @@ function OverviewSlide({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: i * 0.06 }}
-                className="rounded-2xl bg-gradient-to-br from-[#0063a9] to-[#00457a] p-4 shadow-md shadow-blue-900/10"
+                className="rounded-2xl bg-gradient-to-br from-[#0866B1] to-[#00457a] p-4 shadow-md shadow-blue-900/10"
               >
                 <div className="flex items-center gap-1.5 text-blue-100">
                   <Icon size={13} className="shrink-0" />
@@ -361,8 +361,8 @@ function OverviewSlide({
             );
           }
 
-          const accentColor = isElevatedNa ? '#f59e0b' : '#0063a9';
-          const accentBadgeClass = isElevatedNa ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-[#0063a9]';
+          const accentColor = isElevatedNa ? '#f59e0b' : '#0866B1';
+          const accentBadgeClass = isElevatedNa ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-[#0866B1]';
 
           return (
             <motion.div
@@ -386,16 +386,16 @@ function OverviewSlide({
       {isSingleSurveyType ? (
         <div className="mt-4 flex flex-col gap-4 min-h-0 flex-1">
           {/* Top Performer Banner */}
-          <div className="rounded-xl border-2 border-[#0063a9]/15 bg-white p-5 shadow-sm">
+          <div className="rounded-xl border-2 border-[#0866B1]/15 bg-white p-5 shadow-sm">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="space-y-1.5 flex-1 min-w-0 text-center sm:text-left">
-                <div className="flex items-center gap-2 text-[#0063a9] justify-center sm:justify-start">
+                <div className="flex items-center gap-2 text-[#0866B1] justify-center sm:justify-start">
                   <Trophy size={18} />
                   <span className="text-xs font-bold uppercase tracking-wider">Top Performer Overall</span>
                 </div>
                 <h3 className="mt-1 text-lg font-bold text-slate-900 sm:text-xl truncate">{slide.standout.name}</h3>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-blue-50 text-[#0063a9]">
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold bg-blue-50 text-[#0866B1]">
                     {slide.standout.type}
                   </span>
                   <span className="mx-1.5">·</span>
@@ -421,7 +421,7 @@ function OverviewSlide({
                       cx="40"
                       cy="40"
                       r="32"
-                      className="stroke-[#0063a9] fill-none"
+                      className="stroke-[#0866B1] fill-none"
                       strokeWidth="5"
                       strokeDasharray="201.06"
                       initial={{ strokeDashoffset: 201.06 }}
@@ -432,7 +432,7 @@ function OverviewSlide({
                     />
                   </svg>
                   <div className="absolute flex flex-col items-center justify-center text-center">
-                    <span className="text-base font-bold text-[#0063a9]">{Math.round(scorePercent)}%</span>
+                    <span className="text-base font-bold text-[#0866B1]">{Math.round(scorePercent)}%</span>
                     <span className="text-[6px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Rating</span>
                   </div>
                 </div>
@@ -509,16 +509,16 @@ function OverviewSlide({
         </div>
       ) : (
         <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr,1fr]">
-          <div className="rounded-xl border-2 border-[#0063a9]/15 bg-white p-6 shadow-sm flex flex-col justify-between">
+          <div className="rounded-xl border-2 border-[#0866B1]/15 bg-white p-6 shadow-sm flex flex-col justify-between">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
               <div className="space-y-2 flex-1 min-w-0 text-center sm:text-left">
-                <div className="flex items-center gap-2 text-[#0063a9] justify-center sm:justify-start">
+                <div className="flex items-center gap-2 text-[#0866B1] justify-center sm:justify-start">
                   <Trophy size={18} />
                   <span className="text-xs font-bold uppercase tracking-wider">Top Performer Overall</span>
                 </div>
                 <h3 className="mt-2 text-xl font-bold text-slate-900 sm:text-2xl truncate">{slide.standout.name}</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-50 text-[#0063a9]">
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-50 text-[#0866B1]">
                     {slide.standout.type}
                   </span>
                   <span className="mx-2">·</span>
@@ -544,7 +544,7 @@ function OverviewSlide({
                       cx="64"
                       cy="64"
                       r="50"
-                      className="stroke-[#0063a9] fill-none"
+                      className="stroke-[#0866B1] fill-none"
                       strokeWidth="8"
                       strokeDasharray="314.16"
                       initial={{ strokeDashoffset: 314.16 }}
@@ -555,7 +555,7 @@ function OverviewSlide({
                     />
                   </svg>
                   <div className="absolute flex flex-col items-center justify-center text-center">
-                    <span className="text-2xl font-bold text-[#0063a9]">{Math.round(scorePercent)}%</span>
+                    <span className="text-2xl font-bold text-[#0866B1]">{Math.round(scorePercent)}%</span>
                     <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Rating</span>
                   </div>
                 </div>
@@ -573,7 +573,7 @@ function OverviewSlide({
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Top {performer.type}</p>
                   <p className="truncate text-sm font-bold text-slate-800">{performer.name}</p>
                 </div>
-                <span className="shrink-0 text-sm font-bold text-[#0063a9]">{performer.score}</span>
+                <span className="shrink-0 text-sm font-bold text-[#0866B1]">{performer.score}</span>
               </div>
             ))}
           </div>
@@ -649,7 +649,7 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
       {/* Slide Header with Interactive Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0063a9]">{SLIDE_EYEBROWS.comparison}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0866B1]">{SLIDE_EYEBROWS.comparison}</p>
           <h2 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl leading-tight">
             {performanceMode === 'highest' ? 'Top Rated Companies' : 'Least Rated Companies'}
           </h2>
@@ -666,7 +666,7 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
               onClick={() => setPerformanceMode('highest')}
               className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
                 performanceMode === 'highest'
-                  ? 'bg-white text-[#0063a9] shadow-xs'
+                  ? 'bg-white text-[#0866B1] shadow-xs'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
@@ -922,8 +922,8 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
         titleClass: "mb-6 text-lg sm:text-2xl font-black uppercase tracking-[0.2em] text-center block",
         listSpacingClass: "space-y-3.5",
         buttonPaddingClass: "py-3 px-4",
-        rankClass: "flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs sm:text-lg font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-sm sm:text-lg font-bold text-slate-800 group-hover:text-[#0063a9] group-hover:underline transition-all",
+        rankClass: "flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs sm:text-lg font-bold text-slate-500 group-hover:bg-[#0866B1]/10 group-hover:text-[#0866B1] transition-colors",
+        companyClass: "min-w-0 flex-1 truncate text-sm sm:text-lg font-bold text-slate-800 group-hover:text-[#0866B1] group-hover:underline transition-all",
         scoreClass: "shrink-0 text-sm sm:text-lg font-extrabold transition-all group-hover:scale-105",
         noDataClass: "text-base sm:text-lg text-slate-400 text-center py-6",
       };
@@ -935,8 +935,8 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
         titleClass: "mb-5 text-sm sm:text-lg font-extrabold uppercase tracking-wider text-center block",
         listSpacingClass: "space-y-2.5",
         buttonPaddingClass: "py-2 px-3",
-        rankClass: "flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs sm:text-base font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-base font-semibold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
+        rankClass: "flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs sm:text-base font-bold text-slate-500 group-hover:bg-[#0866B1]/10 group-hover:text-[#0866B1] transition-colors",
+        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-base font-semibold text-slate-700 group-hover:text-[#0866B1] group-hover:underline transition-all",
         scoreClass: "shrink-0 text-xs sm:text-base font-bold transition-all group-hover:scale-105",
         noDataClass: "text-xs sm:text-sm text-slate-400 text-center py-4",
       };
@@ -948,8 +948,8 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
         titleClass: "mb-3 text-xs sm:text-sm font-extrabold uppercase tracking-wider text-center block",
         listSpacingClass: "space-y-1.5",
         buttonPaddingClass: "py-1.5 px-2.5",
-        rankClass: "flex h-5 w-5 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] sm:text-xs font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-sm font-bold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
+        rankClass: "flex h-5 w-5 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] sm:text-xs font-bold text-slate-500 group-hover:bg-[#0866B1]/10 group-hover:text-[#0866B1] transition-colors",
+        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-sm font-bold text-slate-700 group-hover:text-[#0866B1] group-hover:underline transition-all",
         scoreClass: "shrink-0 text-xs sm:text-sm font-bold transition-all group-hover:scale-105",
         noDataClass: "text-xs text-slate-400 text-center py-2",
       };
@@ -1129,7 +1129,7 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
       <SlideBackdrop />
       <div className="relative z-10 flex h-full min-h-0 flex-col">
       <div className="shrink-0">
-        <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0063a9]">{SLIDE_EYEBROWS.leaderboard}</p>
+        <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0866B1]">{SLIDE_EYEBROWS.leaderboard}</p>
         <h2 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">Company Leaderboard</h2>
         <p className="mt-1 text-sm text-slate-500">
           Top-ranked partners within each survey type. Click a company to view interactive breakdown & trends.
@@ -1190,7 +1190,7 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
 
 function TrendsSlide({ slide }: { slide: Extract<Slide, { kind: 'trends' }> }) {
   const [metric, setMetric] = useState<'average' | 'responses'>('average');
-  const color = metric === 'average' ? '#0063a9' : '#10b981';
+  const color = metric === 'average' ? '#0866B1' : '#10b981';
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
@@ -1433,7 +1433,7 @@ function NeedsAttentionSlide({ slide }: { slide: Extract<Slide, { kind: 'distrib
 
 function ClosingSlide({ slide }: { slide: Extract<Slide, { kind: 'closing' }> }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#172033] via-[#0f1a2e] to-[#0063a9] px-10 py-10 text-center text-white">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#172338] via-[#0f1a2e] to-[#0866B1] px-10 py-10 text-center text-white">
       <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
       <Trophy className="mb-4 text-sky-200" size={30} />

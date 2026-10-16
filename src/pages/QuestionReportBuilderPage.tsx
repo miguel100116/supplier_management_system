@@ -523,7 +523,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                     type="checkbox"
                     checked={selectedTypes[type]}
                     onChange={() => toggleType(type)}
-                    className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                    className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                   />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     {surveyTypeDisplayLabel[type]}
@@ -542,7 +542,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   type="checkbox"
                   checked={columnsVisibility.average}
                   onChange={(e) => setColumnsVisibility(prev => ({ ...prev, average: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Average Rating (%)
@@ -554,7 +554,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   type="checkbox"
                   checked={columnsVisibility.responses}
                   onChange={(e) => setColumnsVisibility(prev => ({ ...prev, responses: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Total Responses Count
@@ -566,7 +566,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   type="checkbox"
                   checked={columnsVisibility.highest}
                   onChange={(e) => setColumnsVisibility(prev => ({ ...prev, highest: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Highest Scoring Company
@@ -578,7 +578,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   type="checkbox"
                   checked={columnsVisibility.lowest}
                   onChange={(e) => setColumnsVisibility(prev => ({ ...prev, lowest: e.target.checked }))}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Lowest Scoring Company
@@ -629,9 +629,9 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   <div className="flex h-full flex-col items-center px-6 text-center">
                     <div className="pt-[16%]">
                       <img src="/microgenesis_logo.png" alt="Microgenesis" className="mx-auto h-14 w-auto" />
-                      <div className="mx-auto mt-7 h-px w-20 bg-[#0063a9]" />
+                      <div className="mx-auto mt-7 h-px w-20 bg-[#0866B1]" />
                       <h1 className="mt-7 text-2xl font-bold text-slate-800 dark:text-slate-100">Question Performance Report</h1>
-                      <p className="mt-2 text-lg font-bold text-[#0063a9]">MBS Partner Evaluation Analytics</p>
+                      <p className="mt-2 text-lg font-bold text-[#0866B1]">MBS Partner Evaluation Analytics</p>
                       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                         Generated on {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                       </p>
@@ -689,7 +689,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                         {/* Questions Performance Table */}
                         <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 mt-2">
                           <table className="w-full text-left text-[10px]">
-                            <thead className="bg-[#0063a9] text-white">
+                            <thead className="bg-[#0866B1] text-white">
                               <tr>
                                 <th className="px-2.5 py-1.5 font-semibold">Question</th>
                                 {columnsVisibility.average && (

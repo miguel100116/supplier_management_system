@@ -161,7 +161,7 @@ export function CurrentFormsTab({
                   </div>
 
                   {/* Survey Title */}
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-[#0063a9] transition line-clamp-2">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-[#0866B1] transition line-clamp-2">
                     {survey.title}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 line-clamp-2">{survey.description || 'Stakeholder evaluation survey.'}</p>
@@ -199,7 +199,7 @@ export function CurrentFormsTab({
 
                   <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
                     <span>{survey.deadlineDate ? `Deadline: ${survey.deadlineDate}` : 'Active Survey'}</span>
-                    <span className="font-semibold text-[#0063a9] dark:text-blue-300 flex items-center gap-0.5 group-hover:translate-x-0.5 transition">
+                    <span className="font-semibold text-[#0866B1] dark:text-blue-300 flex items-center gap-0.5 group-hover:translate-x-0.5 transition">
                       View Details
                       <ChevronRight size={12} />
                     </span>

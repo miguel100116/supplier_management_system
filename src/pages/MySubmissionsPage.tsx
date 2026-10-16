@@ -54,7 +54,7 @@ export function MySubmissionsPage({ responses, userEmail, onFillForm }: MySubmis
       <section className="panel flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-base font-semibold flex items-center gap-2">
-            <ClipboardList size={18} className="text-[#0063a9] dark:text-blue-400" />
+            <ClipboardList size={18} className="text-[#0866B1] dark:text-blue-400" />
             My Submission History
           </h3>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -81,7 +81,7 @@ export function MySubmissionsPage({ responses, userEmail, onFillForm }: MySubmis
               setCurrentPage(1);
               setExpandedId(null);
             }}
-            className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#0063a9] dark:focus:ring-blue-600"
+            className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#0866B1] dark:focus:ring-blue-600"
           />
         </div>
       )}
@@ -127,12 +127,12 @@ export function MySubmissionsPage({ responses, userEmail, onFillForm }: MySubmis
                 {isExpanded && (
                   <div className="mt-4 space-y-4 border-t border-slate-100 dark:border-slate-800 pt-4">
                     {group.map((ans) => (
-                      <div key={ans.questionId} className="border-l-2 border-[#0063a9] dark:border-blue-500 pl-4">
+                      <div key={ans.questionId} className="border-l-2 border-[#0866B1] dark:border-blue-500 pl-4">
                         <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{ans.questionCategory} - Q{ans.questionNumber}</p>
                         <p className="font-medium text-slate-900 dark:text-slate-100 mb-2">{ans.question}</p>
                         <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg flex items-center gap-2">
                           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Answer:</span>
-                          <span className="font-bold text-[#0063a9] dark:text-blue-400">
+                          <span className="font-bold text-[#0866B1] dark:text-blue-400">
                             {isScoredQuestion(ans.surveyType, ans.questionId) ? ans.rating : (ans.comment || 'N/A')}
                           </span>
                         </div>

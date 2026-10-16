@@ -231,7 +231,7 @@ export function PastResultsTab({
 
                       <button
                         onClick={() => onOpenSendToPartner(survey, matchingCompany)}
-                        className="primary-button py-1 px-2.5 text-[11px] gap-1 bg-[#0063a9] hover:bg-blue-800"
+                        className="primary-button py-1 px-2.5 text-[11px] gap-1 bg-[#0866B1] hover:bg-blue-800"
                         title="Send / Resend to Partner"
                       >
                         <Send size={13} />

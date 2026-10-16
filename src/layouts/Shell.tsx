@@ -113,10 +113,10 @@ export function Shell<T extends string>({
   return (
     <div className="min-h-screen bg-cloud text-ink dark:bg-slate-950 dark:text-slate-100 flex flex-col">
       {/* Top Header Layer */}
-      <header className="sticky top-0 z-40 h-20 border-b border-[#00528c] bg-[#0063a9] flex items-center justify-between w-full lg:pr-8 shadow-sm">
+      <header className="sticky top-0 z-40 h-20 border-b border-[#07528E] bg-[#0866B1] flex items-center justify-between w-full lg:pr-8 shadow-sm">
         <div className="flex items-center h-full flex-1 min-w-0">
           {/* Brand Box / Logo Area - Fixed Width, unaffected by collapsing */}
-          <div className="relative z-10 flex h-full w-[92px] shrink-0 items-center justify-center bg-[#0063a9] px-2 min-[380px]:w-[116px] sm:w-[180px] sm:px-4 lg:w-[220px]">
+          <div className="relative z-10 flex h-full w-[92px] shrink-0 items-center justify-center bg-[#0866B1] px-2 min-[380px]:w-[116px] sm:w-[180px] sm:px-4 lg:w-[220px]">
             <button
                onClick={() => {
                  const homePage = pages.find((p) => p.type !== 'group' && (p as NavLeaf<T>).key === ('dashboard' as any));
@@ -150,7 +150,7 @@ export function Shell<T extends string>({
         <button
           type="button"
           onClick={() => setIsMobileNavOpen((value) => !value)}
-          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#0063a9] transition dark:border-slate-800 dark:bg-slate-900 dark:text-blue-300"
+          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#0866B1] transition dark:border-slate-800 dark:bg-slate-900 dark:text-blue-300"
         >
           <span className="flex items-center gap-2.5">
             <ActiveIcon size={16} className="shrink-0" />
@@ -189,7 +189,7 @@ export function Shell<T extends string>({
                               child.disabled
                                 ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
                                 : active
-                                  ? 'bg-blue-50 text-[#0063a9] font-bold dark:bg-blue-950/40 dark:text-blue-300'
+                                  ? 'bg-blue-50 text-[#0866B1] font-bold dark:bg-blue-950/40 dark:text-blue-300'
                                   : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
                             }`}
                           >
@@ -217,7 +217,7 @@ export function Shell<T extends string>({
                       page.disabled
                         ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
                         : active
-                          ? 'bg-blue-50 text-[#0063a9] font-bold dark:bg-blue-950/40 dark:text-blue-300'
+                          ? 'bg-blue-50 text-[#0866B1] font-bold dark:bg-blue-950/40 dark:text-blue-300'
                           : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900'
                     }`}
                   >
@@ -240,7 +240,7 @@ export function Shell<T extends string>({
               centered regardless of viewport height (1366x768, 1920x1080, etc). */}
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="absolute top-1/2 -translate-y-1/2 -right-3.5 z-30 h-7 w-7 rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 hover:text-[#0063a9] hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-105 transition-all cursor-pointer"
+            className="absolute top-1/2 -translate-y-1/2 -right-3.5 z-30 h-7 w-7 rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-md flex items-center justify-center text-slate-500 hover:text-[#0866B1] hover:bg-slate-50 dark:hover:bg-slate-800 hover:scale-105 transition-all cursor-pointer"
             title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isSidebarCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
@@ -264,7 +264,7 @@ export function Shell<T extends string>({
                         }}
                         className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-200 ${
                           groupHasActiveChild
-                            ? 'text-[#0063a9] dark:text-blue-200 font-bold'
+                            ? 'text-[#0866B1] dark:text-blue-200 font-bold'
                             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'
                         } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
                         title={isSidebarCollapsed ? page.label : undefined}
@@ -293,7 +293,7 @@ export function Shell<T extends string>({
                                   child.disabled
                                     ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
                                     : active
-                                      ? 'bg-blue-50 text-[#0063a9] font-bold dark:bg-blue-950/60 dark:text-blue-200'
+                                      ? 'bg-blue-50 text-[#0866B1] font-bold dark:bg-blue-950/60 dark:text-blue-200'
                                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'
                                 }`}
                               >
@@ -326,7 +326,7 @@ export function Shell<T extends string>({
                       page.disabled
                         ? 'cursor-not-allowed text-slate-300 dark:text-slate-600'
                         : active
-                          ? 'bg-blue-50 text-[#0063a9] dark:bg-blue-950/60 dark:text-blue-200 shadow-sm font-bold'
+                          ? 'bg-blue-50 text-[#0866B1] dark:bg-blue-950/60 dark:text-blue-200 shadow-sm font-bold'
                           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'
                     } ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
                   >
@@ -360,15 +360,15 @@ export function Shell<T extends string>({
 
         {/* Page Content - Below Header */}
         <main className="min-w-0 flex-1 transition-colors duration-300 dark:bg-slate-900">
-          <div className="px-3 py-4 sm:px-4 sm:py-6 lg:px-8">
-            <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${compactPageHeader ? 'mb-3' : 'mb-6'}`}>
+          <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <div className={`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${compactPageHeader ? 'mb-4' : 'mb-6'}`}>
               <div className="min-w-0">
                 {showModuleContext && (
-                  <p className="mb-1 break-words text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 sm:text-xs">
+                  <p className="mb-1 break-words text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-slate-400">
                     {moduleLabel}
                   </p>
                 )}
-                <h2 className="break-words text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">{contentHeading}</h2>
+                <h1 className="page-title break-words">{contentHeading}</h1>
               </div>
               <div id="shell-header-action"></div>
             </div>

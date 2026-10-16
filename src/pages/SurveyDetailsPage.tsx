@@ -151,7 +151,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
           
           <button
             onClick={() => setShowPreview(true)}
-            className="primary-button bg-[#0063a9] hover:bg-[#00528c] px-6 py-3 text-base h-12 flex items-center justify-center gap-2"
+            className="primary-button bg-[#0866B1] hover:bg-[#07528E] px-6 py-3 text-base h-12 flex items-center justify-center gap-2"
             type="button"
             id="btn-preview-survey"
           >
@@ -216,7 +216,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
                     </div>
                     <div className="flex-1 space-y-1">
                       <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{q.question}</p>
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300">
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300">
                         {q.questionCategory}
                       </span>
                     </div>
@@ -271,7 +271,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
 
               <div className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/50">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average Rating</p>
-                <p className="mt-1 break-words text-2xl font-bold tabular-nums text-[#0063a9] dark:text-blue-300 min-[420px]:text-3xl">{formatCompositeScore(survey.surveyType, stats.avg).text}</p>
+                <p className="mt-1 break-words text-2xl font-bold tabular-nums text-[#0866B1] dark:text-blue-300 min-[420px]:text-3xl">{formatCompositeScore(survey.surveyType, stats.avg).text}</p>
               </div>
             </div>
 
@@ -367,14 +367,14 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
                       <td className="px-4 py-3">{sub.respondentType}</td>
                       <td className="px-4 py-3">{new Date(sub.submissionDate).toLocaleString()}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300">
+                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300">
                           {score}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => setSelectedSubmissionId(sub.responseId)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#0063a9] hover:underline dark:text-blue-300 cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#0866B1] hover:underline dark:text-blue-300 cursor-pointer"
                         >
                           <Eye size={13} />
                           <span>View Detail</span>

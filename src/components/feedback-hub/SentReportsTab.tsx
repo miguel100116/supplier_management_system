@@ -273,7 +273,7 @@ export function SentReportsTab({
                           <>
                             <button
                               onClick={() => setReportToPreview(report)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-blue-50 text-[#0063a9] hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 py-1 text-[11px] font-bold transition"
+                              className="inline-flex items-center gap-1 rounded-lg bg-blue-50 text-[#0866B1] hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 py-1 text-[11px] font-bold transition"
                               title="Review the exact email text, formatting, and attached report document before it sends"
                             >
                               <Eye size={12} />
@@ -362,7 +362,7 @@ export function SentReportsTab({
           <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
               <div className="flex items-center gap-2 font-bold text-sm text-slate-900 dark:text-white">
-                <Mail size={18} className="text-[#0063a9]" />
+                <Mail size={18} className="text-[#0866B1]" />
                 Email Preview — {reportToPreview.companyName}
               </div>
               <button
@@ -410,7 +410,7 @@ export function SentReportsTab({
             <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-6 py-3 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
               <button
                 onClick={() => onPreviewDocument(reportToPreview)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0063a9] hover:bg-[#00548d] text-white px-3 py-1.5 text-[11px] font-bold transition shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0866B1] hover:bg-[#07528E] text-white px-3 py-1.5 text-[11px] font-bold transition shadow-sm"
                 title="Generate and open the exact PDF report that will be attached"
               >
                 <FileText size={13} />
@@ -433,7 +433,7 @@ export function SentReportsTab({
           <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
               <div className="flex items-center gap-2 font-bold text-sm text-slate-900 dark:text-white">
-                <History size={18} className="text-[#0063a9]" />
+                <History size={18} className="text-[#0866B1]" />
                 Audit Trail Log - {historyReport.companyName}
               </div>
               <button
@@ -453,7 +453,7 @@ export function SentReportsTab({
               <div className="space-y-3 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
                 {historyReport.history.map((entry, idx) => (
                   <div key={idx} className="relative pl-7 text-xs">
-                    <div className="absolute left-1.5 top-1 h-3 w-3 rounded-full border-2 border-white bg-[#0063a9] dark:border-slate-950" />
+                    <div className="absolute left-1.5 top-1 h-3 w-3 rounded-full border-2 border-white bg-[#0866B1] dark:border-slate-950" />
                     <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
                       <span>{entry.action}</span>
                       <span className="text-[10px] text-slate-400 font-normal">
@@ -489,7 +489,7 @@ export function SentReportsTab({
           <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Settings size={16} className="text-[#0063a9]" />
+                <Settings size={16} className="text-[#0866B1]" />
                 Default Queue Timer Duration Settings
               </h3>
               <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -520,7 +520,7 @@ export function SentReportsTab({
             <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 dark:border-slate-800 dark:bg-slate-900 text-right">
               <button
                 onClick={() => setShowSettingsModal(false)}
-                className="primary-button text-xs bg-[#0063a9]"
+                className="primary-button text-xs bg-[#0866B1]"
               >
                 Save & Close
               </button>

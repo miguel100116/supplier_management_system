@@ -35,7 +35,7 @@ type CompanySummary = {
 };
 
 const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
-const panelClass = 'rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950';
+const panelClass = 'rounded-xl border border-border-default bg-white shadow-panel dark:border-slate-800 dark:bg-slate-950';
 const typeStyles: Record<SurveyType, { dot: string; text: string; soft: string; bar: string }> = {
   Courier: { dot: 'bg-sky-600', text: 'text-sky-700 dark:text-sky-400', soft: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300', bar: 'bg-sky-600' },
   Supplier: { dot: 'bg-emerald-600', text: 'text-emerald-700 dark:text-emerald-400', soft: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', bar: 'bg-emerald-600' },
@@ -270,5 +270,5 @@ function AnalyticsHeader({ dataScope, onChangeDataScope, rankingMode, onChangeRa
 }
 
 function KpiCard({ label, value, detail, tooltip }: { label: string; value: string; detail: string; tooltip: string }) {
-  return <article className={`${panelClass} p-4 sm:p-5`}><div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400"><span>{label}</span><AnalyticsTooltip text={tooltip} /></div><p className="mt-2 text-2xl font-bold tracking-tight text-[#0078a8] sm:text-3xl">{value}</p><p className="mt-1 text-[11px] text-slate-400">{detail}</p></article>;
+  return <article className={`${panelClass} p-4 sm:p-6`}><div className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary dark:text-slate-400"><span>{label}</span><AnalyticsTooltip text={tooltip} /></div><p className="mt-2 text-kpi text-brand">{value}</p><p className="supporting-text mt-1">{detail}</p></article>;
 }

@@ -26,18 +26,18 @@ function isOption<T extends string>(options: readonly T[], value: string): value
 
 const PAGE_MODULES: { key: PageModuleKey; label: string; description: string }[] = [
   { key: 'dashboard', label: 'Dashboard', description: 'Personalized performance indicators and KPIs' },
-  { key: 'survey-forms', label: 'Survey Forms', description: 'View, fill, and publish feedback forms' },
-  { key: 'explorer', label: 'Survey Explorer', description: 'Analyze complete survey response records' },
+  { key: 'survey-forms', label: 'Evaluations', description: 'Open evaluation forms and related workflows' },
+  { key: 'explorer', label: 'Evaluation Responses', description: 'Review complete evaluation response records' },
   { key: 'analytics', label: 'Analytics', description: 'Company-wide statistical charts and trends' },
-  { key: 'reports', label: 'Reports', description: 'Generate custom report cards and raw exports' },
-  { key: 'present', label: 'Present', description: 'Staggered slide deck presentation builder' },
-  { key: 'partner-companies', label: 'Partner Companies', description: 'Manage external courier, supplier, and subcontractor rosters' },
-  { key: 'document-register', label: 'Document Tracker', description: 'Categorized compliance-document table across all partner companies' },
+  { key: 'reports', label: 'Reports', description: 'Create reports and access presentation and export workflows' },
+  { key: 'present', label: 'Presentations', description: 'Presentation-ready evaluation results' },
+  { key: 'partner-companies', label: 'Partners', description: 'Manage courier, supplier, and subcontractor company records' },
+  { key: 'document-register', label: 'Compliance Documents', description: 'Track compliance documents across all partner companies' },
   { key: 'renew-documents', label: 'Renew Compliance Documents', description: 'Action permission: update document expiry dates/status in Partner Companies and the Document Tracker, without needing full Account Management access' },
   { key: 'supplier-ranking', label: 'Supplier Ranking', description: 'Curate and reorder the Top 20 Suppliers evaluable by default in Supplier surveys' },
-  { key: 'account-management', label: 'Account Management', description: 'Configure system roles, ranks, and user permissions' },
+  { key: 'account-management', label: 'Users & Access', description: 'Configure employee accounts, roles, ranks, and permissions' },
   { key: 'notifications', label: 'Notification Logs', description: 'Audit trails of incoming survey responses' },
-  { key: 'archive', label: 'Archive Center', description: 'Browse and restore archived feedback submissions' },
+  { key: 'archive', label: 'Archive', description: 'Browse and restore archived companies, forms, and responses' },
 ];
 
 const SURVEY_TYPES: { key: SurveyType; label: string; description: string }[] = [
@@ -347,7 +347,7 @@ export function AccountManagementPage({
           </button>
           <button
             onClick={handleOpenAdd}
-            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#0063a9] hover:bg-[#00528c] px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200"
+            className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[#0866B1] hover:bg-[#07528E] px-4 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200"
             type="button"
           >
             <Plus size={16} />
@@ -530,7 +530,7 @@ export function AccountManagementPage({
                   openAccountEditor(pendingEditAccount);
                   setPendingEditAccount(null);
                 }}
-                className="rounded-xl bg-[#0063a9] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#00528c]"
+                className="rounded-xl bg-[#0866B1] px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#07528E]"
               >
                 Continue to permissions
               </button>
@@ -749,7 +749,7 @@ export function AccountManagementPage({
               <button
                 type="submit"
                 form="account-form"
-                className="px-4 py-2 text-sm font-bold text-white bg-[#0063a9] hover:bg-[#00528c] rounded-xl transition cursor-pointer shadow-md"
+                className="px-4 py-2 text-sm font-bold text-white bg-[#0866B1] hover:bg-[#07528E] rounded-xl transition cursor-pointer shadow-md"
               >
                 {editingEmail ? 'Save Permissions' : 'Add Account'}
               </button>

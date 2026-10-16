@@ -145,7 +145,7 @@ export function NotificationLogsPage({
               type="button"
               onClick={onMarkAllRead}
               disabled={unreadCount === 0}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#0063a9] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#0866B1] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
             >
               Mark all as read
             </button>
@@ -156,7 +156,7 @@ export function NotificationLogsPage({
           <label className="field-label">
             Search
             <div className="mt-1 flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white pl-3 pr-3 transition focus-within:border-azure focus-within:ring-2 focus-within:ring-blue-100 dark:border-slate-800 dark:bg-slate-900 dark:focus-within:ring-blue-950">
-              <Search size={16} className="shrink-0 text-[#0063a9] dark:text-blue-300" />
+              <Search size={16} className="shrink-0 text-[#0866B1] dark:text-blue-300" />
               <span className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
               <input
                 className="w-full bg-transparent py-2 text-sm text-ink outline-none placeholder:text-slate-400 dark:text-slate-100"
@@ -320,7 +320,7 @@ export function NotificationLogsPage({
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-[#0063a9] dark:text-blue-400">
+                    <td className="px-4 py-3 font-mono text-xs text-[#0866B1] dark:text-blue-400">
                       {item.designation === 'Document Alert' ? '⚠️ SYSTEM ALERT' : item.respondentEmail}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-semibold text-xs">
@@ -341,7 +341,7 @@ export function NotificationLogsPage({
                       <button
                         type="button"
                         onClick={() => (item.isNew ? onMarkRead(item.id) : onMarkUnread(item.id))}
-                        className="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#0063a9] transition hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                        className="whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#0866B1] transition hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
                         aria-label={`${item.isNew ? 'Mark as read' : 'Mark as unread'}: ${item.company}`}
                       >
                         {item.isNew ? 'Mark as read' : 'Mark as unread'}

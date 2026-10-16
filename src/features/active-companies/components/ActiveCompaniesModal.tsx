@@ -164,7 +164,7 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
                           <select
                             value={selected?.id}
                             onChange={(event) => setSelectedIds((current) => ({ ...current, [type]: event.target.value }))}
-                            className="min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-[#0063a9] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            className="min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-[#0866B1] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                           >
                             {history.map((snapshot, index) => (
                               <option key={snapshot.id} value={snapshot.id}>

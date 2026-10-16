@@ -224,7 +224,7 @@ export function SurveyDetailModal({
                 onSendToPartner(survey);
                 onClose();
               }}
-              className="primary-button text-xs gap-1.5 bg-[#0063a9] hover:bg-blue-800 text-white"
+              className="primary-button text-xs gap-1.5 bg-[#0866B1] hover:bg-blue-800 text-white"
             >
               <Send size={14} />
               Send Report to Partner

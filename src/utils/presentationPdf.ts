@@ -5,8 +5,8 @@ const PAGE_W = 841.89;
 const PAGE_H = 595.28;
 const MARGIN = 48;
 const CONTENT_W = PAGE_W - MARGIN * 2;
-const BRAND = '#0063a9';
-const INK = '#172033';
+const BRAND = '#0866B1';
+const INK = '#172338';
 
 function hexToRgb(hex: string): [number, number, number] {
   const clean = hex.replace('#', '');
@@ -25,14 +25,14 @@ function setText(doc: jsPDF, hex: string) {
 }
 
 function drawCoverBackground(doc: jsPDF) {
-  setFill(doc, '#0063a9');
+  setFill(doc, '#0866B1');
   doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
   setFill(doc, '#00335a');
   doc.circle(PAGE_W - 60, 40, 90, 'F');
 }
 
 function drawClosingBackground(doc: jsPDF) {
-  setFill(doc, '#172033');
+  setFill(doc, '#172338');
   doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
 }
 

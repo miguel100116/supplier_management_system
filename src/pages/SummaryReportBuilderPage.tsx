@@ -50,7 +50,7 @@ const LOGO_URL = '/microgenesis_logo.png';
 const LOGO_ASPECT = 498 / 1921; // height / width
 
 const COLORS = {
-  Courier: '#0063a9',
+  Courier: '#0866B1',
   Supplier: '#0ea5e9',
   Subcontractor: '#14b8a6',
 };
@@ -621,7 +621,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                   type="checkbox"
                   checked={selectedTypes[type]}
                   onChange={() => toggleType(type)}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   {type} Evaluation Survey
@@ -669,7 +669,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 type="checkbox"
                 checked={showKpis}
                 onChange={(e) => setShowKpis(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">Core KPI Summary Cards</span>
             </label>
@@ -679,7 +679,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 type="checkbox"
                 checked={showChart}
                 onChange={(e) => setShowChart(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">Circular Graphe Chart</span>
             </label>
@@ -689,7 +689,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 type="checkbox"
                 checked={showTable}
                 onChange={(e) => setShowTable(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">Performance Summary Table</span>
             </label>
@@ -699,7 +699,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 type="checkbox"
                 checked={showTopCompanies}
                 onChange={(e) => setShowTopCompanies(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">Top Performing Companies</span>
             </label>
@@ -709,7 +709,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 type="checkbox"
                 checked={showBottomCompanies}
                 onChange={(e) => setShowBottomCompanies(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">Lowest Rated Companies</span>
             </label>
@@ -719,7 +719,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 type="checkbox"
                 checked={showQuestions}
                 onChange={(e) => setShowQuestions(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">Question Highlights (Top 5)</span>
             </label>
@@ -803,7 +803,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
               <div className="flex h-full flex-col items-center px-4 text-center">
                 <div className="pt-[16%]">
                   <img src={LOGO_URL} alt="Microgenesis" className="mx-auto h-14 w-auto" referrerPolicy="no-referrer" />
-                  <div className="mx-auto mt-7 h-px w-20 bg-[#0063a9]" />
+                  <div className="mx-auto mt-7 h-px w-20 bg-[#0866B1]" />
                   <h1 className="mt-7 text-2xl font-bold text-slate-800 dark:text-slate-100">Summary Report</h1>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">MBS Partner Evaluation System</p>
 
@@ -831,19 +831,19 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
               {showKpis && (
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span className="block text-lg font-bold text-[#0063a9]">{summary.totalResponses}</span>
+                    <span className="block text-lg font-bold text-[#0866B1]">{summary.totalResponses}</span>
                     <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Submitted Evaluations</span>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span className="block text-lg font-bold text-[#0063a9]">{formatNumber(summary.averageRating)}%</span>
+                    <span className="block text-lg font-bold text-[#0866B1]">{formatNumber(summary.averageRating)}%</span>
                     <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Average System Score</span>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span className="block text-lg font-bold text-[#0063a9]">{formatNumber(summary.overallSatisfactionScore)}%</span>
+                    <span className="block text-lg font-bold text-[#0866B1]">{formatNumber(summary.overallSatisfactionScore)}%</span>
                     <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Overall Satisfaction Index</span>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
-                    <span className="block text-lg font-bold text-[#0063a9]">{formatNumber(summary.naPercentage)}%</span>
+                    <span className="block text-lg font-bold text-[#0866B1]">{formatNumber(summary.naPercentage)}%</span>
                     <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">N/A Answer Frequency Rate</span>
                   </div>
                 </div>
@@ -899,7 +899,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                       {/* Donut-hole readout: the headline number, visible without hovering
                           over a slice - essential since the static PDF capture can't show tooltips. */}
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-2xl font-black text-[#0063a9] dark:text-blue-400 leading-none">
+                        <span className="text-2xl font-black text-[#0866B1] dark:text-blue-400 leading-none">
                           {chartCenterValue}
                         </span>
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1 text-center px-2 leading-tight">
@@ -940,7 +940,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                   <div className="overflow-hidden border border-slate-200 dark:border-slate-800 rounded-lg">
                     <table className="w-full text-left border-collapse text-[10px]">
                       <thead>
-                        <tr className="bg-[#0063a9] text-white">
+                        <tr className="bg-[#0866B1] text-white">
                           <th className="px-3 py-1.5 font-bold">Survey Category</th>
                           <th className="px-3 py-1.5 font-bold text-center">Average Score</th>
                           <th className="px-3 py-1.5 font-bold text-center">Total Submissions</th>
@@ -1065,7 +1065,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                           {questionRows.map((row, idx) => (
                             <tr key={row.question} className={idx % 2 === 0 ? 'bg-slate-50 dark:bg-slate-900/20' : 'bg-white dark:bg-slate-950'}>
                               <td className="px-3 py-1.5 text-slate-600 dark:text-slate-300 font-medium leading-relaxed">{row.question}</td>
-                              <td className="px-3 py-1.5 text-center font-extrabold text-[#0063a9]">{formatNumber(row.average)}%</td>
+                              <td className="px-3 py-1.5 text-center font-extrabold text-[#0866B1]">{formatNumber(row.average)}%</td>
                               <td className="px-3 py-1.5 text-center text-slate-500">{row.responses}</td>
                             </tr>
                           ))}

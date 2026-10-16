@@ -267,7 +267,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             />
 
             <div className="mb-7">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#0063a9]">SMPESA</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#0866B1]">SMPESA</p>
               <h1 className="mt-1.5 text-2xl font-medium text-slate-900">Welcome back</h1>
               <p className="mt-1.5 text-sm font-light text-slate-500">
                 {isSupabaseConfigured
@@ -299,7 +299,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     autoComplete="email"
                     required
                     placeholder="name@mgenesis.com"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0866B1] focus:ring-2 focus:ring-[#0866B1]/15"
                   />
                 </label>
                 <div>
@@ -313,13 +313,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     autoComplete="current-password"
                     minLength={8}
                     required
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-[#0866B1] focus:ring-2 focus:ring-[#0866B1]/15"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isPasswordSubmitting}
-                  className="w-full rounded-lg bg-[#0063a9] py-2.5 text-sm font-semibold text-white transition hover:bg-[#00558f] disabled:opacity-70"
+                  className="w-full rounded-lg bg-[#0866B1] py-2.5 text-sm font-semibold text-white transition hover:bg-[#07528E] disabled:opacity-70"
                 >
                   {isPasswordSubmitting ? 'Please wait…' : 'Sign in'}
                 </button>
@@ -335,7 +335,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   type="button"
                   onClick={handlePasswordResetRequest}
                   disabled={isPasswordSubmitting || !email}
-                  className="w-full py-1.5 text-sm font-medium text-[#0063a9] transition hover:text-[#004f86] disabled:opacity-50"
+                  className="w-full py-1.5 text-sm font-medium text-[#0866B1] transition hover:text-[#004f86] disabled:opacity-50"
                 >
                   Forgot password?
                 </button>

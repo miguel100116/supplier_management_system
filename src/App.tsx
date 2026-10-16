@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useMemo, useRef, useState, useEffect } fro
 import { createPortal } from 'react-dom';
 import { BarChart3, FileText, LayoutDashboard, Moon, Sun, FilePlus, ClipboardCheck, ArrowLeft, Clock3, LogOut, ShieldAlert, Users, UserCog, ClipboardList, X } from 'lucide-react';
 import { EvaluationWorkspace, isEvaluationWorkspacePage } from './features/evaluations/components/EvaluationWorkspace';
+import { ModuleWorkspace } from './components/ModuleWorkspace';
 import { AccountMenu } from './components/AccountMenu';
 import { NotificationBell } from './components/NotificationBell';
 import { EmployeeNotificationBell } from './components/EmployeeNotificationBell';
@@ -119,52 +120,35 @@ const DEFAULT_ACCOUNTS: AccountProfile[] = [...BOOTSTRAP_ADMIN_ACCOUNTS];
 
 type PageKey = 'dashboard' | 'partner-companies' | 'document-register' | 'supplier-ranking' | 'partners-feedback-hub' | 'account-management' | 'survey-forms' | 'analytics' | 'present' | 'explorer' | 'reports' | 'notifications' | 'create-form' | 'view-form' | 'fill-form' | 'archive' | 'import-evaluations' | 'my-submissions' | 'profile-settings' | 'pending-review' | 'export-history' | 'settings' | 'categories-manager';
 
-// Admin sidebar: grouped by workflow stage (raw data -> insight -> output)
-// rather than flat/alphabetical, per the dashboard IA redesign.
+const PARTNER_WORKSPACE_VIEWS = [
+  { key: 'partner-companies', label: 'Directory' },
+  { key: 'document-register', label: 'Compliance Documents' },
+  { key: 'supplier-ranking', label: 'Supplier Ranking' },
+  { key: 'partners-feedback-hub', label: 'Partner Feedback' },
+] as const;
+
+const REPORT_WORKSPACE_VIEWS = [
+  { key: 'reports', label: 'Create Report' },
+  { key: 'present', label: 'Presentations' },
+  { key: 'export-history', label: 'Export History' },
+] as const;
+
+const isPartnerWorkspacePage = (page: PageKey): page is typeof PARTNER_WORKSPACE_VIEWS[number]['key'] =>
+  PARTNER_WORKSPACE_VIEWS.some((view) => view.key === page);
+
+const isReportWorkspacePage = (page: PageKey): page is typeof REPORT_WORKSPACE_VIEWS[number]['key'] =>
+  REPORT_WORKSPACE_VIEWS.some((view) => view.key === page);
+
+// Related secondary views live inside each module so every primary
+// destination is reachable from the sidebar with one click.
 const adminNavItems: NavItem<PageKey>[] = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  {
-    type: 'group',
-    id: 'group-suppliers',
-    // "Partner Companies" (not "Suppliers") - the registry covers Couriers
-    // and Subcontractors too, and "Suppliers" is only one of those three
-    // categories.
-    label: 'Partner Companies',
-    icon: Users,
-    children: [
-      { key: 'partner-companies', label: 'Partners' },
-      { key: 'document-register', label: 'Document Tracker' },
-      { key: 'supplier-ranking', label: 'Supplier Ranking' },
-      { key: 'partners-feedback-hub', label: 'Feedback Hub' },
-    ],
-  },
-  {
-    type: 'group',
-    id: 'group-evaluations',
-    label: 'Evaluations',
-    icon: ClipboardCheck,
-    children: [
-      { key: 'survey-forms', label: 'Evaluation Workspace' },
-      { key: 'archive', label: 'Archive Center' },
-      { key: 'import-evaluations', label: 'Import Evaluation Responses' },
-      { key: 'categories-manager', label: 'Evaluation Settings' },
-    ],
-  },
-  // Single page already covers trends + company comparisons together, so
-  // it's one flat destination rather than a group of near-duplicate items.
+  { key: 'partner-companies', label: 'Partners', icon: Users },
+  { key: 'survey-forms', label: 'Evaluations', icon: ClipboardCheck },
   { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-  {
-    type: 'group',
-    id: 'group-reports',
-    label: 'Reports & Exports',
-    icon: FileText,
-    children: [
-      { key: 'reports', label: 'Generate Report' },
-      { key: 'present', label: 'Present Mode' },
-      { key: 'export-history', label: 'Export History' },
-    ],
-  },
-  { key: 'account-management', label: 'Employees / Users', icon: UserCog },
+  { key: 'reports', label: 'Reports', icon: FileText },
+  { key: 'account-management', label: 'Users & Access', icon: UserCog },
+  { key: 'archive', label: 'Archive', icon: ClipboardList },
 ];
 
 const allSurveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
@@ -632,22 +616,24 @@ export default function App() {
   );
 
   const isAdminEvaluationWorkspace = isAdmin && isEvaluationWorkspacePage(activePage);
+  const isAdminPartnerWorkspace = isAdmin && isPartnerWorkspacePage(activePage);
+  const isAdminReportWorkspace = isAdmin && isReportWorkspacePage(activePage);
 
   const activeTitle = useMemo(() => {
-    if (isAdmin && isEvaluationWorkspacePage(activePage)) return 'Evaluation Workspace';
+    if (isAdmin && isEvaluationWorkspacePage(activePage)) return 'Evaluations';
+    if (isAdmin && isPartnerWorkspacePage(activePage)) return 'Partners';
+    if (isAdmin && isReportWorkspacePage(activePage)) return 'Reports';
     if (activePage === 'dashboard') {
       return 'Dashboard';
     }
-    if (activePage === 'partner-companies') return 'Administrative Partner Registry';
-    if (activePage === 'document-register') return 'Document Tracker';
-    if (activePage === 'account-management') return 'Account Management';
+    if (activePage === 'account-management') return 'Users & Access';
     if (activePage === 'create-form') return editingSurveyId ? 'Edit Survey Form' : 'Create Survey Form';
     if (activePage === 'view-form') {
       const selected = surveys.find((s) => s.id === selectedSurveyId);
       return selected ? `Survey: ${selected.title}` : 'Survey Details';
     }
     if (activePage === 'fill-form') return 'Fill Out Stakeholder Survey';
-    if (activePage === 'import-evaluations') return 'Import Evaluation Responses';
+    if (activePage === 'archive') return 'Archive';
     return flatNavLeaves.find((page) => page.key === activePage)?.label ?? 'Dashboard';
   }, [activePage, selectedSurveyId, surveys, editingSurveyId, profile, isAdmin, flatNavLeaves]);
 
@@ -1190,7 +1176,7 @@ export default function App() {
       <div className={darkMode ? 'dark' : ''}>
         <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
           <div className="flex flex-col items-center gap-4 text-slate-500 dark:text-slate-400">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-[#0063a9] dark:border-slate-700 dark:border-t-blue-500" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-[#0866B1] dark:border-slate-700 dark:border-t-blue-500" />
             <p className="font-medium animate-pulse">Loading access settings...</p>
           </div>
         </div>
@@ -1202,7 +1188,13 @@ export default function App() {
     <div className={darkMode ? 'dark' : ''}>
       <Shell
         pages={visiblePages}
-        activePage={isAdminEvaluationWorkspace ? 'survey-forms' : activePage}
+        activePage={isAdminEvaluationWorkspace
+          ? 'survey-forms'
+          : isAdminPartnerWorkspace
+            ? 'partner-companies'
+            : isAdminReportWorkspace
+              ? 'reports'
+              : activePage}
         onPageChange={(page) => {
           const targetPage = page as PageKey;
           navigateTo(targetPage);
@@ -1210,7 +1202,7 @@ export default function App() {
         }}
         title={activeTitle}
         pageHeading={pageHeading}
-        hideModuleContext={activePage === 'dashboard' || activePage === 'account-management' || activePage === 'partner-companies'}
+        hideModuleContext={activePage === 'dashboard' || activePage === 'account-management' || isAdminPartnerWorkspace || isAdminEvaluationWorkspace || isAdminReportWorkspace}
         compactPageHeader={activePage === 'analytics'}
         action={
           <div className="flex min-w-0 items-center divide-x divide-blue-400/25">
@@ -1287,7 +1279,7 @@ export default function App() {
                   aria-live="polite"
                 >
                   <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400">
-                    <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0063a9] dark:border-slate-700 dark:border-t-blue-500" />
+                    <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0866B1] dark:border-slate-700 dark:border-t-blue-500" />
                     <p className="text-sm font-medium">Refreshing shared data...</p>
                   </div>
                 </div>
@@ -1297,7 +1289,7 @@ export default function App() {
                     fallback={(
                       <div className="flex min-h-64 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950" role="status" aria-live="polite">
                         <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400">
-                          <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0063a9] dark:border-slate-700 dark:border-t-blue-500" />
+                          <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0866B1] dark:border-slate-700 dark:border-t-blue-500" />
                           <p className="text-sm font-medium">Loading page...</p>
                         </div>
                       </div>
@@ -1307,6 +1299,14 @@ export default function App() {
                       <EvaluationWorkspace activePage={activePage} onNavigate={navigateTo}>
                         {pageContent}
                       </EvaluationWorkspace>
+                    ) : isAdmin && isPartnerWorkspacePage(activePage) ? (
+                      <ModuleWorkspace activePage={activePage} views={PARTNER_WORKSPACE_VIEWS} onNavigate={navigateTo} navigationLabel="Partner views">
+                        {pageContent}
+                      </ModuleWorkspace>
+                    ) : isAdmin && isReportWorkspacePage(activePage) ? (
+                      <ModuleWorkspace activePage={activePage} views={REPORT_WORKSPACE_VIEWS} onNavigate={navigateTo} navigationLabel="Report views">
+                        {pageContent}
+                      </ModuleWorkspace>
                     ) : pageContent}
                   </Suspense>
                   {isSupabaseConfigured && isRefreshing && (
@@ -1316,7 +1316,7 @@ export default function App() {
                       aria-live="polite"
                     >
                       <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-3.5 py-2 text-sm font-medium text-slate-600 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300">
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#0063a9] dark:border-slate-600 dark:border-t-blue-400" />
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-[#0866B1] dark:border-slate-600 dark:border-t-blue-400" />
                         <span>Refreshing shared data...</span>
                       </div>
                     </div>
@@ -1364,7 +1364,7 @@ export default function App() {
                 fallback={(
                   <div className="flex min-h-64 items-center justify-center" role="status" aria-live="polite">
                     <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400">
-                      <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0063a9] dark:border-slate-700 dark:border-t-blue-500" />
+                      <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0866B1] dark:border-slate-700 dark:border-t-blue-500" />
                       <p className="text-sm font-medium">Loading notifications...</p>
                     </div>
                   </div>
@@ -1440,7 +1440,7 @@ export default function App() {
                 type="button"
                 onClick={staySignedIn}
                 autoFocus
-                className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-[#0063a9] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#00528c] focus:outline-none focus:ring-2 focus:ring-[#0063a9] focus:ring-offset-2 dark:focus:ring-offset-slate-950"
+                className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-[#0866B1] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#07528E] focus:outline-none focus:ring-2 focus:ring-[#0866B1] focus:ring-offset-2 dark:focus:ring-offset-slate-950"
               >
                 Stay signed in
               </button>
@@ -1485,7 +1485,7 @@ export default function App() {
               fallback={(
                 <div className="flex min-h-64 flex-1 items-center justify-center p-4 sm:p-6" role="status" aria-live="polite">
                   <div className="flex flex-col items-center gap-3 text-slate-500 dark:text-slate-400">
-                    <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0063a9] dark:border-slate-700 dark:border-t-blue-500" />
+                    <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0866B1] dark:border-slate-700 dark:border-t-blue-500" />
                     <p className="text-sm font-medium">Loading settings...</p>
                   </div>
                 </div>

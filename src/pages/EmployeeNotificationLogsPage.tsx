@@ -154,7 +154,7 @@ export function EmployeeNotificationLogsPage({
               type="button"
               onClick={() => markNotificationsRead(userEmail, notifications.map((notification) => notification.id))}
               disabled={unreadCount === 0}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#0063a9] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#0866B1] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
             >
               Mark all as read
             </button>
@@ -230,7 +230,7 @@ export function EmployeeNotificationLogsPage({
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggleChecked(item.id)}
-                      className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[#0063a9] focus:ring-blue-200 dark:border-slate-600"
+                      className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[#0866B1] focus:ring-blue-200 dark:border-slate-600"
                     />
                   </label>
                   <button type="button" onClick={() => handleOpen(item.id)} className="flex min-w-0 flex-1 items-center gap-4 text-left">
@@ -258,7 +258,7 @@ export function EmployeeNotificationLogsPage({
                       if (isRead) markNotificationUnread(userEmail, item.id);
                       else markNotificationRead(userEmail, item.id);
                     }}
-                    className="shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#0063a9] transition hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                    className="shrink-0 cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-[#0866B1] transition hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-900 dark:text-blue-300 dark:hover:bg-blue-950/30"
                     aria-label={`${isRead ? 'Mark as unread' : 'Mark as read'}: ${item.surveyTitle}`}
                   >
                     {isRead ? 'Mark as unread' : 'Mark as read'}
@@ -367,7 +367,7 @@ function MessageView({
 
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
             <p className="mb-2 flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
-              <CheckSquare size={14} className="text-[#0063a9] dark:text-blue-400" />
+              <CheckSquare size={14} className="text-[#0866B1] dark:text-blue-400" />
               <span>Remaining Partner Companies to Evaluate ({notification.pendingCompanies.length}):</span>
             </p>
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -376,7 +376,7 @@ function MessageView({
                   key={c.id}
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold dark:border-slate-800 dark:bg-slate-950"
                 >
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#0063a9]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#0866B1]" />
                   <span className="truncate">{c.name}</span>
                 </li>
               ))}
@@ -402,7 +402,7 @@ function MessageView({
             <button
               type="button"
               onClick={() => onFillForm(notification.surveyId)}
-              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#0063a9] px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#00528c] hover:shadow-lg sm:w-auto"
+              className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#0866B1] px-6 py-3 text-sm font-bold text-white shadow-md transition hover:bg-[#07528E] hover:shadow-lg sm:w-auto"
             >
               <Award size={16} />
               <span>Start Evaluation Now</span>

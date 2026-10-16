@@ -55,7 +55,7 @@ export function PasswordRecoveryPage({ onComplete }: PasswordRecoveryPageProps) 
               autoComplete="new-password"
               minLength={8}
               required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0866B1] focus:ring-2 focus:ring-[#0866B1]/15"
             />
           </div>
           <div>
@@ -69,13 +69,13 @@ export function PasswordRecoveryPage({ onComplete }: PasswordRecoveryPageProps) 
               autoComplete="new-password"
               minLength={8}
               required
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-[#0866B1] focus:ring-2 focus:ring-[#0866B1]/15"
             />
           </div>
           <button
             type="submit"
             disabled={isSaving}
-            className="w-full rounded-lg bg-[#0063a9] py-2.5 text-sm font-semibold text-white transition hover:bg-[#00558f] disabled:opacity-70"
+            className="w-full rounded-lg bg-[#0866B1] py-2.5 text-sm font-semibold text-white transition hover:bg-[#07528E] disabled:opacity-70"
           >
             {isSaving ? 'Updating password…' : 'Update password'}
           </button>

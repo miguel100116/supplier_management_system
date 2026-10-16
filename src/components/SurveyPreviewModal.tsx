@@ -169,7 +169,7 @@ export function SurveyPreviewModal({ survey, partnerCompanies = [], onClose }: S
                 const currentRating = ratings[q.questionId] !== undefined ? ratings[q.questionId] : maxVal;
 
                 return (
-                  <div key={q.questionId} className="panel p-5 space-y-4 shadow-sm border-l-4 border-l-[#0063a9] dark:border-l-blue-400">
+                  <div key={q.questionId} className="panel p-5 space-y-4 shadow-sm border-l-4 border-l-[#0866B1] dark:border-l-blue-400">
                     <div className="flex items-start justify-between gap-4">
                       <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">
                         <span className="text-slate-400 font-bold mr-1.5">{idx + 1}.</span>
@@ -207,7 +207,7 @@ export function SurveyPreviewModal({ survey, partnerCompanies = [], onClose }: S
                             <label key={opt} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
-                                className="w-4 h-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                                className="w-4 h-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                                 checked={isChecked}
                                 onChange={(e) => handleCheckboxChange(q.questionId, opt, e.target.checked)}
                               />
@@ -254,14 +254,14 @@ export function SurveyPreviewModal({ survey, partnerCompanies = [], onClose }: S
                                 <tr key={sub.id} className={subIdx !== q.subQuestions!.length - 1 ? 'border-b border-slate-100 dark:border-slate-800' : ''}>
                                   <td className="py-4 pr-4">
                                     <div className="text-slate-800 dark:text-slate-200 leading-snug">{String.fromCharCode(97 + subIdx)}. {sub.label}</div>
-                                    {sub.description && <div className="text-xs text-[#0063a9] dark:text-blue-400 mt-2 font-medium">{sub.description}</div>}
+                                    {sub.description && <div className="text-xs text-[#0866B1] dark:text-blue-400 mt-2 font-medium">{sub.description}</div>}
                                   </td>
                                   {[2, 1, 0, 'N/A'].map((opt) => (
                                     <td key={opt} className="py-4 text-center">
                                       <input
                                         type="radio"
                                         name={`preview-matrix-${q.questionId}-${sub.id}`}
-                                        className="w-4 h-4 text-[#0063a9] border-slate-300 focus:ring-[#0063a9]"
+                                        className="w-4 h-4 text-[#0866B1] border-slate-300 focus:ring-[#0866B1]"
                                         checked={subVal.toString() === opt.toString()}
                                         onChange={() => handleMatrixRatingChange(q.questionId, sub.id, opt)}
                                       />
@@ -350,7 +350,7 @@ export function SurveyPreviewModal({ survey, partnerCompanies = [], onClose }: S
             <button
               type="button"
               onClick={() => setPageIndex((p) => Math.min(totalPages - 1, p + 1))}
-              className="primary-button bg-[#0063a9] hover:bg-[#00528c] text-xs"
+              className="primary-button bg-[#0866B1] hover:bg-[#07528E] text-xs"
             >
               Next <ArrowRight size={14} />
             </button>

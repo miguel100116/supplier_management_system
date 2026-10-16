@@ -106,10 +106,10 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
               className="panel text-left p-5 space-y-3 hover:border-blue-200 dark:hover:border-blue-900 transition cursor-pointer group"
             >
               <div className="flex items-center justify-between">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300">
                   <Icon size={18} />
                 </span>
-                <ChevronRight size={16} className="text-slate-300 group-hover:text-[#0063a9] dark:group-hover:text-blue-300 transition" />
+                <ChevronRight size={16} className="text-slate-300 group-hover:text-[#0866B1] dark:group-hover:text-blue-300 transition" />
               </div>
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-white">{type}</h3>
@@ -184,7 +184,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
                   type="button"
                   onClick={requestSave}
                   disabled={!isDirty}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0063a9] px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#00528c] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 dark:disabled:bg-slate-700"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0866B1] px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#07528E] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 dark:disabled:bg-slate-700"
                 >
                   <Save size={13} /> Save Changes
                 </button>

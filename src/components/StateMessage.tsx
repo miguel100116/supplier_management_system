@@ -8,8 +8,8 @@ export function StateMessage({ title, message, compact = false }: StateMessagePr
   return (
     <div className={`panel flex items-center justify-center text-center ${compact ? 'min-h-32' : 'min-h-72'}`}>
       <div>
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{message}</p>
+        <h3 className="card-title">{title}</h3>
+        <p className="supporting-text mt-2 max-w-xl">{message}</p>
       </div>
     </div>
   );

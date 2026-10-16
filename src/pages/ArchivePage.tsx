@@ -442,13 +442,13 @@ export function ArchivePage({
           }}
           className={`panel p-6 flex items-start gap-4 text-left transition relative overflow-hidden cursor-pointer ${
             activeTab === 'surveys'
-              ? 'ring-2 ring-[#0063a9] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
+              ? 'ring-2 ring-[#0866B1] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
               : 'hover:border-slate-300 hover:bg-slate-50/30'
           }`}
           id="btn-archive-surveys"
         >
           <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'surveys' ? 'bg-[#0063a9] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            activeTab === 'surveys' ? 'bg-[#0866B1] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
           }`}>
             <ClipboardList size={24} />
           </div>
@@ -471,13 +471,13 @@ export function ArchivePage({
           }}
           className={`panel p-6 flex items-start gap-4 text-left transition relative overflow-hidden cursor-pointer ${
             activeTab === 'responses'
-              ? 'ring-2 ring-[#0063a9] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
+              ? 'ring-2 ring-[#0866B1] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
               : 'hover:border-slate-300 hover:bg-slate-50/30'
           }`}
           id="btn-archive-responses"
         >
           <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'responses' ? 'bg-[#0063a9] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            activeTab === 'responses' ? 'bg-[#0866B1] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
           }`}>
             <FileText size={24} />
           </div>
@@ -501,13 +501,13 @@ export function ArchivePage({
           }}
           className={`panel p-6 flex items-start gap-4 text-left transition relative overflow-hidden cursor-pointer ${
             activeTab === 'companies'
-              ? 'ring-2 ring-[#0063a9] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
+              ? 'ring-2 ring-[#0866B1] bg-blue-50/20 dark:bg-blue-950/10 border-blue-200 dark:border-blue-900'
               : 'hover:border-slate-300 hover:bg-slate-50/30'
           }`}
           id="btn-archive-companies"
         >
           <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'companies' ? 'bg-[#0063a9] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+            activeTab === 'companies' ? 'bg-[#0866B1] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
           }`}>
             <Building2 size={24} />
           </div>
@@ -532,7 +532,7 @@ export function ArchivePage({
             <input
               type="search"
               placeholder={'Search archived ' + activeTab + '...'}
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#0063a9] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#0866B1] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
             />
@@ -574,7 +574,7 @@ export function ArchivePage({
               <SlidersHorizontal size={15} aria-hidden="true" className="hidden sm:block" />
               Filters
               {activeFilterCount > 0 && (
-                <span className="rounded-full bg-[#0063a9] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={activeFilterCount + ' active filters'}>
+                <span className="rounded-full bg-[#0866B1] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={activeFilterCount + ' active filters'}>
                   {activeFilterCount}
                 </span>
               )}
@@ -629,7 +629,7 @@ export function ArchivePage({
                   setDateTo('');
                   setCompanyTypeFilter('All');
                 }}
-                className="text-xs font-semibold text-[#0063a9] hover:underline dark:text-blue-400"
+                className="text-xs font-semibold text-[#0866B1] hover:underline dark:text-blue-400"
               >
                 Reset filters
               </button>
@@ -695,7 +695,7 @@ export function ArchivePage({
                         <td className="px-4 py-4 text-right">
                           <button
                             onClick={() => handleRestoreSurvey(survey)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#0063a9] text-[#0063a9] hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/20 px-3 py-1.5 text-xs font-bold transition cursor-pointer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#0866B1] text-[#0866B1] hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/20 px-3 py-1.5 text-xs font-bold transition cursor-pointer"
                             type="button"
                           >
                             <RefreshCw size={12} />
@@ -753,7 +753,7 @@ export function ArchivePage({
                         <td className="px-4 py-4 text-right">
                           <button
                             onClick={() => setConfirmPartnerCompany(company)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#0063a9] text-[#0063a9] hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/20 px-3 py-1.5 text-xs font-bold transition cursor-pointer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#0866B1] text-[#0866B1] hover:bg-blue-50 dark:border-blue-500 dark:text-blue-400 dark:hover:bg-blue-950/20 px-3 py-1.5 text-xs font-bold transition cursor-pointer"
                             type="button"
                           >
                             <RefreshCw size={12} />
@@ -782,7 +782,7 @@ export function ArchivePage({
                     <select
                       value={trendCompany}
                       onChange={(e) => setTrendCompany(e.target.value)}
-                      className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#0063a9] cursor-pointer"
+                      className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#0866B1] cursor-pointer"
                     >
                       <option value="__overall__">Overall (all companies)</option>
                       {trendCompanies.map((c) => (
@@ -821,15 +821,15 @@ export function ArchivePage({
               <div className="space-y-4">
                 {/* Bulk Actions Bar */}
                 {selectedGroups.size > 0 && (
-                  <div className="bg-[#0063a9]/10 border border-[#0063a9]/20 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
-                    <span className="text-sm font-bold text-[#0063a9] dark:text-blue-400">
+                  <div className="bg-[#0866B1]/10 border border-[#0866B1]/20 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 animate-fade-in">
+                    <span className="text-sm font-bold text-[#0866B1] dark:text-blue-400">
                       {selectedGroups.size} group(s) selected
                     </span>
                     <div className="flex items-center gap-2">
-                      <button onClick={handleExportSelected} className="px-3 py-1.5 text-xs font-bold rounded-lg border border-[#0063a9]/30 bg-white dark:bg-slate-900 text-[#0063a9] hover:bg-blue-50 dark:hover:bg-slate-800 transition cursor-pointer">
+                      <button onClick={handleExportSelected} className="px-3 py-1.5 text-xs font-bold rounded-lg border border-[#0866B1]/30 bg-white dark:bg-slate-900 text-[#0866B1] hover:bg-blue-50 dark:hover:bg-slate-800 transition cursor-pointer">
                         Export Selected
                       </button>
-                      <button onClick={handleBulkRestore} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-[#0063a9] text-white hover:bg-[#00528c] transition cursor-pointer">
+                      <button onClick={handleBulkRestore} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-[#0866B1] text-white hover:bg-[#07528E] transition cursor-pointer">
                         Restore Selected
                       </button>
                       <button onClick={handleBulkDelete} className="px-3 py-1.5 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition cursor-pointer">
@@ -848,7 +848,7 @@ export function ArchivePage({
                     type="checkbox"
                     checked={selectedGroups.size === filteredGroupedResponses.length && filteredGroupedResponses.length > 0}
                     onChange={selectAll}
-                    className="w-4 h-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                    className="w-4 h-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                   />
                   <span>Select All ({filteredGroupedResponses.length})</span>
                 </div>
@@ -858,14 +858,14 @@ export function ArchivePage({
                   const isSelected = selectedGroups.has(group.id);
                   
                   return (
-                    <div key={group.id} className={`rounded-xl border transition ${isSelected ? 'border-[#0063a9] bg-blue-50/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'}`}>
+                    <div key={group.id} className={`rounded-xl border transition ${isSelected ? 'border-[#0866B1] bg-blue-50/10' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900'}`}>
                       <div className="p-4 flex flex-wrap items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelect(group.id)}
-                            className="w-4 h-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                            className="w-4 h-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                           />
                           <div className="p-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-500">
                             <ClipboardList size={20} />
@@ -882,7 +882,7 @@ export function ArchivePage({
                                     if (e.key === 'Enter') commitRenameSeries();
                                     if (e.key === 'Escape') { setEditingSeriesId(null); setEditingLabel(''); }
                                   }}
-                                  className="rounded-lg border border-[#0063a9] bg-white dark:bg-slate-950 px-2 py-1 text-sm font-bold text-slate-900 dark:text-white focus:outline-none"
+                                  className="rounded-lg border border-[#0866B1] bg-white dark:bg-slate-950 px-2 py-1 text-sm font-bold text-slate-900 dark:text-white focus:outline-none"
                                 />
                                 <button
                                   type="button"
@@ -900,7 +900,7 @@ export function ArchivePage({
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); startRenameSeries(group.seriesId!, group.label); }}
-                                    className="text-slate-300 hover:text-[#0063a9] dark:text-slate-600 dark:hover:text-blue-400 cursor-pointer"
+                                    className="text-slate-300 hover:text-[#0866B1] dark:text-slate-600 dark:hover:text-blue-400 cursor-pointer"
                                     aria-label="Rename period"
                                   >
                                     <Pencil size={13} />
@@ -946,7 +946,7 @@ export function ArchivePage({
                                 <div key={respId} className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-800 shadow-sm text-xs space-y-2">
                                   <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                                     <div className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                      <Building2 size={14} className="text-[#0063a9]" />
+                                      <Building2 size={14} className="text-[#0866B1]" />
                                       {first.company}
                                     </div>
                                     <div className="text-slate-500 flex items-center gap-1">
@@ -958,7 +958,7 @@ export function ArchivePage({
                                       <div key={ans.questionId} className="py-1.5 flex justify-between gap-4">
                                         <span className="text-slate-600 dark:text-slate-400 truncate max-w-sm">Q{ans.questionNumber}. {ans.question}</span>
                                         <div className="text-right shrink-0">
-                                          <span className="font-bold text-[#0063a9]">{ans.rating}</span>
+                                          <span className="font-bold text-[#0866B1]">{ans.rating}</span>
                                         </div>
                                       </div>
                                     ))}
@@ -983,7 +983,7 @@ export function ArchivePage({
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="confirm-restore-survey-modal">
           <div className="bg-white dark:bg-slate-950 rounded-2xl max-w-md w-full border border-slate-100 dark:border-slate-800/80 p-6 shadow-xl space-y-4">
             <div className="flex items-start gap-3">
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-[#0063a9] dark:text-blue-400 rounded-xl shrink-0">
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-[#0866B1] dark:text-blue-400 rounded-xl shrink-0">
                 <RefreshCw size={24} className="animate-spin-slow" />
               </div>
               <div className="space-y-1">
@@ -1003,7 +1003,7 @@ export function ArchivePage({
               </button>
               <button
                 onClick={executeRestoreSurvey}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl bg-[#0063a9] hover:bg-[#00528c] text-white cursor-pointer transition"
+                className="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl bg-[#0866B1] hover:bg-[#07528E] text-white cursor-pointer transition"
                 id="btn-confirm-restore-survey"
               >
                 Confirm Restore
@@ -1017,7 +1017,7 @@ export function ArchivePage({
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in" id="confirm-restore-partner-company-modal">
           <div className="bg-white dark:bg-slate-950 rounded-2xl max-w-md w-full border border-slate-100 dark:border-slate-800/80 p-6 shadow-xl space-y-4">
             <div className="flex items-start gap-3">
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-[#0063a9] dark:text-blue-400 rounded-xl shrink-0">
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 text-[#0866B1] dark:text-blue-400 rounded-xl shrink-0">
                 <Building2 size={24} />
               </div>
               <div className="space-y-1">
@@ -1037,7 +1037,7 @@ export function ArchivePage({
               </button>
               <button
                 onClick={executeRestorePartnerCompany}
-                className="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl bg-[#0063a9] hover:bg-[#00528c] text-white cursor-pointer transition"
+                className="px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-xl bg-[#0866B1] hover:bg-[#07528E] text-white cursor-pointer transition"
                 id="btn-confirm-restore-partner-company"
               >
                 Confirm Restore
@@ -1168,7 +1168,7 @@ export function ArchivePage({
               </button>
               <button
                 onClick={() => setImportResult(null)}
-                className="bg-[#0063a9] hover:bg-[#00528c] text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
+                className="bg-[#0866B1] hover:bg-[#07528E] text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
                 type="button"
               >
                 Done

@@ -123,7 +123,7 @@ export function ActiveCompanyUploadCards({ userEmail }: ActiveCompanyUploadCards
               <div
                 className={`mt-2 rounded-lg border border-dashed px-2 py-3 text-center transition-colors ${
                   isDragging
-                    ? 'border-[#0063a9] bg-blue-50 dark:bg-blue-950/30'
+                    ? 'border-[#0866B1] bg-blue-50 dark:bg-blue-950/30'
                     : 'border-slate-200 bg-slate-50/70 dark:border-slate-700 dark:bg-slate-950/40'
                 }`}
                 onDragEnter={(event) => {
@@ -138,7 +138,7 @@ export function ActiveCompanyUploadCards({ userEmail }: ActiveCompanyUploadCards
                   type="button"
                   onClick={() => fileInputs.current[type]?.click()}
                   disabled={Boolean(busyType)}
-                  className="inline-flex min-h-8 items-center gap-1.5 text-[11px] font-bold text-[#0063a9] hover:text-[#004f87] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400"
+                  className="inline-flex min-h-8 items-center gap-1.5 text-[11px] font-bold text-[#0866B1] hover:text-[#004f87] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0866B1] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400"
                 >
                   {isBusy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <FileSpreadsheet size={14} aria-hidden="true" />}
                   {isBusy ? 'Uploading...' : 'Choose File'}

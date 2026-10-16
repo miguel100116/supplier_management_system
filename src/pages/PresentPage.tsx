@@ -101,7 +101,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
 
   return (
     <div className="space-y-5">
-      <section className="panel relative overflow-hidden border-2 border-blue-100/70 bg-gradient-to-r from-[#0063a9] to-[#00457a] p-6 text-white dark:border-blue-900/40 sm:p-8">
+      <section className="panel relative overflow-hidden border-2 border-blue-100/70 bg-gradient-to-r from-[#0866B1] to-[#00457a] p-6 text-white dark:border-blue-900/40 sm:p-8">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
         <div className="relative flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
@@ -139,13 +139,13 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
                 onClick={() => toggleCategory(category.id)}
                 className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition ${
                   active
-                    ? 'border-[#0063a9] bg-blue-50/70 dark:border-blue-500 dark:bg-blue-950/30'
+                    ? 'border-[#0866B1] bg-blue-50/70 dark:border-blue-500 dark:bg-blue-950/30'
                     : 'border-slate-100 hover:border-slate-200 dark:border-slate-800 dark:hover:border-slate-700'
                 }`}
               >
                 <div
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                    active ? 'bg-[#0063a9] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    active ? 'bg-[#0866B1] text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
                   }`}
                 >
                   <Icon size={16} />
@@ -163,7 +163,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
       {/* Step 2: Time window */}
       <section className="panel">
         <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-[#0063a9] dark:text-blue-400" />
+          <Calendar size={16} className="text-[#0866B1] dark:text-blue-400" />
           <h3 className="text-base font-semibold">2. What time window?</h3>
         </div>
         <p className="text-sm text-slate-500 dark:text-slate-400">Narrow the deck to a specific reporting period, or cover everything on record.</p>
@@ -176,7 +176,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
               title={option.description}
               className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
                 dateRangeId === option.id
-                  ? 'border-[#0063a9] bg-[#0063a9] text-white'
+                  ? 'border-[#0866B1] bg-[#0866B1] text-white'
                   : 'border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400'
               }`}
             >
@@ -192,7 +192,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
                 type="date"
                 value={customFrom}
                 onChange={(e) => setCustomFrom(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-[#0063a9] focus:outline-none focus:ring-1 focus:ring-[#0063a9] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-[#0866B1] focus:outline-none focus:ring-1 focus:ring-[#0866B1] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -201,7 +201,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
                 type="date"
                 value={customTo}
                 onChange={(e) => setCustomTo(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-[#0063a9] focus:outline-none focus:ring-1 focus:ring-[#0063a9] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-800 focus:border-[#0866B1] focus:outline-none focus:ring-1 focus:ring-[#0866B1] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               />
             </label>
             {isCustomInvalid && (
@@ -223,7 +223,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
               onClick={() => toggleSurveyType(type)}
               className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition ${
                 surveyTypes.includes(type)
-                  ? 'border-[#0063a9] bg-[#0063a9] text-white'
+                  ? 'border-[#0866B1] bg-[#0866B1] text-white'
                   : 'border-slate-200 text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:text-slate-400'
               }`}
             >
@@ -245,7 +245,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
           onChange={(e) => setTitleInput(e.target.value)}
           placeholder={DEFAULT_TITLE}
           maxLength={120}
-          className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-[#0063a9] focus:outline-none focus:ring-1 focus:ring-[#0063a9] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 focus:border-[#0866B1] focus:outline-none focus:ring-1 focus:ring-[#0866B1] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
         />
       </section>
 

@@ -62,7 +62,7 @@ import { formatNumber, getScoreAxisDomain, questionPerformance, submissionScores
 import { radarPointLabel } from '../../utils/radarChartLabels';
 import { BulkHiddenChartCapturer, BulkReportCaptureItem } from './BulkHiddenChartCapturer';
 
-const PRIMARY_COLOR = '#0063a9';
+const PRIMARY_COLOR = '#0866B1';
 const PEER_COLOR = '#b91c1c';
 const PEER_LABEL = 'Peer average';
 
@@ -610,7 +610,7 @@ export function SendToPartnerWizard({
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden flex flex-col animate-fadeIn min-h-[80vh]">
       {/* Dispatch Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 dark:border-slate-800 bg-[#0063a9] text-white">
+      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 dark:border-slate-800 bg-[#0866B1] text-white">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
@@ -666,12 +666,12 @@ export function SendToPartnerWizard({
           <div
             onClick={() => setStep(1)}
             className={`flex items-center gap-1.5 font-semibold cursor-pointer ${
-              step >= 1 ? 'text-[#0063a9] dark:text-blue-300' : 'text-slate-400'
+              step >= 1 ? 'text-[#0866B1] dark:text-blue-300' : 'text-slate-400'
             }`}
           >
             <span
               className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                step === 1 ? 'bg-[#0063a9] text-white' : 'bg-blue-100 text-[#0063a9]'
+                step === 1 ? 'bg-[#0866B1] text-white' : 'bg-blue-100 text-[#0866B1]'
               }`}
             >
               1
@@ -683,12 +683,12 @@ export function SendToPartnerWizard({
           <div
             onClick={() => setStep(2)}
             className={`flex items-center gap-1.5 font-semibold cursor-pointer ${
-              step >= 2 ? 'text-[#0063a9] dark:text-blue-300' : 'text-slate-400'
+              step >= 2 ? 'text-[#0866B1] dark:text-blue-300' : 'text-slate-400'
             }`}
           >
             <span
               className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                step === 2 ? 'bg-[#0063a9] text-white' : 'bg-blue-100 text-[#0063a9]'
+                step === 2 ? 'bg-[#0866B1] text-white' : 'bg-blue-100 text-[#0866B1]'
               }`}
             >
               2
@@ -700,12 +700,12 @@ export function SendToPartnerWizard({
           <div
             onClick={() => setStep(3)}
             className={`flex items-center gap-1.5 font-semibold cursor-pointer ${
-              step >= 3 ? 'text-[#0063a9] dark:text-blue-300' : 'text-slate-400'
+              step >= 3 ? 'text-[#0866B1] dark:text-blue-300' : 'text-slate-400'
             }`}
           >
             <span
               className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                step === 3 ? 'bg-[#0063a9] text-white' : 'bg-blue-100 text-[#0063a9]'
+                step === 3 ? 'bg-[#0866B1] text-white' : 'bg-blue-100 text-[#0866B1]'
               }`}
             >
               3
@@ -717,12 +717,12 @@ export function SendToPartnerWizard({
           <div
             onClick={() => setStep(4)}
             className={`flex items-center gap-1.5 font-semibold cursor-pointer ${
-              step >= 4 ? 'text-[#0063a9] dark:text-blue-300' : 'text-slate-400'
+              step >= 4 ? 'text-[#0866B1] dark:text-blue-300' : 'text-slate-400'
             }`}
           >
             <span
               className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                step === 4 ? 'bg-[#0063a9] text-white' : 'bg-blue-100 text-[#0063a9]'
+                step === 4 ? 'bg-[#0866B1] text-white' : 'bg-blue-100 text-[#0866B1]'
               }`}
             >
               4
@@ -734,12 +734,12 @@ export function SendToPartnerWizard({
           <div
             onClick={() => setStep(5)}
             className={`flex items-center gap-1.5 font-semibold cursor-pointer ${
-              step >= 5 ? 'text-[#0063a9] dark:text-blue-300' : 'text-slate-400'
+              step >= 5 ? 'text-[#0866B1] dark:text-blue-300' : 'text-slate-400'
             }`}
           >
             <span
               className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                step === 5 ? 'bg-[#0063a9] text-white' : 'bg-blue-100 text-[#0063a9]'
+                step === 5 ? 'bg-[#0866B1] text-white' : 'bg-blue-100 text-[#0866B1]'
               }`}
             >
               5
@@ -773,13 +773,13 @@ export function SendToPartnerWizard({
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setBulkModificationsModalOpen(true)}
-                    className="text-xs font-bold text-[#0063a9] hover:underline"
+                    className="text-xs font-bold text-[#0866B1] hover:underline"
                   >
                     General Modification
                   </button>
                   <button
                     onClick={handleToggleAllBulk}
-                    className="text-xs font-bold text-[#0063a9] hover:underline"
+                    className="text-xs font-bold text-[#0866B1] hover:underline"
                   >
                     {allBulkSelected ? 'Deselect All' : 'Select All'}
                   </button>
@@ -794,7 +794,7 @@ export function SendToPartnerWizard({
                         type="checkbox"
                         checked={item.selected}
                         onChange={() => handleToggleBulkItem(item.company.id)}
-                        className="h-4.5 w-4.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                        className="h-4.5 w-4.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                       />
                       <div>
                         <p className="font-bold text-slate-900 dark:text-white">{item.company.name}</p>
@@ -806,7 +806,7 @@ export function SendToPartnerWizard({
 
                     <div className="w-24 shrink-0">
                       <p className="text-[10px] text-slate-500">Overall Score</p>
-                      <p className="font-extrabold text-[#0063a9] text-sm">{formatCompositeScore(item.survey?.surveyType ?? sType, item.overallScore).text}</p>
+                      <p className="font-extrabold text-[#0866B1] text-sm">{formatCompositeScore(item.survey?.surveyType ?? sType, item.overallScore).text}</p>
                     </div>
 
                     <div className="flex items-center gap-6 ml-auto">
@@ -841,7 +841,7 @@ export function SendToPartnerWizard({
                              setTempBulkComments(initial);
                              setBulkCommentsModalCompany(item.company.id);
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 rounded border border-[#0063a9]/20 bg-blue-50/50 px-2 py-1.5 text-[10px] font-bold text-[#0063a9] hover:bg-[#0063a9]/10 transition dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300"
+                          className="inline-flex items-center justify-center gap-1.5 rounded border border-[#0866B1]/20 bg-blue-50/50 px-2 py-1.5 text-[10px] font-bold text-[#0866B1] hover:bg-[#0866B1]/10 transition dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-300"
                         >
                           <MessageSquare size={12} />
                           Select Feedback
@@ -856,7 +856,7 @@ export function SendToPartnerWizard({
                               });
                             }
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 rounded border border-[#0063a9]/20 bg-[#0063a9]/10 px-2 py-1.5 text-[10px] font-bold text-[#0063a9] hover:bg-[#0063a9]/20 transition dark:border-blue-900/40 dark:text-blue-300"
+                          className="inline-flex items-center justify-center gap-1.5 rounded border border-[#0866B1]/20 bg-[#0866B1]/10 px-2 py-1.5 text-[10px] font-bold text-[#0866B1] hover:bg-[#0866B1]/20 transition dark:border-blue-900/40 dark:text-blue-300"
                         >
                           <FileText size={12} />
                           Preview Document
@@ -911,7 +911,7 @@ export function SendToPartnerWizard({
               {step === 1 && (
                 <div className="space-y-4 max-w-3xl mx-auto">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FileText size={16} className="text-[#0063a9]" />
+                    <FileText size={16} className="text-[#0866B1]" />
                     Step 1: Confirm Target Partner Company
                   </h4>
 
@@ -937,7 +937,7 @@ export function SendToPartnerWizard({
                             setCcEmails(contact?.ccEmails || []);
                           }
                         }}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0063a9]"
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0866B1]"
                       >
                         <option value="" disabled>Select a company</option>
                         {partnerCompanies
@@ -953,7 +953,7 @@ export function SendToPartnerWizard({
                     {composite ? (
                       <div className="rounded-xl border border-blue-50 bg-blue-50/20 p-4 dark:border-blue-950/20 dark:bg-blue-950/5 space-y-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
-                          <CheckCircle2 className="text-[#0063a9]" size={15} />
+                          <CheckCircle2 className="text-[#0866B1]" size={15} />
                           Active completed survey evaluation found!
                         </div>
                         <div className="grid grid-cols-1 gap-4 text-xs min-[420px]:grid-cols-2">
@@ -965,7 +965,7 @@ export function SendToPartnerWizard({
                           </div>
                           <div>
                             <span className="text-slate-400">Composite Score:</span>
-                            <span className="ml-1.5 font-black text-[#0063a9] dark:text-blue-300">
+                            <span className="ml-1.5 font-black text-[#0866B1] dark:text-blue-300">
                               {formatCompositeScore(sType, composite.compositeScore).text}
                             </span>
                           </div>
@@ -990,7 +990,7 @@ export function SendToPartnerWizard({
               {step === 2 && (
                 <div className="space-y-4 max-w-3xl mx-auto">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Users size={16} className="text-[#0063a9]" />
+                    <Users size={16} className="text-[#0866B1]" />
                     Step 2: Recipient Contact Details
                   </h4>
 
@@ -1006,7 +1006,7 @@ export function SendToPartnerWizard({
                       <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                         Primary Contact Email <span className="text-rose-500">*</span>
                       </label>
-                      <div className="flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 focus-within:ring-2 focus-within:ring-[#0063a9]">
+                      <div className="flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 focus-within:ring-2 focus-within:ring-[#0866B1]">
                         <Mail size={16} className="text-slate-400 shrink-0" />
                         <input
                           type="email"
@@ -1028,7 +1028,7 @@ export function SendToPartnerWizard({
                           value={ccInput}
                           onChange={(e) => setCcInput(e.target.value)}
                           placeholder="Add CC email address..."
-                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs bg-white dark:bg-slate-900 dark:border-slate-700 outline-none flex-1 focus:ring-2 focus:ring-[#0063a9]"
+                          className="rounded-lg border border-slate-300 px-3 py-2 text-xs bg-white dark:bg-slate-900 dark:border-slate-700 outline-none flex-1 focus:ring-2 focus:ring-[#0866B1]"
                           onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddCc())}
                         />
                         <button
@@ -1069,7 +1069,7 @@ export function SendToPartnerWizard({
               {step === 3 && (
                 <div className="space-y-4">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <BarChart3 size={16} className="text-[#0063a9]" />
+                    <BarChart3 size={16} className="text-[#0866B1]" />
                     Step 3: Build the Performance Report
                   </h4>
 
@@ -1147,7 +1147,7 @@ export function SendToPartnerWizard({
                                   setTempSelectedComments({ ...selectedComments });
                                   setIsCommentsModalOpen(true);
                                 }}
-                                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-[#0063a9]/20 bg-[#0063a9]/5 px-3 py-2 text-[11px] font-bold text-[#0063a9] hover:bg-[#0063a9]/10 transition dark:border-blue-900/40 dark:text-blue-300"
+                                className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-[#0866B1]/20 bg-[#0866B1]/5 px-3 py-2 text-[11px] font-bold text-[#0866B1] hover:bg-[#0866B1]/10 transition dark:border-blue-900/40 dark:text-blue-300"
                               >
                                 <MessageSquare size={13} />
                                 <span>Review Stakeholder Remarks ({selectedCommentsList.length})</span>
@@ -1179,9 +1179,9 @@ export function SendToPartnerWizard({
                             <PagedSheet pageLabel="Page 1 · Cover">
                               <div className="flex h-full flex-col items-center justify-center px-6 text-center">
                                 <img src="/microgenesis_logo.png" alt="Microgenesis" className="h-10 w-auto" />
-                                <div className="mt-5 h-px w-14 bg-[#0063a9]" />
+                                <div className="mt-5 h-px w-14 bg-[#0866B1]" />
                                 <h1 className="mt-5 text-xl font-black text-slate-800 dark:text-slate-100 leading-tight">{reportTemplate.reportTitle}</h1>
-                                <p className="mt-1 text-base font-extrabold text-[#0063a9]">{selectedCompanyName || 'Select a company'}</p>
+                                <p className="mt-1 text-base font-extrabold text-[#0866B1]">{selectedCompanyName || 'Select a company'}</p>
                                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                   {periodCovered} · Generated{' '}
                                   {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -1307,7 +1307,7 @@ export function SendToPartnerWizard({
                                   <h4 className="mb-1 text-[10px] font-bold text-slate-700 dark:text-slate-200">Per-Question Average Rating</h4>
                                   <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 text-[9px]">
                                     <table className="w-full text-left">
-                                      <thead className="bg-[#0063a9] text-white">
+                                      <thead className="bg-[#0866B1] text-white">
                                         <tr>
                                           <th className="px-2 py-1 font-semibold">Question</th>
                                           <th className="px-2 py-1 font-semibold w-20">Average</th>
@@ -1343,7 +1343,7 @@ export function SendToPartnerWizard({
                                   ) : (
                                     <div className="overflow-hidden rounded border border-slate-200 dark:border-slate-800 text-[9px] max-h-40 overflow-y-auto">
                                       <table className="w-full text-left">
-                                        <thead className="bg-[#0063a9] text-white">
+                                        <thead className="bg-[#0866B1] text-white">
                                           <tr>
                                             <th className="px-2 py-1 font-semibold w-8">#</th>
                                             <th className="px-2 py-1 font-semibold">Feedback / Comments</th>
@@ -1379,7 +1379,7 @@ export function SendToPartnerWizard({
               {step === 4 && (
                 <div className="space-y-4 max-w-3xl mx-auto">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Mail size={16} className="text-[#0063a9]" />
+                    <Mail size={16} className="text-[#0866B1]" />
                     Step 4: Edit Dispatch Email Message & Attached Performance Report
                   </h4>
 
@@ -1390,7 +1390,7 @@ export function SendToPartnerWizard({
                         type="text"
                         value={subject}
                         onChange={(e) => setSubject(e.target.value)}
-                        className="rounded-lg border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-800 w-full dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0063a9]"
+                        className="rounded-lg border border-slate-300 px-3 py-2.5 text-xs font-semibold text-slate-800 w-full dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0866B1]"
                       />
                     </div>
 
@@ -1402,7 +1402,7 @@ export function SendToPartnerWizard({
                         rows={12}
                         value={body}
                         onChange={(e) => setBody(e.target.value)}
-                        className="rounded-lg border border-slate-300 px-4 py-3 text-xs font-mono leading-relaxed text-slate-800 w-full dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0063a9] min-h-[320px] shadow-sm"
+                        className="rounded-lg border border-slate-300 px-4 py-3 text-xs font-mono leading-relaxed text-slate-800 w-full dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0866B1] min-h-[320px] shadow-sm"
                       />
                     </div>
 
@@ -1590,7 +1590,7 @@ export function SendToPartnerWizard({
               <button
                 type="button"
                 onClick={() => handleExportPdfPreview(true)}
-                className="inline-flex items-center rounded-lg bg-[#0063a9]/10 hover:bg-[#0063a9]/20 text-[#0063a9] px-4 py-2 text-xs font-bold transition border border-[#0063a9]/20"
+                className="inline-flex items-center rounded-lg bg-[#0866B1]/10 hover:bg-[#0866B1]/20 text-[#0866B1] px-4 py-2 text-xs font-bold transition border border-[#0866B1]/20"
               >
                 <FileText size={14} className="mr-1.5" />
                 Preview/Print
@@ -1599,7 +1599,7 @@ export function SendToPartnerWizard({
             <button
               type="button"
               onClick={() => setStep((step + 1) as any)}
-              className="primary-button text-xs gap-1.5 bg-[#0063a9] hover:bg-blue-800 animate-none"
+              className="primary-button text-xs gap-1.5 bg-[#0866B1] hover:bg-blue-800 animate-none"
             >
               Next Step
               <ChevronRight size={14} />
@@ -1633,12 +1633,12 @@ export function SendToPartnerWizard({
             </div>
             <div className="p-5 overflow-y-auto space-y-3 flex-1 bg-slate-50/50 dark:bg-slate-900">
               {respondentComments.map((c) => (
-                <label key={c.responseId} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 cursor-pointer hover:border-[#0063a9]/50 transition">
+                <label key={c.responseId} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 cursor-pointer hover:border-[#0866B1]/50 transition">
                   <input
                     type="checkbox"
                     checked={tempSelectedComments[c.responseId] !== false}
                     onChange={(e) => setTempSelectedComments({ ...tempSelectedComments, [c.responseId]: e.target.checked })}
-                    className="mt-0.5 rounded text-[#0063a9] focus:ring-[#0063a9]"
+                    className="mt-0.5 rounded text-[#0866B1] focus:ring-[#0866B1]"
                   />
                   <div>
                     <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{c.respondentType} {c.department ? `- ${c.department}` : ''}</p>
@@ -1660,7 +1660,7 @@ export function SendToPartnerWizard({
                   }
                   setIsCommentsModalOpen(false);
                 }}
-                className="px-4 py-2 text-xs font-bold text-white bg-[#0063a9] hover:bg-blue-800 rounded-lg"
+                className="px-4 py-2 text-xs font-bold text-white bg-[#0866B1] hover:bg-blue-800 rounded-lg"
               >
                 Save Selections
               </button>
@@ -1692,12 +1692,12 @@ export function SendToPartnerWizard({
                  );
                  if (compComments.length === 0) return <p className="text-sm text-center text-slate-500">No stakeholder comments found.</p>;
                  return compComments.map((c) => (
-                    <label key={c.responseId} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 cursor-pointer hover:border-[#0063a9]/50 transition">
+                    <label key={c.responseId} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 dark:border-slate-700 cursor-pointer hover:border-[#0866B1]/50 transition">
                       <input
                         type="checkbox"
                         checked={tempBulkComments[c.responseId] !== false}
                         onChange={(e) => setTempBulkComments({ ...tempBulkComments, [c.responseId]: e.target.checked })}
-                        className="mt-0.5 rounded text-[#0063a9] focus:ring-[#0063a9]"
+                        className="mt-0.5 rounded text-[#0866B1] focus:ring-[#0866B1]"
                       />
                       <div>
                         <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{c.respondentType} {c.department ? `- ${c.department}` : ''}</p>
@@ -1717,7 +1717,7 @@ export function SendToPartnerWizard({
                   }
                   setBulkCommentsModalCompany(null);
                 }}
-                className="px-4 py-2 text-xs font-bold text-white bg-[#0063a9] hover:bg-blue-800 rounded-lg"
+                className="px-4 py-2 text-xs font-bold text-white bg-[#0866B1] hover:bg-blue-800 rounded-lg"
               >
                 Save Selections
               </button>
@@ -1753,12 +1753,12 @@ export function SendToPartnerWizard({
                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5"><MessageSquare size={16} /> Stakeholder Remarks</span>
                      <p className="text-[10px] text-slate-500 mt-0.5">Include written comments in the report</p>
                    </div>
-                   <input type="checkbox" checked={includeComments} onChange={(e) => setIncludeComments(e.target.checked)} className="h-5 w-5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]" />
+                   <input type="checkbox" checked={includeComments} onChange={(e) => setIncludeComments(e.target.checked)} className="h-5 w-5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]" />
                  </label>
                </div>
             </div>
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 flex justify-end">
-              <button onClick={() => setBulkModificationsModalOpen(false)} className="px-5 py-2.5 text-xs font-bold text-white bg-[#0063a9] hover:bg-blue-800 rounded-lg shadow">
+              <button onClick={() => setBulkModificationsModalOpen(false)} className="px-5 py-2.5 text-xs font-bold text-white bg-[#0866B1] hover:bg-blue-800 rounded-lg shadow">
                 Done
               </button>
             </div>
@@ -1849,7 +1849,7 @@ function GraphOption({
 }) {
   return (
     <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs dark:border-slate-800 bg-white dark:bg-slate-900">
-      <input type="checkbox" checked={checked} onChange={onChange} className="rounded text-[#0063a9] focus:ring-[#0063a9]" />
+      <input type="checkbox" checked={checked} onChange={onChange} className="rounded text-[#0866B1] focus:ring-[#0866B1]" />
       <Icon size={14} className="text-slate-400" />
       <span className="text-slate-700 dark:text-slate-200 font-medium">{label}</span>
     </label>

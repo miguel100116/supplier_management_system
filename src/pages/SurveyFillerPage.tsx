@@ -705,12 +705,12 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       {/* Step Progress bar */}
       <div className="flex items-center justify-between gap-2 px-1 sm:px-2">
         <div className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 1 ? 'bg-[#0063a9] text-white' : 'bg-slate-200 text-slate-500'}`}>1</span>
+          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 1 ? 'bg-[#0866B1] text-white' : 'bg-slate-200 text-slate-500'}`}>1</span>
           <span className={`hidden min-[420px]:inline ${step >= 1 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400'}`}>Respondent Info</span>
         </div>
         <div className="mx-1 h-px flex-1 bg-slate-200 dark:bg-slate-800 sm:mx-4" />
         <div className="flex items-center gap-1.5 text-xs font-semibold">
-          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 2 ? 'bg-[#0063a9] text-white' : 'bg-slate-200 text-slate-500'}`}>2</span>
+          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${step >= 2 ? 'bg-[#0866B1] text-white' : 'bg-slate-200 text-slate-500'}`}>2</span>
           <span className={`hidden min-[420px]:inline ${step >= 2 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400'}`}>Questions Form</span>
         </div>
         <div className="mx-1 h-px flex-1 bg-slate-200 dark:bg-slate-800 sm:mx-4" />
@@ -723,7 +723,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       {step === 1 && (
         <div className="panel space-y-6 p-4 min-[420px]:p-6 sm:p-10" id="survey-filler-step-1">
           <div className="text-center max-w-xl mx-auto space-y-2">
-            <p className="text-[10px] uppercase tracking-widest text-[#0063a9] font-bold dark:text-blue-300">Microsoft Forms Ingress</p>
+            <p className="text-[10px] uppercase tracking-widest text-[#0866B1] font-bold dark:text-blue-300">Microsoft Forms Ingress</p>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Stakeholder Feedback Form</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Provide your details and complete the official MBS stakeholder evaluation survey. Your feedback directly impacts operations.
@@ -750,7 +750,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
           )}
 
           <form onSubmit={handleStartForm} className="space-y-5 border-t border-slate-100 pt-6 dark:border-slate-800">
-            <div className="bg-[#0063a9]/10 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300 font-bold px-4 py-2.5 rounded-lg text-sm uppercase tracking-wider border border-[#0063a9]/10 shadow-xs mb-6">
+            <div className="bg-[#0866B1]/10 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300 font-bold px-4 py-2.5 rounded-lg text-sm uppercase tracking-wider border border-[#0866B1]/10 shadow-xs mb-6">
               Section 1: Details
             </div>
 
@@ -873,7 +873,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 {lastSubmissionForType && (
                   <label
                     htmlFor="filler-copy-previous"
-                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#0063a9]/20 bg-[#0063a9]/5 p-4 text-sm dark:border-blue-900/40 dark:bg-blue-950/20"
+                    className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#0866B1]/20 bg-[#0866B1]/5 p-4 text-sm dark:border-blue-900/40 dark:bg-blue-950/20"
                   >
                     <input
                       id="filler-copy-previous"
@@ -916,7 +916,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
               {!hasEvaluatedAll && (
                 <button
                   type="submit"
-                  className="primary-button w-full bg-[#0063a9] hover:bg-[#00528c] min-[420px]:w-auto"
+                  className="primary-button w-full bg-[#0866B1] hover:bg-[#07528E] min-[420px]:w-auto"
                   id="btn-filler-next"
                 >
                   <span>Proceed to Form Questions</span>
@@ -931,8 +931,8 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       {step === 2 && activeSurvey && (
         <form onSubmit={handleSubmit} className="space-y-6" id="survey-filler-step-2">
           {/* Form Header Info card */}
-          <div className="panel bg-[#0063a9]/5 border-blue-100 dark:border-blue-900/30">
-            <h3 className="text-lg font-bold text-[#0063a9] dark:text-blue-300">{activeSurvey.title}</h3>
+          <div className="panel bg-[#0866B1]/5 border-blue-100 dark:border-blue-900/30">
+            <h3 className="text-lg font-bold text-[#0866B1] dark:text-blue-300">{activeSurvey.title}</h3>
             <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{activeSurvey.description}</p>
             <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-blue-400/10">
               <div>
@@ -974,7 +974,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                   <div key={q.questionId} className="space-y-3">
                     {showSectionHeader && (
                       <div className="pt-6 pb-1 first:pt-0">
-                        <div className="bg-[#0063a9]/10 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300 font-bold px-4 py-2.5 rounded-lg text-sm uppercase tracking-wider border border-[#0063a9]/10 shadow-xs">
+                        <div className="bg-[#0866B1]/10 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300 font-bold px-4 py-2.5 rounded-lg text-sm uppercase tracking-wider border border-[#0866B1]/10 shadow-xs">
                           {q.section}
                         </div>
                       </div>
@@ -986,7 +986,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                       className={`panel p-5 space-y-4 shadow-sm hover:shadow-md transition duration-200 border-l-4 ${
                         validationErrors[q.questionId]
                           ? 'border-l-rose-500 bg-rose-50/10 ring-1 ring-rose-300 dark:border-l-rose-500 dark:bg-rose-950/5 dark:ring-rose-900/30'
-                          : 'border-l-[#0063a9] dark:border-l-blue-400'
+                          : 'border-l-[#0866B1] dark:border-l-blue-400'
                       }`}
                     >
                       <div className="space-y-1">
@@ -1055,7 +1055,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                                 <label key={opt} className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
                                   <input 
                                     type="checkbox"
-                                    className="w-4 h-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                                    className="w-4 h-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                                     checked={isChecked}
                                     onChange={(e) => {
                                       handleCheckboxChange(q.questionId, opt, e.target.checked);
@@ -1127,14 +1127,14 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                                   <tr key={sub.id} className={idx !== q.subQuestions!.length - 1 ? "border-b border-slate-100 dark:border-slate-800" : ""}>
                                     <td className="py-4 pr-4">
                                       <div className="text-slate-800 dark:text-slate-200 leading-snug">{String.fromCharCode(97 + idx)}. {sub.label}</div>
-                                      {sub.description && <div className="text-xs text-[#0063a9] dark:text-blue-400 mt-2 font-medium">{sub.description}</div>}
+                                      {sub.description && <div className="text-xs text-[#0866B1] dark:text-blue-400 mt-2 font-medium">{sub.description}</div>}
                                     </td>
                                     {[2, 1, 0, 'N/A'].map(opt => (
                                       <td key={opt} className="py-4 text-center">
                                         <input 
                                           type="radio"
                                           name={`matrix-${q.questionId}-${sub.id}`}
-                                          className="w-4 h-4 text-[#0063a9] border-slate-300 focus:ring-[#0063a9]"
+                                          className="w-4 h-4 text-[#0866B1] border-slate-300 focus:ring-[#0866B1]"
                                           checked={subVal.toString() === opt.toString()}
                                           onChange={() => {
                                             handleMatrixRatingChange(q.questionId, sub.id, opt);
@@ -1334,7 +1334,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="primary-button bg-[#0063a9] hover:bg-[#00528c]"
+                className="primary-button bg-[#0866B1] hover:bg-[#07528E]"
                 type="button"
               >
                 Return to Directory

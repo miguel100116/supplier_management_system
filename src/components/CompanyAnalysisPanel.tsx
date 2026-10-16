@@ -279,7 +279,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
               <button
                 key={type}
                 type="button"
-                className={`min-w-max py-2 text-center w-full flex-1 ${surveyType === type ? 'segmented-active font-bold text-[#0063a9] dark:text-blue-400 shadow-sm' : ''}`}
+                className={`min-w-max py-2 text-center w-full flex-1 ${surveyType === type ? 'segmented-active font-bold text-[#0866B1] dark:text-blue-400 shadow-sm' : ''}`}
                 aria-pressed={surveyType === type}
                 onClick={() => {
                   setSurveyType(type);
@@ -350,7 +350,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
                   onClick={() => setChartView('radar')}
                   className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors ${
                     chartView === 'radar'
-                      ? 'bg-[#0063a9] text-white'
+                      ? 'bg-[#0866B1] text-white'
                       : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900'
                   }`}
                   aria-label="Show radar chart"
@@ -363,7 +363,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
                   onClick={() => setChartView('bar')}
                   className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors border-l border-slate-200 dark:border-slate-700 ${
                     chartView === 'bar'
-                      ? 'bg-[#0063a9] text-white'
+                      ? 'bg-[#0866B1] text-white'
                       : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900'
                   }`}
                   aria-label="Show bar chart"
@@ -448,7 +448,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
                     onClick={() => setTrendGranularity(option)}
                     className={`px-3 py-1.5 text-xs font-medium capitalize transition-colors ${idx > 0 ? 'border-l border-slate-200 dark:border-slate-700' : ''} ${
                       trendGranularity === option
-                        ? 'bg-[#0063a9] text-white'
+                        ? 'bg-[#0866B1] text-white'
                         : 'bg-white dark:bg-slate-950 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900'
                     }`}
                     aria-pressed={trendGranularity === option}

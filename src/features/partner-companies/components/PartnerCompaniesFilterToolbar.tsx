@@ -134,10 +134,10 @@ export function PartnerCompaniesFilterToolbar({
           </select>
         )}
 
-        <button type="button" onClick={onToggleAdvancedFilters} className={'secondary-button min-h-10 justify-center gap-1.5 px-3 text-xs font-bold ' + (isAdvancedFiltersOpen ? 'ring-2 ring-[#0063a9]/20' : '')} aria-expanded={isAdvancedFiltersOpen} aria-controls="partner-company-advanced-filters">
+        <button type="button" onClick={onToggleAdvancedFilters} className={'secondary-button min-h-10 justify-center gap-1.5 px-3 text-xs font-bold ' + (isAdvancedFiltersOpen ? 'ring-2 ring-[#0866B1]/20' : '')} aria-expanded={isAdvancedFiltersOpen} aria-controls="partner-company-advanced-filters">
           <SlidersHorizontal size={14} aria-hidden="true" />
           Filters
-          {advancedFilterCount > 0 && <span className="rounded-full bg-[#0063a9] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={advancedFilterCount + ' active filters'}>{advancedFilterCount}</span>}
+          {advancedFilterCount > 0 && <span className="rounded-full bg-[#0866B1] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={advancedFilterCount + ' active filters'}>{advancedFilterCount}</span>}
           <ChevronDown size={14} className={'transition-transform ' + (isAdvancedFiltersOpen ? 'rotate-180' : '')} aria-hidden="true" />
         </button>
 
@@ -147,7 +147,7 @@ export function PartnerCompaniesFilterToolbar({
             <button type="button" onClick={onOpenActiveCompanies} className="secondary-button min-h-10 flex-1 gap-1.5 px-3 text-xs font-bold sm:flex-none" title="View active companies by type">
               <Building size={14} aria-hidden="true" /> Active by Type
             </button>
-            <button type="button" onClick={onOpenRegister} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0063a9] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition duration-150 hover:bg-[#00528c] sm:flex-none">
+            <button type="button" onClick={onOpenRegister} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0866B1] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition duration-150 hover:bg-[#07528E] sm:flex-none">
               <Plus size={15} aria-hidden="true" /> <span>Register New Partner</span>
             </button>
           </div>
@@ -161,7 +161,7 @@ export function PartnerCompaniesFilterToolbar({
               <span className="truncate">{chip.label}</span><X size={12} className="shrink-0" aria-hidden="true" />
             </button>
           ))}
-          <button type="button" onClick={onReset} className="text-xs font-semibold text-[#0063a9] underline dark:text-blue-400">Clear all</button>
+          <button type="button" onClick={onReset} className="text-xs font-semibold text-[#0866B1] underline dark:text-blue-400">Clear all</button>
         </div>
       )}
 

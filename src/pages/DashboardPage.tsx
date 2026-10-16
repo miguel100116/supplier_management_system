@@ -466,7 +466,7 @@ export function DashboardPage({
                   onClick={() => onChangeDataScope(scope)}
                   className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                     dataScope === scope
-                      ? 'bg-[#0063a9] text-white shadow-xs'
+                      ? 'bg-[#0866B1] text-white shadow-xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
@@ -1001,7 +1001,7 @@ export function DashboardPage({
                   onClick={() => setCatalogTab(tab)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
                     catalogTab === tab 
-                      ? 'bg-[#0063a9] text-white' 
+                      ? 'bg-[#0866B1] text-white'
                       : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                   }`}
                   type="button"
@@ -1040,7 +1040,7 @@ export function DashboardPage({
                       </span>
                       <button
                         onClick={() => handleAddWidget(item)}
-                        className="inline-flex items-center justify-center gap-1 cursor-pointer rounded-lg bg-[#0063a9]/10 hover:bg-[#0063a9] text-[#0063a9] hover:text-white px-2.5 py-1.5 text-[11px] font-bold transition-all duration-150"
+                        className="inline-flex items-center justify-center gap-1 cursor-pointer rounded-lg bg-[#0866B1]/10 hover:bg-[#0866B1] text-[#0866B1] hover:text-white px-2.5 py-1.5 text-[11px] font-bold transition-all duration-150"
                         type="button"
                       >
                         <Plus size={12} />

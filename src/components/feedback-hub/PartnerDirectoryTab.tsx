@@ -126,7 +126,7 @@ export function PartnerDirectoryTab({
 
           <button
             onClick={handleOpenAdd}
-            className="primary-button text-xs gap-1.5 bg-[#0063a9] hover:bg-blue-800 shrink-0"
+            className="primary-button text-xs gap-1.5 bg-[#0866B1] hover:bg-blue-800 shrink-0"
           >
             <Plus size={15} />
             Add Partner Contact
@@ -166,7 +166,7 @@ export function PartnerDirectoryTab({
               </div>
 
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Building size={16} className="text-[#0063a9] shrink-0" />
+                <Building size={16} className="text-[#0866B1] shrink-0" />
                 {contact.companyName}
               </h3>
 
@@ -178,7 +178,7 @@ export function PartnerDirectoryTab({
 
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">Primary Email</span>
-                  <span className="font-semibold text-[#0063a9] dark:text-blue-300 flex items-center gap-1 mt-0.5">
+                  <span className="font-semibold text-[#0866B1] dark:text-blue-300 flex items-center gap-1 mt-0.5">
                     <Mail size={13} />
                     {contact.email}
                   </span>
@@ -215,7 +215,7 @@ export function PartnerDirectoryTab({
           <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Users size={16} className="text-[#0063a9]" />
+                <Users size={16} className="text-[#0866B1]" />
                 {editingContact ? 'Edit Partner Contact' : 'Add New Partner Contact'}
               </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
@@ -293,7 +293,7 @@ export function PartnerDirectoryTab({
                 </button>
                 <button
                   type="submit"
-                  className="primary-button text-xs bg-[#0063a9]"
+                  className="primary-button text-xs bg-[#0866B1]"
                 >
                   {editingContact ? 'Save Changes' : 'Create Contact'}
                 </button>

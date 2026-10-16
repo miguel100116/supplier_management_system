@@ -146,12 +146,12 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
             </div>
             <div className="space-y-6">
               {selectedSubmission.answers.map((answer) => (
-                <div key={answer.questionId} className="border-l-2 border-[#0063a9] pl-4 dark:border-blue-500">
+                <div key={answer.questionId} className="border-l-2 border-[#0866B1] pl-4 dark:border-blue-500">
                   <p className="mb-1 text-sm text-slate-500 dark:text-slate-400">{answer.questionCategory} - Q{answer.questionNumber}</p>
                   <p className="mb-2 font-medium text-slate-900 dark:text-slate-100">{answer.question}</p>
                   <div className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-900/50">
                     <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Answer:</span>
-                    <span className="font-bold text-[#0063a9] dark:text-blue-400">{answerValue(answer)}</span>
+                    <span className="font-bold text-[#0866B1] dark:text-blue-400">{answerValue(answer)}</span>
                   </div>
                 </div>
               ))}
@@ -164,7 +164,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                 <label htmlFor="response-email-search" className="mb-2 block text-sm font-semibold">Search respondent email</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-                  <input id="response-email-search" type="search" placeholder="Filter by email..." className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#0063a9] dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-600" value={emailSearch} onChange={(event) => { setEmailSearch(event.target.value); setPage(1); }} />
+                  <input id="response-email-search" type="search" placeholder="Filter by email..." className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[#0866B1] dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-600" value={emailSearch} onChange={(event) => { setEmailSearch(event.target.value); setPage(1); }} />
                 </div>
               </div>
               <div>
@@ -174,7 +174,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                   <option value="filtered">Filtered responses</option>
                 </select>
               </div>
-              <button type="button" onClick={exportExcel} disabled={!exportSubmissions.length || isExporting} className="inline-flex items-center gap-2 rounded-lg bg-[#0063a9] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-600">
+              <button type="button" onClick={exportExcel} disabled={!exportSubmissions.length || isExporting} className="inline-flex items-center gap-2 rounded-lg bg-[#0866B1] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-600">
                 <Download size={16} /> {isExporting ? 'Preparing Excel...' : 'Export to Excel'}
               </button>
             </div>
@@ -199,7 +199,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                           <td className="px-4 py-3">{submission.first.company}</td>
                           <td className="px-4 py-3">{new Date(submission.first.submissionDate).toLocaleString()}{submission.first.submissionDateInferredFrom && ' (inferred)'}</td>
                           <td className="px-4 py-3">{submission.score === null ? 'N/A' : (Math.round(submission.score * 10) / 10) + '%'}</td>
-                          <td className="px-4 py-3"><button type="button" className="font-semibold text-[#0063a9] underline dark:text-blue-400" onClick={() => setSelectedResponseId(submission.id)}>View answers</button></td>
+                          <td className="px-4 py-3"><button type="button" className="font-semibold text-[#0866B1] underline dark:text-blue-400" onClick={() => setSelectedResponseId(submission.id)}>View answers</button></td>
                         </tr>
                       ))}
                     </tbody>

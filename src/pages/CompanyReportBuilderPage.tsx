@@ -46,7 +46,7 @@ interface CompanyReportBuilderPageProps {
 }
 
 const CATEGORIES: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
-const PRIMARY_COLOR = '#0063a9';
+const PRIMARY_COLOR = '#0866B1';
 const PEER_COLOR = '#b91c1c';
 const PEER_LABEL = 'Peer average';
 
@@ -340,7 +340,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                 <button
                   type="button"
                   onClick={handleOpenCommentsModal}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-[#0063a9]/20 bg-[#0063a9]/5 px-4 py-2 text-xs font-semibold text-[#0063a9] hover:bg-[#0063a9]/10 transition dark:border-blue-900/40 dark:text-blue-300"
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-[#0866B1]/20 bg-[#0866B1]/5 px-4 py-2 text-xs font-semibold text-[#0866B1] hover:bg-[#0866B1]/10 transition dark:border-blue-900/40 dark:text-blue-300"
                 >
                   <MessageSquare size={14} />
                   <span>Review Stakeholder Remarks ({selectedCommentsList.length})</span>
@@ -374,9 +374,9 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                   <div className="flex h-full flex-col items-center px-6 text-center">
                     <div className="pt-[16%]">
                       <img src="/microgenesis_logo.png" alt="Microgenesis" className="mx-auto h-14 w-auto" />
-                      <div className="mx-auto mt-7 h-px w-20 bg-[#0063a9]" />
+                      <div className="mx-auto mt-7 h-px w-20 bg-[#0866B1]" />
                       <h1 className="mt-7 text-3xl font-bold text-slate-800 dark:text-slate-100">Company Performance Report</h1>
-                      <p className="mt-2 text-xl font-bold text-[#0063a9]">{composite.company}</p>
+                      <p className="mt-2 text-xl font-bold text-[#0866B1]">{composite.company}</p>
                       <p className="mt-1 text-base text-slate-500 dark:text-slate-400">
                         {category} Evaluation · Generated{' '}
                         {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -519,7 +519,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                         <h4 className="mb-2 text-base font-bold text-slate-800 dark:text-slate-100">Per-Question Average Rating</h4>
                         <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
                           <table className="w-full text-left text-[10px]">
-                            <thead className="bg-[#0063a9] text-white">
+                            <thead className="bg-[#0866B1] text-white">
                               <tr>
                                 <th className="px-2.5 py-1.5 font-semibold">Question</th>
                                 <th className="px-2.5 py-1.5 font-semibold">Average Rating</th>
@@ -550,7 +550,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                         ) : (
                           <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
                             <table className="w-full text-left text-[10px]">
-                              <thead className="bg-[#0063a9] text-white">
+                              <thead className="bg-[#0866B1] text-white">
                                 <tr>
                                   <th className="px-2.5 py-1.5 font-semibold w-12">#</th>
                                   <th className="px-2.5 py-1.5 font-semibold">Feedback / Comments</th>
@@ -652,7 +652,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                           });
                           setTempSelectedComments(updated);
                         }}
-                        className="text-[#0063a9] hover:underline dark:text-blue-400"
+                        className="text-[#0866B1] hover:underline dark:text-blue-400"
                       >
                         Select All
                       </button>
@@ -677,7 +677,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                           key={c.responseId}
                           className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition text-sm ${
                             isChecked
-                              ? 'border-[#0063a9]/30 bg-[#0063a9]/5 dark:border-blue-900/30 dark:bg-blue-950/20'
+                              ? 'border-[#0866B1]/30 bg-[#0866B1]/5 dark:border-blue-900/30 dark:bg-blue-950/20'
                               : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/50'
                           }`}
                         >
@@ -690,7 +690,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                                 [c.responseId]: e.target.checked,
                               }));
                             }}
-                            className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                           />
                           <div className="flex-1 space-y-1">
                             <p className="text-slate-700 dark:text-slate-200 italic leading-relaxed">
@@ -724,7 +724,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                   setSelectedComments(tempSelectedComments);
                   setIsCommentsModalOpen(false);
                 }}
-                className="primary-button bg-[#0063a9] hover:bg-[#00528c]"
+                className="primary-button bg-[#0866B1] hover:bg-[#07528E]"
               >
                 Save Selection
               </button>
@@ -740,7 +740,7 @@ function SummaryStat({ label, value, accent }: { label: string; value: string; a
   return (
     <div className="p-3">
       <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
-      <p className={`mt-1 text-sm font-bold ${accent ? 'text-[#0063a9]' : 'text-slate-800 dark:text-slate-100'}`}>{value}</p>
+      <p className={`mt-1 text-sm font-bold ${accent ? 'text-[#0866B1]' : 'text-slate-800 dark:text-slate-100'}`}>{value}</p>
     </div>
   );
 }

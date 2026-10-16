@@ -72,7 +72,7 @@ const LOGO_URL = '/microgenesis_logo.png';
 const LOGO_ASPECT = 498 / 1921; // height / width
 
 const COLORS = {
-  Courier: '#0063a9',
+  Courier: '#0866B1',
   Supplier: '#0ea5e9',
   Subcontractor: '#14b8a6',
 };
@@ -1105,7 +1105,7 @@ export function ExecutiveSummaryReportBuilderPage({
                   type="checkbox"
                   checked={selectedTypes[type]}
                   onChange={() => toggleType(type)}
-                  className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                  className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   {type} Division
@@ -1122,7 +1122,7 @@ export function ExecutiveSummaryReportBuilderPage({
               <TrendingUp size={13} />
               <span>2. Critical Threshold</span>
             </span>
-            <span className="text-[#0063a9] font-mono font-bold text-xs">{questionThreshold}%</span>
+            <span className="text-[#0866B1] font-mono font-bold text-xs">{questionThreshold}%</span>
           </div>
           <p className="text-[10px] text-slate-400">Flag questions with scores under this benchmark limit.</p>
           <input
@@ -1131,7 +1131,7 @@ export function ExecutiveSummaryReportBuilderPage({
             max="95"
             value={questionThreshold}
             onChange={(e) => setQuestionThreshold(Number(e.target.value))}
-            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0063a9] dark:bg-slate-800"
+            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-[#0866B1] dark:bg-slate-800"
             id="threshold-range"
           />
           <div className="flex justify-between text-[10px] text-slate-400">
@@ -1177,7 +1177,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showCoverPage}
                 onChange={(e) => setShowCoverPage(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Confidential Cover Page</span>
             </label>
@@ -1186,7 +1186,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showKpis}
                 onChange={(e) => setShowKpis(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Core KPI Metrics Cards</span>
             </label>
@@ -1195,7 +1195,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showChart}
                 onChange={(e) => setShowChart(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Circular Graphe Chart</span>
             </label>
@@ -1204,7 +1204,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showSurveyTable}
                 onChange={(e) => setShowSurveyTable(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Survey Division Metrics</span>
             </label>
@@ -1213,7 +1213,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showQuestionTable}
                 onChange={(e) => setShowQuestionTable(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Ranked Question Diagnostics</span>
             </label>
@@ -1222,7 +1222,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showCompanyRankings}
                 onChange={(e) => setShowCompanyRankings(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Top / Bottom Rated Partners</span>
             </label>
@@ -1231,7 +1231,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showRecommendations}
                 onChange={(e) => setShowRecommendations(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Automated Action Guidelines</span>
             </label>
@@ -1240,7 +1240,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showCustomNotes}
                 onChange={(e) => setShowCustomNotes(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Executive Commentary Box</span>
             </label>
@@ -1249,7 +1249,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 type="checkbox"
                 checked={showDetailedQuestionReport}
                 onChange={(e) => setShowDetailedQuestionReport(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
+                className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
               <span className="text-slate-600 dark:text-slate-300">Detailed Question Reports</span>
             </label>
@@ -1321,7 +1321,7 @@ export function ExecutiveSummaryReportBuilderPage({
             
             {/* Confidential Cover Page Preview if checked */}
             {showCoverPage && (
-              <div className="border-b-4 border-[#0063a9] pb-8 mb-8 animate-fade-in text-center">
+              <div className="border-b-4 border-[#0866B1] pb-8 mb-8 animate-fade-in text-center">
                 <img src={LOGO_URL} alt="Microgenesis" className="mx-auto h-10 w-auto" referrerPolicy="no-referrer" />
                 <div className="pt-8 pb-4">
                   <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Executive Briefing Report</h1>
@@ -1349,7 +1349,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 <img src={LOGO_URL} alt="Microgenesis Logo" className="h-8 w-auto object-contain" referrerPolicy="no-referrer" />
               </div>
               <div className="text-right">
-                <h1 className="text-xs font-extrabold tracking-wider text-[#0063a9] uppercase">Executive Briefing Report</h1>
+                <h1 className="text-xs font-extrabold tracking-wider text-[#0866B1] uppercase">Executive Briefing Report</h1>
                 <p className="text-[9px] text-slate-400 mt-0.5 font-mono">MBS Partner Evaluation System</p>
               </div>
             </div>
@@ -1357,25 +1357,25 @@ export function ExecutiveSummaryReportBuilderPage({
             {/* 1. Core KPIs Section */}
             {showKpis && (
               <div className="space-y-3">
-                <h3 className="text-xs font-extrabold text-[#0063a9] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                <h3 className="text-xs font-extrabold text-[#0866B1] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   <Zap size={14} />
                   <span>1. Operational Overview &amp; KPIs</span>
                 </h3>
                 <div className="grid grid-cols-2 gap-3.5">
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
-                    <span className="text-lg font-black text-[#0063a9] block">{summary.totalResponses}</span>
+                    <span className="text-lg font-black text-[#0866B1] block">{summary.totalResponses}</span>
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">Total Submitted Survey Evaluations</span>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
-                    <span className="text-lg font-black text-[#0063a9] block">{formatNumber(summary.averageRating)}%</span>
+                    <span className="text-lg font-black text-[#0866B1] block">{formatNumber(summary.averageRating)}%</span>
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">Average System Compliance Score</span>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
-                    <span className="text-lg font-black text-[#0063a9] block">{formatNumber(summary.overallSatisfactionScore)}%</span>
+                    <span className="text-lg font-black text-[#0866B1] block">{formatNumber(summary.overallSatisfactionScore)}%</span>
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">Overall Partner Satisfaction Index</span>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
-                    <span className="text-lg font-black text-[#0063a9] block">{formatNumber(summary.naPercentage)}%</span>
+                    <span className="text-lg font-black text-[#0866B1] block">{formatNumber(summary.naPercentage)}%</span>
                     <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">N/A Relevancy Frequency Rate</span>
                   </div>
                 </div>
@@ -1444,7 +1444,7 @@ export function ExecutiveSummaryReportBuilderPage({
                           {surveyPerformance.map((row) => (
                             <tr key={row.surveyType} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                               <td className="p-2 font-medium">{row.surveyType}</td>
-                              <td className="p-2 text-right font-semibold text-[#0063a9]">{formatCompositeScore(row.surveyType, row.average).text}</td>
+                              <td className="p-2 text-right font-semibold text-[#0866B1]">{formatCompositeScore(row.surveyType, row.average).text}</td>
                               <td className="p-2 text-right text-slate-500">{row.responses}</td>
                             </tr>
                           ))}
@@ -1473,7 +1473,7 @@ export function ExecutiveSummaryReportBuilderPage({
             {/* 2. Critical Area Diagnostics Section (Question Report Integration) */}
             {showQuestionTable && criticalQuestions.length > 0 && (
               <div className="space-y-3 pt-1">
-                <h3 className="text-xs font-extrabold text-[#0063a9] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                <h3 className="text-xs font-extrabold text-[#0866B1] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   <FileSpreadsheet size={14} />
                   <span>2. Critical Area Diagnostics (Questions Ranked)</span>
                 </h3>
@@ -1540,7 +1540,7 @@ export function ExecutiveSummaryReportBuilderPage({
             {/* 3. Partner Performance Rankings Section */}
             {showCompanyRankings && (topCompanies.length > 0 || leastRatedCompanies.length > 0) && (
               <div className="space-y-4 pt-1">
-                <h3 className="text-xs font-extrabold text-[#0063a9] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                <h3 className="text-xs font-extrabold text-[#0866B1] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   <Award size={14} />
                   <span>3. Partner Performance Rankings</span>
                 </h3>
@@ -1626,7 +1626,7 @@ export function ExecutiveSummaryReportBuilderPage({
             {/* 4. Strategic Guidelines Section */}
             {showRecommendations && generatedRecommendations.length > 0 && (
               <div className="space-y-3 pt-1">
-                <h3 className="text-xs font-extrabold text-[#0063a9] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                <h3 className="text-xs font-extrabold text-[#0866B1] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   <Sparkles size={14} />
                   <span>4. Strategic Action Guidelines</span>
                 </h3>
@@ -1731,7 +1731,7 @@ export function ExecutiveSummaryReportBuilderPage({
                               {questionsList.map((row) => (
                                 <tr key={row.questionId} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                                   <td className="p-2 font-medium max-w-[220px] leading-relaxed text-[11px]">{row.questionText}</td>
-                                  <td className="p-2 text-right font-bold text-[#0063a9] text-[11px]">{formatNumber(row.average)}%</td>
+                                  <td className="p-2 text-right font-bold text-[#0866B1] text-[11px]">{formatNumber(row.average)}%</td>
                                   <td className="p-2 text-right text-slate-500 text-[11px]">{row.responsesCount}</td>
                                   <td className="p-2 text-[11px] text-slate-600 dark:text-slate-300">
                                     {row.highestCompany ? (

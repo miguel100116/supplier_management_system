@@ -40,10 +40,12 @@ test('realtime refreshes load only the application record type that changed', ()
 });
 
 
-test('Admin evaluation navigation groups the existing routes into one workspace', () => {
-  const group = APP_SOURCE.slice(APP_SOURCE.indexOf("id: 'group-evaluations'"), APP_SOURCE.indexOf('// Single page already covers'));
-  assert.match(group, /key: 'survey-forms', label: 'Evaluation Workspace'/);
-  assert.match(group, /key: 'categories-manager', label: 'Evaluation Settings'/);
-  assert.doesNotMatch(group, /key: 'explorer'|key: 'pending-review'/);
-  assert.match(APP_SOURCE, /activePage=\{isAdminEvaluationWorkspace \? 'survey-forms' : activePage\}/);
+test('Admin sidebar exposes direct task-focused module destinations', () => {
+  const navigation = APP_SOURCE.slice(APP_SOURCE.indexOf('const adminNavItems'), APP_SOURCE.indexOf('const allSurveyTypes'));
+  assert.match(navigation, /key: 'partner-companies', label: 'Partners'/);
+  assert.match(navigation, /key: 'survey-forms', label: 'Evaluations'/);
+  assert.match(navigation, /key: 'reports', label: 'Reports'/);
+  assert.match(navigation, /key: 'account-management', label: 'Users & Access'/);
+  assert.doesNotMatch(navigation, /type: 'group'/);
+  assert.match(APP_SOURCE, /activePage=\{isAdminEvaluationWorkspace[\s\S]*?'survey-forms'/);
 });

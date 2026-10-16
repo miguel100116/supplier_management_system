@@ -38,7 +38,7 @@ export function AnalyticsToolbar({
     <section aria-labelledby="analytics-view-controls" className="panel p-3 sm:p-4">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#0063a9] dark:bg-blue-950/60 dark:text-blue-300">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#0866B1] dark:bg-blue-950/60 dark:text-blue-300">
             <SlidersHorizontal size={17} aria-hidden="true" />
           </span>
           <div className="min-w-0">
@@ -106,7 +106,7 @@ export function AnalyticsToolbar({
                   key={series.id}
                   className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                     selectedSeriesIds.includes(series.id)
-                      ? 'border-[#0063a9] bg-[#0063a9] text-white'
+                      ? 'border-[#0866B1] bg-[#0866B1] text-white'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'
                   }`}
                 >

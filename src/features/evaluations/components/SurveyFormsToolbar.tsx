@@ -69,7 +69,7 @@ export function SurveyFormsToolbar({
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search survey title or description..."
-          className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#0063a9] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#0866B1] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
         />
       </label>
 
@@ -88,7 +88,7 @@ export function SurveyFormsToolbar({
           aria-pressed={isSelectMode}
           className={isSelectMode
             ? 'inline-flex h-10 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-2 text-xs font-semibold sm:px-3 sm:text-sm text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-400'
-            : 'inline-flex h-10 items-center justify-center rounded-lg bg-[#0063a9] px-2 text-xs font-semibold sm:px-3 sm:text-sm text-white hover:bg-[#00528c] dark:bg-blue-600 dark:hover:bg-blue-700'}
+            : 'inline-flex h-10 items-center justify-center rounded-lg bg-[#0866B1] px-2 text-xs font-semibold sm:px-3 sm:text-sm text-white hover:bg-[#07528E] dark:bg-blue-600 dark:hover:bg-blue-700'}
         >
           <span className="sm:hidden">{isSelectMode ? 'Cancel' : 'Select'}</span>
           <span className="hidden sm:inline">{isSelectMode ? 'Cancel Selection' : 'Select Forms'}</span>
@@ -100,7 +100,7 @@ export function SurveyFormsToolbar({
           <SlidersHorizontal size={15} aria-hidden="true" className="hidden sm:block" />
           Filters
           {activeFilterCount > 0 && (
-            <span className="rounded-full bg-[#0063a9] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={activeFilterCount + ' active filters'}>
+            <span className="rounded-full bg-[#0866B1] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={activeFilterCount + ' active filters'}>
               {activeFilterCount}
             </span>
           )}
@@ -146,7 +146,7 @@ export function SurveyFormsToolbar({
               />
             </label>
           </fieldset>
-          <button type="button" onClick={onResetFilters} className="text-xs font-semibold text-[#0063a9] hover:underline dark:text-blue-400">
+          <button type="button" onClick={onResetFilters} className="text-xs font-semibold text-[#0866B1] hover:underline dark:text-blue-400">
             Reset filters
           </button>
         </div>

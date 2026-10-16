@@ -130,7 +130,7 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
       <div className="flex flex-col gap-5 px-4 py-5 sm:px-5 lg:flex-row lg:items-end lg:justify-between lg:gap-8">
         <div className="min-w-0 max-w-2xl">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0063a9] dark:bg-slate-800 dark:text-blue-400">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0866B1] dark:bg-slate-800 dark:text-blue-400">
               <Trophy size={17} strokeWidth={2} aria-hidden="true" />
             </span>
             <h3 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">Company Leaderboards</h3>
@@ -154,9 +154,9 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
                   <button
                     key={type}
                     type="button"
-                    className={`inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[11px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 sm:px-3 sm:text-xs ${
+                    className={`inline-flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-[11px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0866B1] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-100 sm:px-3 sm:text-xs ${
                       isSelected
-                        ? 'bg-[#0063a9] text-white shadow-sm'
+                        ? 'bg-[#0866B1] text-white shadow-sm'
                         : 'text-slate-600 hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
                     }`}
                     onClick={() => setSurveyType(type)}

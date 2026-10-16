@@ -16,7 +16,7 @@ import {
   normalizeReportResponsesForCompany,
 } from '../../features/feedback-hub/reporting';
 
-const PRIMARY_COLOR = '#0063a9';
+const PRIMARY_COLOR = '#0866B1';
 const PEER_COLOR = '#b91c1c';
 const PEER_LABEL = 'Peer average';
 

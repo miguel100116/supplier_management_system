@@ -39,11 +39,11 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
     <div className="relative" ref={menuRef} id="account-menu-container">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 rounded-lg border border-blue-400/25 bg-[#00528c]/40 px-1.5 py-1.5 text-sm font-medium text-white outline-none transition hover:bg-[#00528c]/60 min-[380px]:gap-2 min-[380px]:px-2 sm:px-3 cursor-pointer animate-fade-in"
+        className="flex items-center gap-1 rounded-lg border border-blue-400/25 bg-[#07528E]/40 px-1.5 py-1.5 text-sm font-medium text-white outline-none transition hover:bg-[#07528E]/60 min-[380px]:gap-2 min-[380px]:px-2 sm:px-3 cursor-pointer animate-fade-in"
         type="button"
         id="account-menu-trigger"
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[#0063a9] font-bold text-xs shadow-sm shrink-0">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[#0866B1] font-bold text-xs shadow-sm shrink-0">
           {initials}
         </div>
         <span className="hidden md:inline truncate max-w-28 text-blue-100 group-hover:text-white">
@@ -67,7 +67,7 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
           <div className="mt-1 divide-y divide-slate-100 dark:divide-slate-800">
             <div className="flex flex-col gap-2 px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">
               <div className="flex items-center gap-2">
-                <User size={13} className="text-[#0063a9] dark:text-blue-400" />
+                <User size={13} className="text-[#0866B1] dark:text-blue-400" />
                 <span className="font-bold text-slate-700 dark:text-slate-300">
                   {role === 'Admin' ? 'System Administrator' : 'Employee Access'}
                 </span>

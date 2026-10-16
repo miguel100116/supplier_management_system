@@ -57,7 +57,7 @@ export function ProfilePage({
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <section className="panel lg:col-span-2">
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#0063a9]/10 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300 font-bold text-lg">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#0866B1]/10 text-[#0866B1] dark:bg-blue-950/40 dark:text-blue-300 font-bold text-lg">
             {initials}
           </div>
           <div className="min-w-0">
@@ -132,7 +132,7 @@ export function ProfilePage({
             <button
               onClick={onViewAllSubmissions}
               type="button"
-              className="text-xs font-bold text-[#0063a9] dark:text-blue-400 hover:underline cursor-pointer"
+              className="text-xs font-bold text-[#0866B1] dark:text-blue-400 hover:underline cursor-pointer"
             >
               View all
             </button>
@@ -152,7 +152,7 @@ export function ProfilePage({
                   className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 dark:border-slate-800 px-3.5 py-2.5"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <ClipboardCheck size={15} className="text-[#0063a9] dark:text-blue-400 shrink-0" />
+                    <ClipboardCheck size={15} className="text-[#0866B1] dark:text-blue-400 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{head.company}</p>
                       <p className="text-xs text-slate-400">{head.surveyType}</p>
@@ -186,7 +186,7 @@ export function ProfilePage({
             type="button"
             role="switch"
             aria-checked={darkMode}
-            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition cursor-pointer ${darkMode ? 'bg-[#0063a9]' : 'bg-slate-300'}`}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition cursor-pointer ${darkMode ? 'bg-[#0866B1]' : 'bg-slate-300'}`}
           >
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
