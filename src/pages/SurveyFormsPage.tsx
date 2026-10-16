@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useModalEscape } from '../hooks/useModalEscape';
-import { ClipboardList, Search, Eye, FormInput, X, Check, Award, Building2, CalendarClock, ArrowLeft, Archive, Send, Pencil, CircleCheck, Clock3, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ClipboardList, Search, Eye, FormInput, X, Check, Award, Building2, CalendarClock, ArrowLeft, Archive, Send, Pencil, CircleCheck, Clock3, Info } from 'lucide-react';
 import { CustomForm, SurveyType, PartnerCompany, SurveyAccessRole } from '../types/survey';
 import { StateMessage } from '../components/StateMessage';
 import { CompletionStatusBar } from '../components/CompletionStatusBar';
+import { Pagination } from '../components/Pagination';
 import { getAllCompaniesOfType, getSurveyEvaluationCompanies, hasAnsweredItem } from '../utils/analytics';
 import { getReminderFrequency, saveReminderFrequency } from '../utils/reminderSettings';
 import { TableFilterBar } from '../components/TableFilterBar';
@@ -123,6 +124,7 @@ export function SurveyFormsPage({
   const [previewEditError, setPreviewEditError] = useState('');
   const [activityEntries, setActivityEntries] = useState<AdminActivityEntry[]>(() => getAdminActivity());
   const [activityPage, setActivityPage] = useState(1);
+  const [activityPageSize, setActivityPageSize] = useState(EVALUATION_ACTIVITY_PAGE_SIZE);
 
   useEffect(() => {
     const now = Date.now();
@@ -191,10 +193,10 @@ export function SurveyFormsPage({
   }, []);
 
   const evaluationActivityEntries = activityEntries.filter((entry) => /evaluation form|evaluation access/i.test(entry.action));
-  const activityTotalPages = Math.max(1, Math.ceil(evaluationActivityEntries.length / EVALUATION_ACTIVITY_PAGE_SIZE));
+  const activityTotalPages = Math.max(1, Math.ceil(evaluationActivityEntries.length / activityPageSize));
   const currentActivityPage = Math.min(activityPage, activityTotalPages);
-  const activityStartIndex = (currentActivityPage - 1) * EVALUATION_ACTIVITY_PAGE_SIZE;
-  const visibleActivityEntries = evaluationActivityEntries.slice(activityStartIndex, activityStartIndex + EVALUATION_ACTIVITY_PAGE_SIZE);
+  const activityStartIndex = (currentActivityPage - 1) * activityPageSize;
+  const visibleActivityEntries = evaluationActivityEntries.slice(activityStartIndex, activityStartIndex + activityPageSize);
 
   const previewSurvey = surveys.find((survey) => survey.id === previewSurveyId) ?? null;
   const previewEditSurvey = surveys.find((survey) => survey.id === previewEditSurveyId) ?? null;
@@ -952,38 +954,9 @@ export function SurveyFormsPage({
                   </li>
                 ))}
               </ul>
-              <nav className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-800" aria-label="Recent Activity pagination">
-                <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
-                  Showing {activityStartIndex + 1}–{activityStartIndex + visibleActivityEntries.length} of {evaluationActivityEntries.length} activities
-                </p>
-                {activityTotalPages > 1 && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setActivityPage(currentActivityPage - 1)}
-                      disabled={currentActivityPage === 1}
-                      className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                      aria-label="Previous activity page"
-                    >
-                      <ChevronLeft size={15} aria-hidden="true" />
-                      Previous
-                    </button>
-                    <span className="min-w-20 text-center text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      Page {currentActivityPage} of {activityTotalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setActivityPage(currentActivityPage + 1)}
-                      disabled={currentActivityPage === activityTotalPages}
-                      className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900"
-                      aria-label="Next activity page"
-                    >
-                      Next
-                      <ChevronRight size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                )}
-              </nav>
+              <Pagination page={currentActivityPage} pageSize={activityPageSize} totalItems={evaluationActivityEntries.length}
+                onPageChange={setActivityPage} onPageSizeChange={(size) => { setActivityPageSize(size); setActivityPage(1); }}
+                ariaLabel="Recent Activity pagination" className="mt-3" showPageControls={activityTotalPages > 1 || activityPageSize !== EVALUATION_ACTIVITY_PAGE_SIZE} />
             </>
           ) : (
             <p className="py-4 text-sm text-slate-500">No evaluation activity recorded yet.</p>

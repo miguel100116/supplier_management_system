@@ -56,7 +56,7 @@
 @media(max-width:560px){.employee-experience .sidebar .nav-item{font-size:9px}.employee-experience .quick-guide-modal{padding:26px 22px}.employee-experience .quick-guide-modal h2{font-size:24px}.employee-experience .quick-guide-modal .modal-subtitle{font-size:12px;margin-bottom:18px}.employee-experience .quick-guide-steps{gap:13px}.employee-experience .quick-guide-steps h3{font-size:13px}.employee-experience .quick-guide-steps p{font-size:11px}.employee-experience .quick-guide-note{font-size:10px}}
 .employee-experience .employee-history-pagination{display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:18px 25px;border-top:1px solid var(--border);font-size:13px;color:var(--muted)}
 .employee-experience .employee-history-pagination button:disabled{opacity:.5;cursor:not-allowed}
-.employee-experience .employee-survey-filler .question.validation-error{border:1px solid #eed3d6;padding:12px;border-radius:6px}
+.employee-experience .employee-survey-filler .question.validation-error{border:0;padding:0;border-radius:4px;background:#fffafb;box-shadow:none}
 .employee-experience main>.space-y-5{display:contents}
 .employee-experience .topbar-right>div.divide-x{border-color:var(--border)}
 .employee-experience #btn-employee-bell{color:#8b97a8}
@@ -154,13 +154,13 @@
 .employee-experience #survey-filler-container .evaluation-context{margin-bottom:22px}
 .employee-experience #survey-filler-container .form-panel{padding:26px 28px}
 .employee-experience #survey-filler-container .respondent-summary{padding:20px;margin:22px 0}
-.employee-experience #survey-filler-container .question{margin-bottom:22px}
-.employee-experience #survey-filler-container .rating-scale-shell{width:100%;padding:0;border:0;border-radius:0;background:transparent}
-.employee-experience #survey-filler-container .rating-scale-shell{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#c9d8e6 transparent}
-.employee-experience #survey-filler-container .rating-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(62px,1fr));gap:8px;overflow:visible;padding:0}
-.employee-experience #survey-filler-container .rating-option{width:100%;min-width:62px;height:62px;min-height:62px;flex:none;flex-direction:column;padding:10px 8px;border:1px solid #dce5ef;border-radius:9px;background:#fff;color:#111827;font-size:15px}
-.employee-experience #survey-filler-container .rating-option-description{color:#8998ac;font-size:10px;font-weight:400;line-height:1.2;text-align:center}
-.employee-experience #survey-filler-container .rating-option.not-applicable{flex-basis:auto;font-size:12px}
+.employee-experience #survey-filler-container .question{margin-bottom:18px}
+.employee-experience #survey-filler-container .question.space-y-4>:not([hidden])~:not([hidden]){margin-top:12px}
+.employee-experience #survey-filler-container .rating-scale-shell{width:100%;overflow:visible;padding:0;border:0;border-radius:0;background:transparent}
+.employee-experience #survey-filler-container .rating-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(42px,1fr));gap:7px;overflow:visible;padding:0}
+.employee-experience #survey-filler-container .rating-option{width:100%;min-width:42px;height:48px;min-height:48px;flex:none;flex-direction:column;gap:2px;padding:5px 4px;border:1px solid #dce5ef;border-radius:8px;background:#fff;color:#111827;font-size:15px;line-height:1.2}
+.employee-experience #survey-filler-container .rating-option-description{color:#8998ac;font-size:9px;font-weight:400;line-height:1.1;text-align:center}
+.employee-experience #survey-filler-container .rating-option.not-applicable{flex-basis:auto;font-size:13px}
 .employee-experience #survey-filler-container .rating-option:hover{border-color:var(--brand);background:#f3f9fd;color:var(--brand)}
 .employee-experience #survey-filler-container .rating-option.selected,.employee-experience #survey-filler-container .rating-option[aria-checked=true]{border:2px solid var(--brand);background:#edf7fd;color:var(--brand)}
 .employee-experience #survey-filler-step-2 .draft-warning{color:#547b9d;background:#f1f7fc;border-color:#dceaf5}
@@ -170,7 +170,7 @@
 .employee-experience .draft-confirmation-modal .exit-without-saving{border-color:#d7e2ee;background:#fff;color:var(--brand)}
 .employee-experience .draft-confirmation-modal .exit-without-saving:hover{border-color:#b8d8ec;background:#f3f9fd;color:var(--brand-hover)}
 @media(max-width:800px){.employee-experience #survey-filler-container .form-panel{padding:24px}}
-@media(max-width:560px){.employee-experience #survey-filler-container .form-panel{padding:22px 18px}.employee-experience #survey-filler-container .rating-options{display:flex;grid-template-columns:none;gap:6px;width:max-content;min-width:100%}.employee-experience #survey-filler-container .rating-option{width:62px;flex:0 0 62px;height:58px;min-height:58px;padding:8px 5px}.employee-experience .draft-confirmation-modal .draft-modal-content{padding-right:32px}.employee-experience .draft-confirmation-modal .confirmation-actions .exit-without-saving{flex:none}}
+@media(max-width:560px){.employee-experience #survey-filler-container .form-panel{padding:22px 18px}.employee-experience #survey-filler-container .rating-options{grid-template-columns:repeat(auto-fit,minmax(42px,1fr));gap:6px}.employee-experience #survey-filler-container .rating-option{height:46px;min-height:46px;padding:4px 3px}.employee-experience .draft-confirmation-modal .draft-modal-content{padding-right:32px}.employee-experience .draft-confirmation-modal .confirmation-actions .exit-without-saving{flex:none}}
 
 @keyframes employee-home-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @keyframes employee-home-float{0%,100%{translate:0 0}50%{translate:0 -6px}}
@@ -233,12 +233,15 @@
 .dark .employee-profile-signout:hover{background:#2b2026}
 @media(max-width:560px){.employee-profile-dialog-header{padding:16px 18px!important}.employee-profile-dialog-content{padding:20px 18px 23px!important}.employee-profile-details{gap:14px 10px}.employee-profile-details dt{font-size:9px;letter-spacing:.55px}.employee-profile-details dd{font-size:13px}.employee-profile-session{align-items:flex-start}}
 
+.employee-experience #survey-filler-container .employee-rating-validation-message{margin:16px 0 0;color:#a45d64;font-size:12px;font-weight:550;line-height:1.45}
+.dark .employee-experience #survey-filler-container .question.validation-error{background:rgba(209,125,133,.06);box-shadow:none}
+
 /* Match Home category badges to the established Admin category palette. */
-.employee-experience .content-grid .evaluation-row .type-tag.courier{background:#eff6ff;border-color:#dbeafe;color:#1d4ed8}
-.employee-experience .content-grid .evaluation-row .type-tag.supplier{background:#ecfdf5;border-color:#d1fae5;color:#047857}
-.employee-experience .content-grid .evaluation-row .type-tag.subcontractor{background:#fff7ed;border-color:#ffedd5;color:#c2410c}
-.dark .employee-experience .content-grid .evaluation-row .type-tag.courier{background:#17243a;border-color:#263e63;color:#93c5fd}
-.dark .employee-experience .content-grid .evaluation-row .type-tag.supplier{background:#142a22;border-color:#24543f;color:#6ee7b7}
-.dark .employee-experience .content-grid .evaluation-row .type-tag.subcontractor{background:#302115;border-color:#62401f;color:#fdba74}
+.employee-experience .evaluation-row .type-tag.courier{background:#eff6ff;border-color:#dbeafe;color:#1d4ed8}
+.employee-experience .evaluation-row .type-tag.supplier{background:#ecfdf5;border-color:#d1fae5;color:#047857}
+.employee-experience .evaluation-row .type-tag.subcontractor{background:#fff7ed;border-color:#ffedd5;color:#c2410c}
+.dark .employee-experience .evaluation-row .type-tag.courier{background:#17243a;border-color:#263e63;color:#93c5fd}
+.dark .employee-experience .evaluation-row .type-tag.supplier{background:#142a22;border-color:#24543f;color:#6ee7b7}
+.dark .employee-experience .evaluation-row .type-tag.subcontractor{background:#302115;border-color:#62401f;color:#fdba74}
 .employee-experience .guide-link{font-size:12px}
 @media(max-width:560px){.employee-experience .guide-link{font-size:11px}}
