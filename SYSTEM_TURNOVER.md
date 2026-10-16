@@ -41,18 +41,18 @@ The system recognizes two system roles:
   - **Designation** (organizational rank): Rank & File, Supervisory, Managerial, Director, or Executive.
   - **Department**: Accounts Payable - Trade, Business Solutions Manager, Executive Office, Logistics, Procurement Group, or TASS.
 
-Every account's default module access and visible survey data types are computed automatically from its Designation × Department combination (`src/utils/rbac.ts`). An Admin can override this per individual account, or set a bulk ceiling for an entire department, from the Account Management page.
+Every account's default module access and visible survey data types are computed automatically from its Designation × Department combination (`src/utils/rbac.ts`). An Admin can override this per individual account, or set a bulk ceiling for an entire department, from Users & Access.
 
 **Default module access by designation**
 
 | Designation | Default modules granted |
 |---|---|
-| Rank & File | Dashboard, Analytics, Survey Forms, Partner Companies, Document Tracker, Notification Logs |
-| Supervisory | All Rank & File modules, plus Partners Feedback Hub and Reports |
-| Managerial | All Supervisory modules, plus Survey Explorer, Present, and Archive Center |
+| Rank & File | Dashboard, Analytics, Evaluations, Partners, Compliance Documents, Notification Logs |
+| Supervisory | All Rank & File modules, plus Partner Feedback and Reports |
+| Managerial | All Supervisory modules, plus Evaluation Responses, Presentations, and Archive |
 | Director | Same default module set as Managerial |
-| Executive | Dashboard, Analytics, Reports, Present, Notification Logs (a reduced, summary-focused set) |
-| Admin (role) | Every module, regardless of designation, including Account Management, Renew Compliance Documents, and Import Evaluation Responses |
+| Executive | Dashboard, Analytics, Reports, Presentations, Notification Logs (a reduced, summary-focused set) |
+| Admin (role) | Every module, regardless of designation, including Users & Access, Renew Compliance Documents, and Import Responses |
 
 *Data-scoping for survey responses is enforced by the applied versioned RLS migrations: Admin, Executive, and Director see every response; Supervisory sees their own department's responses; Rank & File sees only their own submissions. The product intends Analytics to remain company-wide and aggregate-only for every rank, but lower-rank sessions currently hydrate from these already-scoped raw rows. A protected aggregate RPC/view is still required; see `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`.*
 
@@ -63,27 +63,27 @@ An Admin account has unrestricted access to every module in the system:
 | Module | What it does |
 |---|---|
 | Dashboard | Personalized performance indicators and KPIs |
-| Survey Forms | View, fill, and publish feedback forms |
-| Survey Explorer | Analyze complete survey response records |
+| Evaluations → Forms | View, fill, and publish evaluation forms |
+| Evaluations → Responses | Analyze complete evaluation response records |
 | Analytics | Company-wide statistical charts and trends |
 | Reports | Generate custom report cards and raw exports |
-| Present | Staggered slide-deck presentation builder |
-| Partner Companies | Manage external courier, supplier, and subcontractor rosters |
-| Document Tracker | Categorized compliance-document table across all partner companies |
-| Renew Compliance Documents | Action permission: update document expiry/status in Partner Companies and the Document Tracker without needing full Account Management access |
-| Supplier Ranking | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys |
-| Account Management | Configure system roles, ranks, departments, and user permissions |
+| Reports → Presentations | Staggered slide-deck presentation builder |
+| Partners → Directory | Manage external courier, supplier, and subcontractor rosters |
+| Partners → Compliance Documents | Categorized compliance-document table across all partner companies |
+| Renew Compliance Documents | Action permission: update document expiry/status in Partners and Compliance Documents without requiring full Users & Access permissions |
+| Partners → Supplier Ranking | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys |
+| Users & Access | Configure system roles, ranks, departments, and user permissions |
 | Notification Logs | Audit trail of incoming survey responses and document-expiry alerts |
-| Archive Center | Browse and restore archived feedback submissions |
-| Import Evaluation Responses | Import Supplier, Subcontractor, and Courier evaluation worksheets together from one Excel workbook |
+| Archive | Browse and restore archived feedback submissions |
+| Evaluations → Import Responses | Import Supplier, Subcontractor, and Courier evaluation worksheets together from one Excel workbook |
 
-One built-in Admin identity, `admin@mgenesis.com`, ships as the seed account for a fresh deployment — it exists specifically so there is a way to sign in for the first time and start adding real employees through Account Management. From there, Admin rights can be granted to any other real mgenesis.com employee the same way any account is granted access (Section 1.1), simply by setting their System Role to Admin.
+One built-in Admin identity, `admin@mgenesis.com`, ships as the seed account for a fresh deployment — it exists specifically so there is a way to sign in for the first time and start adding real employees through Users & Access. From there, Admin rights can be granted to any other real mgenesis.com employee the same way any account is granted access (Section 1.1), simply by setting their System Role to Admin.
 
 | Email | Role | Designation | Department |
 |---|---|---|---|
 | admin@mgenesis.com | Admin | Executive | Business Solutions Manager |
 
-An Admin account has no separate password to hand over: access is authenticated the same way as every other account, through the employee's own mgenesis.com Microsoft 365 / Entra ID sign-in (Section 1.4). Being an Admin is an authorization record in Account Management, not a separate credential.
+An Admin account has no separate password to hand over: access is authenticated the same way as every other account, through the employee's own mgenesis.com Microsoft 365 / Entra ID sign-in (Section 1.4). Being an Admin is an authorization record in Users & Access, not a separate credential.
 
 ### 1.3 Procedure for Requesting New User Access
 
@@ -93,12 +93,12 @@ New access should be requested and granted end-to-end as follows:
 |---|---|---|
 | 1 | Requester (manager/supervisor) | Submits a request for the new employee's system access to the System Administrator, stating the employee's name, department, and designation/rank. |
 | 2 | mgenesis IT (Entra ID) | Confirms the employee has an active @mgenesis.com Microsoft 365 / Entra ID account (provisions one first if this is a new hire). |
-| 3 | System Administrator | Opens Account Management → Add Account, and enters the employee's @mgenesis.com email, System Role, Designation, and Department. |
+| 3 | System Administrator | Opens Users & Access → Add Account, and enters the employee's @mgenesis.com email, System Role, Designation, and Department. |
 | 4 | System | Automatically computes the employee's default module and survey-data access from their Designation and Department. |
 | 5 | System Administrator | Optionally customizes individual module access ("Custom Overrides") if the employee needs something outside their role default, then saves. |
 | 6 | Employee | Signs in at the system's login page with "Sign in with Microsoft," using their existing mgenesis.com credentials — no separate password is created. |
 
-Once an account exists in Account Management, an Admin can further customize its individual module or survey-type access ("Custom Overrides"), or reset it back to role/department defaults at any time. A department's overall access ceiling can also be set in bulk via "Department Access," which then applies to every member of that department.
+Once an account exists in Users & Access, an Admin can further customize its individual module or survey-type access ("Custom Overrides"), or reset it back to role/department defaults at any time. A department's overall access ceiling can also be set in bulk via "Department Access," which then applies to every member of that department.
 
 Built-in safeguards: an Admin cannot delete their own account, or delete another account that shares their same role.
 
@@ -130,23 +130,23 @@ The system is organized into modules, each shown or hidden in the navigation acc
 | Module | What it does |
 |---|---|
 | Dashboard | Personalized performance indicators and KPIs |
-| Survey Forms | View, fill, and publish feedback forms |
-| Survey Explorer | Analyze complete survey response records |
+| Evaluations → Forms | View, fill, and publish evaluation forms |
+| Evaluations → Responses | Analyze complete evaluation response records |
 | Analytics | Company-wide statistical charts and trends |
 | Reports | Generate custom report cards and raw exports |
-| Present | Staggered slide-deck presentation builder |
-| Partner Companies | Manage external courier, supplier, and subcontractor rosters |
-| Document Tracker | Categorized compliance-document table across all partner companies |
-| Renew Compliance Documents | Action permission: update document expiry/status in Partner Companies and the Document Tracker without needing full Account Management access |
-| Supplier Ranking | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys |
-| Account Management | Configure system roles, ranks, departments, and user permissions |
+| Reports → Presentations | Staggered slide-deck presentation builder |
+| Partners → Directory | Manage external courier, supplier, and subcontractor rosters |
+| Partners → Compliance Documents | Categorized compliance-document table across all partner companies |
+| Renew Compliance Documents | Action permission: update document expiry/status in Partners and Compliance Documents without requiring full Users & Access permissions |
+| Partners → Supplier Ranking | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys |
+| Users & Access | Configure system roles, ranks, departments, and user permissions |
 | Notification Logs | Audit trail of incoming survey responses and document-expiry alerts |
-| Archive Center | Browse and restore archived feedback submissions |
-| Import Evaluation Responses | Import Supplier, Subcontractor, and Courier evaluation worksheets together from one Excel workbook |
+| Archive | Browse and restore archived feedback submissions |
+| Evaluations → Import Responses | Import Supplier, Subcontractor, and Courier evaluation worksheets together from one Excel workbook |
 
 **Settings**
 
-Every signed-in user has a Settings page for light/dark mode and signing out; Admins additionally see the admin activity log, export history, and Import Evaluation Responses.
+Every signed-in user has a Settings page for light/dark mode and signing out; Admins additionally see the admin activity log, export history, and Evaluations → Import Responses.
 
 **Frequently Asked Questions**
 
@@ -154,28 +154,28 @@ Every signed-in user has a Settings page for light/dark mode and signing out; Ad
 Go to Reports and choose a builder — Summary, Company, Question, or Executive Summary — then export it as PDF, Excel, or CSV.
 
 **How do I send a report to a partner company?**
-Open Partners Feedback Hub, select a completed survey, and use "Send Report to Partner" for one company, or "Bulk Sending" to queue reports for every completed company at once. The email (with a PDF report attached) is sent through Microsoft Graph as the signed-in Admin's own Microsoft account, so "Sign in with Microsoft" is required to use it.
+Open Partners → Partner Feedback, select a completed survey, and use "Send Report to Partner" for one company, or "Bulk Sending" to queue reports for every completed company at once. The email (with a PDF report attached) is sent through Microsoft Graph as the signed-in Admin's own Microsoft account, so "Sign in with Microsoft" is required to use it.
 
 **How do I create and publish a new survey?**
-Go to Survey Forms → Create, fill in the type, questions, deadline, and which departments/ranks/companies should see it, then Publish.
+Go to Evaluations → Forms → Create Evaluation Form, fill in the type, questions, deadline, and which departments/ranks/companies should see it, then Publish.
 
 **How do I check which compliance documents are expiring soon?**
-Open the Document Tracker for the full list, or check the Notification Bell / Notification Logs for active expiring/expired alerts.
+Open Partners → Compliance Documents for the full list, or check the Notification Bell / Notification Logs for active expiring/expired alerts.
 
 **How do I request access for a new employee?**
-Follow the procedure in [Section 1.3](#13-procedure-for-requesting-new-user-access) of this document — it starts with your mgenesis IT/Entra ID request, then an Admin adds the account in Account Management.
+Follow the procedure in [Section 1.3](#13-procedure-for-requesting-new-user-access) of this document — it starts with your mgenesis IT/Entra ID request, then an Admin adds the account in Users & Access.
 
 **How do I reset my password?**
 Password reset is handled by mgenesis' Microsoft Entra ID / Microsoft 365, the same as for email — see [Section 1.4](#14-password-reset-process). This system does not manage passwords itself.
 
 **How do I give someone extra access beyond their role's default?**
-In Account Management, edit their account and toggle the specific modules or survey types they need; saving marks their account "Custom Overrides." Use "Reset Access" to remove the override and return to role defaults.
+In Users & Access, edit their account and toggle the specific modules or survey types they need; saving marks their account "Custom Overrides." Use "Reset Access" to remove the override and return to role defaults.
 
 **How do I recover an archived survey response?**
-Go to Archive Center to browse and restore previously archived submissions.
+Go to Archive to browse and restore previously archived submissions.
 
 **How do I present results to leadership?**
-Use Present to build a staggered slide-deck from the current analytics/report data.
+Use Reports → Presentations to build a staggered slide-deck from the current analytics/report data.
 
 **Why can't I see a module I need?**
 It is not part of your role/department's default access. Ask an Admin to grant it to your account individually, or check whether your department's overall access ceiling (Department Access) allows it.
@@ -186,19 +186,19 @@ A condensed cheat-sheet of who gets what, by default:
 
 | Designation | Default modules granted |
 |---|---|
-| Rank & File | Dashboard, Analytics, Survey Forms, Partner Companies, Document Tracker, Notification Logs |
-| Supervisory | All Rank & File modules, plus Partners Feedback Hub and Reports |
-| Managerial | All Supervisory modules, plus Survey Explorer, Present, and Archive Center |
+| Rank & File | Dashboard, Analytics, Evaluations, Partners, Compliance Documents, Notification Logs |
+| Supervisory | All Rank & File modules, plus Partner Feedback and Reports |
+| Managerial | All Supervisory modules, plus Evaluation Responses, Presentations, and Archive |
 | Director | Same default module set as Managerial |
-| Executive | Dashboard, Analytics, Reports, Present, Notification Logs (a reduced, summary-focused set) |
-| Admin (role) | Every module, regardless of designation, including Account Management, Renew Compliance Documents, and Import Evaluation Responses |
+| Executive | Dashboard, Analytics, Reports, Presentations, Notification Logs (a reduced, summary-focused set) |
+| Admin (role) | Every module, regardless of designation, including Users & Access, Renew Compliance Documents, and Import Responses |
 
-- To add a user: Account Management → Add Account (Admin only).
-- To change what a whole department can see: Account Management → Department Access.
-- To create a survey: Survey Forms → Create (Admin only by default).
-- To check compliance-document expiries: Document Tracker, or the Notification Bell for active alerts.
-- To recover archived responses: Archive Center.
-- To send a report to a partner company: Partners Feedback Hub → Send Report to Partner, or Bulk Sending for multiple companies at once.
+- To add a user: Users & Access → Add Account (Admin only).
+- To change what a whole department can see: Users & Access → Department Access.
+- To create an evaluation form: Evaluations → Forms → Create Evaluation Form (Admin only by default).
+- To check compliance-document expiries: Partners → Compliance Documents, or the Notification Bell for active alerts.
+- To recover archived responses: Archive.
+- To send a report to a partner company: Partners → Partner Feedback → Send Report to Partner, or Bulk Sending for multiple companies at once.
 
 ### 2.3 Process Flow / Workflow Diagrams
 
@@ -221,18 +221,18 @@ A condensed cheat-sheet of who gets what, by default:
 | 2 | Admin | Publishes the form (status: Running). |
 | 3 | Employee / Partner | Fills out the form if their department/rank/company is in scope. |
 | 4 | System | Records one response row per answered question and updates the Notification Bell and Notification Logs. |
-| 5 | All eligible users | See the new data reflected in Dashboard, Analytics (company-wide for everyone), and — for their own scope — Survey Explorer and Reports. |
+| 5 | All eligible users | See the new data reflected in Dashboard, Analytics (company-wide for everyone), and — for their own scope — Evaluations → Responses and Reports. |
 | 6 | Admin | Archives a completed survey's responses into an Archive Series once it is no longer active. |
-| 7 | Authorized users | Browse or restore archived submissions from the Archive Center. |
+| 7 | Authorized users | Browse or restore archived submissions from Archive. |
 
 **C. Partner company & compliance-document tracking**
 
 | Step | Actor | Action |
 |---|---|---|
 | 1 | Admin | Adds or edits a Partner Company (Courier, Supplier, or Subcontractor), including branches and compliance documents. |
-| 2 | System | Aggregates compliance documents across all partner companies into the Document Tracker, applying each document type's configured expiry milestones. |
+| 2 | System | Aggregates compliance documents across all partner companies into Partners → Compliance Documents, applying each document type's configured expiry milestones. |
 | 3 | System | Raises "expiring soon" / "expired" alerts based on Document Notification Settings, surfaced via the Notification Bell and Notification Logs. |
-| 4 | User with Renew Compliance Documents permission | Updates the document's expiry date/status in Partner Companies or the Document Tracker. |
+| 4 | User with Renew Compliance Documents permission | Updates the document's expiry date/status in Partners → Directory or Partners → Compliance Documents. |
 
 ### 2.4 Known Issues & Workarounds
 
@@ -250,7 +250,7 @@ Every item below was verified directly against the current source code, not infe
 | 8 | No User Manual, Quick Reference Guide, Known Issues log, or Release Notes existed in the repository before this handoff. | New team members previously had no onboarding documentation. | This document is the first pass at all four — keep it updated as the system changes. |
 | 9 | Lower-rank Analytics is intended to be company-wide, but its input is the raw `survey_response` projection restricted by RLS. | Supervisory users see only their department and Rank & File users see only their own records, so their charts cannot be company-wide. | Add a protected aggregate RPC/view; do not widen access to raw responses. See `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`. |
 | 10 | The UI can grant `renew-documents` to a non-Admin, while `partner_company` updates are Admin-only in RLS. | A delegated document renewal can appear optimistically in the browser and then fail to persist. | Add a narrowly validated renewal RPC or a server-side effective-permission rule before relying on delegated renewal. |
-| 11 | Managerial and Director defaults expose Archive Center, while existing response UPDATE/DELETE operations are Admin-only in RLS. | Archive, restore, and permanent-delete mutations fail remotely for those non-Admin roles. | Decide whether Archive Center is Admin-only or implement an authorized server-side archive operation. |
+| 11 | Managerial and Director defaults expose Archive, while existing response UPDATE/DELETE operations are Admin-only in RLS. | Archive, restore, and permanent-delete mutations fail remotely for those non-Admin roles. | Decide whether Archive is Admin-only or implement an authorized server-side archive operation. |
 
 ### 2.5 Release Notes
 
@@ -273,4 +273,4 @@ Summarized from the project's git commit history (first commit July 18, 2026 thr
 
 ### Admin evaluation navigation
 
-Admins open Evaluations > Evaluation Workspace and switch between Forms (form management), Responses (submitted answer inspection), and Coverage (company evaluation coverage). Archive Center and Import Evaluation Responses remain separate destinations. Evaluation Settings contains Category Labels. Existing route permissions and persistence contracts are unchanged.
+Admins open Evaluations and switch between Forms (form management), Responses (submitted answer inspection), Coverage (company evaluation coverage), Import Responses, and Category Settings. Archive remains a separate primary destination. Existing route permissions and persistence contracts are unchanged.

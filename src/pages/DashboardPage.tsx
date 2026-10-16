@@ -98,10 +98,10 @@ const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defau
   },
   { 
     type: 'active-forms', 
-    title: 'Published Survey Forms', 
+    title: 'Published Evaluation Forms',
     desc: 'Overview of live questionnaires, response counters, and close dates.', 
     defaultSpan: 1,
-    category: 'Surveys'
+    category: 'Evaluations'
   },
   { 
     type: 'recent-submissions', 
@@ -123,7 +123,7 @@ const DEFAULT_LAYOUT: DashboardWidget[] = [
   { id: 'widget-satisfaction', type: 'satisfaction-gauge', title: 'Top Performing Partner', gridSpan: 2 },
   { id: 'widget-volume', type: 'volume-tracker', title: 'Response Statistics Feed', gridSpan: 1 },
   { id: 'widget-comparison', type: 'group-comparison', title: 'Stakeholder Group Comparison', gridSpan: 1 },
-  { id: 'widget-active-forms', type: 'active-forms', title: 'Published Survey Forms', gridSpan: 1 },
+  { id: 'widget-active-forms', type: 'active-forms', title: 'Published Evaluation Forms', gridSpan: 1 },
   { id: 'widget-recent', type: 'recent-submissions', title: 'Recent Evaluations Log', gridSpan: 1 }
 ];
 

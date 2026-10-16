@@ -15,12 +15,12 @@ test('SMS-60 puts archive search beside Filters and nests sort and date range in
     isAdmin: true,
   }));
   assert.match(html, /role="toolbar" aria-label="Archive filters"/);
-  assert.match(html, /placeholder="Search archived surveys/);
+  assert.match(html, /placeholder="Search archived forms/);
   assert.match(html, /<details class="relative shrink-0"><summary[^>]*>.*Filters/);
   assert.match(html, /<\/summary><div[^>]*>.*aria-label="Sort archived items"/);
   assert.match(html, /aria-label="Archived date from"/);
   assert.match(html, /aria-label="Archived date to"/);
-  assert.match(html, /0 archived surveys/);
+  assert.match(html, /0 archived forms/);
   assert.doesNotMatch(html, /Reset<\/button>/);
   assert.doesNotMatch(html, /rounded-xl border border-slate-200 bg-slate-50\/70 p-3/);
 });

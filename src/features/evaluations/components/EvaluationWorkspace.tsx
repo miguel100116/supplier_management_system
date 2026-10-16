@@ -1,19 +1,14 @@
 import React, { type ReactNode } from 'react';
 import { ModuleWorkspace } from '../../../components/ModuleWorkspace';
+import {
+  EVALUATION_WORKSPACE_VIEWS,
+  isEvaluationWorkspacePage,
+} from '../../../navigation/navigationConfig';
 
-export const EVALUATION_WORKSPACE_TABS = [
-  { key: 'survey-forms', label: 'Forms' },
-  { key: 'explorer', label: 'Responses' },
-  { key: 'pending-review', label: 'Coverage' },
-  { key: 'import-evaluations', label: 'Import Responses' },
-  { key: 'categories-manager', label: 'Settings' },
-] as const;
+export const EVALUATION_WORKSPACE_TABS = EVALUATION_WORKSPACE_VIEWS;
+export { isEvaluationWorkspacePage };
 
 export type EvaluationWorkspacePage = typeof EVALUATION_WORKSPACE_TABS[number]['key'];
-
-export function isEvaluationWorkspacePage(page: string): page is EvaluationWorkspacePage {
-  return EVALUATION_WORKSPACE_TABS.some((tab) => tab.key === page);
-}
 
 export function EvaluationWorkspace({ activePage, onNavigate, children }: {
   activePage: EvaluationWorkspacePage;

@@ -977,7 +977,7 @@ export function SendToPartnerWizard({
                         <div>
                           <p className="font-bold">No completed evaluation found for this partner</p>
                           <p className="mt-0.5 text-rose-600 dark:text-rose-400 leading-normal">
-                            You can still proceed, but the report PDF will show empty graphs or averages. Please complete evaluations in the Feedback Hub first.
+                            You can still proceed, but the report PDF will show empty graphs or averages. Please complete evaluations in Partner Feedback first.
                           </p>
                         </div>
                       </div>

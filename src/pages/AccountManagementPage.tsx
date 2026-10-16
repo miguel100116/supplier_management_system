@@ -33,7 +33,7 @@ const PAGE_MODULES: { key: PageModuleKey; label: string; description: string }[]
   { key: 'present', label: 'Presentations', description: 'Presentation-ready evaluation results' },
   { key: 'partner-companies', label: 'Partners', description: 'Manage courier, supplier, and subcontractor company records' },
   { key: 'document-register', label: 'Compliance Documents', description: 'Track compliance documents across all partner companies' },
-  { key: 'renew-documents', label: 'Renew Compliance Documents', description: 'Action permission: update document expiry dates/status in Partner Companies and the Document Tracker, without needing full Account Management access' },
+  { key: 'renew-documents', label: 'Renew Compliance Documents', description: 'Action permission: update document expiry dates/status in Partners and Compliance Documents without requiring full Users & Access permissions' },
   { key: 'supplier-ranking', label: 'Supplier Ranking', description: 'Curate and reorder the Top 20 Suppliers evaluable by default in Supplier surveys' },
   { key: 'account-management', label: 'Users & Access', description: 'Configure employee accounts, roles, ranks, and permissions' },
   { key: 'notifications', label: 'Notification Logs', description: 'Audit trails of incoming survey responses' },
@@ -653,7 +653,7 @@ export function AccountManagementPage({
                     Determine which operational data the user has visibility over.
                   </p>
                   <p className="text-[11px] text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-lg px-2.5 py-2">
-                    Note: checking a category here grants broad visibility, but a specific form is only visible to the user once you also allow their department/role on that form (Survey Forms → Modify → Access). Sharing a form directly with a department/role there will automatically unlock the matching category here too.
+                    Note: checking a category here grants broad visibility, but a specific form is only visible to the user once you also allow their department/role on that form (Evaluations → Forms → Modify Settings → Access). Sharing a form directly with a department/role there will automatically unlock the matching category here too.
                   </p>
                   
                   <div className="space-y-2">

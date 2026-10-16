@@ -1446,7 +1446,7 @@ export function SurveyFormsPage({
                   <div className="bg-rose-50/75 dark:bg-rose-950/15 p-3.5 rounded-xl border border-rose-100 dark:border-rose-900/30 text-xs text-rose-700 dark:text-rose-300 leading-relaxed space-y-1.5">
                     <p className="font-bold">⚠️ CRITICAL WARNING:</p>
                     <p>Archiving these survey forms will completely hide them from both active administrator tables and employee evaluation dashboards.</p>
-                    <p>The forms will no longer accept responses, but their historic responses will be preserved in the Archive Center.</p>
+                    <p>The forms will no longer accept responses, but their historic responses will be preserved in Archive.</p>
                   </div>
 
                   {archiveError && (
@@ -1522,7 +1522,7 @@ export function SurveyFormsPage({
                       onChange={(e) => setResetSeriesLabel(e.target.value)}
                     />
                     <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                      Names this batch of archived responses so it shows up as its own period in Archive Center's history and trend charts. Reusing an existing label merges into that same period.
+                      Names this batch of archived responses so it shows up as its own period in Archive history and trend charts. Reusing an existing label merges into that same period.
                     </p>
                   </div>
 

@@ -6,6 +6,10 @@ import { EvaluationWorkspace, EVALUATION_WORKSPACE_TABS, isEvaluationWorkspacePa
 
 test('workspace routes include evaluation operations and exclude archive and employee form entry', () => {
   for (const tab of EVALUATION_WORKSPACE_TABS) assert.equal(isEvaluationWorkspacePage(tab.key), true);
+  assert.equal(
+    EVALUATION_WORKSPACE_TABS.find((tab) => tab.key === 'categories-manager')?.label,
+    'Category Settings',
+  );
   for (const page of ['archive', 'fill-form', 'dashboard']) {
     assert.equal(isEvaluationWorkspacePage(page), false);
   }

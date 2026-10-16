@@ -46,8 +46,8 @@ interface ShellProps<T extends string> {
   title: string;
   action: ReactNode;
   children: ReactNode;
-  pageHeading?: string;
-  hideModuleContext?: boolean;
+  pageDescription?: string;
+  breadcrumbs?: readonly { label: string; page?: T }[];
   compactPageHeader?: boolean;
   sidebarExtra?: (isCollapsed: boolean) => ReactNode;
 }
@@ -69,8 +69,8 @@ export function Shell<T extends string>({
   title,
   action,
   children,
-  pageHeading,
-  hideModuleContext = false,
+  pageDescription,
+  breadcrumbs = [],
   compactPageHeader = false,
   sidebarExtra,
 }: ShellProps<T>) {
@@ -81,9 +81,6 @@ export function Shell<T extends string>({
   const flatPages = flattenPages(pages);
   const activePageItem = flatPages.find((p) => p.key === activePage);
   const ActiveIcon = activePageItem?.icon ?? Menu;
-  const moduleLabel = activePageItem?.label ?? title;
-  const contentHeading = pageHeading || title;
-  const showModuleContext = !hideModuleContext && moduleLabel !== contentHeading;
 
   // Auto-expand whichever group currently contains the active page, without
   // collapsing groups the user has already opened manually.
@@ -363,12 +360,39 @@ export function Shell<T extends string>({
           <div className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             <div className={`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${compactPageHeader ? 'mb-4' : 'mb-6'}`}>
               <div className="min-w-0">
-                {showModuleContext && (
-                  <p className="mb-1 break-words text-xs font-semibold uppercase tracking-wide text-text-secondary dark:text-slate-400">
-                    {moduleLabel}
+                {breadcrumbs.length > 0 ? (
+                  <nav aria-label="Breadcrumb" className="mb-1">
+                    <ol className="flex flex-wrap items-center gap-1 text-[13px] text-text-secondary dark:text-slate-400">
+                      {breadcrumbs.map((breadcrumb, index) => {
+                        const isCurrent = index === breadcrumbs.length - 1;
+                        return (
+                          <li key={breadcrumb.label} className="flex min-w-0 items-center gap-1">
+                            {index > 0 && <ChevronRight size={14} aria-hidden="true" className="shrink-0 text-slate-400" />}
+                            {!isCurrent && breadcrumb.page ? (
+                              <button
+                                type="button"
+                                onClick={() => onPageChange(breadcrumb.page as T)}
+                                className="truncate rounded-sm font-medium text-text-secondary transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:text-slate-400 dark:hover:text-blue-300"
+                              >
+                                {breadcrumb.label}
+                              </button>
+                            ) : (
+                              <span aria-current={isCurrent ? 'page' : undefined} className="truncate font-medium">
+                                {breadcrumb.label}
+                              </span>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </nav>
+                ) : null}
+                <h1 className="page-title break-words">{title}</h1>
+                {pageDescription && (
+                  <p className="mt-1 text-[13px] font-normal text-text-secondary dark:text-slate-400">
+                    {pageDescription}
                   </p>
                 )}
-                <h1 className="page-title break-words">{contentHeading}</h1>
               </div>
               <div id="shell-header-action"></div>
             </div>

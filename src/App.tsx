@@ -35,6 +35,16 @@ import { PageModuleKey, getDefaultPermissions, getEffectiveSurveyTypes, hasPageA
 import { clearSessionActivity, recordSessionActivity, useIdleSessionTimeout } from './hooks/useIdleSessionTimeout';
 import { formatSessionTimeRemaining } from './utils/sessionTimeout';
 import { useModalEscape } from './hooks/useModalEscape';
+import {
+  ADMIN_PRIMARY_NAVIGATION,
+  EMPLOYEE_PRIMARY_NAVIGATION,
+  PARTNER_WORKSPACE_VIEWS,
+  REPORT_WORKSPACE_VIEWS,
+  getPagePresentation,
+  isPartnerWorkspacePage,
+  isReportWorkspacePage,
+  type PageKey,
+} from './navigation/navigationConfig';
 
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ AnalyticsPage }) => ({ default: AnalyticsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })));
@@ -118,38 +128,22 @@ const BOOTSTRAP_ADMIN_ACCOUNTS: AccountProfile[] = BOOTSTRAP_ADMIN_EMAILS.map((e
 
 const DEFAULT_ACCOUNTS: AccountProfile[] = [...BOOTSTRAP_ADMIN_ACCOUNTS];
 
-type PageKey = 'dashboard' | 'partner-companies' | 'document-register' | 'supplier-ranking' | 'partners-feedback-hub' | 'account-management' | 'survey-forms' | 'analytics' | 'present' | 'explorer' | 'reports' | 'notifications' | 'create-form' | 'view-form' | 'fill-form' | 'archive' | 'import-evaluations' | 'my-submissions' | 'profile-settings' | 'pending-review' | 'export-history' | 'settings' | 'categories-manager';
-
-const PARTNER_WORKSPACE_VIEWS = [
-  { key: 'partner-companies', label: 'Directory' },
-  { key: 'document-register', label: 'Compliance Documents' },
-  { key: 'supplier-ranking', label: 'Supplier Ranking' },
-  { key: 'partners-feedback-hub', label: 'Partner Feedback' },
-] as const;
-
-const REPORT_WORKSPACE_VIEWS = [
-  { key: 'reports', label: 'Create Report' },
-  { key: 'present', label: 'Presentations' },
-  { key: 'export-history', label: 'Export History' },
-] as const;
-
-const isPartnerWorkspacePage = (page: PageKey): page is typeof PARTNER_WORKSPACE_VIEWS[number]['key'] =>
-  PARTNER_WORKSPACE_VIEWS.some((view) => view.key === page);
-
-const isReportWorkspacePage = (page: PageKey): page is typeof REPORT_WORKSPACE_VIEWS[number]['key'] =>
-  REPORT_WORKSPACE_VIEWS.some((view) => view.key === page);
-
 // Related secondary views live inside each module so every primary
 // destination is reachable from the sidebar with one click.
-const adminNavItems: NavItem<PageKey>[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'partner-companies', label: 'Partners', icon: Users },
-  { key: 'survey-forms', label: 'Evaluations', icon: ClipboardCheck },
-  { key: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { key: 'reports', label: 'Reports', icon: FileText },
-  { key: 'account-management', label: 'Users & Access', icon: UserCog },
-  { key: 'archive', label: 'Archive', icon: ClipboardList },
-];
+const adminNavIcons = {
+  dashboard: LayoutDashboard,
+  'partner-companies': Users,
+  'survey-forms': ClipboardCheck,
+  analytics: BarChart3,
+  reports: FileText,
+  'account-management': UserCog,
+  archive: ClipboardList,
+} as const;
+
+const adminNavItems: NavItem<PageKey>[] = ADMIN_PRIMARY_NAVIGATION.map((item) => ({
+  ...item,
+  icon: adminNavIcons[item.key],
+}));
 
 const allSurveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
 
@@ -576,15 +570,21 @@ export default function App() {
 
 
   // Employee sidebar: simple, task-focused, flat (no groups). Every
-  // authenticated employee gets the same 5 items regardless of rank -
+  // authenticated employee gets the same 3 items regardless of rank -
   // deeper per-rank data scoping still applies to the pages themselves via
   // applyAccessFilter/userPermissions, just not to which nav items show.
   const employeeNavItems: NavItem<PageKey>[] = useMemo(
-    () => [
-      { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { key: 'fill-form', label: 'New Evaluation', icon: FilePlus },
-      { key: 'my-submissions', label: 'My Submissions', icon: ClipboardList },
-    ],
+    () => {
+      const icons = {
+        dashboard: LayoutDashboard,
+        'fill-form': FilePlus,
+        'my-submissions': ClipboardList,
+      } as const;
+      return EMPLOYEE_PRIMARY_NAVIGATION.map((item) => ({
+        ...item,
+        icon: icons[item.key],
+      }));
+    },
     []
   );
 
@@ -604,9 +604,7 @@ export default function App() {
         });
   }, [isAdmin, employeeNavItems, userPermissions.pages]);
 
-  // Flattened lookup (groups expanded) used for the title/heading and the
-  // route-guard fallback below, regardless of whether the current role's
-  // nav is grouped or flat.
+  // Flattened lookup (groups expanded) used by the route-guard fallback.
   const flatNavLeaves = useMemo(
     () =>
       visiblePages.flatMap((item) =>
@@ -615,40 +613,19 @@ export default function App() {
     [visiblePages]
   );
 
-  const isAdminEvaluationWorkspace = isAdmin && isEvaluationWorkspacePage(activePage);
-  const isAdminPartnerWorkspace = isAdmin && isPartnerWorkspacePage(activePage);
-  const isAdminReportWorkspace = isAdmin && isReportWorkspacePage(activePage);
-
-  const activeTitle = useMemo(() => {
-    if (isAdmin && isEvaluationWorkspacePage(activePage)) return 'Evaluations';
-    if (isAdmin && isPartnerWorkspacePage(activePage)) return 'Partners';
-    if (isAdmin && isReportWorkspacePage(activePage)) return 'Reports';
-    if (activePage === 'dashboard') {
-      return 'Dashboard';
-    }
-    if (activePage === 'account-management') return 'Users & Access';
-    if (activePage === 'create-form') return editingSurveyId ? 'Edit Survey Form' : 'Create Survey Form';
-    if (activePage === 'view-form') {
-      const selected = surveys.find((s) => s.id === selectedSurveyId);
-      return selected ? `Survey: ${selected.title}` : 'Survey Details';
-    }
-    if (activePage === 'fill-form') return 'Fill Out Stakeholder Survey';
-    if (activePage === 'archive') return 'Archive';
-    return flatNavLeaves.find((page) => page.key === activePage)?.label ?? 'Dashboard';
-  }, [activePage, selectedSurveyId, surveys, editingSurveyId, profile, isAdmin, flatNavLeaves]);
-
-  const pageHeading = useMemo(() => {
-    if (activePage === 'dashboard') {
-      const namePart = profile?.email ? profile.email.split('@')[0] : 'User';
-      const capitalizedName = namePart
-        .split('.')
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(' ');
-      return `Welcome Back, ${capitalizedName || 'User'}!`;
-    }
-    return activeTitle;
-  }, [activePage, activeTitle, profile]);
+  const namePart = profile?.email ? profile.email.split('@')[0] : 'User';
+  const userDisplayName = namePart
+    .split('.')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ') || 'User';
+  const selectedSurveyTitle = surveys.find((survey) => survey.id === selectedSurveyId)?.title;
+  const pagePresentation = getPagePresentation(activePage, {
+    isAdmin,
+    editingSurveyId,
+    selectedSurveyTitle,
+    userDisplayName,
+  });
 
   // Safe routing guard redirecting users to permitted views
   useEffect(() => {
@@ -1188,21 +1165,15 @@ export default function App() {
     <div className={darkMode ? 'dark' : ''}>
       <Shell
         pages={visiblePages}
-        activePage={isAdminEvaluationWorkspace
-          ? 'survey-forms'
-          : isAdminPartnerWorkspace
-            ? 'partner-companies'
-            : isAdminReportWorkspace
-              ? 'reports'
-              : activePage}
+        activePage={pagePresentation.sidebarKey}
         onPageChange={(page) => {
           const targetPage = page as PageKey;
           navigateTo(targetPage);
           if (targetPage === 'notifications') markNotificationsRead();
         }}
-        title={activeTitle}
-        pageHeading={pageHeading}
-        hideModuleContext={activePage === 'dashboard' || activePage === 'account-management' || isAdminPartnerWorkspace || isAdminEvaluationWorkspace || isAdminReportWorkspace}
+        title={pagePresentation.title}
+        pageDescription={pagePresentation.description}
+        breadcrumbs={pagePresentation.breadcrumbs}
         compactPageHeader={activePage === 'analytics'}
         action={
           <div className="flex min-w-0 items-center divide-x divide-blue-400/25">

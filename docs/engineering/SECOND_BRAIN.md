@@ -540,3 +540,13 @@ Decision: Standardize the interactive application on local Inter typography and 
 Consequences: The primary brand color and hover color are consistent across application and export surfaces, the shell uses the approved 28px page heading, shared KPI values use 30px bold type, and modules can migrate away from one-off utility combinations incrementally. Inter is bundled locally through `@fontsource-variable/inter`; no runtime font service is required.
 
 Evidence: `tailwind.config.js`, `src/styles.css`, `src/main.tsx`, `src/layouts/Shell.tsx`, shared presentation components under `src/components/`, analytics presentation components, and the repository-wide primary-color migration.
+
+### 2026-10-16 - Centralized navigation terminology and page hierarchy
+
+Status: implemented locally; rendered browser comparison remains pending.
+
+Decision: Keep existing route and permission keys while centralizing primary navigation labels, workspace view labels, page titles, breadcrumbs, and parent-sidebar selection in `src/navigation/navigationConfig.ts`. Use Dashboard as the page H1 with the personalized welcome as supporting text. Use semantic breadcrumbs for Admin workspace and Evaluation detail views, and use New Evaluation consistently for employee form entry.
+
+Consequences: Partner, Evaluation, and Report subviews now identify the current view in the H1 while retaining their parent sidebar selection. Create, edit, view, and Admin fill-form routes select Evaluations. User-visible legacy names such as Document Tracker, Account Management, Archive Center, and Survey Forms tab were updated without renaming internal route keys, persistence keys, or components.
+
+Evidence: `src/navigation/navigationConfig.ts`, `src/App.tsx`, `src/layouts/Shell.tsx`, `src/features/evaluations/components/EvaluationWorkspace.tsx`, focused navigation tests, `README.md`, and `SYSTEM_TURNOVER.md`.

@@ -90,7 +90,7 @@ Each survey type's questions are grouped into **5 scored categories** plus a fix
 - **Weighted rubric:** Each question carries a point value validated against the company's original paper evaluation forms (`src/data/questionWeights.ts`). Answers are scored, summed per category, and normalized so **every survey type shares one 0–100 composite axis** (`src/utils/scoring.ts`).
 - **Score bands:** Composite scores map to labeled bands (e.g. Critical → Excellent). Companies with no scoreable answers yet get a distinct "No Score Yet" band instead of being mislabeled as failing.
 - **Ranking:** The leaderboard uses a *volume-weighted* variant of the composite score, pulling companies with very few evaluations toward the peer mean so a single glowing review doesn't top the chart.
-- **Renaming vs. rubric:** Admins can **rename** a category's display label via the **Categories Manager** without ever touching the underlying point values — display names are translated by slot position, keeping the validated rubric intact.
+- **Renaming vs. rubric:** Admins can **rename** a category's display label from **Evaluations → Category Settings** without ever touching the underlying point values — display names are translated by slot position, keeping the validated rubric intact.
 
 ### 3.3 Roles, Designations & Departments (RBAC)
 
@@ -104,14 +104,14 @@ Access is **computed**, not hand-assigned per user. Every account has three attr
 
 | Designation | Default modules granted |
 |---|---|
-| Rank & File | Dashboard, Analytics, Survey Forms, Partner Companies, Document Tracker, Notifications |
-| Supervisory | All Rank & File modules + Feedback Hub and Reports |
-| Managerial | All Supervisory modules + Survey Explorer, Present, and Archive Center |
+| Rank & File | Dashboard, Analytics, Evaluations, Partners, Compliance Documents, Notifications |
+| Supervisory | All Rank & File modules + Partner Feedback and Reports |
+| Managerial | All Supervisory modules + Evaluation Responses, Presentations, and Archive |
 | Director | Same default set as Managerial |
-| Executive | Dashboard, Analytics, Reports, Present, Notifications (a reduced, summary-focused set) |
-| **Admin (role)** | **Every module**, including Account Management, Renew Compliance Documents, and Import Evaluation Responses |
+| Executive | Dashboard, Analytics, Reports, Presentations, Notifications (a reduced, summary-focused set) |
+| **Admin (role)** | **Every module**, including Users & Access, Renew Compliance Documents, and Import Responses |
 
-An Admin can **override** access per individual account ("Custom Overrides"), or set a bulk access **ceiling** for an entire department ("Department Access"), from the Account Management page.
+An Admin can **override** access per individual account ("Custom Overrides"), or set a bulk access **ceiling** for an entire department ("Department Access"), from Users & Access.
 
 ### 3.4 Data Scoping & Isolation
 
@@ -133,21 +133,21 @@ A **Data Scope** toggle (shared across Dashboard and Analytics) further switches
 | Module | What it does |
 |---|---|
 | **Dashboard** | Personalized performance indicators and KPIs. |
-| **Survey Forms** | View, fill, and publish feedback forms. |
-| **Survey Explorer** | Review each survey submission, filter by respondent email, inspect answers, and export all or filtered responses to Excel. |
+| **Evaluations → Forms** | View, fill, and publish evaluation forms. |
+| **Evaluations → Responses** | Review each evaluation submission, filter by respondent email, inspect answers, and export all or filtered responses to Excel. |
 | **Analytics** | Company statistical charts, trends, rankings, and company comparisons over the response data authorized for the current session. |
 | **Reports** | Summary / Company / Question / Executive-Summary builders + raw exports (PDF, Excel, CSV). |
-| **Present** | Staggered slide-deck presentation builder (PDF/PPTX export). |
-| **Partner Companies** | Manage external courier, supplier, and subcontractor rosters, branches, documents, and the Admin-only dated Active Companies upload history. |
-| **Document Tracker** | Categorized compliance-document register across all partner companies. |
-| **Renew Compliance Documents** | Action permission: update document expiry/status without full Account Management access. |
-| **Supplier Ranking** | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys. |
-| **Partners Feedback Hub** | Send report cards to partner companies (single or bulk email via Microsoft Graph). |
-| **Account Management** | Configure roles, ranks, departments, and per-user/per-department permissions. |
+| **Reports → Presentations** | Staggered slide-deck presentation builder (PDF/PPTX export). |
+| **Partners → Directory** | Manage external courier, supplier, and subcontractor rosters, branches, documents, and the Admin-only dated Active Companies upload history. |
+| **Partners → Compliance Documents** | Categorized compliance-document register across all partner companies. |
+| **Renew Compliance Documents** | Action permission: update document expiry/status without full Users & Access permissions. |
+| **Partners → Supplier Ranking** | Curate and reorder the Top 20 suppliers evaluable by default in Supplier surveys. |
+| **Partners → Partner Feedback** | Send report cards to partner companies (single or bulk email via Microsoft Graph). |
+| **Users & Access** | Configure roles, ranks, departments, and per-user/per-department permissions. |
 | **Notifications** | Audit trail of incoming survey responses and document-expiry alerts, opened as a modal from the header bell rather than a separate sidebar destination. |
-| **Archive Center** | Browse and restore archived feedback submissions and series. |
-| **Import Evaluation Responses** | Admins upload one Excel workbook containing Supplier, Subcontractor, and Courier evaluation worksheets. The system detects each form, matches companies against the full Partner Registry, and imports the categories together. The original workbook is stored once in a private Supabase Storage archive with Admin-only download access. |
-| **Categories Manager** | Rename the display labels of scoring categories per survey type. |
+| **Archive** | Browse and restore archived feedback submissions and series. |
+| **Evaluations → Import Responses** | Admins upload one Excel workbook containing Supplier, Subcontractor, and Courier evaluation worksheets. The system detects each form, matches companies against the full Partner Registry, and imports the categories together. The original workbook is stored once in a private Supabase Storage archive with Admin-only download access. |
+| **Evaluations → Category Settings** | Rename the display labels of scoring categories per survey type. |
 | **Settings / Profile** | A large modal opened from the account-session dropdown. Employees retain their full profile, impact, recent-submission, preference, and session view; Admins retain the complete Settings view with activity, import, and cache-management tools. |
 
 ---
@@ -312,7 +312,7 @@ The system was built iteratively over roughly three weeks, starting **July 18, 2
 | 2026-07-31 | Dashboards | Documents Tracker + Employee Evaluation Tracker dashboards. |
 | 2026-08-03 | Updates | Final committed round before handoff. |
 | 2026-08-04 | Backend groundwork | Supabase draft schema + partial wiring; `.env` / demo-mode flags added. |
-| 2026-08-05 | Categories & docs | Categories Manager wired up; system turnover + Admin/Employee manuals added. |
+| 2026-08-05 | Categories & docs | Category Settings wired up; system turnover + Admin/Employee manuals added. |
 
 The system now uses explicit Supabase repository and adapter boundaries for shared business data, keeping normalized import/audit tables separate from the editable frontend projection.
 
@@ -366,4 +366,4 @@ This system is **pre-production**. The most important open items (verified again
 
 ### Admin evaluation navigation
 
-Admins open Evaluations > Evaluation Workspace and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), and Coverage (company evaluation coverage). Archive Center and Import Evaluation Responses remain separate destinations. Evaluation Settings contains Category Labels. Existing route permissions and persistence contracts are unchanged.
+Admins open Evaluations and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), Coverage (company evaluation coverage), Import Responses, and Category Settings. Archive remains a separate primary destination. Existing route permissions and persistence contracts are unchanged.

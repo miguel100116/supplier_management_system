@@ -80,7 +80,7 @@ export function CurrentFormsTab({
         <div className="panel space-y-2 p-6 text-center text-slate-500 sm:p-12">
           <AlertCircle size={32} className="mx-auto text-slate-400" />
           <p className="font-semibold text-slate-700 dark:text-slate-300">No matching survey forms found</p>
-          <p className="text-xs">Adjust search filters or create new survey forms under Survey Forms tab.</p>
+          <p className="text-xs">Adjust search filters or create new evaluation forms under Evaluations → Forms.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

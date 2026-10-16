@@ -2083,7 +2083,7 @@ export function PartnerCompaniesPage({
                     value={newNtBpCode}
                     onChange={(e) => setNewNtBpCode(e.target.value)}
                   />
-                  <p className="mt-1 text-[10.5px] text-slate-400">Registered as a second branch — both BP Codes will show as their own row in the Document Tracker.</p>
+                  <p className="mt-1 text-[10.5px] text-slate-400">Registered as a second branch — both BP Codes will show as their own row in Compliance Documents.</p>
                 </div>
               )}
 
@@ -2100,7 +2100,7 @@ export function PartnerCompaniesPage({
               </div>
 
               <p className="text-[11px] text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
-                Compliance documents (Business Permit, AFS, SIF, etc.) aren't uploaded here — each BP Code above starts out Missing in the Document Tracker until renewed there, or via a Master List upload.
+                Compliance documents (Business Permit, AFS, SIF, etc.) aren't uploaded here — each BP Code above starts out Missing in Compliance Documents until renewed there, or via a Master List upload.
               </p>
 
               <div className="flex items-center justify-end gap-3 mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">

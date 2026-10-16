@@ -405,21 +405,22 @@ export function ArchivePage({
       ? filteredArchivedCompanies.length
       : filteredGroupedResponses.length;
   const activeFilterCount = countActiveArchiveFilters(tableSort, dateFrom, dateTo, companyTypeFilter, activeTab);
-  const archiveItemLabel = activeTab === 'companies' ? 'company' : activeTab === 'surveys' ? 'survey' : 'response';
+  const archiveItemLabel = activeTab === 'companies' ? 'partner' : activeTab === 'surveys' ? 'form' : 'response';
+  const archiveCollectionLabel = activeTab === 'companies' ? 'partners' : activeTab === 'surveys' ? 'forms' : 'responses';
 
   if (!isAdmin) {
     return (
       <div className="panel mx-auto mt-10 max-w-md p-5 text-center text-slate-500 sm:p-8">
         <Trash2 className="mx-auto mb-4 text-rose-500 h-12 w-12" />
         <h3 className="text-lg font-bold text-slate-900 dark:text-white">Access Restricted</h3>
-        <p className="text-sm mt-2">Only administrators can access the Archive Center.</p>
+        <p className="text-sm mt-2">Only administrators can access Archive.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <PageDescription>Manage archived partner companies, restore archived surveys, and review preserved responses.</PageDescription>
+      <PageDescription>Manage archived partners, restore archived forms, and review preserved responses.</PageDescription>
       {successMessage && (
         <div className="bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/50 rounded-xl p-4 flex items-center gap-3 text-emerald-800 dark:text-emerald-300 text-sm animate-fade-in">
           <RefreshCw size={18} className="animate-spin-slow text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -453,7 +454,7 @@ export function ArchivePage({
             <ClipboardList size={24} />
           </div>
           <div className="space-y-1 flex-1 pr-12">
-            <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Surveys</h3>
+            <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Forms</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
               Form templates removed from active rotation. Can be restored back to the active registry.
             </p>
@@ -492,7 +493,7 @@ export function ArchivePage({
           </span>
         </button>
 
-        {/* Block 3: Archived Companies */}
+        {/* Block 3: Archived Partners */}
         <button
           onClick={() => {
             setActiveTab('companies');
@@ -512,7 +513,7 @@ export function ArchivePage({
             <Building2 size={24} />
           </div>
           <div className="space-y-1 flex-1 pr-12">
-            <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Companies</h3>
+            <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Partners</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
               View archived partner records and restore companies to the active registry.
             </p>
@@ -527,11 +528,11 @@ export function ArchivePage({
       <div className="panel p-5 space-y-4">
         <div role="toolbar" aria-label="Archive filters" className="flex flex-wrap items-center gap-2">
           <label className="relative min-w-0 flex-1 basis-24 sm:min-w-[160px]">
-            <span className="sr-only">Search archived {activeTab}</span>
+            <span className="sr-only">Search archived {archiveCollectionLabel}</span>
             <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
-              placeholder={'Search archived ' + activeTab + '...'}
+              placeholder={'Search archived ' + archiveCollectionLabel + '...'}
               className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#0866B1] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -607,12 +608,12 @@ export function ArchivePage({
               </fieldset>
               {activeTab === 'companies' && (
                 <label className="block">
-                  <span className="sr-only">Filter archived companies by type</span>
+                  <span className="sr-only">Filter archived partners by type</span>
                   <select
                     value={companyTypeFilter}
                     onChange={(event) => setCompanyTypeFilter(event.target.value as 'All' | PartnerCompanyType)}
                     className="field !mt-0 w-full py-2 text-sm"
-                    aria-label="Filter archived companies by type"
+                    aria-label="Filter archived partners by type"
                   >
                     <option value="All">All company types</option>
                     {(['Courier', 'Supplier', 'Subcontractor', 'Uncategorized'] as PartnerCompanyType[]).map((type) => (
@@ -652,7 +653,7 @@ export function ArchivePage({
             {filteredArchivedSurveys.length === 0 ? (
               <div className="text-center py-10 text-slate-500">
                 <Archive size={32} className="mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">No archived surveys found.</p>
+                <p className="text-sm">No archived forms found.</p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
@@ -716,7 +717,7 @@ export function ArchivePage({
             {filteredArchivedCompanies.length === 0 ? (
               <div className="text-center py-10 text-slate-500">
                 <Building2 size={32} className="mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">No archived companies match these filters.</p>
+                <p className="text-sm">No archived partners match these filters.</p>
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
