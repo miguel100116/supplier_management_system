@@ -1,5 +1,5 @@
 import type { PageKey } from '../navigation/navigationConfig';
-import { PATHS } from './paths';
+import { LEGACY_PATHS, PATHS, ROUTE_PATTERNS } from './paths';
 
 export type RouteRole = 'public' | 'admin' | 'employee';
 
@@ -72,46 +72,46 @@ const forBoth = (path: string): LegacyRedirectTarget => ({ admin: path, employee
 // these aliases preserve bookmarks created from its state-navigation names.
 // Keep this block self-contained so it can be removed after the transition.
 export const LEGACY_REDIRECTS = new Map<string, LegacyRedirectTarget>([
-  ['/dashboard', { admin: PATHS.admin.dashboard, employee: PATHS.employee.home }],
-  ['/partner-companies', forBoth(PATHS.admin.partners.root)],
-  ['/document-register', forBoth(PATHS.admin.partners.documents)],
-  ['/supplier-ranking', forBoth(PATHS.admin.partners.root)],
-  ['/partners-feedback-hub', forBoth(PATHS.admin.partners.feedback)],
-  ['/survey-forms', { admin: PATHS.admin.evaluations.workspace.forms, employee: PATHS.employee.evaluations }],
-  ['/explorer', forBoth(PATHS.admin.evaluations.workspace.responses)],
-  ['/pending-review', forBoth(PATHS.admin.evaluations.workspace.coverage)],
-  ['/categories-manager', forBoth(PATHS.admin.evaluations.workspace.categoryLabels)],
-  ['/archive', forBoth(PATHS.admin.evaluations.archive)],
-  ['/import-evaluations', forBoth(PATHS.admin.evaluations.importResponses)],
-  ['/analytics', forBoth(PATHS.admin.analytics)],
-  ['/reports', forBoth(PATHS.admin.reports.generate)],
-  ['/present', forBoth(PATHS.admin.reports.present)],
-  ['/export-history', forBoth(PATHS.admin.reports.history)],
-  ['/account-management', forBoth(PATHS.admin.users.root)],
-  ['/notifications', { admin: PATHS.admin.notifications, employee: PATHS.employee.notifications }],
-  ['/settings', { admin: PATHS.admin.settings, employee: PATHS.employee.profile }],
-  ['/create-form', forBoth(PATHS.admin.evaluations.workspace.newForm)],
-  ['/view-form', forBoth(PATHS.admin.evaluations.workspace.forms)],
-  ['/fill-form', { admin: PATHS.admin.evaluations.workspace.forms, employee: PATHS.employee.evaluations }],
-  ['/my-submissions', { admin: PATHS.admin.dashboard, employee: PATHS.employee.submissions }],
-  ['/profile-settings', { admin: PATHS.admin.settings, employee: PATHS.employee.profile }],
-  ['/admin/partner-companies', forBoth(PATHS.admin.partners.root)],
-  ['/admin/document-register', forBoth(PATHS.admin.partners.documents)],
-  ['/admin/supplier-ranking', forBoth(PATHS.admin.partners.root)],
-  ['/admin/partners-feedback-hub', forBoth(PATHS.admin.partners.feedback)],
-  ['/admin/survey-forms', forBoth(PATHS.admin.evaluations.workspace.forms)],
-  ['/admin/explorer', forBoth(PATHS.admin.evaluations.workspace.responses)],
-  ['/admin/pending-review', forBoth(PATHS.admin.evaluations.workspace.coverage)],
-  ['/admin/categories-manager', forBoth(PATHS.admin.evaluations.workspace.categoryLabels)],
-  ['/admin/archive', forBoth(PATHS.admin.evaluations.archive)],
-  ['/admin/import-evaluations', forBoth(PATHS.admin.evaluations.importResponses)],
-  ['/admin/present', forBoth(PATHS.admin.reports.present)],
-  ['/admin/export-history', forBoth(PATHS.admin.reports.history)],
-  ['/admin/account-management', forBoth(PATHS.admin.users.root)],
-  ['/employee/dashboard', { admin: PATHS.admin.dashboard, employee: PATHS.employee.home }],
-  ['/employee/fill-form', { admin: PATHS.admin.dashboard, employee: PATHS.employee.evaluations }],
-  ['/employee/my-submissions', { admin: PATHS.admin.dashboard, employee: PATHS.employee.submissions }],
-  ['/employee/profile-settings', { admin: PATHS.admin.dashboard, employee: PATHS.employee.profile }],
+  [LEGACY_PATHS.dashboard, { admin: PATHS.admin.dashboard, employee: PATHS.employee.home }],
+  [LEGACY_PATHS.partnerCompanies, forBoth(PATHS.admin.partners.root)],
+  [LEGACY_PATHS.documentRegister, forBoth(PATHS.admin.partners.documents)],
+  [LEGACY_PATHS.supplierRanking, forBoth(PATHS.admin.partners.root)],
+  [LEGACY_PATHS.partnersFeedbackHub, forBoth(PATHS.admin.partners.feedback)],
+  [LEGACY_PATHS.surveyForms, { admin: PATHS.admin.evaluations.workspace.forms, employee: PATHS.employee.evaluations }],
+  [LEGACY_PATHS.explorer, forBoth(PATHS.admin.evaluations.workspace.responses)],
+  [LEGACY_PATHS.pendingReview, forBoth(PATHS.admin.evaluations.workspace.coverage)],
+  [LEGACY_PATHS.categoriesManager, forBoth(PATHS.admin.evaluations.workspace.categoryLabels)],
+  [LEGACY_PATHS.archive, forBoth(PATHS.admin.evaluations.archive)],
+  [LEGACY_PATHS.importEvaluations, forBoth(PATHS.admin.evaluations.importResponses)],
+  [LEGACY_PATHS.analytics, forBoth(PATHS.admin.analytics)],
+  [LEGACY_PATHS.reports, forBoth(PATHS.admin.reports.generate)],
+  [LEGACY_PATHS.present, forBoth(PATHS.admin.reports.present)],
+  [LEGACY_PATHS.exportHistory, forBoth(PATHS.admin.reports.history)],
+  [LEGACY_PATHS.accountManagement, forBoth(PATHS.admin.users.root)],
+  [LEGACY_PATHS.notifications, { admin: PATHS.admin.notifications, employee: PATHS.employee.notifications }],
+  [LEGACY_PATHS.settings, { admin: PATHS.admin.settings, employee: PATHS.employee.profile }],
+  [LEGACY_PATHS.createForm, forBoth(PATHS.admin.evaluations.workspace.newForm)],
+  [LEGACY_PATHS.viewForm, forBoth(PATHS.admin.evaluations.workspace.forms)],
+  [LEGACY_PATHS.fillForm, { admin: PATHS.admin.evaluations.workspace.forms, employee: PATHS.employee.evaluations }],
+  [LEGACY_PATHS.mySubmissions, { admin: PATHS.admin.dashboard, employee: PATHS.employee.submissions }],
+  [LEGACY_PATHS.profileSettings, { admin: PATHS.admin.settings, employee: PATHS.employee.profile }],
+  [LEGACY_PATHS.admin.partnerCompanies, forBoth(PATHS.admin.partners.root)],
+  [LEGACY_PATHS.admin.documentRegister, forBoth(PATHS.admin.partners.documents)],
+  [LEGACY_PATHS.admin.supplierRanking, forBoth(PATHS.admin.partners.root)],
+  [LEGACY_PATHS.admin.partnersFeedbackHub, forBoth(PATHS.admin.partners.feedback)],
+  [LEGACY_PATHS.admin.surveyForms, forBoth(PATHS.admin.evaluations.workspace.forms)],
+  [LEGACY_PATHS.admin.explorer, forBoth(PATHS.admin.evaluations.workspace.responses)],
+  [LEGACY_PATHS.admin.pendingReview, forBoth(PATHS.admin.evaluations.workspace.coverage)],
+  [LEGACY_PATHS.admin.categoriesManager, forBoth(PATHS.admin.evaluations.workspace.categoryLabels)],
+  [LEGACY_PATHS.admin.archive, forBoth(PATHS.admin.evaluations.archive)],
+  [LEGACY_PATHS.admin.importEvaluations, forBoth(PATHS.admin.evaluations.importResponses)],
+  [LEGACY_PATHS.admin.present, forBoth(PATHS.admin.reports.present)],
+  [LEGACY_PATHS.admin.exportHistory, forBoth(PATHS.admin.reports.history)],
+  [LEGACY_PATHS.admin.accountManagement, forBoth(PATHS.admin.users.root)],
+  [LEGACY_PATHS.employee.dashboard, { admin: PATHS.admin.dashboard, employee: PATHS.employee.home }],
+  [LEGACY_PATHS.employee.fillForm, { admin: PATHS.admin.dashboard, employee: PATHS.employee.evaluations }],
+  [LEGACY_PATHS.employee.mySubmissions, { admin: PATHS.admin.dashboard, employee: PATHS.employee.submissions }],
+  [LEGACY_PATHS.employee.profileSettings, { admin: PATHS.admin.dashboard, employee: PATHS.employee.profile }],
 ]);
 
 export function resolveAppRoute(value: string): AppRouteMatch | null {
@@ -119,16 +119,16 @@ export function resolveAppRoute(value: string): AppRouteMatch | null {
   const exact = exactRoutes.get(pathname);
   if (exact) return exact;
 
-  let match = pathname.match(/^\/admin\/partners\/([^/]+)$/);
+  let match = pathname.match(ROUTE_PATTERNS.adminPartnerDetails);
   if (match) return route('partner-companies', 'admin', { partnerId: decodeSegment(match[1]) });
 
-  match = pathname.match(/^\/admin\/evaluations\/workspace\/forms\/([^/]+)\/edit$/);
+  match = pathname.match(ROUTE_PATTERNS.adminEvaluationEdit);
   if (match) return route('create-form', 'admin', { formId: decodeSegment(match[1]), mode: 'edit' });
 
-  match = pathname.match(/^\/admin\/evaluations\/workspace\/forms\/([^/]+)$/);
+  match = pathname.match(ROUTE_PATTERNS.adminEvaluationDetails);
   if (match) return route('view-form', 'admin', { formId: decodeSegment(match[1]), mode: 'view' });
 
-  match = pathname.match(/^\/employee\/evaluations\/([^/]+)\/fill$/);
+  match = pathname.match(ROUTE_PATTERNS.employeeEvaluationFill);
   if (match) return route('fill-form', 'employee', { formId: decodeSegment(match[1]), mode: 'fill' });
 
   return null;
@@ -147,8 +147,8 @@ export function getRoleGuardRedirect(value: string, isAuthenticated: boolean, is
   const pathname = pathnameOf(value);
   if (!isAuthenticated) return pathname === PATHS.login || pathname === PATHS.passwordRecovery ? null : PATHS.login;
   if (pathname === PATHS.login || pathname === PATHS.passwordRecovery) return isAdmin ? PATHS.admin.dashboard : PATHS.employee.home;
-  if (pathname.startsWith('/admin/') || pathname === PATHS.admin.root) return isAdmin ? null : PATHS.employee.home;
-  if (pathname.startsWith('/employee/')) return isAdmin ? PATHS.admin.dashboard : null;
+  if (pathname.startsWith(`${PATHS.admin.root}/`) || pathname === PATHS.admin.root) return isAdmin ? null : PATHS.employee.home;
+  if (pathname.startsWith(`${PATHS.employee.root}/`)) return isAdmin ? PATHS.admin.dashboard : null;
   return isAdmin ? PATHS.admin.dashboard : PATHS.employee.home;
 }
 

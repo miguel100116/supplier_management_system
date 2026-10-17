@@ -3,6 +3,7 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { EvaluationWorkspace, EVALUATION_WORKSPACE_TABS, isEvaluationWorkspacePage } from './EvaluationWorkspace';
+import { PATHS } from '../../../routes/paths';
 
 test('workspace routes include evaluation operations and exclude archive and employee form entry', () => {
   for (const tab of EVALUATION_WORKSPACE_TABS) assert.equal(isEvaluationWorkspacePage(tab.key), true);
@@ -19,7 +20,7 @@ test('each workspace view exposes four URL-aware navigation choices, one current
   const segments = ['forms', 'responses', 'coverage', 'category-labels'];
   EVALUATION_WORKSPACE_TABS.forEach((tab, index) => {
     const html = renderToStaticMarkup(createElement(EvaluationWorkspace, {
-      currentPath: `/admin/evaluations/workspace/${segments[index]}`,
+      currentPath: `${PATHS.admin.evaluations.workspace.root}/${segments[index]}`,
       onNavigate: () => {},
       children: createElement('p', null, `Content for ${tab.label}`),
     }));
