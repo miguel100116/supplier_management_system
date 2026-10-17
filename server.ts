@@ -37,8 +37,13 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     
-    // Fallback to index.html for React SPA client-side routing
-    app.get('*', (req, res) => {
+    // Express 4 accepts the bare wildcard. Keep API misses as real 404s while
+    // serving the SPA entry point for every browser-managed application path.
+    app.get('*', (req, res, next) => {
+      if (req.path === '/api' || req.path.startsWith('/api/')) {
+        next();
+        return;
+      }
       res.sendFile(path.join(distPath, 'index.html'));
     });
   } else {

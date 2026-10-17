@@ -523,7 +523,7 @@ Evidence: src/hooks/useModalScrollLock.ts, src/hooks/useModalEscape.ts, src/comp
 
 ### 2026-10-16 - Task-focused admin navigation
 
-Status: implemented locally; visual browser review remains pending.
+Status: superseded by the URL-backed navigation decision dated 2026-10-17.
 
 Decision: The Admin sidebar exposes seven direct destinations: Dashboard, Partners, Evaluations, Analytics, Reports, Users & Access, and Archive. Related existing routes remain unchanged and are presented as contextual module views: partner directory/compliance/ranking/feedback, evaluation forms/responses/coverage/import/settings, and report creation/presentations/export history. Sidebar, page-heading, and account-permission terminology now use the same module names. Employee navigation is unchanged.
 
@@ -543,10 +543,20 @@ Evidence: `tailwind.config.js`, `src/styles.css`, `src/main.tsx`, `src/layouts/S
 
 ### 2026-10-16 - Centralized navigation terminology and page hierarchy
 
-Status: implemented locally; rendered browser comparison remains pending.
+Status: superseded in part by the canonical terminology and route hierarchy dated 2026-10-17.
 
 Decision: Keep existing route and permission keys while centralizing primary navigation labels, workspace view labels, page titles, breadcrumbs, and parent-sidebar selection in `src/navigation/navigationConfig.ts`. Use Dashboard as the page H1 with the personalized welcome as supporting text. Use semantic breadcrumbs for Admin workspace and Evaluation detail views, and use New Evaluation consistently for employee form entry.
 
 Consequences: Partner, Evaluation, and Report subviews now identify the current view in the H1 while retaining their parent sidebar selection. Create, edit, view, and Admin fill-form routes select Evaluations. User-visible legacy names such as Document Tracker, Account Management, Archive Center, and Survey Forms tab were updated without renaming internal route keys, persistence keys, or components.
 
 Evidence: `src/navigation/navigationConfig.ts`, `src/App.tsx`, `src/layouts/Shell.tsx`, `src/features/evaluations/components/EvaluationWorkspace.tsx`, focused navigation tests, `README.md`, and `SYSTEM_TURNOVER.md`.
+
+### 2026-10-17 - Canonical URL-backed module navigation
+
+Status: implemented locally; rendered desktop/mobile browser comparison and hosted Vercel verification remain pending.
+
+Decision: Retain the existing `PageKey`, permission, component, and persistence contracts while making browser paths canonical through `src/routes/paths.ts` and `src/routes/appRouter.ts`. The Admin shell groups Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History); Dashboard, Analytics, and Users remain direct destinations, with Notifications and Settings pinned at the bottom. Employees use Home, Assigned Evaluations, My Submissions, Notifications, and Profile. History API synchronization supplies deep links, back/forward behavior, role guards, and centralized redirects without adding a routing dependency.
+
+Consequences: User-visible terminology is Evaluation and Partner while legacy internal identifiers remain stable. Unauthenticated application paths resolve to `/login`; authenticated employees cannot enter `/admin/*`. Express 4 and Vercel serve `index.html` for client routes while excluding `/api`, and Vite emits root-relative assets. Existing Supabase RLS remains the authorization boundary; client guards are a usability layer.
+
+Evidence: `src/routes/paths.ts`, `src/routes/appRouter.ts`, `src/config/navigation.ts`, `src/layouts/Shell.tsx`, `src/layouts/WorkspaceLayout.tsx`, `src/App.tsx`, `server.ts`, `vite.config.ts`, `vercel.json`, and focused route/fallback tests.

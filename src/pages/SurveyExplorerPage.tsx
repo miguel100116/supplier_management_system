@@ -57,7 +57,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
     setExportError('');
     setIsExporting(true);
     const filename = surveyResponseFilename(selectedSurvey.title, new Date());
-    const worker = new Worker(new URL('../features/evaluations/workers/evaluationResponsesExport.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('../features/evaluations/workers/surveyResponsesExport.worker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
     worker.onmessage = (event: MessageEvent<{ bytes?: ArrayBuffer; error?: string }>) => {
       worker.terminate();

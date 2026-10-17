@@ -366,4 +366,4 @@ This system is **pre-production**. The most important open items (verified again
 
 ### Admin evaluation navigation
 
-Admins open Evaluations and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), Coverage (company evaluation coverage), Import Responses, and Category Settings. Archive remains a separate primary destination. Existing route permissions and persistence contracts are unchanged.
+Admins use grouped, URL-backed navigation: Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History), plus Dashboard, Analytics, and Users. Notifications and Settings are pinned at the bottom of the sidebar. Employees use Home, Assigned Evaluations, My Submissions, Notifications, and Profile. Existing permission and persistence keys remain unchanged.
