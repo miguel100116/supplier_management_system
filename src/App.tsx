@@ -39,7 +39,7 @@ import {
   getPagePresentation,
   type PageKey,
 } from './navigation/navigationConfig';
-import { getIndexRedirect, getPagePath, getRoleGuardRedirect, resolveAppRoute } from './routes/appRouter';
+import { getIndexRedirect, getLegacyRedirect, getPagePath, getRoleGuardRedirect, resolveAppRoute } from './routes/appRouter';
 import { PATHS } from './routes/paths';
 
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ AnalyticsPage }) => ({ default: AnalyticsPage })));
@@ -483,7 +483,7 @@ export default function App() {
     if (!authChecked || isPasswordRecovery || (isSupabaseConfigured && isSupabaseHydrating && account)) return;
 
     const guardedPath = getRoleGuardRedirect(currentPath, Boolean(account), Boolean(isAdmin));
-    const redirectedPath = guardedPath ?? getIndexRedirect(currentPath);
+    const redirectedPath = guardedPath ?? getIndexRedirect(currentPath) ?? getLegacyRedirect(currentPath, Boolean(isAdmin));
     if (redirectedPath && redirectedPath !== currentPath) {
       setBrowserPath(redirectedPath, true);
       return;

@@ -61,6 +61,59 @@ export const INDEX_REDIRECTS = new Map<string, string>([
   [PATHS.admin.reports.root, PATHS.admin.reports.generate],
 ]);
 
+interface LegacyRedirectTarget {
+  admin: string;
+  employee: string;
+}
+
+const forBoth = (path: string): LegacyRedirectTarget => ({ admin: path, employee: path });
+
+// Legacy PageKey aliases. The former application did not expose URL routes;
+// these aliases preserve bookmarks created from its state-navigation names.
+// Keep this block self-contained so it can be removed after the transition.
+export const LEGACY_REDIRECTS = new Map<string, LegacyRedirectTarget>([
+  ['/dashboard', { admin: PATHS.admin.dashboard, employee: PATHS.employee.home }],
+  ['/partner-companies', forBoth(PATHS.admin.partners.root)],
+  ['/document-register', forBoth(PATHS.admin.partners.documents)],
+  ['/supplier-ranking', forBoth(PATHS.admin.partners.root)],
+  ['/partners-feedback-hub', forBoth(PATHS.admin.partners.feedback)],
+  ['/survey-forms', { admin: PATHS.admin.evaluations.workspace.forms, employee: PATHS.employee.evaluations }],
+  ['/explorer', forBoth(PATHS.admin.evaluations.workspace.responses)],
+  ['/pending-review', forBoth(PATHS.admin.evaluations.workspace.coverage)],
+  ['/categories-manager', forBoth(PATHS.admin.evaluations.workspace.categoryLabels)],
+  ['/archive', forBoth(PATHS.admin.evaluations.archive)],
+  ['/import-evaluations', forBoth(PATHS.admin.evaluations.importResponses)],
+  ['/analytics', forBoth(PATHS.admin.analytics)],
+  ['/reports', forBoth(PATHS.admin.reports.generate)],
+  ['/present', forBoth(PATHS.admin.reports.present)],
+  ['/export-history', forBoth(PATHS.admin.reports.history)],
+  ['/account-management', forBoth(PATHS.admin.users.root)],
+  ['/notifications', { admin: PATHS.admin.notifications, employee: PATHS.employee.notifications }],
+  ['/settings', { admin: PATHS.admin.settings, employee: PATHS.employee.profile }],
+  ['/create-form', forBoth(PATHS.admin.evaluations.workspace.newForm)],
+  ['/view-form', forBoth(PATHS.admin.evaluations.workspace.forms)],
+  ['/fill-form', { admin: PATHS.admin.evaluations.workspace.forms, employee: PATHS.employee.evaluations }],
+  ['/my-submissions', { admin: PATHS.admin.dashboard, employee: PATHS.employee.submissions }],
+  ['/profile-settings', { admin: PATHS.admin.settings, employee: PATHS.employee.profile }],
+  ['/admin/partner-companies', forBoth(PATHS.admin.partners.root)],
+  ['/admin/document-register', forBoth(PATHS.admin.partners.documents)],
+  ['/admin/supplier-ranking', forBoth(PATHS.admin.partners.root)],
+  ['/admin/partners-feedback-hub', forBoth(PATHS.admin.partners.feedback)],
+  ['/admin/survey-forms', forBoth(PATHS.admin.evaluations.workspace.forms)],
+  ['/admin/explorer', forBoth(PATHS.admin.evaluations.workspace.responses)],
+  ['/admin/pending-review', forBoth(PATHS.admin.evaluations.workspace.coverage)],
+  ['/admin/categories-manager', forBoth(PATHS.admin.evaluations.workspace.categoryLabels)],
+  ['/admin/archive', forBoth(PATHS.admin.evaluations.archive)],
+  ['/admin/import-evaluations', forBoth(PATHS.admin.evaluations.importResponses)],
+  ['/admin/present', forBoth(PATHS.admin.reports.present)],
+  ['/admin/export-history', forBoth(PATHS.admin.reports.history)],
+  ['/admin/account-management', forBoth(PATHS.admin.users.root)],
+  ['/employee/dashboard', { admin: PATHS.admin.dashboard, employee: PATHS.employee.home }],
+  ['/employee/fill-form', { admin: PATHS.admin.dashboard, employee: PATHS.employee.evaluations }],
+  ['/employee/my-submissions', { admin: PATHS.admin.dashboard, employee: PATHS.employee.submissions }],
+  ['/employee/profile-settings', { admin: PATHS.admin.dashboard, employee: PATHS.employee.profile }],
+]);
+
 export function resolveAppRoute(value: string): AppRouteMatch | null {
   const pathname = pathnameOf(value);
   const exact = exactRoutes.get(pathname);
@@ -83,6 +136,11 @@ export function resolveAppRoute(value: string): AppRouteMatch | null {
 
 export function getIndexRedirect(value: string) {
   return INDEX_REDIRECTS.get(pathnameOf(value)) ?? null;
+}
+
+export function getLegacyRedirect(value: string, isAdmin: boolean) {
+  const target = LEGACY_REDIRECTS.get(pathnameOf(value));
+  return target ? (isAdmin ? target.admin : target.employee) : null;
 }
 
 export function getRoleGuardRedirect(value: string, isAuthenticated: boolean, isAdmin: boolean) {

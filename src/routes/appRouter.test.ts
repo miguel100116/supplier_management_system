@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getIndexRedirect, getRoleGuardRedirect, resolveAppRoute } from './appRouter';
+import { getIndexRedirect, getLegacyRedirect, getRoleGuardRedirect, LEGACY_REDIRECTS, resolveAppRoute } from './appRouter';
 import { PATHS } from './paths';
 
 test('canonical nested routes resolve to existing page contracts and decode parameters', () => {
@@ -32,4 +32,18 @@ test('role guard keeps unauthenticated users at login and separates admin and em
   assert.equal(getRoleGuardRedirect(PATHS.employee.home, true, true), PATHS.admin.dashboard);
   assert.equal(getRoleGuardRedirect(PATHS.admin.dashboard, true, true), null);
   assert.equal(getRoleGuardRedirect(PATHS.employee.home, true, false), null);
+});
+
+test('legacy PageKey aliases redirect by role and every target is canonical', () => {
+  assert.equal(getLegacyRedirect('/dashboard', true), PATHS.admin.dashboard);
+  assert.equal(getLegacyRedirect('/dashboard', false), PATHS.employee.home);
+  assert.equal(getLegacyRedirect('/notifications', false), PATHS.employee.notifications);
+  assert.equal(getLegacyRedirect('/admin/survey-forms', true), PATHS.admin.evaluations.workspace.forms);
+  assert.equal(getLegacyRedirect('/employee/my-submissions', false), PATHS.employee.submissions);
+  assert.equal(getLegacyRedirect('/not-a-legacy-route', true), null);
+
+  for (const target of LEGACY_REDIRECTS.values()) {
+    assert.ok(resolveAppRoute(target.admin), `Unresolved admin redirect target: ${target.admin}`);
+    assert.ok(resolveAppRoute(target.employee), `Unresolved employee redirect target: ${target.employee}`);
+  }
 });
