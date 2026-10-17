@@ -76,7 +76,7 @@ export function getEmployeePendingSurveys(
         surveyTitle: survey.title,
         surveyType: survey.surveyType,
         sender: 'admin@mgenesis.com',
-        subject: 'REMINDER - Survey Accomplishment',
+        subject: 'REMINDER - Evaluation Completion',
         deadlineDate: deadline,
         pendingCompanies,
         createdAt,

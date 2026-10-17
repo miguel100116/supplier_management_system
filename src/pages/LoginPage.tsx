@@ -167,7 +167,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       if (result.signedIn) {
         await onLogin(result.email);
       } else {
-        setPasswordMessage('Check your company email, confirm the account, then return here to sign in.');
+        setPasswordMessage('Check your work email, confirm the account, then return here to sign in.');
       }
     } catch (err) {
       setPasswordError(err instanceof Error ? err.message : 'Unable to create the account.');
@@ -183,7 +183,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     try {
       const redirectTo = `${window.location.origin}${window.location.pathname}`;
       await requestSupabasePasswordReset(email, redirectTo);
-      setPasswordMessage('If that company account exists, a password reset link has been sent.');
+      setPasswordMessage('If that work account exists, a password reset link has been sent.');
     } catch (err) {
       setPasswordError(err instanceof Error ? err.message : 'Unable to request a password reset.');
     } finally {
@@ -205,11 +205,11 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <div className="mt-8 flex max-w-xs items-center gap-3 text-left">
             <img src="/smpesa_icon.png" alt="" className="h-9 w-9 shrink-0 object-contain" />
             <h1 className="min-w-0 text-xl font-medium leading-snug tracking-tight text-white">
-              Supplier Management Performance Evaluation Survey Analytics
+              Supplier Management Performance Evaluation Analytics
             </h1>
           </div>
           <p className="mt-4 max-w-xs text-xs font-light leading-relaxed text-[#93aec9]">
-            Surveys, scoring, and reporting for every Microgenesis supplier — in one place.
+            Evaluations, scoring, and reporting for every Microgenesis supplier — in one place.
           </p>
         </div>
       </div>
@@ -240,13 +240,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 <div className="flex items-center gap-5">
                   <img src="/smpesa_icon.png" alt="" className="h-16 w-16 shrink-0 object-contain lg:h-20 lg:w-20" />
                   <h2 className="min-w-0 text-4xl font-medium leading-snug tracking-tight text-white lg:text-5xl">
-                    Supplier Management Performance Evaluation Survey Analytics
+                    Supplier Management Performance Evaluation Analytics
                   </h2>
                 </div>
               </motion.div>
 
               <p className="mt-6 text-base font-light leading-relaxed text-[#93aec9] lg:text-lg">
-                Centralizing stakeholder surveys, scoring, and reporting for every Microgenesis supplier and
+                Centralizing stakeholder evaluations, scoring, and reporting for every Microgenesis supplier and
                 subcontractor — in one dashboard.
               </p>
             </div>
@@ -271,7 +271,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <h1 className="mt-1.5 text-2xl font-medium text-slate-900">Welcome back</h1>
               <p className="mt-1.5 text-sm font-light text-slate-500">
                 {isSupabaseConfigured
-                  ? 'Sign in with your verified Microgenesis company email.'
+                  ? 'Sign in with your verified Microgenesis work email.'
                   : 'Sign in with your Microgenesis Microsoft account to continue.'}
               </p>
             </div>
@@ -291,7 +291,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             {isSupabaseConfigured && (
               <form onSubmit={handlePasswordSignIn} className="space-y-3">
                 <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-slate-600">Company email</span>
+                  <span className="mb-1 block text-xs font-medium text-slate-600">Partner email</span>
                   <input
                     type="email"
                     value={email}

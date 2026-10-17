@@ -47,17 +47,17 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
 
   const metricLabel = rankingMode === 'weighted' ? 'Weighted score' : 'Average score';
   const leaderboardDescription = rankingMode === 'weighted'
-    ? 'Top performing companies based on weighted scores.'
-    : 'Top performing companies based on average scores.';
+    ? 'Top performing partners based on weighted scores.'
+    : 'Top performing partners based on average scores.';
 
   const renderColumn = (items: typeof leaderboard, startIndex: number) => (
     <div className={items.length === 0 ? 'hidden xl:block' : 'min-w-0'}>
       <div className="grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 border-b border-slate-200 px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400 dark:border-slate-800 dark:text-slate-500 sm:grid-cols-[2.25rem_minmax(0,1fr)_7.75rem]">
         <span>Rank</span>
-        <span>Company</span>
+        <span>Partner</span>
         <span className="hidden text-right sm:block">{metricLabel}</span>
       </div>
-      <ol className="divide-y divide-slate-100 dark:divide-slate-800" aria-label={`${surveyType} company rankings by ${metricLabel.toLowerCase()}`}>
+      <ol className="divide-y divide-slate-100 dark:divide-slate-800" aria-label={`${surveyType} partner rankings by ${metricLabel.toLowerCase()}`}>
         {items.map((composite, i) => {
           const rank = composite.displayRank ?? startIndex + i + 1;
           const score = composite.hasScore
@@ -133,12 +133,12 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[#0866B1] dark:bg-slate-800 dark:text-blue-400">
               <Trophy size={17} strokeWidth={2} aria-hidden="true" />
             </span>
-            <h3 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">Company Leaderboards</h3>
+            <h3 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">Partner Leaderboards</h3>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
             {rankingMode === 'weighted'
               ? 'Composite scores weighted to match each form\'s actual point values, ranked within their own peer group and adjusted for evaluation volume so a handful of reviews can\'t outrank dozens.'
-              : 'Ranked purely by actual average score regardless of evaluation count. Ties broken by number of evaluations — more respondents rank higher. Companies with an identical score and submission count share the same rank.'}
+              : 'Ranked purely by actual average score regardless of evaluation count. Ties broken by number of evaluations — more respondents rank higher. Partners with an identical score and submission count share the same rank.'}
           </p>
         </div>
 
@@ -181,13 +181,13 @@ export function CompanyLeaderboardPanel({ responses, rankingMode }: CompanyLeade
             <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">{leaderboardDescription}</p>
           </div>
           <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-            {leaderboard.length} companies
+            {leaderboard.length} partners
           </span>
         </div>
 
         {leaderboard.length === 0 ? (
           <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-            No evaluations available for this survey type yet.
+            No evaluations available for this evaluation type yet.
           </p>
         ) : (
           <div className="mt-4 grid min-w-0 xl:grid-cols-2 xl:divide-x xl:divide-slate-200 dark:xl:divide-slate-800">

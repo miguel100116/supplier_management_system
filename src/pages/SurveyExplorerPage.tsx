@@ -57,7 +57,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
     setExportError('');
     setIsExporting(true);
     const filename = surveyResponseFilename(selectedSurvey.title, new Date());
-    const worker = new Worker(new URL('../features/evaluations/workers/surveyResponsesExport.worker.ts', import.meta.url), { type: 'module' });
+    const worker = new Worker(new URL('../features/evaluations/workers/evaluationResponsesExport.worker.ts', import.meta.url), { type: 'module' });
     workerRef.current = worker;
     worker.onmessage = (event: MessageEvent<{ bytes?: ArrayBuffer; error?: string }>) => {
       worker.terminate();
@@ -126,7 +126,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
   return (
     <div className="space-y-5">
       <button onClick={() => { setSelectedSurveyId(null); setSelectedResponseId(null); }} className="secondary-button inline-flex items-center gap-2" type="button">
-        <ChevronLeft size={16} /> Back to Surveys
+        <ChevronLeft size={16} /> Back to Evaluations
       </button>
       <section className="panel space-y-4">
         <div>
@@ -141,7 +141,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
             <div className="flex flex-wrap gap-6 border-b border-slate-100 pb-4 dark:border-slate-800">
               <div><p className="text-xs font-medium text-slate-500">Respondent Email</p><p className="font-semibold">{selectedSubmission.first.respondentEmail || 'N/A'}</p></div>
               <div><p className="text-xs font-medium text-slate-500">Submission Date</p><p className="font-semibold">{new Date(selectedSubmission.first.submissionDate).toLocaleString()}{selectedSubmission.first.submissionDateInferredFrom && ' (inferred)'}</p></div>
-              <div><p className="text-xs font-medium text-slate-500">Company</p><p className="font-semibold">{selectedSubmission.first.company}</p></div>
+              <div><p className="text-xs font-medium text-slate-500">Partner</p><p className="font-semibold">{selectedSubmission.first.company}</p></div>
               <div><p className="text-xs font-medium text-slate-500">Department</p><p className="font-semibold">{selectedSubmission.first.department || 'N/A'}</p></div>
             </div>
             <div className="space-y-6">
@@ -180,7 +180,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
             </div>
             {exportError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{exportError}</p>}
             {!submissions.length ? (
-              <p className="py-8 text-center text-slate-500">No responses have been submitted for this survey.</p>
+              <p className="py-8 text-center text-slate-500">No responses have been submitted for this evaluation.</p>
             ) : !filteredSubmissions.length ? (
               <p className="py-8 text-center text-slate-500">No responses match this email search.</p>
             ) : (
@@ -189,7 +189,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                 <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
                   <table className="min-w-[760px] w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                      <tr><th className="px-4 py-3">Respondent Email</th><th className="px-4 py-3">Department</th><th className="px-4 py-3">Company</th><th className="px-4 py-3">Submission Date</th><th className="px-4 py-3">Overall Score</th><th className="px-4 py-3"><span className="sr-only">Action</span></th></tr>
+                      <tr><th className="px-4 py-3">Respondent Email</th><th className="px-4 py-3">Department</th><th className="px-4 py-3">Partner</th><th className="px-4 py-3">Submission Date</th><th className="px-4 py-3">Overall Score</th><th className="px-4 py-3"><span className="sr-only">Action</span></th></tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {visibleSubmissions.map((submission) => (

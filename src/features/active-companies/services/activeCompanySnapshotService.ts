@@ -24,7 +24,7 @@ export async function saveActiveCompanySnapshot(snapshot: ActiveCompanySnapshot)
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     if (message.includes('application_records_record_type_check')) {
-      throw new Error('Active-company uploads are not enabled in this Supabase environment yet. Apply migration 202609230001_active_company_snapshots.sql, then try again.');
+      throw new Error('Active-partner uploads are not enabled in this Supabase environment yet. Contact an administrator to enable this feature.');
     }
     throw error;
   }

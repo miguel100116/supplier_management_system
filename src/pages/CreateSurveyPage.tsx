@@ -52,7 +52,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
 
   const handleRemoveQuestion = (index: number) => {
     if (questions.length === 1) {
-      setError('A survey must have at least one question.');
+      setError('A evaluation must have at least one question.');
       return;
     }
     const next = [...questions];
@@ -78,7 +78,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
     setError('');
 
     if (!title.trim()) {
-      setError('Please provide a survey title.');
+      setError('Please provide a evaluation title.');
       return;
     }
 
@@ -110,7 +110,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
     onSave({
       title: title.trim(),
       surveyType,
-      description: description.trim() || `Custom survey for ${surveyType} stakeholders.`,
+      description: description.trim() || `Custom evaluation for ${surveyType} stakeholders.`,
       deadlineDate: deadlineDate.trim() || undefined,
       maxRating,
       questions: formattedQuestions as any,
@@ -145,7 +145,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
         <div className="grid gap-5 md:grid-cols-3">
           <div className="md:col-span-2 space-y-4">
             <div>
-              <label htmlFor="survey-title" className="field-label">Survey Title *</label>
+              <label htmlFor="survey-title" className="field-label">Evaluation Title *</label>
               <input
                 id="survey-title"
                 type="text"
@@ -162,7 +162,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
               <textarea
                 id="survey-desc"
                 className="field min-h-20 max-h-40"
-                placeholder="Describe the purpose of this survey to respondents..."
+                placeholder="Describe the purpose of this evaluation to respondents..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -171,7 +171,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
 
           <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-900/50 space-y-4">
             <div>
-              <label htmlFor="survey-type" className="field-label">Survey Type (Audience) *</label>
+              <label htmlFor="survey-type" className="field-label">Evaluation Type (Audience) *</label>
               <select
                 id="survey-type"
                 className="field"
@@ -250,7 +250,7 @@ export function CreateSurveyPage({ onBack, onSave, surveyToEdit, categoryLabels 
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <FileText size={18} className="text-[#0866B1] dark:text-blue-400" />
-              <span>Survey Questions ({questions.length})</span>
+              <span>Evaluation Questions ({questions.length})</span>
             </h3>
             <button
               type="button"

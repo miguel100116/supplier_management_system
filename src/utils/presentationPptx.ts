@@ -193,7 +193,7 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
     }
 
     case 'comparison': {
-      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.comparison, 'Survey Type Comparison');
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.comparison, 'Evaluation Type Comparison');
       const chartH = CONTENT_BOTTOM - contentTop;
       pptxSlide.addChart(
         pres.ChartType.bar,
@@ -263,7 +263,7 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
     }
 
     case 'leaderboard': {
-      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.leaderboard, 'Company Leaderboard');
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.leaderboard, 'Partner Leaderboard');
       const groups = slide.groups;
       const colGap = 0.2;
       const colW = (CONTENT_W - colGap * (groups.length - 1)) / groups.length;
@@ -378,7 +378,7 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
     }
 
     case 'spotlight': {
-      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.spotlight, 'Company Spotlight');
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.spotlight, 'Partner Spotlight');
       const leftW = 3.4;
       const rightX = MARGIN + leftW + 0.3;
       const rightW = CONTENT_W - leftW - 0.3;
@@ -465,7 +465,7 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
         pptxSlide,
         SLIDE_EYEBROWS.distribution,
         'Partners Needing Attention',
-        `Companies trailing their own peer group, and the specific category dragging each one down${slide.naPercentage > 0 ? ` (${slide.naPercentage.toFixed(1)}% of ratings marked N/A)` : ''}.`,
+        `Partners trailing their own peer group, and the specific category dragging each one down${slide.naPercentage > 0 ? ` (${slide.naPercentage.toFixed(1)}% of ratings marked N/A)` : ''}.`,
       );
       const colH = CONTENT_BOTTOM - contentTop;
 

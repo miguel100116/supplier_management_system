@@ -385,7 +385,7 @@ export function SurveyFormsPage({
       return;
     }
     if (overrideAccess && (accessDepartments.length === 0 || accessRoles.length === 0)) {
-      alert("Please select at least one department and one role that can answer the survey.");
+      alert("Please select at least one department and one role that can answer the evaluation.");
       return;
     }
 
@@ -442,7 +442,7 @@ export function SurveyFormsPage({
 
   const handleProceedArchive = async () => {
     if (!onUpdateSurveysBulk && !onUpdateSurvey) {
-      setArchiveError('Survey update callback is not configured.');
+      setArchiveError('Evaluation update callback is not configured.');
       return;
     }
 
@@ -464,13 +464,13 @@ export function SurveyFormsPage({
         await Promise.all(updatedSurveysList.map((survey) => onUpdateSurvey(survey)));
       }
 
-      alert("Selected survey forms have been successfully archived!");
+      alert("Selected evaluation forms have been successfully archived!");
       setIsSelectMode(false);
       setSelectedSurveyIds(new Set());
       setIsModifyOpen(false);
       setIsArchiveConfirmOpen(false);
     } catch (error) {
-      setArchiveError(error instanceof Error ? error.message : 'Unable to archive the selected survey forms.');
+      setArchiveError(error instanceof Error ? error.message : 'Unable to archive the selected evaluation forms.');
     } finally {
       setIsArchiving(false);
     }
@@ -479,7 +479,7 @@ export function SurveyFormsPage({
   const handleProceedReset = () => {
     if (onArchiveResponses) {
       onArchiveResponses([...selectedSurveyIds], resetSeriesLabel);
-      alert("Selected survey responses have been archived successfully, and the forms have been reset!");
+      alert("Selected evaluation responses have been archived successfully, and the forms have been reset!");
       setIsSelectMode(false);
       setSelectedSurveyIds(new Set());
       setIsModifyOpen(false);
@@ -502,7 +502,7 @@ export function SurveyFormsPage({
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Your Evaluation Progress</span>
                 <h3 className="text-base font-extrabold text-slate-500 dark:text-slate-400">No Task Yet</h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500">
-                  No survey forms have been assigned to you yet.
+                  No evaluation forms have been assigned to you yet.
                 </p>
               </div>
             </div>
@@ -518,7 +518,7 @@ export function SurveyFormsPage({
                 {evaluatedCount} of {totalCompanies} Partners Evaluated
               </h3>
               <p className="text-xs text-slate-400 dark:text-slate-500">
-                {completionPercentage === 100 ? '🎉 All evaluations completed!' : 'Click to view pending companies by type'}
+                {completionPercentage === 100 ? '🎉 All evaluations completed!' : 'Click to view pending partners by type'}
               </p>
             </div>
             
@@ -589,7 +589,7 @@ export function SurveyFormsPage({
           <>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <h3 className="text-base font-semibold">Active Survey Forms</h3>
+                <h3 className="text-base font-semibold">Active Evaluation Forms</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Interactive forms for evaluating performance metrics, contracts, and service level agreements.
                 </p>
@@ -633,13 +633,13 @@ export function SurveyFormsPage({
                 }}
               >
                 <label className="min-w-[220px] flex-1">
-                  <span className="sr-only">Search survey forms</span>
+                  <span className="sr-only">Search evaluation forms</span>
                   <span className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white pl-3 pr-3 transition focus-within:border-azure focus-within:ring-2 focus-within:ring-blue-100 dark:border-slate-800 dark:bg-slate-900 dark:focus-within:ring-blue-950">
                     <Search size={16} className="shrink-0 text-[#0866B1] dark:text-blue-300" />
                     <span className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
                     <input
                       className="w-full bg-transparent py-2 text-sm text-ink outline-none placeholder:text-slate-400 dark:text-slate-100"
-                      placeholder="Search survey title or description..."
+                      placeholder="Search evaluation title or description..."
                       value={search}
                       onChange={(event) => setSearch(event.target.value)}
                     />
@@ -653,10 +653,10 @@ export function SurveyFormsPage({
         {filteredSurveys.length === 0 ? (
           <StateMessage
             compact
-            title="No survey forms found"
+            title="No evaluation forms found"
             message={
               surveys.length === 0
-                ? "No custom survey forms have been created yet."
+                ? "No custom evaluation forms have been created yet."
                 : "Try adjusting the filters or search to find what you're looking for."
             }
           />
@@ -675,7 +675,7 @@ export function SurveyFormsPage({
                           className="h-4.5 w-4.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1] transition cursor-pointer"
                         />
                       )}
-                      <span>Survey Title</span>
+                      <span>Evaluation Title</span>
                     </div>
                   </th>
                   <th className="px-4 py-3.5">Category Type</th>
@@ -756,7 +756,7 @@ export function SurveyFormsPage({
                               onClick={() => openSingleModify(survey)}
                               className="inline-flex items-center justify-center gap-2 w-36 rounded-lg bg-[#0866B1] text-white hover:bg-[#07528E] dark:bg-blue-600 dark:hover:bg-blue-700 px-4 py-2 text-sm font-bold transition cursor-pointer"
                               type="button"
-                              title="Modify Survey"
+                              title="Modify Evaluation"
                             >
                               <ClipboardList size={16} />
                               <span>Modify</span>
@@ -768,7 +768,7 @@ export function SurveyFormsPage({
                               onClick={() => onSelectSurvey(survey.id)}
                               className="inline-flex items-center justify-center gap-2 w-36 rounded-lg border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 px-4 py-2 text-sm font-semibold transition cursor-pointer"
                               type="button"
-                              title="View survey details"
+                              title="View evaluation details"
                             >
                               <Eye size={16} />
                               <span>View</span>
@@ -777,10 +777,10 @@ export function SurveyFormsPage({
                               onClick={() => onFillForm(survey.id)}
                               className="inline-flex items-center justify-center gap-2 w-36 rounded-lg bg-[#0866B1] text-white hover:bg-[#07528E] dark:bg-blue-600 dark:hover:bg-blue-700 px-4 py-2 text-sm font-bold transition cursor-pointer"
                               type="button"
-                              title="Answer Survey"
+                              title="Answer Evaluation"
                             >
                               <FormInput size={16} />
-                              <span>Answer Survey</span>
+                              <span>Answer Evaluation</span>
                             </button>
                           </div>
                         )}
@@ -857,11 +857,11 @@ export function SurveyFormsPage({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-slate-700 dark:text-slate-100">
-                    Current progress: {evaluatedCount} / {totalCompanies} companies
+                    Current progress: {evaluatedCount} / {totalCompanies} partners
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     {completionPercentage === 100 
-                      ? "Awesome job! You have fully evaluated all active companies."
+                      ? "Awesome job! You have fully evaluated all active partners."
                       : `You still have ${totalCompanies - evaluatedCount} partners left to evaluate.`
                     }
                   </p>
@@ -876,7 +876,7 @@ export function SurveyFormsPage({
                   <div className="space-y-1">
                     <h4 className="text-sm font-bold text-slate-800 dark:text-white">All Completed!</h4>
                     <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                      Thank you! You have evaluated all Courier, Supplier, and Subcontractor companies.
+                      Thank you! You have evaluated all Courier, Supplier, and Subcontractor partners.
                     </p>
                   </div>
                 </div>
@@ -968,7 +968,7 @@ export function SurveyFormsPage({
                   <button
                     onClick={() => {
                       if (selectedSurveyIds.size === 0) {
-                        alert("Please select at least one survey form to modify.");
+                        alert("Please select at least one evaluation form to modify.");
                         return;
                       }
                       openBulkModify();
@@ -981,7 +981,7 @@ export function SurveyFormsPage({
                     }`}
                     type="button"
                   >
-                    Modify Selected Survey
+                    Modify Selected Evaluation
                   </button>
                 </div>
               </div>
@@ -1007,7 +1007,7 @@ export function SurveyFormsPage({
                       {isSelectMode ? 'Bulk Modify Settings' : 'Modify Settings'}
                     </h3>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                      Applying to {selectedSurveyIds.size} selected survey {selectedSurveyIds.size === 1 ? 'form' : 'forms'} (Step {modifyStep} of 2)
+                      Applying to {selectedSurveyIds.size} selected evaluation {selectedSurveyIds.size === 1 ? 'form' : 'forms'} (Step {modifyStep} of 2)
                     </p>
                   </div>
                   <button
@@ -1027,7 +1027,7 @@ export function SurveyFormsPage({
                       {/* Section 1: Survey Status & Archive */}
                       <div className="space-y-3">
                         <span className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                          Survey Status
+                          Evaluation Status
                         </span>
 
                         {/* Radio Choice List */}
@@ -1078,7 +1078,7 @@ export function SurveyFormsPage({
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-3">
                           <label className="text-sm font-bold text-slate-800 dark:text-slate-200 block uppercase tracking-wider">
-                            Survey Access
+                            Evaluation Access
                           </label>
                           {isSelectMode && (
                             <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 cursor-pointer">
@@ -1239,7 +1239,7 @@ export function SurveyFormsPage({
                             type="button"
                           >
                             <Building2 size={14} />
-                            <span>Modify Companies to Evaluate</span>
+                            <span>Modify Partners to Evaluate</span>
                           </button>
                         </div>
                       )}
@@ -1338,7 +1338,7 @@ export function SurveyFormsPage({
                       </button>
                       <div>
                         <h3 className="text-lg font-extrabold text-slate-950 dark:text-white">
-                          Modify Companies to Evaluate
+                          Modify Partners to Evaluate
                         </h3>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                           {targetSurvey ? `${targetSurvey.surveyType} partners` : 'Partners'} · {evaluationCompanyIds.length} / {pickerCompanies.length} selected
@@ -1357,7 +1357,7 @@ export function SurveyFormsPage({
 
                   <div className="flex-1 overflow-y-auto p-6 space-y-3">
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Choose which registered {targetSurvey ? targetSurvey.surveyType.toLowerCase() : ''} partner companies this survey should evaluate. This list always reflects the companies currently in the Partner Registry, and every completion percentage for this survey is calculated against your selection here.
+                      Choose which registered {targetSurvey ? targetSurvey.surveyType.toLowerCase() : ''} partners this evaluation should evaluate. This list always reflects the partners currently in the Partner Registry, and every completion percentage for this evaluation is calculated against your selection here.
                     </p>
 
                     <label className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 px-3.5 py-2.5 cursor-pointer">
@@ -1376,7 +1376,7 @@ export function SurveyFormsPage({
 
                     {pickerCompanies.length === 0 ? (
                       <div className="text-center py-10 text-sm font-semibold text-slate-400 dark:text-slate-500">
-                        No {targetSurvey?.surveyType.toLowerCase()} partner companies are registered yet.
+                        No {targetSurvey?.surveyType.toLowerCase()} partners are registered yet.
                       </div>
                     ) : (
                       <div className="space-y-1.5">
@@ -1437,7 +1437,7 @@ export function SurveyFormsPage({
                       Archive Selected Forms
                     </h3>
                     <p className="text-xs text-rose-500 font-semibold mt-0.5">
-                      Applying to {selectedSurveyIds.size} survey forms
+                      Applying to {selectedSurveyIds.size} evaluation forms
                     </p>
                   </div>
                 </div>
@@ -1445,7 +1445,7 @@ export function SurveyFormsPage({
                 <div className="space-y-2.5">
                   <div className="bg-rose-50/75 dark:bg-rose-950/15 p-3.5 rounded-xl border border-rose-100 dark:border-rose-900/30 text-xs text-rose-700 dark:text-rose-300 leading-relaxed space-y-1.5">
                     <p className="font-bold">⚠️ CRITICAL WARNING:</p>
-                    <p>Archiving these survey forms will completely hide them from both active administrator tables and employee evaluation dashboards.</p>
+                    <p>Archiving these evaluation forms will completely hide them from both active administrator tables and employee evaluation dashboards.</p>
                     <p>The forms will no longer accept responses, but their historic responses will be preserved in Archive.</p>
                   </div>
 
@@ -1498,7 +1498,7 @@ export function SurveyFormsPage({
                       Reset Selected Forms
                     </h3>
                     <p className="text-xs text-amber-500 font-semibold mt-0.5">
-                      Applying to {selectedSurveyIds.size} survey forms
+                      Applying to {selectedSurveyIds.size} evaluation forms
                     </p>
                   </div>
                 </div>
@@ -1506,7 +1506,7 @@ export function SurveyFormsPage({
                 <div className="space-y-2.5">
                   <div className="bg-amber-50/75 dark:bg-amber-950/15 p-3.5 rounded-xl border border-amber-100 dark:border-amber-900/30 text-xs text-amber-700 dark:text-amber-300 leading-relaxed space-y-1.5">
                     <p className="font-bold">⚠️ CRITICAL WARNING:</p>
-                    <p>Resetting these forms will archive all previous responses submitted by employees for these specific survey questions.</p>
+                    <p>Resetting these forms will archive all previous responses submitted by employees for these specific evaluation questions.</p>
                     <p>This allows employees to answer the evaluation forms completely fresh, while previous answers are moved securely to historical archives.</p>
                   </div>
 

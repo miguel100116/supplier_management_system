@@ -83,7 +83,7 @@ function findCompanyColumn(rows: unknown[][], surveyType: SurveyType): { columnI
   }
 
   throw new Error(
-    `Could not find a company-name column for ${surveyType}. Label one column "${surveyType} Name" or "Company Name", or upload a one-column company list.`,
+    `Could not find a partner-name column for ${surveyType}. Label one column "${surveyType} Name", or upload a one-column partner list.`,
   );
 }
 
@@ -106,7 +106,7 @@ export function parseActiveCompanyWorkbook(
   if (!sheet) throw new Error('The uploaded file has no sheets.');
 
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  if (rows.length === 0) throw new Error('The uploaded file has no company rows.');
+  if (rows.length === 0) throw new Error('The uploaded file has no partner rows.');
 
   const { columnIndex, firstDataRow } = findCompanyColumn(rows, surveyType);
 
@@ -119,7 +119,7 @@ export function parseActiveCompanyWorkbook(
   }
 
   const companies = [...uniqueCompanies.values()].sort((left, right) => left.localeCompare(right));
-  if (companies.length === 0) throw new Error('No company names were found in the uploaded file.');
+  if (companies.length === 0) throw new Error('No partner names were found in the uploaded file.');
   return companies;
 }
 
@@ -143,7 +143,7 @@ export function createActiveCompanySnapshot(
 
 export function parseActiveCompanySnapshot(value: unknown): ActiveCompanySnapshot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('An active-company snapshot is not an object.');
+    throw new Error('An active-partner snapshot is not an object.');
   }
   const candidate = value as Partial<ActiveCompanySnapshot>;
   const validSurveyType = candidate.surveyType === 'Courier'
@@ -167,7 +167,7 @@ export function parseActiveCompanySnapshot(value: unknown): ActiveCompanySnapsho
     || candidate.sourceFileName.length > 2_000
     || !validCompanies
   ) {
-    throw new Error('An active-company snapshot has an invalid stored shape.');
+    throw new Error('An active-partner snapshot has an invalid stored shape.');
   }
 
   return candidate as ActiveCompanySnapshot;

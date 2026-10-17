@@ -266,9 +266,9 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
-          <h3 className="text-base font-semibold">Company Analysis</h3>
+          <h3 className="text-base font-semibold">Partner Analysis</h3>
           <p className="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Search for a specific company to see its section breakdown and score trend over time.
+            Search for a specific partner to see its section breakdown and score trend over time.
           </p>
           </div>
 
@@ -301,8 +301,8 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
           <CompanyCombobox
             key={`${surveyType}-primary`}
             idPrefix="company-search"
-            label={`Search ${surveyTypeDisplayLabel[surveyType]} companies`}
-            placeholder={`Search ${surveyTypeDisplayLabel[surveyType].toLowerCase()} companies...`}
+            label={`Search ${surveyTypeDisplayLabel[surveyType]} partners`}
+            placeholder={`Search ${surveyTypeDisplayLabel[surveyType].toLowerCase()} partners...`}
             icon={<Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />}
             tone="primary"
             options={filteredOptions}
@@ -315,7 +315,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
           <CompanyCombobox
             key={`${surveyType}-compare`}
             idPrefix="company-compare"
-            label={`Compare with another ${surveyTypeDisplayLabel[surveyType]} company`}
+            label={`Compare with another ${surveyTypeDisplayLabel[surveyType]} partner`}
             placeholder={`Compare with another ${surveyTypeDisplayLabel[surveyType].toLowerCase()}...`}
             icon={<GitCompareArrows size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />}
             tone="compare"
@@ -461,7 +461,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
             <div className="h-56 md:h-64">
               {trendGranularity === 'series' && displayedTrendData.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-sm text-slate-400 dark:text-slate-500 text-center px-4">
-                  No named archive periods for this company yet - archive a survey with a period label to see it here.
+                  No named archive periods for this partner yet - archive a evaluation with a period label to see it here.
                 </div>
               ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -502,7 +502,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
         </div>
       ) : (
         <p className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center">
-          Search and select a company above to view its performance analysis.
+          Search and select a partner above to view its performance analysis.
         </p>
       )}
     </section>

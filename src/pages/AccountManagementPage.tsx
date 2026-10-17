@@ -28,16 +28,16 @@ const PAGE_MODULES: { key: PageModuleKey; label: string; description: string }[]
   { key: 'dashboard', label: 'Dashboard', description: 'Personalized performance indicators and KPIs' },
   { key: 'survey-forms', label: 'Evaluations', description: 'Open evaluation forms and related workflows' },
   { key: 'explorer', label: 'Evaluation Responses', description: 'Review complete evaluation response records' },
-  { key: 'analytics', label: 'Analytics', description: 'Company-wide statistical charts and trends' },
+  { key: 'analytics', label: 'Analytics', description: 'Partner-wide statistical charts and trends' },
   { key: 'reports', label: 'Reports', description: 'Create reports and access presentation and export workflows' },
   { key: 'present', label: 'Presentations', description: 'Presentation-ready evaluation results' },
-  { key: 'partner-companies', label: 'Partners', description: 'Manage courier, supplier, and subcontractor company records' },
-  { key: 'document-register', label: 'Compliance Documents', description: 'Track compliance documents across all partner companies' },
+  { key: 'partner-companies', label: 'Partners', description: 'Manage courier, supplier, and subcontractor partner records' },
+  { key: 'document-register', label: 'Compliance Documents', description: 'Track compliance documents across all partners' },
   { key: 'renew-documents', label: 'Renew Compliance Documents', description: 'Action permission: update document expiry dates/status in Partners and Compliance Documents without requiring full Users & Access permissions' },
-  { key: 'supplier-ranking', label: 'Supplier Ranking', description: 'Curate and reorder the Top 20 Suppliers evaluable by default in Supplier surveys' },
+  { key: 'supplier-ranking', label: 'Supplier Ranking', description: 'Curate and reorder the Top 20 Suppliers evaluable by default in Supplier evaluations' },
   { key: 'account-management', label: 'Users & Access', description: 'Configure employee accounts, roles, ranks, and permissions' },
-  { key: 'notifications', label: 'Notification Logs', description: 'Audit trails of incoming survey responses' },
-  { key: 'archive', label: 'Archive', description: 'Browse and restore archived companies, forms, and responses' },
+  { key: 'notifications', label: 'Notification Logs', description: 'Audit trails of incoming evaluation responses' },
+  { key: 'archive', label: 'Archive', description: 'Browse and restore archived partners, forms, and responses' },
 ];
 
 const SURVEY_TYPES: { key: SurveyType; label: string; description: string }[] = [
@@ -647,7 +647,7 @@ export function AccountManagementPage({
                 {/* Data Access Block */}
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800">
-                    Survey Data Access
+                    Evaluation Data Access
                   </h4>
                   <p className="text-xs text-slate-500">
                     Determine which operational data the user has visibility over.
@@ -829,7 +829,7 @@ export function AccountManagementPage({
                 {/* Survey Type Access */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800">
-                    Survey Data Access
+                    Evaluation Data Access
                   </h4>
                   <div className="grid grid-cols-1 gap-2.5">
                     {SURVEY_TYPES.map(type => {

@@ -225,7 +225,7 @@ export function PartnerDirectoryTab({
 
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="field-label text-xs font-bold">Partner Company Name <span className="text-rose-500">*</span></label>
+                <label className="field-label text-xs font-bold">Partner Name <span className="text-rose-500">*</span></label>
                 <input
                   type="text"
                   required
@@ -267,7 +267,7 @@ export function PartnerDirectoryTab({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. contact@company.com"
+                  placeholder="e.g. contact@partner.com"
                   className="field mt-1 text-xs"
                 />
               </div>
@@ -278,7 +278,7 @@ export function PartnerDirectoryTab({
                   type="text"
                   value={ccListInput}
                   onChange={(e) => setCcListInput(e.target.value)}
-                  placeholder="e.g. ops@company.com, rep@mgenesis.com"
+                  placeholder="e.g. ops@partner.com, rep@mgenesis.com"
                   className="field mt-1 text-xs"
                 />
               </div>

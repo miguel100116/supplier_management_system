@@ -83,17 +83,17 @@ test('page presentation keeps titles, breadcrumbs, and sidebar parents aligned',
   });
 
   assert.deepEqual(getPagePresentation('document-register', { isAdmin: true }), {
-    title: 'Compliance Documents',
+    title: 'Documents',
     sidebarKey: 'partner-companies',
     breadcrumbs: [
       { label: 'Partners', page: 'partner-companies' },
-      { label: 'Compliance Documents' },
+      { label: 'Documents' },
     ],
   });
 
   assert.equal(getPagePresentation('categories-manager', { isAdmin: true }).title, 'Category Labels');
   assert.equal(getPagePresentation('create-form', { isAdmin: true }).sidebarKey, 'survey-forms');
-  assert.equal(getPagePresentation('fill-form', { isAdmin: false }).title, 'New Evaluation');
+  assert.equal(getPagePresentation('fill-form', { isAdmin: false }).title, 'Assigned Evaluations');
   assert.equal(getPagePresentation('fill-form', { isAdmin: false }).sidebarKey, 'fill-form');
 });
 

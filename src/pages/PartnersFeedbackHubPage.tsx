@@ -239,7 +239,7 @@ export function PartnersFeedbackHubPage({
       } else if (report) {
         handleRealSendResult(report.id, {
           success: false,
-          error: 'The queued report has no valid company ID or survey record. Revise and re-queue it before sending.',
+          error: 'The queued report has no valid partner ID or evaluation record. Revise and re-queue it before sending.',
         });
       }
       return;
@@ -301,7 +301,7 @@ export function PartnersFeedbackHubPage({
     const newWindow = window.open('about:blank', '_blank');
     if (!resolveQueuedReportCaptureItem(report)) {
       if (newWindow) {
-        newWindow.document.write('<p style="font-family: sans-serif; margin: 50px; color: #b91c1c;">The queued report has no valid company ID or survey record. Revise and re-queue it before previewing.</p>');
+        newWindow.document.write('<p style="font-family: sans-serif; margin: 50px; color: #b91c1c;">The queued report has no valid partner ID or evaluation record. Revise and re-queue it before previewing.</p>');
       }
       return;
     }
@@ -477,8 +477,8 @@ export function PartnersFeedbackHubPage({
             }`}
             title={
               areAllSurveysCompleted
-                ? 'Queue reports for all completed companies in bulk'
-                : 'Bulk Sending is locked until all active surveys are Completed'
+                ? 'Queue reports for all completed partners in bulk'
+                : 'Bulk Sending is locked until all active evaluations are Completed'
             }
           >
             <Send size={13} />
@@ -486,7 +486,7 @@ export function PartnersFeedbackHubPage({
           </button>
           {!areAllSurveysCompleted && (
             <span className="text-[10px] text-slate-400 font-semibold max-w-[150px] leading-tight">
-              Needs all active surveys <strong>Completed</strong>
+              Needs all active evaluations <strong>Completed</strong>
             </span>
           )}
         </div>

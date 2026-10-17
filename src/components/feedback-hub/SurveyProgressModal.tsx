@@ -76,9 +76,9 @@ export function SurveyProgressModal({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
-                  Survey Ongoing
+                  Evaluation Ongoing
                 </span>
-                <span className="text-xs font-medium text-slate-500">{survey.surveyType} Survey</span>
+                <span className="text-xs font-medium text-slate-500">{survey.surveyType} Evaluation</span>
               </div>
               <h3 className="mt-0.5 break-words text-base font-bold text-slate-900 dark:text-white sm:text-lg">{survey.title}</h3>
             </div>
@@ -97,9 +97,9 @@ export function SurveyProgressModal({
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 flex items-start gap-3 text-sm">
             <AlertTriangle size={18} className="shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
             <div>
-              <p className="font-semibold">Survey is actively gathering responses</p>
+              <p className="font-semibold">Evaluation is actively gathering responses</p>
               <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
-                You are viewing real-time response progress. <strong>Export PDF</strong> and <strong>Send to Partner Report</strong> features will automatically unlock once the survey completes or reaches deadline.
+                You are viewing real-time response progress. <strong>Export PDF</strong> and <strong>Send to Partner Report</strong> features will automatically unlock once the evaluation completes or reaches deadline.
               </p>
             </div>
           </div>
@@ -133,7 +133,7 @@ export function SurveyProgressModal({
 
             <div className="rounded-lg border border-slate-200 p-4 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
-                <span>Survey Deadline</span>
+                <span>Evaluation Deadline</span>
                 <Clock size={14} className="text-slate-400" />
               </div>
               <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
@@ -149,11 +149,11 @@ export function SurveyProgressModal({
               <span>
                 Employee Completion ({completion.eligibleEmployees.filter((e) => e.completed >= e.total && e.total > 0).length} / {completion.eligibleEmployees.length} at 100%)
               </span>
-              <span className="text-xs font-normal text-slate-500">{completion.companiesTotal} companies in scope</span>
+              <span className="text-xs font-normal text-slate-500">{completion.companiesTotal} partners in scope</span>
             </h4>
             {completion.eligibleEmployees.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500 dark:border-slate-800">
-                No employees currently have access to this survey's department/role scope.
+                No employees currently have access to this evaluation's department/role scope.
               </div>
             ) : (
               <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
@@ -226,7 +226,7 @@ export function SurveyProgressModal({
                 className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white hover:bg-emerald-700 transition w-fit"
               >
                 <CheckCircle2 size={15} />
-                Mark Survey as Complete Now
+                Mark Evaluation as Complete Now
               </button>
             )}
           </div>

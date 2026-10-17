@@ -90,7 +90,7 @@ function rowToResponse(row: Record<string, unknown>): { response?: SurveyRespons
     || submissionDateFromResponseId(responseId);
 
   if (!responseId) return { reason: 'Missing responseId' };
-  if (!company) return { reason: 'Missing company' };
+  if (!company) return { reason: 'Missing partner' };
   if (!questionId) return { reason: 'Missing questionId' };
   if (!VALID_SURVEY_TYPES.includes(surveyType)) return { reason: `Invalid surveyType "${row.surveyType}"` };
   if (!recoveredSubmissionDate || Number.isNaN(Date.parse(recoveredSubmissionDate))) {

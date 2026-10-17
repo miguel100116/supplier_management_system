@@ -134,7 +134,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
           id="btn-back"
         >
           <ArrowLeft size={20} />
-          <span>Back to Surveys</span>
+          <span>Back to Evaluations</span>
         </button>
         <div className="flex flex-wrap items-center gap-3">
           {isAdmin && onEdit && (
@@ -145,7 +145,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
               id="btn-edit-survey"
             >
               <Pencil size={20} />
-              <span>Edit Survey Form</span>
+              <span>Edit Evaluation Form</span>
             </button>
           )}
           
@@ -167,7 +167,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
               id="btn-delete-survey"
             >
               <Trash size={20} />
-              <span>Delete Survey</span>
+              <span>Delete Evaluation</span>
             </button>
           )}
         </div>
@@ -229,17 +229,17 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
                   <Building2 size={14} className="text-slate-400" />
-                  <span>Companies You Still Need to Evaluate</span>
+                  <span>Partners You Still Need to Evaluate</span>
                 </h4>
                 <CompletionStatusBar completed={completedCount} total={totalCompanies} className="w-40" />
               </div>
 
               {totalCompanies === 0 ? (
-                <p className="text-sm text-slate-400 py-4 text-center">No {survey.surveyType.toLowerCase()} companies are registered yet.</p>
+                <p className="text-sm text-slate-400 py-4 text-center">No {survey.surveyType.toLowerCase()} partners are registered yet.</p>
               ) : pendingCompanies.length === 0 ? (
                 <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50/50 border border-emerald-100/50 dark:text-emerald-400 dark:bg-emerald-950/10 dark:border-emerald-900/20 rounded-lg p-4">
                   <Check size={16} className="shrink-0" />
-                  <span>You've evaluated every {survey.surveyType.toLowerCase()} company. Great job!</span>
+                  <span>You've evaluated every {survey.surveyType.toLowerCase()} partner. Great job!</span>
                 </div>
               ) : (
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -304,8 +304,8 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
           sortOptions={[
             { value: 'date-desc', label: 'Submission: newest first' },
             { value: 'date-asc', label: 'Submission: oldest first' },
-            { value: 'company-asc', label: 'Company: A–Z' },
-            { value: 'company-desc', label: 'Company: Z–A' },
+            { value: 'company-asc', label: 'Partner: A–Z' },
+            { value: 'company-desc', label: 'Partner: Z–A' },
           ]}
           sortValue={submissionSort}
           onSortChange={setSubmissionSort}
@@ -327,7 +327,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
             <input
               value={submissionSearch}
               onChange={(event) => setSubmissionSearch(event.target.value)}
-              placeholder="Company, department, role…"
+              placeholder="Partner, department, role…"
               className="field !mt-0 w-full py-2 text-xs sm:w-[220px]"
             />
           </label>
@@ -400,7 +400,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
           <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-center gap-3 text-rose-500">
               <AlertTriangle size={24} className="shrink-0" />
-              <h3 className="text-lg font-bold">Delete Survey Form?</h3>
+              <h3 className="text-lg font-bold">Delete Evaluation Form?</h3>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
               Are you sure you want to delete <strong className="text-slate-700 dark:text-slate-300">"{survey.title}"</strong>? This will remove this form and all of its submission entries from your dashboards. This action cannot be undone.

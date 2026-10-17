@@ -84,8 +84,8 @@ export function SurveyDetailModal({
         title: 'KPI Executive Summary',
         columns: ['Metric', 'Value'],
         rows: [
-          ['Survey Title', survey.title],
-          ['Survey Category', survey.surveyType],
+          ['Evaluation Title', survey.title],
+          ['Evaluation Category', survey.surveyType],
           ['Total Submissions', String(totalResponsesCount)],
           ['Overall Satisfaction Score', `${satisfactionScore.toFixed(1)}%`],
           ['Average Rating', avgRatingFormatted],
@@ -101,7 +101,7 @@ export function SurveyDetailModal({
     exportTablesAsPDF(
       `${survey.title} - Performance Report`,
       tables,
-      `${survey.surveyType}_Survey_Report`
+      `${survey.surveyType}_Evaluation_Report`
     );
   };
 
@@ -117,9 +117,9 @@ export function SurveyDetailModal({
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700">
-                  Completed Survey
+                  Completed Evaluation
                 </span>
-                <span className="text-xs font-medium text-slate-500">{survey.surveyType} Survey</span>
+                <span className="text-xs font-medium text-slate-500">{survey.surveyType} Evaluation</span>
                 {reportSentStatus?.isSent && (
                   <span className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
                     Report Sent ✓

@@ -219,8 +219,8 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
       // Add Survey performance table
       if (showTable) {
         tables.push({
-          title: 'Survey Category Summary',
-          columns: ['Survey Category', 'Average Rating', 'Response Count'],
+          title: 'Evaluation Category Summary',
+          columns: ['Evaluation Category', 'Average Rating', 'Response Count'],
           rows: surveyPerformance.map(r => [r.surveyType, formatCompositeScore(r.surveyType, r.average).text, r.responses]),
         });
       }
@@ -228,8 +228,8 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
       // Add Highest Rated
       if (showTopCompanies && topCompanies.length > 0) {
         tables.push({
-          title: 'Highest Rated Evaluated Companies',
-          columns: ['Company', 'Average Score', 'Evaluations Count', 'Remarks'],
+          title: 'Highest Rated Evaluated Partners',
+          columns: ['Partner', 'Average Score', 'Evaluations Count', 'Remarks'],
           rows: topCompanies.map(r => [r.company, formatCompositeScore(r.surveyType, r.average).text, r.evaluations, getRemarkText(getBand(r.surveyType, r.average))]),
         });
       }
@@ -237,8 +237,8 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
       // Add Lowest Rated
       if (showBottomCompanies && leastRatedCompanies.length > 0) {
         tables.push({
-          title: 'Lowest Rated Evaluated Companies',
-          columns: ['Company', 'Average Score', 'Evaluations Count', 'Remarks'],
+          title: 'Lowest Rated Evaluated Partners',
+          columns: ['Partner', 'Average Score', 'Evaluations Count', 'Remarks'],
           rows: leastRatedCompanies.map(r => [r.company, formatCompositeScore(r.surveyType, r.average).text, r.evaluations, getRemarkText(getBand(r.surveyType, r.average))]),
         });
       }
@@ -310,8 +310,8 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text(`Active Survey Types:  ${activeTypes.join(', ') || 'None selected'}`, marginLeft + 60, 435);
-        doc.text(`Total Submitted Surveys Count:  ${summary.totalResponses} submissions`, marginLeft + 60, 452);
+        doc.text(`Active Evaluation Types:  ${activeTypes.join(', ') || 'None selected'}`, marginLeft + 60, 435);
+        doc.text(`Total Submitted Evaluations Count:  ${summary.totalResponses} submissions`, marginLeft + 60, 452);
         doc.text(`Average System-wide Score:  ${formatNumber(summary.averageRating)}%`, marginLeft + 60, 469);
         doc.text(`Generated On:  ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`, marginLeft + 60, 486);
 
@@ -427,7 +427,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(30);
-            doc.text(`Survey Performance Metrics Map (${chartMetric === 'responses' ? 'Submissions Volume' : 'Average Score %'})`, marginLeft, cursorY);
+            doc.text(`Evaluation Performance Metrics Map (${chartMetric === 'responses' ? 'Submissions Volume' : 'Average Score %'})`, marginLeft, cursorY);
             cursorY += 12;
 
             const { width: natW, height: natH } = await dataUrlDimensions(chartDataUrl);
@@ -443,10 +443,10 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(11);
           doc.setTextColor(30);
-          doc.text('Survey Category Performance Table', marginLeft, cursorY);
+          doc.text('Evaluation Category Performance Table', marginLeft, cursorY);
           cursorY += 10;
 
-          const tableHeaders = ['Survey Category', 'Average Score', 'Total Submissions'];
+          const tableHeaders = ['Evaluation Category', 'Average Score', 'Total Submissions'];
           const tableRows = surveyPerformance.map(row => [
             row.surveyType,
             formatCompositeScore(row.surveyType, row.average).text,
@@ -480,10 +480,10 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(30);
-            doc.text('Highest Rated Evaluated Companies', marginLeft, cursorY);
+            doc.text('Highest Rated Evaluated Partners', marginLeft, cursorY);
             cursorY += 10;
 
-            const tableHeaders = ['Rank', 'Company Name', 'Average Score', 'Evaluations Count', 'Remarks'];
+            const tableHeaders = ['Rank', 'Partner Name', 'Average Score', 'Evaluations Count', 'Remarks'];
             const tableRows = topCompanies.map((row, idx) => [
               `#${idx + 1}`,
               row.company,
@@ -515,10 +515,10 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(30);
-            doc.text('Lowest Rated Evaluated Companies', marginLeft, cursorY);
+            doc.text('Lowest Rated Evaluated Partners', marginLeft, cursorY);
             cursorY += 10;
 
-            const tableHeaders = ['Rank', 'Company Name', 'Average Score', 'Evaluations Count', 'Remarks'];
+            const tableHeaders = ['Rank', 'Partner Name', 'Average Score', 'Evaluations Count', 'Remarks'];
             const tableRows = leastRatedCompanies.map((row, idx) => [
               `#${leastRatedCompanies.length - idx}`,
               row.company,
@@ -624,7 +624,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                   className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  {type} Evaluation Survey
+                  {type} Evaluation
                 </span>
               </label>
             ))}
@@ -701,7 +701,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 onChange={(e) => setShowTopCompanies(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
-              <span className="text-sm text-slate-700 dark:text-slate-300">Top Performing Companies</span>
+              <span className="text-sm text-slate-700 dark:text-slate-300">Top Performing Partners</span>
             </label>
 
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -711,7 +711,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                 onChange={(e) => setShowBottomCompanies(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
-              <span className="text-sm text-slate-700 dark:text-slate-300">Lowest Rated Companies</span>
+              <span className="text-sm text-slate-700 dark:text-slate-300">Lowest Rated Partners</span>
             </label>
 
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -730,7 +730,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
         {activeTypes.length === 0 && (
           <div className="flex gap-2.5 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30 text-xs">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
-            <span>Select at least one survey category to populate summary statistics.</span>
+            <span>Select at least one evaluation category to populate summary statistics.</span>
           </div>
         )}
       </aside>
@@ -810,8 +810,8 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                   <div className="mt-14 w-full max-w-md rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 p-5 text-left">
                     <p className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Report Specifications:</p>
                     <div className="mt-2.5 space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
-                      <p><span className="font-semibold text-slate-700 dark:text-slate-200">Active Survey Types:</span> {activeTypes.join(', ') || 'None selected'}</p>
-                      <p><span className="font-semibold text-slate-700 dark:text-slate-200">Total Submitted Surveys Count:</span> {summary.totalResponses} submissions</p>
+                      <p><span className="font-semibold text-slate-700 dark:text-slate-200">Active Evaluation Types:</span> {activeTypes.join(', ') || 'None selected'}</p>
+                      <p><span className="font-semibold text-slate-700 dark:text-slate-200">Total Submitted Evaluations Count:</span> {summary.totalResponses} submissions</p>
                       <p><span className="font-semibold text-slate-700 dark:text-slate-200">Average System-wide Score:</span> {formatNumber(summary.averageRating)}%</p>
                       <p><span className="font-semibold text-slate-700 dark:text-slate-200">Generated On:</span> {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                     </div>
@@ -853,7 +853,7 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
               {showChart && activeTypes.length > 0 && (
                 <div className="mt-5">
                   <h4 className="mb-2 text-xs font-bold text-slate-800 dark:text-slate-100">
-                    Survey Performance Metrics Map ({chartMetric === 'responses' ? 'Submissions Volume' : 'Average Score %'})
+                    Evaluation Performance Metrics Map ({chartMetric === 'responses' ? 'Submissions Volume' : 'Average Score %'})
                   </h4>
 
                   {/* Captured chart wrapper */}
@@ -936,12 +936,12 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
               {/* Performance Summary Table */}
               {showTable && activeTypes.length > 0 && (
                 <div className="mt-5 space-y-2">
-                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">Survey Category Performance Table</h3>
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white">Evaluation Category Performance Table</h3>
                   <div className="overflow-hidden border border-slate-200 dark:border-slate-800 rounded-lg">
                     <table className="w-full text-left border-collapse text-[10px]">
                       <thead>
                         <tr className="bg-[#0866B1] text-white">
-                          <th className="px-3 py-1.5 font-bold">Survey Category</th>
+                          <th className="px-3 py-1.5 font-bold">Evaluation Category</th>
                           <th className="px-3 py-1.5 font-bold text-center">Average Score</th>
                           <th className="px-3 py-1.5 font-bold text-center">Total Submissions</th>
                         </tr>
@@ -974,14 +974,14 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                   <div className="mt-5 space-y-2">
                     <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-white">
                       <Award size={14} className="text-emerald-500" />
-                      <span>Highest Rated Evaluated Companies</span>
+                      <span>Highest Rated Evaluated Partners</span>
                     </h3>
                     <div className="overflow-hidden border border-slate-100 dark:border-slate-800 rounded-lg text-[10px]">
                       <table className="w-full text-left">
                         <thead className="bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 font-bold">
                           <tr>
                             <th className="px-3 py-1.5">Rank</th>
-                            <th className="px-3 py-1.5">Company Name</th>
+                            <th className="px-3 py-1.5">Partner Name</th>
                             <th className="px-3 py-1.5 text-center">Average Score</th>
                             <th className="px-3 py-1.5 text-center">Evaluations Count</th>
                             <th className="px-3 py-1.5 text-center">Remarks</th>
@@ -1012,14 +1012,14 @@ export function SummaryReportBuilderPage({ responses, partnerCompanies = [], can
                   <div className="mt-5 space-y-2">
                     <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-white">
                       <AlertTriangle size={14} className="text-rose-500" />
-                      <span>Lowest Rated Evaluated Companies</span>
+                      <span>Lowest Rated Evaluated Partners</span>
                     </h3>
                     <div className="overflow-hidden border border-slate-100 dark:border-slate-800 rounded-lg text-[10px]">
                       <table className="w-full text-left">
                         <thead className="bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-400 font-bold">
                           <tr>
                             <th className="px-3 py-1.5">Rank</th>
-                            <th className="px-3 py-1.5">Company Name</th>
+                            <th className="px-3 py-1.5">Partner Name</th>
                             <th className="px-3 py-1.5 text-center">Average Score</th>
                             <th className="px-3 py-1.5 text-center">Evaluations Count</th>
                             <th className="px-3 py-1.5 text-center">Remarks</th>

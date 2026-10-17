@@ -345,7 +345,7 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.setFont('helvetica', 'normal');
-  doc.text('Column codes used on every company sheet in this document map to the questions below. Free-text answers are truncated on those sheets to keep the page count down - see the Excel/CSV export for full remarks.', marginLeft, 50, { maxWidth: usableWidth });
+  doc.text('Column codes used on every partner sheet in this document map to the questions below. Free-text answers are truncated on those sheets to keep the page count down - see the Excel/CSV export for full remarks.', marginLeft, 50, { maxWidth: usableWidth });
 
   let legendY = 74;
   const legendLineHeight = 10;

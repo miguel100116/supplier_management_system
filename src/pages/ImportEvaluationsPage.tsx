@@ -303,7 +303,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
 
         {summaries && <p role="status" className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-xs text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300">The original workbook was archived once. Re-uploads update matching responses using each worksheet row's source ID.</p>}
         <p className="rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5 text-[11px] text-blue-800 dark:border-blue-900/50 dark:bg-blue-950/20 dark:text-blue-300">
-          Company names are matched against the full Partner Registry, including companies with another classification or an archived status. Each response ID comes from its own worksheet's source ID.
+          Partner names are matched against the full Partner Registry, including partners with another classification or an archived status. Each response ID comes from its own worksheet's source ID.
         </p>
       </section>
 
@@ -336,7 +336,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div role="dialog" aria-modal="true" aria-labelledby="company-match-review-title" className="relative flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <button type="button" onClick={() => setIsReviewingCompanies(false)} className="absolute right-4 top-4 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-900 dark:hover:text-white" title="Close review"><X size={18} /></button>
-            <div className="flex items-center gap-3 text-amber-600"><span className="rounded-lg bg-amber-50 p-2 dark:bg-amber-950/30"><AlertTriangle size={20} /></span><div><h3 id="company-match-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review unmatched companies</h3><p className="text-xs text-slate-500">These names appear in the workbook but were not found in the Partner Registry.</p></div></div>
+            <div className="flex items-center gap-3 text-amber-600"><span className="rounded-lg bg-amber-50 p-2 dark:bg-amber-950/30"><AlertTriangle size={20} /></span><div><h3 id="company-match-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review unmatched partners</h3><p className="text-xs text-slate-500">These names appear in the workbook but were not found in the Partner Registry.</p></div></div>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
               <button type="button" onClick={() => setDecisions((current) => ({ ...current, ...Object.fromEntries(SURVEY_TYPES.map((surveyType) => [surveyType, Object.fromEntries(Object.keys(current[surveyType]).map((name) => [name, 'add-as-partner' as CompanyDecision]))])) }))} className="text-[11px] font-bold text-[#0866B1] hover:underline dark:text-blue-400">Add all as partners</button>
               <button type="button" onClick={() => setDecisions((current) => ({ ...current, ...Object.fromEntries(SURVEY_TYPES.map((surveyType) => [surveyType, Object.fromEntries(Object.keys(current[surveyType]).map((name) => [name, 'skip' as CompanyDecision]))])) }))} className="text-[11px] font-bold text-slate-500 hover:underline">Skip all</button>
@@ -346,7 +346,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
                 <li key={`${surveyType}-${match.normalizedName}`} className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100">{match.rawName}</p><p className="text-[10px] text-slate-500">{surveyType} worksheet</p></div>
                   <select aria-label={`How to handle ${match.rawName}`} value={decisions[surveyType][match.normalizedName] ?? 'add-as-partner'} onChange={(event) => patchDecision(surveyType, match.normalizedName, event.target.value as CompanyDecision)} className="min-h-9 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-                    <option value="add-as-partner">Add as a new partner</option><option value="skip">Skip this company's responses</option>
+                    <option value="add-as-partner">Add as a new partner</option><option value="skip">Skip this partner's responses</option>
                   </select>
                 </li>
               ))}

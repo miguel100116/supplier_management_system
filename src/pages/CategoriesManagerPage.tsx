@@ -91,7 +91,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
     <div className="space-y-5">
       <PageDescription>
         Each partner type is evaluated across 5 categories. Renaming a category here updates it everywhere it's
-        used - survey question categories, the radar chart, bar charts, reports, and the survey editor's category
+        used - evaluation question categories, the radar chart, bar charts, reports, and the evaluation editor's category
         dropdown.
       </PageDescription>
 
@@ -162,8 +162,8 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
                 </div>
               ))}
               <p className="text-[11px] text-slate-400 pt-1">
-                "Overall" (whole-company feedback like Period Covered and the closing comments question) is a fixed
-                category shared by every survey type and isn't managed here.
+                "Overall" (whole-partner feedback like Period Covered and the closing comments question) is a fixed
+                category shared by every evaluation type and isn't managed here.
               </p>
             </div>
 
@@ -205,7 +205,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
                 </h3>
                 <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
                   This changes {openType} category names across the whole system - the radar chart, bar charts,
-                  reports, the analytics dashboard, and every existing survey question and submitted response
+                  reports, the analytics dashboard, and every existing evaluation question and submitted response
                   already tagged with the old name. This can't be undone automatically.
                 </p>
               </div>

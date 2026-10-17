@@ -158,7 +158,7 @@ export function EmployeeNotificationBell({
         >
           <span className="flex items-center gap-3">
             <Bell size={18} />
-            <span>Survey Reminders</span>
+            <span>Evaluation Reminders</span>
           </span>
           {unreadCount > 0 && (
             <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
@@ -187,7 +187,7 @@ export function EmployeeNotificationBell({
         className={`relative inline-flex h-10 w-10 items-center justify-center rounded-lg transition cursor-pointer ${
           isOpen ? 'bg-white/10 text-white' : 'text-blue-100 hover:text-white'
         }`}
-        title="Pending Survey Reminders"
+        title="Pending Evaluation Reminders"
         id="btn-employee-bell"
       >
         <Bell size={18} />
@@ -227,7 +227,7 @@ export function EmployeeNotificationBell({
             <Inbox size={22} className="text-slate-300 dark:text-slate-700" />
             <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Inbox is empty</p>
             <p className="text-[10px] text-slate-400 dark:text-slate-500">
-              Amazing job! You have accomplished all assigned supplier surveys.
+              Amazing job! You have accomplished all assigned supplier evaluations.
             </p>
           </div>
         ) : (
@@ -387,7 +387,7 @@ export function EmployeeNotificationBell({
               <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4">
                 <p className="font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1.5">
                   <CheckSquare size={14} className="text-[#0866B1] dark:text-blue-400" />
-                  <span>Remaining Partner Companies to Evaluate ({selectedNotification.pendingCompanies.length}):</span>
+                  <span>Remaining Partners to Evaluate ({selectedNotification.pendingCompanies.length}):</span>
                 </p>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {selectedNotification.pendingCompanies.map((c) => (
@@ -403,7 +403,7 @@ export function EmployeeNotificationBell({
               </div>
 
               <p>
-                Please accomplish this survey on or before{' '}
+                Please accomplish this evaluation on or before{' '}
                 <span className="font-black text-rose-600 dark:text-rose-400 underline">
                   {selectedNotification.deadlineDate}
                 </span>
@@ -415,7 +415,7 @@ export function EmployeeNotificationBell({
               {/* Dynamic Notification Frequency Note */}
               <div className="bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/30 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-400">
                 <span className="font-bold">Automated Notification System:</span> This reminder is automatically dispatched{' '}
-                <span className="font-bold">every {frequencyLabel}</span> in accordance with administrative policy, and will continue until all partner companies under this survey have been fully evaluated.
+                <span className="font-bold">every {frequencyLabel}</span> in accordance with administrative policy, and will continue until all partners under this evaluation have been fully evaluated.
               </div>
 
               {/* Call to Action */}

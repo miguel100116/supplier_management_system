@@ -228,7 +228,7 @@ export async function loadNormalizedPartnerCompanies(): Promise<PartnerCompany[]
       .select(COMPANY_SELECT)
       .order('canonical_name')
       .range(from, from + pageSize - 1);
-    if (error) throw new Error(`Unable to load staging partner companies: ${error.message}`);
+    if (error) throw new Error(`Unable to load staging partner records: ${error.message}`);
     const rows = (data ?? []) as unknown as NormalizedCompanyRow[];
     companies.push(...rows.map(mapNormalizedCompany));
     if (rows.length < pageSize) break;

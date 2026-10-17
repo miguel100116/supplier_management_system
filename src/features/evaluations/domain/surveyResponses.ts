@@ -104,7 +104,7 @@ export function buildSurveyResponseExport(
     }
   }
   return {
-    columns: ['Respondent Email', 'Department', 'Company Evaluated', 'Submission Date', 'Overall Score (%)', ...definitions.map((definition) => definition.label)],
+    columns: ['Respondent Email', 'Department', 'Partner Evaluated', 'Submission Date', 'Overall Score (%)', ...definitions.map((definition) => definition.label)],
     rows: submissions.map((submission) => {
       const answers = new Map(submission.answers.map((answer) => [answer.questionId, answerValue(answer)]));
       const first = submission.first;
@@ -121,6 +121,6 @@ export function buildSurveyResponseExport(
 }
 
 export function surveyResponseFilename(title: string, date: Date): string {
-  const safeTitle = title.replace(/[\\/:*?"<>|\x00-\x1f]/g, ' ').trim().replace(/\s+/g, '_').slice(0, 80) || 'Survey';
+  const safeTitle = title.replace(/[\\/:*?"<>|\x00-\x1f]/g, ' ').trim().replace(/\s+/g, '_').slice(0, 80) || 'Evaluation';
   return safeTitle + '_responses_' + date.toISOString().slice(0, 10) + '.xlsx';
 }

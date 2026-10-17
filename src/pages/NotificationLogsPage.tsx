@@ -37,7 +37,7 @@ export function NotificationLogsPage({
   const [dateTo, setDateTo] = useState('');
   const [activityType, setActivityType] = useState<'all' | 'submission' | 'document'>('all');
 
-  type SortField = 'submissionDate' | 'surveyType' | 'company' | 'respondentEmail' | 'department' | 'designation';
+  type SortField = 'submissionDate' | 'evaluationType' | 'company' | 'respondentEmail' | 'department' | 'designation';
   type SortOrder = 'asc' | 'desc';
 
   const [sortField, setSortField] = useState<SortField>('submissionDate');
@@ -75,7 +75,7 @@ export function NotificationLogsPage({
       if (sortField === 'submissionDate') {
         valA = a.submissionDate || '';
         valB = b.submissionDate || '';
-      } else if (sortField === 'surveyType') {
+      } else if (sortField === 'evaluationType') {
         valA = a.surveyType || '';
         valB = b.surveyType || '';
       } else if (sortField === 'company') {
@@ -125,7 +125,7 @@ export function NotificationLogsPage({
           <div>
             <h3 className="text-base font-semibold">Activity log</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Every survey submission received, with details of each response.
+              Every evaluation submission received, with details of each response.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -160,7 +160,7 @@ export function NotificationLogsPage({
               <span className="h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700" />
               <input
                 className="w-full bg-transparent py-2 text-sm text-ink outline-none placeholder:text-slate-400 dark:text-slate-100"
-                placeholder="Company, respondent, department..."
+                placeholder="Partner, respondent, department..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -173,10 +173,10 @@ export function NotificationLogsPage({
             sortOptions={[
               { value: 'date-desc', label: 'Date: newest first' },
               { value: 'date-asc', label: 'Date: oldest first' },
-              { value: 'company-asc', label: 'Company: A–Z' },
-              { value: 'company-desc', label: 'Company: Z–A' },
+              { value: 'company-asc', label: 'Partner: A–Z' },
+              { value: 'company-desc', label: 'Partner: Z–A' },
             ]}
-            sortValue={sortField === 'company' ? `company-${sortOrder}` : `date-${sortOrder}`}
+            sortValue={sortField === 'company' ? `partner-${sortOrder}` : `date-${sortOrder}`}
             onSortChange={(value) => {
               const [field, order] = value.split('-') as ['date' | 'company', SortOrder];
               setSortField(field === 'date' ? 'submissionDate' : 'company');
@@ -206,7 +206,7 @@ export function NotificationLogsPage({
                 className="field !mt-0 w-full py-2 text-xs sm:w-[170px]"
               >
                 <option value="all">All activity</option>
-                <option value="submission">Survey submissions</option>
+                <option value="submission">Evaluation submissions</option>
                 <option value="document">Document alerts</option>
               </select>
             </label>
@@ -218,7 +218,7 @@ export function NotificationLogsPage({
             title="No notifications found"
             message={
               notifications.length === 0
-                ? 'No survey responses have been logged yet.'
+                ? 'No evaluation responses have been logged yet.'
                 : 'Try adjusting the filters or search to find what you\u2019re looking for.'
             }
           />
@@ -237,10 +237,10 @@ export function NotificationLogsPage({
                       )}
                     </div>
                   </th>
-                  <th className="px-4 py-3 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-900 transition" onClick={() => handleSort('surveyType')}>
+                  <th className="px-4 py-3 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-900 transition" onClick={() => handleSort('evaluationType')}>
                     <div className="flex items-center gap-1.5">
                       <span>Category</span>
-                      {sortField === 'surveyType' ? (
+                      {sortField === 'evaluationType' ? (
                         <span className="text-blue-600 dark:text-blue-400 font-extrabold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                       ) : (
                         <span className="text-slate-300 dark:text-slate-600 font-normal">↕</span>
@@ -249,7 +249,7 @@ export function NotificationLogsPage({
                   </th>
                   <th className="px-4 py-3 cursor-pointer select-none hover:bg-slate-100 dark:hover:bg-slate-900 transition" onClick={() => handleSort('company')}>
                     <div className="flex items-center gap-1.5">
-                      <span>Company</span>
+                      <span>Partner</span>
                       {sortField === 'company' ? (
                         <span className="text-blue-600 dark:text-blue-400 font-extrabold">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                       ) : (

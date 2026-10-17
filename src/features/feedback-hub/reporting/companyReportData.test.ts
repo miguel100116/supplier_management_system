@@ -68,19 +68,19 @@ test('maps every survey card type to the exact retained Word reference', () => {
     [
       {
         type: 'Courier',
-        card: 'Courier Satisfaction Survey',
+        card: 'Courier Satisfaction Evaluation',
         reference: 'Sample Format - Courier Performance Rating.docx',
         title: 'Courier Performance Report',
       },
       {
         type: 'Supplier',
-        card: 'Supplier Quality Survey',
+        card: 'Supplier Quality Evaluation',
         reference: 'Sample Format - Supplier Performance Rating.docx',
         title: 'Supplier Performance Report',
       },
       {
         type: 'Subcontractor',
-        card: 'Subcontractor Performance Survey',
+        card: 'Subcontractor Performance Evaluation',
         reference: 'Sample Format - Subcon Performance Rating.docx',
         title: 'Subcontractor Performance Report',
       },

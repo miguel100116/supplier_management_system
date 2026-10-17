@@ -179,7 +179,7 @@ function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
       break;
     }
     case 'comparison': {
-      drawHeader(doc, SLIDE_EYEBROWS.comparison, 'Survey Type Comparison');
+      drawHeader(doc, SLIDE_EYEBROWS.comparison, 'Evaluation Type Comparison');
       const maxAvg = pdfMaxRating;
       const top = 150;
       const bottom = PAGE_H - MARGIN;
@@ -225,7 +225,7 @@ function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
       break;
     }
     case 'leaderboard': {
-      drawHeader(doc, SLIDE_EYEBROWS.leaderboard, 'Company Leaderboard');
+      drawHeader(doc, SLIDE_EYEBROWS.leaderboard, 'Partner Leaderboard');
       const colGap = 20;
       const colW = (CONTENT_W - colGap * (slide.groups.length - 1)) / slide.groups.length;
       const top = 165;
@@ -302,7 +302,7 @@ function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
       break;
     }
     case 'spotlight': {
-      drawHeader(doc, SLIDE_EYEBROWS.spotlight, 'Company Spotlight');
+      drawHeader(doc, SLIDE_EYEBROWS.spotlight, 'Partner Spotlight');
       setText(doc, slide.hex);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
@@ -357,7 +357,7 @@ function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
         doc,
         SLIDE_EYEBROWS.distribution,
         'Partners Needing Attention',
-        `Companies trailing their own peer group, and the specific category dragging each one down${slide.naPercentage > 0 ? ` (${slide.naPercentage.toFixed(1)}% of ratings marked N/A)` : ''}.`,
+        `Partners trailing their own peer group, and the specific category dragging each one down${slide.naPercentage > 0 ? ` (${slide.naPercentage.toFixed(1)}% of ratings marked N/A)` : ''}.`,
       );
       const top = 155;
       const bottom = PAGE_H - MARGIN;

@@ -99,7 +99,7 @@ export function SentReportsTab({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search email log by company, survey title, or recipient..."
+            placeholder="Search email log by partner, evaluation title, or recipient..."
             className="field text-xs !mt-0"
             style={{ paddingLeft: '2.75rem' }}
           />
@@ -134,8 +134,8 @@ export function SentReportsTab({
         sortOptions={[
           { value: 'date-desc', label: 'Activity: newest first' },
           { value: 'date-asc', label: 'Activity: oldest first' },
-          { value: 'company-asc', label: 'Company: A–Z' },
-          { value: 'company-desc', label: 'Company: Z–A' },
+          { value: 'company-asc', label: 'Partner: A–Z' },
+          { value: 'company-desc', label: 'Partner: Z–A' },
         ]}
         sortValue={tableSort}
         onSortChange={setTableSort}
@@ -161,9 +161,9 @@ export function SentReportsTab({
             <thead className="bg-slate-50 text-slate-600 dark:bg-slate-900/80 dark:text-slate-300 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="px-4 py-3.5">Date Queued / Sent</th>
-                <th className="px-4 py-3.5">Partner Company</th>
+                <th className="px-4 py-3.5">Partner</th>
                 <th className="px-4 py-3.5">Recipient & CC</th>
-                <th className="px-4 py-3.5">Survey Report Title</th>
+                <th className="px-4 py-3.5">Evaluation Report Title</th>
                 <th className="px-4 py-3.5">Status & Countdown</th>
                 <th className="px-4 py-3.5 text-right">Review Actions</th>
               </tr>

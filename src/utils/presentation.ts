@@ -128,8 +128,8 @@ export const SLIDE_EYEBROWS: Record<Slide['kind'], string> = {
 export const PRESENTATION_CATEGORIES: PresentationCategoryDef[] = [
   {
     id: 'comparison',
-    label: 'Company Performance Rankings',
-    description: 'Interactive rankings of the best performing and least rated companies across survey types',
+    label: 'Partner Performance Rankings',
+    description: 'Interactive rankings of the best performing and least rated partners across evaluation types',
   },
   {
     id: 'sections',
@@ -138,8 +138,8 @@ export const PRESENTATION_CATEGORIES: PresentationCategoryDef[] = [
   },
   {
     id: 'leaderboard',
-    label: 'Company Leaderboard',
-    description: 'Top-ranked partner companies within each survey type',
+    label: 'Partner Leaderboard',
+    description: 'Top-ranked partners within each evaluation type',
   },
   {
     id: 'trends',
@@ -153,7 +153,7 @@ export const PRESENTATION_CATEGORIES: PresentationCategoryDef[] = [
   },
   {
     id: 'spotlight',
-    label: 'Company Spotlight',
+    label: 'Partner Spotlight',
     description: 'A closer look at the top performer plus anyone falling behind their peers',
   },
   {

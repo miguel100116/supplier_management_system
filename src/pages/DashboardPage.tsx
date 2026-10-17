@@ -74,11 +74,11 @@ interface DashboardPageProps {
   userEmail?: string;
 }
 
-const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defaultSpan: 1 | 2 | 3; category: 'Analytics' | 'Surveys' | 'Submissions' }[] = [
+const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defaultSpan: 1 | 2 | 3; category: 'Analytics' | 'Evaluations' | 'Submissions' }[] = [
   { 
     type: 'satisfaction-gauge', 
     title: 'Top Performing Partner', 
-    desc: 'Displays the highest-rated active partner company with a prominent satisfaction radial gauge.', 
+    desc: 'Displays the highest-rated active partner with a prominent satisfaction radial gauge.',
     defaultSpan: 2,
     category: 'Analytics'
   },
@@ -106,7 +106,7 @@ const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defau
   { 
     type: 'recent-submissions', 
     title: 'Recent Evaluations Log', 
-    desc: 'A real-time stream of the latest completed survey submissions and stakeholder ratings.', 
+    desc: 'A real-time stream of the latest completed evaluation submissions and stakeholder ratings.',
     defaultSpan: 1,
     category: 'Submissions'
   },
@@ -164,7 +164,7 @@ export function DashboardPage({
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [catalogTab, setCatalogTab] = useState<'All' | 'Analytics' | 'Surveys' | 'Submissions'>('All');
+  const [catalogTab, setCatalogTab] = useState<'All' | 'Analytics' | 'Evaluations' | 'Submissions'>('All');
   const [showConfigMenu, setShowConfigMenu] = useState<string | null>(null);
   const [headerPortalTarget, setHeaderPortalTarget] = useState<Element | null>(null);
   useModalEscape(isAddOpen, () => setIsAddOpen(false));
@@ -526,7 +526,7 @@ export function DashboardPage({
             </span>
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-white">Evaluation Progress</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Complete evaluations for all registered partner companies below.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Complete evaluations for all registered partners below.</p>
             </div>
           </div>
 
@@ -564,7 +564,7 @@ export function DashboardPage({
                       No Task Yet
                     </p>
                     <p className="mt-1 text-[10px] font-medium text-slate-400 dark:text-slate-600 text-center">
-                      No {category.toLowerCase()} survey form has been assigned to you.
+                      No {category.toLowerCase()} evaluation form has been assigned to you.
                     </p>
                   </div>
                 );
@@ -607,7 +607,7 @@ export function DashboardPage({
 
                   {/* Companies evaluated subtext, centered */}
                   <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 text-center">
-                    {answered}/{total} Companies Evaluated
+                    {answered}/{total} Partners Evaluated
                   </p>
                 </div>
               );
@@ -763,7 +763,7 @@ export function DashboardPage({
                                 {topPartner.name}
                               </h5>
                               <p className="text-xs text-slate-400 mt-1 leading-snug">
-                                Acclaimed leader across {topPartner.count} employee feedback surveys.
+                                Acclaimed leader across {topPartner.count} employee feedback evaluations.
                               </p>
                               <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-500 sm:justify-start">
                                 <span>Rating: {formatCompositeScore(topPartner.type as SurveyType, topPartner.scorePercentage).text}</span>
@@ -871,7 +871,7 @@ export function DashboardPage({
                       <div className="space-y-4">
                         {surveys.length === 0 ? (
                           <div className="text-center text-slate-400 text-xs py-4">
-                            No published survey questionnaires are available.
+                            No published evaluation questionnaires are available.
                           </div>
                         ) : (
                           surveys.slice(0, 3).map((survey) => {
@@ -904,7 +904,7 @@ export function DashboardPage({
                       <div className="space-y-2">
                         {recentSubmissions.length === 0 ? (
                           <div className="text-center text-slate-400 text-xs py-4">
-                            No survey responses are available.
+                            No evaluation responses are available.
                           </div>
                         ) : (
                           recentSubmissions.map((resp, sIdx) => {
@@ -995,7 +995,7 @@ export function DashboardPage({
 
             {/* Catalog Categories */}
             <div className="flex flex-wrap gap-2 mb-5">
-              {(['All', 'Analytics', 'Surveys', 'Submissions'] as const).map(tab => (
+              {(['All', 'Analytics', 'Evaluations', 'Submissions'] as const).map(tab => (
                 <button
                   key={tab}
                   onClick={() => setCatalogTab(tab)}

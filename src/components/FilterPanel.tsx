@@ -49,7 +49,7 @@ export function FilterPanel({
         }
       }
     }
-    update('surveyType', next);
+    update('evaluationType', next);
   };
 
   const filteredCompanies = useMemo(() => {
@@ -71,7 +71,7 @@ export function FilterPanel({
       <div className="space-y-4">
         {isDashboard ? (
           <label className="field-label">
-            Company Category
+            Partner Category
             <select
               className="field mt-1"
               value={filters.surveyType.length === 1 ? filters.surveyType[0] : 'All'}
@@ -90,7 +90,7 @@ export function FilterPanel({
                        return;
                    }
                 }
-                update('surveyType', nextSurveyType);
+                update('evaluationType', nextSurveyType);
               }}
             >
               {allowedSurveyTypes.length > 1 && <option value="All">All Categories</option>}
@@ -101,7 +101,7 @@ export function FilterPanel({
           </label>
         ) : (
           <div className="field-label">
-            Survey Type
+            Evaluation Type
             <div className="mt-1 space-y-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
               {surveyTypeOptions.map((type) => {
                 const checked = filters.surveyType.includes(type);
@@ -131,9 +131,9 @@ export function FilterPanel({
           </div>
         )}
         <label className="field-label">
-          Company
+          Partner
           <select className="field mt-1" value={filters.company} onChange={(event) => update('company', event.target.value)}>
-            <option value="">All companies</option>
+            <option value="">All partners</option>
             {filteredCompanies.map((company) => (
               <option key={company.id} value={company.name}>{company.name}</option>
             ))}

@@ -96,8 +96,8 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
   doc.setFontSize(11);
   doc.setTextColor(40);
   const introText = doc.splitTextToSize(
-    `This report provides a comprehensive summary of survey analytics and stakeholder feedback. ` +
-    `The data compiled below highlights key performance indicators, comparative analysis across survey categories, ` +
+    `This report provides a comprehensive summary of evaluation analytics and stakeholder feedback. ` +
+    `The data compiled below highlights key performance indicators, comparative analysis across evaluation categories, ` +
     `and detailed question-level responses. Review the insights carefully to inform continuous improvement initiatives ` +
     `and strategic decision-making.`,
     500
@@ -124,15 +124,15 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
     doc.setFont('helvetica', 'normal');
     let description = '';
     if (table.title.includes('Top Performing')) {
-      description = 'This section lists the highest-ranked partner companies based on overall satisfaction and average scores across evaluated categories.';
+      description = 'This section lists the highest-ranked partners based on overall satisfaction and average scores across evaluated categories.';
     } else if (table.title.includes('Least Rated')) {
-      description = 'This section lists partner companies that received lower relative ratings, identifying potential areas for engagement and improvement.';
+      description = 'This section lists partners that received lower relative ratings, identifying potential areas for engagement and improvement.';
     } else if (table.title.includes('Summary')) {
       description = 'High-level key performance metrics representing the aggregate evaluation data.';
     } else if (table.title.includes('Question')) {
       description = 'Performance breakdown across individual evaluation questions, highlighting operational strengths and weaknesses.';
-    } else if (table.title.includes('Survey')) {
-      description = 'Comparison of scores between different survey categories and modules.';
+    } else if (table.title.includes('Evaluation') || table.title.includes('Survey')) {
+      description = 'Comparison of scores between different evaluation categories and modules.';
     }
     if (description) {
       const descLines = doc.splitTextToSize(description, 500);

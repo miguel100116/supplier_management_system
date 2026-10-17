@@ -364,7 +364,7 @@ export function ExecutiveSummaryReportBuilderPage({
         items.push({
           type: 'success',
           title: `Benchmark Set by ${highestCat.surveyType} Division`,
-          text: `The ${highestCat.surveyType} group is outstanding with an average rating of ${formatCompositeScore(highestCat.surveyType, highestCat.average).text}. We recommend documenting their workflow practices to establish a standard company-wide template.`,
+          text: `The ${highestCat.surveyType} group is outstanding with an average rating of ${formatCompositeScore(highestCat.surveyType, highestCat.average).text}. We recommend documenting their workflow practices to establish a standard organization-wide template.`,
         });
       }
     }
@@ -476,8 +476,8 @@ export function ExecutiveSummaryReportBuilderPage({
       // 2. Division Breakdown Table
       if (showSurveyTable) {
         tables.push({
-          title: 'Survey Division Breakdown',
-          columns: ['Survey Category', 'Average Score', 'Total Submissions'],
+          title: 'Evaluation Division Breakdown',
+          columns: ['Evaluation Category', 'Average Score', 'Total Submissions'],
           rows: surveyPerformance.map((r) => [r.surveyType, formatCompositeScore(r.surveyType, r.average).text, r.responses]),
         });
       }
@@ -501,12 +501,12 @@ export function ExecutiveSummaryReportBuilderPage({
       if (showCompanyRankings) {
         tables.push({
           title: 'Highest Rated Partners',
-          columns: ['Partner Company', 'Composite Rating', 'Submissions Count', 'Remarks'],
+          columns: ['Partner', 'Composite Rating', 'Submissions Count', 'Remarks'],
           rows: topCompanies.map((r) => [r.company, formatCompositeScore(r.surveyType, r.average).text, r.evaluations, getRemarkText(getBand(r.surveyType, r.average))]),
         });
         tables.push({
           title: 'Lowest Rated Partners (Operational Alert)',
-          columns: ['Partner Company', 'Composite Rating', 'Submissions Count', 'Remarks'],
+          columns: ['Partner', 'Composite Rating', 'Submissions Count', 'Remarks'],
           rows: leastRatedCompanies.map((r) => [r.company, formatCompositeScore(r.surveyType, r.average).text, r.evaluations, getRemarkText(getBand(r.surveyType, r.average))]),
         });
       }
@@ -528,7 +528,7 @@ export function ExecutiveSummaryReportBuilderPage({
           const questionsList = statsByType[type];
           tables.push({
             title: `${label} Questions`,
-            columns: ['Question', 'Average Score (%)', 'Responses Count', 'Highest Scoring Company', 'Lowest Scoring Company'],
+            columns: ['Question', 'Average Score (%)', 'Responses Count', 'Highest Scoring Partner', 'Lowest Scoring Partner'],
             rows: questionsList.map((row) => [
               row.questionText,
               `${formatNumber(row.average)}%`,
@@ -602,7 +602,7 @@ export function ExecutiveSummaryReportBuilderPage({
           doc.text(`Prepared For:  MBS Stakeholder Operations Steering Committee`, marginLeft + 50, 412);
           doc.text(`Prepared By:   ${preparedBy || 'Operations Team'}`, marginLeft + 50, 429);
           doc.text(`Divisions:     ${activeTypes.join(', ') || 'None selected'}`, marginLeft + 50, 446);
-          doc.text(`Sample Size:   ${summary.totalResponses} submitted surveys`, marginLeft + 50, 463);
+          doc.text(`Sample Size:   ${summary.totalResponses} submitted evaluations`, marginLeft + 50, 463);
           doc.text(`System Rating: ${formatNumber(summary.averageRating)}% benchmark`, marginLeft + 50, 480);
           doc.text(`Date Issued:   ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`, marginLeft + 50, 497);
 
@@ -668,7 +668,7 @@ export function ExecutiveSummaryReportBuilderPage({
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(8);
           doc.setTextColor(100);
-          doc.text('TOTAL SUBMITTED SURVEY EVALUATIONS', marginLeft + 15, cursorY + 35);
+          doc.text('TOTAL SUBMITTED evaluationS', marginLeft + 15, cursorY + 35);
 
           doc.setFillColor(248, 250, 252);
           doc.setDrawColor(226, 232, 240);
@@ -738,10 +738,10 @@ export function ExecutiveSummaryReportBuilderPage({
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(11);
           doc.setTextColor(30);
-          doc.text('Survey Division Breakdown Summary', marginLeft, cursorY);
+          doc.text('Evaluation Division Breakdown Summary', marginLeft, cursorY);
           cursorY += 10;
 
-          const tableHeaders = ['Survey Division Category', 'Average Score', 'Total Submitted Evaluations'];
+          const tableHeaders = ['Evaluation Division Category', 'Average Score', 'Total Submitted Evaluations'];
           const tableRows = surveyPerformance.map((row) => [
             row.surveyType,
             formatCompositeScore(row.surveyType, row.average).text,
@@ -860,7 +860,7 @@ export function ExecutiveSummaryReportBuilderPage({
           cursorY += 20;
 
           if (topCompanies.length > 0) {
-            const tableHeaders = ['Rank', 'Partner Company Name', 'Average Score', 'Remarks'];
+            const tableHeaders = ['Rank', 'Partner Name', 'Average Score', 'Remarks'];
             const tableRows = topCompanies.map((row, idx) => [
               `#${idx + 1}`,
               row.company,
@@ -868,7 +868,7 @@ export function ExecutiveSummaryReportBuilderPage({
               getRemarkText(getBand(row.surveyType, row.average)),
             ]);
 
-            const leastHeaders = ['Alert Rank', 'Partner Company Name', 'Average Score', 'Remarks'];
+            const leastHeaders = ['Alert Rank', 'Partner Name', 'Average Score', 'Remarks'];
             const leastRows = leastRatedCompanies.map((row, idx) => [
               `ALERT #${idx + 1}`,
               row.company,
@@ -975,7 +975,7 @@ export function ExecutiveSummaryReportBuilderPage({
             doc.setDrawColor(226, 232, 240);
             doc.setLineWidth(1);
             
-            const companiesLabel = `Evaluated Companies (${companiesList.length}):`;
+            const companiesLabel = `Evaluated Partners (${companiesList.length}):`;
             
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(9.5);
@@ -1206,7 +1206,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 onChange={(e) => setShowSurveyTable(e.target.checked)}
                 className="h-3.5 w-3.5 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
               />
-              <span className="text-slate-600 dark:text-slate-300">Survey Division Metrics</span>
+              <span className="text-slate-600 dark:text-slate-300">Evaluation Division Metrics</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer text-xs select-none">
               <input
@@ -1335,7 +1335,7 @@ export function ExecutiveSummaryReportBuilderPage({
                     <p><span className="font-semibold text-slate-400">Prepared For:</span> MBS Stakeholder Operations Steering Committee</p>
                     <p><span className="font-semibold text-slate-400">Prepared By:</span> {preparedBy || 'Operations Team'}</p>
                     <p><span className="font-semibold text-slate-400">Divisions:</span> {activeTypes.join(', ') || 'None selected'}</p>
-                    <p><span className="font-semibold text-slate-400">Sample Size:</span> {summary.totalResponses} submitted surveys</p>
+                    <p><span className="font-semibold text-slate-400">Sample Size:</span> {summary.totalResponses} submitted evaluations</p>
                     <p><span className="font-semibold text-slate-400">System Rating:</span> {formatNumber(summary.averageRating)}% benchmark</p>
                     <p><span className="font-semibold text-slate-400">Date Issued:</span> {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                   </div>
@@ -1364,7 +1364,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 <div className="grid grid-cols-2 gap-3.5">
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
                     <span className="text-lg font-black text-[#0866B1] block">{summary.totalResponses}</span>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">Total Submitted Survey Evaluations</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">Total Submitted Evaluations</span>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
                     <span className="text-lg font-black text-[#0866B1] block">{formatNumber(summary.averageRating)}%</span>
@@ -1429,13 +1429,13 @@ export function ExecutiveSummaryReportBuilderPage({
                 {showSurveyTable && (
                   <div className="flex flex-col justify-center">
                     <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-                      Survey Division Breakdown Summary
+                      Evaluation Division Breakdown Summary
                     </h4>
                     <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
                       <table className="w-full text-left text-[10px] border-collapse">
                         <thead>
                           <tr className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                            <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px]">Survey Division Category</th>
+                            <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px]">Evaluation Division Category</th>
                             <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px] text-right">Average Score</th>
                             <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px] text-right">Total Submitted Evaluations</th>
                           </tr>
@@ -1558,7 +1558,7 @@ export function ExecutiveSummaryReportBuilderPage({
                           <thead>
                             <tr className="bg-emerald-50/50 dark:bg-emerald-950/20 border-b border-emerald-100 dark:border-emerald-900/30">
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Rank</th>
-                              <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Partner Company Name</th>
+                              <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Partner Name</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Average Score</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Remarks</th>
                             </tr>
@@ -1595,7 +1595,7 @@ export function ExecutiveSummaryReportBuilderPage({
                           <thead>
                             <tr className="bg-rose-50/50 dark:bg-rose-950/20 border-b border-rose-100 dark:border-rose-900/30">
                               <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Alert Rank</th>
-                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Partner Company Name</th>
+                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Partner Name</th>
                               <th className="p-2 font-bold text-rose-700 text-[9px] uppercase text-right">Average Score</th>
                               <th className="p-2 font-bold text-rose-700 text-[9px] uppercase text-right">Remarks</th>
                             </tr>
@@ -1693,7 +1693,7 @@ export function ExecutiveSummaryReportBuilderPage({
                         {/* Boxed companies list */}
                         <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-lg p-3">
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                            Evaluated Companies ({companiesList.length}):
+                            Evaluated Partners ({companiesList.length}):
                           </span>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300">
                             <div className="space-y-1">

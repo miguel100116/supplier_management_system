@@ -72,7 +72,7 @@ export function AnalyticsToolbar({
           )}
 
           <fieldset className="min-w-0">
-            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Company ranking</legend>
+            <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Partner ranking</legend>
             <div className="segmented-control w-full xl:w-auto">
               {rankingOptions.map((option) => (
                 <button
@@ -97,7 +97,7 @@ export function AnalyticsToolbar({
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Periods included</p>
           {archiveSeries.length === 0 ? (
             <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-              No named archive periods exist yet. Archive a survey with a period label first.
+              No named archive periods exist yet. Archive a evaluation with a period label first.
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">

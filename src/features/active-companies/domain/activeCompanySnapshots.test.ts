@@ -63,7 +63,7 @@ test('rejects an ambiguous multi-column file without a company header', () => {
       'suppliers.xlsx',
       'Supplier',
     ),
-    /Could not find a company-name column/,
+    /Could not find a partner-name column/,
   );
 });
 

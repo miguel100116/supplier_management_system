@@ -113,7 +113,7 @@ export function ProfilePage({
             <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{mySubmissions.length}</p>
           </div>
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Companies Covered</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Partners Covered</p>
             <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{companiesCovered}</p>
           </div>
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 px-4 py-3">

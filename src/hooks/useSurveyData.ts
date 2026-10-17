@@ -96,7 +96,7 @@ function ensureOverallFeedbackQuestion(form: CustomForm): CustomForm {
   const feedbackQuestion = {
     questionId: expectedId,
     questionNumber: nextNum,
-    question: 'Overall Comments and Feedback on the Company',
+    question: 'Overall Comments and Feedback on the Partner',
     questionCategory: OVERALL_CATEGORY,
     section: 'Overall Comments & Feedback',
     inputType: 'text' as const
@@ -1234,7 +1234,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           loadedSurveys = [
             {
               id: 'default-courier',
-              title: 'Courier Satisfaction Survey',
+              title: 'Courier Satisfaction Evaluation',
               surveyType: 'Courier',
               description: 'Standard satisfaction reporting for external courier and logistics.',
               createdAt: new Date('2025-01-01T08:00:00Z').toISOString(),
@@ -1249,7 +1249,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
             },
             {
               id: 'default-supplier',
-              title: 'Supplier Quality Survey',
+              title: 'Supplier Quality Evaluation',
               surveyType: 'Supplier',
               description: 'Product quality and commercial terms assessment for inventory suppliers.',
               createdAt: new Date('2025-01-01T08:00:00Z').toISOString(),
@@ -1261,7 +1261,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
             },
             {
               id: 'default-subcontractor',
-              title: 'Subcontractor Performance Survey',
+              title: 'Subcontractor Performance Evaluation',
               surveyType: 'Subcontractor',
               description: 'On-site execution, compliance, and schedule feedback for active subcontractors.',
               createdAt: new Date('2025-01-01T08:00:00Z').toISOString(),
@@ -1323,7 +1323,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         }
       } catch (loadError) {
         if (isMountedRef.current) {
-          setError(loadError instanceof Error ? loadError.message : 'Unable to load survey data.');
+          setError(loadError instanceof Error ? loadError.message : 'Unable to load evaluation data.');
         }
       } finally {
         if (isMountedRef.current) {

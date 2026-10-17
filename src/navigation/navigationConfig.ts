@@ -29,21 +29,21 @@ export const ADMIN_PRIMARY_NAVIGATION = [
   { key: 'survey-forms', label: 'Evaluations' },
   { key: 'analytics', label: 'Analytics' },
   { key: 'reports', label: 'Reports' },
-  { key: 'account-management', label: 'Users & Access' },
+  { key: 'account-management', label: 'Users' },
   { key: 'archive', label: 'Archive' },
 ] as const;
 
 export const EMPLOYEE_PRIMARY_NAVIGATION = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'fill-form', label: 'New Evaluation' },
+  { key: 'dashboard', label: 'Home' },
+  { key: 'fill-form', label: 'Assigned Evaluations' },
   { key: 'my-submissions', label: 'My Submissions' },
 ] as const;
 
 export const PARTNER_WORKSPACE_VIEWS = [
   { key: 'partner-companies', label: 'Directory' },
-  { key: 'document-register', label: 'Compliance Documents' },
-  { key: 'supplier-ranking', label: 'Supplier Ranking' },
-  { key: 'partners-feedback-hub', label: 'Partner Feedback' },
+  { key: 'document-register', label: 'Documents' },
+  { key: 'supplier-ranking', label: 'Ranking' },
+  { key: 'partners-feedback-hub', label: 'Feedback' },
 ] as const;
 
 export const EVALUATION_WORKSPACE_VIEWS = [
@@ -54,8 +54,8 @@ export const EVALUATION_WORKSPACE_VIEWS = [
 ] as const;
 
 export const REPORT_WORKSPACE_VIEWS = [
-  { key: 'reports', label: 'Create Report' },
-  { key: 'present', label: 'Presentations' },
+  { key: 'reports', label: 'Generate' },
+  { key: 'present', label: 'Present' },
   { key: 'export-history', label: 'Export History' },
 ] as const;
 
@@ -126,7 +126,7 @@ export function getPagePresentation(
 
   if (page === 'dashboard') {
     return {
-      title: 'Dashboard',
+      title: isAdmin ? 'Dashboard' : 'Home',
       sidebarKey: 'dashboard',
       breadcrumbs: [],
       description: `Welcome back, ${userDisplayName}.`,
@@ -161,7 +161,7 @@ export function getPagePresentation(
 
   if (page === 'fill-form') {
     if (!isAdmin) {
-      return { title: 'New Evaluation', sidebarKey: 'fill-form', breadcrumbs: [] };
+      return { title: 'Assigned Evaluations', sidebarKey: 'fill-form', breadcrumbs: [] };
     }
     return {
       title: 'New Evaluation',
@@ -175,13 +175,21 @@ export function getPagePresentation(
 
   const primaryTitle: Partial<Record<PageKey, string>> = {
     analytics: 'Analytics',
-    'account-management': 'Users & Access',
+    'account-management': 'Users',
     archive: 'Archive',
     'my-submissions': 'My Submissions',
     notifications: 'Notifications',
     'profile-settings': 'Profile',
     settings: 'Settings',
   };
+  if (isAdmin && (page === 'archive' || page === 'import-evaluations')) {
+    const title = page === 'archive' ? 'Archive' : 'Import Responses';
+    return {
+      title,
+      sidebarKey: page,
+      breadcrumbs: [{ label: 'Evaluations', page: 'survey-forms' }, { label: title }],
+    };
+  }
   const title = primaryTitle[page] ?? 'Dashboard';
   return { title, sidebarKey: page, breadcrumbs: [] };
 }

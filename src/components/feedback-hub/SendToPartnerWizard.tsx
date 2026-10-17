@@ -413,7 +413,7 @@ export function SendToPartnerWizard({
 
   // Email template defaults
   const defaultSubject = `[Microgenesis] Performance Evaluation Report - ${selectedCompanyName} (${periodCovered})`;
-  const defaultBody = `Dear ${matchingContact?.contactPerson || 'Partner Management'},\n\nPlease find attached the compiled ${periodCovered} Supplier Management Performance Evaluation Report for ${selectedCompanyName}.\n\nExecutive Summary:\n- Evaluation Period: ${periodCovered}\n- Total Submissions: ${responseCount} Stakeholder Surveys\n- Overall Satisfaction Score: ${overallScore}%\n\nThis compiled report reflects structured operational feedback across timeliness, communication quality, compliance, and service value. Please review the detailed PDF attachment.\n\nThank you for your valued partnership with Microgenesis.\n\nBest regards,\nProcurement & Vendor Management Group\nMicrogenesis Software Systems`;
+  const defaultBody = `Dear ${matchingContact?.contactPerson || 'Partner Management'},\n\nPlease find attached the compiled ${periodCovered} Supplier Management Performance Evaluation Report for ${selectedCompanyName}.\n\nExecutive Summary:\n- Evaluation Period: ${periodCovered}\n- Total Submissions: ${responseCount} Stakeholder Evaluations\n- Overall Satisfaction Score: ${overallScore}%\n\nThis compiled report reflects structured operational feedback across timeliness, communication quality, compliance, and service value. Please review the detailed PDF attachment.\n\nThank you for your valued partnership with Microgenesis.\n\nBest regards,\nProcurement & Vendor Management Group\nMicrogenesis Software Systems`;
 
   const [subject, setSubject] = useState<string>(revisionReport?.subject || defaultSubject);
   const [body, setBody] = useState<string>(revisionReport?.body || defaultBody);
@@ -422,7 +422,7 @@ export function SendToPartnerWizard({
   useEffect(() => {
     if (!revisionReport && !bulkMode) {
       setSubject(`[Microgenesis] Performance Evaluation Report - ${selectedCompanyName} (${periodCovered})`);
-      setBody(`Dear ${matchingContact?.contactPerson || 'Partner Management'},\n\nPlease find attached the compiled ${periodCovered} Supplier Management Performance Evaluation Report for ${selectedCompanyName}.\n\nExecutive Summary:\n- Evaluation Period: ${periodCovered}\n- Total Submissions: ${responseCount} Stakeholder Surveys\n- Overall Satisfaction Score: ${overallScore}%\n\nThis compiled report reflects structured operational feedback across timeliness, communication quality, compliance, and service value. Please review the detailed PDF attachment.\n\nThank you for your valued partnership with Microgenesis.\n\nBest regards,\nProcurement & Vendor Management Group\nMicrogenesis Software Systems`);
+      setBody(`Dear ${matchingContact?.contactPerson || 'Partner Management'},\n\nPlease find attached the compiled ${periodCovered} Supplier Management Performance Evaluation Report for ${selectedCompanyName}.\n\nExecutive Summary:\n- Evaluation Period: ${periodCovered}\n- Total Submissions: ${responseCount} Stakeholder Evaluations\n- Overall Satisfaction Score: ${overallScore}%\n\nThis compiled report reflects structured operational feedback across timeliness, communication quality, compliance, and service value. Please review the detailed PDF attachment.\n\nThank you for your valued partnership with Microgenesis.\n\nBest regards,\nProcurement & Vendor Management Group\nMicrogenesis Software Systems`);
     }
   }, [selectedCompanyName, periodCovered, matchingContact, responseCount, overallScore, revisionReport, bulkMode]);
 
@@ -461,11 +461,11 @@ export function SendToPartnerWizard({
   const handleExportPdfPreview = async (previewOnly = false) => {
     setReportGenerationError('');
     if (!currentSurvey) {
-      setReportGenerationError('The selected survey could not be found. Reopen the survey card and try again.');
+      setReportGenerationError('The selected evaluation could not be found. Reopen the evaluation card and try again.');
       return;
     }
     if (!selectedCompanyId || !selectedCompany) {
-      setReportGenerationError('Select a partner company before generating the report.');
+      setReportGenerationError('Select a partner before generating the report.');
       return;
     }
 
@@ -562,7 +562,7 @@ export function SendToPartnerWizard({
         );
 
         const emailSubj = `[Microgenesis] Performance Evaluation Report - ${companyName} (${periodCovered})`;
-        const emailBody = `Dear ${matchingC?.contactPerson || 'Partner Management'},\n\nPlease find attached the compiled ${periodCovered} Supplier Management Performance Evaluation Report for ${companyName}.\n\nExecutive Summary:\n- Evaluation Period: ${periodCovered}\n- Total Submissions: ${count} Stakeholder Surveys\n- Overall Satisfaction Score: ${score}%\n\nThis compiled report reflects structured operational feedback across timeliness, communication quality, compliance, and service value. Please review the detailed PDF attachment.\n\nThank you for your valued partnership with Microgenesis.\n\nBest regards,\nProcurement & Vendor Management Group\nMicrogenesis Software Systems`;
+        const emailBody = `Dear ${matchingC?.contactPerson || 'Partner Management'},\n\nPlease find attached the compiled ${periodCovered} Supplier Management Performance Evaluation Report for ${companyName}.\n\nExecutive Summary:\n- Evaluation Period: ${periodCovered}\n- Total Submissions: ${count} Stakeholder Evaluations\n- Overall Satisfaction Score: ${score}%\n\nThis compiled report reflects structured operational feedback across timeliness, communication quality, compliance, and service value. Please review the detailed PDF attachment.\n\nThank you for your valued partnership with Microgenesis.\n\nBest regards,\nProcurement & Vendor Management Group\nMicrogenesis Software Systems`;
 
         onQueueReport({
           surveyId: surv.id,
@@ -583,7 +583,7 @@ export function SendToPartnerWizard({
     } else {
       // Single queue dispatcher
       if (!currentSurvey || !selectedCompany) {
-        setReportGenerationError('Select a valid survey and partner company before queueing the report.');
+        setReportGenerationError('Select a valid evaluation and partner before queueing the report.');
         return;
       }
       onQueueReport({
@@ -676,7 +676,7 @@ export function SendToPartnerWizard({
             >
               1
             </span>
-            <span>Target Company</span>
+            <span>Target Partner</span>
           </div>
           <ChevronRight size={14} className="text-slate-300" />
 
@@ -759,7 +759,7 @@ export function SendToPartnerWizard({
               <div>
                 <p className="font-bold">Bulk Dispatch Center Enabled</p>
                 <p className="mt-1 text-blue-800 dark:text-blue-300 leading-relaxed">
-                  Select partner companies with completed surveys below to dispatch their formatted feedback reports in a single click.
+                  Select partners with completed evaluations below to dispatch their formatted feedback reports in a single click.
                   Each partner receives an individualized email tailored with their specific response count, overall score, and attached complete performance PDF report containing full analytics and graphs.
                 </p>
               </div>
@@ -799,7 +799,7 @@ export function SendToPartnerWizard({
                       <div>
                         <p className="font-bold text-slate-900 dark:text-white">{item.company.name}</p>
                         <p className="text-[10px] text-slate-500">
-                          {item.company.type} Evaluation Survey • {item.responseCount} responses
+                          {item.company.type} Evaluation • {item.responseCount} responses
                         </p>
                       </div>
                     </div>
@@ -868,7 +868,7 @@ export function SendToPartnerWizard({
 
                 {bulkList.length === 0 && (
                   <div className="p-8 text-center text-slate-500 text-xs">
-                    No completed surveys or response data available for bulk sending yet.
+                    No completed evaluations or response data available for bulk sending yet.
                   </div>
                 )}
               </div>
@@ -912,13 +912,13 @@ export function SendToPartnerWizard({
                 <div className="space-y-4 max-w-3xl mx-auto">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <FileText size={16} className="text-[#0866B1]" />
-                    Step 1: Confirm Target Partner Company
+                    Step 1: Confirm Target Partner
                   </h4>
 
                   <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 p-4 space-y-4">
                     <div className="flex flex-col gap-1.5">
                       <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                        Select Partner Company to Dispatch Report
+                        Select Partner to Dispatch Report
                       </label>
                       <select
                         value={selectedCompanyId}
@@ -939,7 +939,7 @@ export function SendToPartnerWizard({
                         }}
                         className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#0866B1]"
                       >
-                        <option value="" disabled>Select a company</option>
+                        <option value="" disabled>Select a partner</option>
                         {partnerCompanies
                           .filter((comp) => !comp.isArchived && comp.type === currentSurvey?.surveyType)
                           .map((comp) => (
@@ -954,7 +954,7 @@ export function SendToPartnerWizard({
                       <div className="rounded-xl border border-blue-50 bg-blue-50/20 p-4 dark:border-blue-950/20 dark:bg-blue-950/5 space-y-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
                           <CheckCircle2 className="text-[#0866B1]" size={15} />
-                          Active completed survey evaluation found!
+                          Active completed evaluation found!
                         </div>
                         <div className="grid grid-cols-1 gap-4 text-xs min-[420px]:grid-cols-2">
                           <div>
@@ -1181,7 +1181,7 @@ export function SendToPartnerWizard({
                                 <img src="/microgenesis_logo.png" alt="Microgenesis" className="h-10 w-auto" />
                                 <div className="mt-5 h-px w-14 bg-[#0866B1]" />
                                 <h1 className="mt-5 text-xl font-black text-slate-800 dark:text-slate-100 leading-tight">{reportTemplate.reportTitle}</h1>
-                                <p className="mt-1 text-base font-extrabold text-[#0866B1]">{selectedCompanyName || 'Select a company'}</p>
+                                <p className="mt-1 text-base font-extrabold text-[#0866B1]">{selectedCompanyName || 'Select a partner'}</p>
                                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                   {periodCovered} · Generated{' '}
                                   {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -1476,7 +1476,7 @@ export function SendToPartnerWizard({
                   {/* Summary card confirmation */}
                   <div className="rounded-xl border border-slate-200 p-4 space-y-3 text-xs dark:border-slate-800 bg-white dark:bg-slate-900">
                     <div className="flex justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                      <span className="text-slate-500 font-medium">Target Company:</span>
+                      <span className="text-slate-500 font-medium">Target Partner:</span>
                       <span className="font-extrabold text-slate-900 dark:text-white">{selectedCompanyName}</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
@@ -1685,7 +1685,7 @@ export function SendToPartnerWizard({
             <div className="p-5 overflow-y-auto space-y-3 flex-1 bg-slate-50/50 dark:bg-slate-900">
               {(() => {
                  const modalItem = bulkList.find((item) => item.company.id === bulkCommentsModalCompany);
-                 if (!modalItem?.survey) return <p className="text-sm text-center text-rose-600">The selected company record could not be found.</p>;
+                 if (!modalItem?.survey) return <p className="text-sm text-center text-rose-600">The selected partner record could not be found.</p>;
                  const modalSurveyType = modalItem.survey.surveyType;
                  const compComments = filterResponsesForReport(modalItem.survey, modalItem.company, partnerCompanies, responses).filter(
                    (r) => r.questionId === getOverallFeedbackQuestionId(modalSurveyType) && r.comment && r.comment.trim() !== '' && r.comment.trim() !== 'Submitted successfully.'

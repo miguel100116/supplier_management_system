@@ -47,14 +47,14 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ Dashboa
 const NotificationLogsPage = lazy(() => import('./pages/NotificationLogsPage').then(({ NotificationLogsPage }) => ({ default: NotificationLogsPage })));
 const EmployeeNotificationLogsPage = lazy(() => import('./pages/EmployeeNotificationLogsPage').then(({ EmployeeNotificationLogsPage }) => ({ default: EmployeeNotificationLogsPage })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })));
-const SurveyExplorerPage = lazy(() => import('./pages/SurveyExplorerPage').then(({ SurveyExplorerPage }) => ({ default: SurveyExplorerPage })));
-const CreateSurveyPage = lazy(() => import('./pages/CreateSurveyPage').then(({ CreateSurveyPage }) => ({ default: CreateSurveyPage })));
-const SurveyDetailsPage = lazy(() => import('./pages/SurveyDetailsPage').then(({ SurveyDetailsPage }) => ({ default: SurveyDetailsPage })));
-const SurveyFillerPage = lazy(() => import('./pages/SurveyFillerPage').then(({ SurveyFillerPage }) => ({ default: SurveyFillerPage })));
-const PartnerCompaniesPage = lazy(() => import('./pages/PartnerCompaniesPage').then(({ PartnerCompaniesPage }) => ({ default: PartnerCompaniesPage })));
+const SurveyExplorerPage = lazy(() => import('./pages/EvaluationExplorerPage').then(({ SurveyExplorerPage }) => ({ default: SurveyExplorerPage })));
+const CreateSurveyPage = lazy(() => import('./pages/CreateEvaluationPage').then(({ CreateSurveyPage }) => ({ default: CreateSurveyPage })));
+const SurveyDetailsPage = lazy(() => import('./pages/EvaluationDetailsPage').then(({ SurveyDetailsPage }) => ({ default: SurveyDetailsPage })));
+const SurveyFillerPage = lazy(() => import('./pages/EvaluationFillerPage').then(({ SurveyFillerPage }) => ({ default: SurveyFillerPage })));
+const PartnerCompaniesPage = lazy(() => import('./pages/PartnerPartnersPage').then(({ PartnerCompaniesPage }) => ({ default: PartnerCompaniesPage })));
 const DocumentRegisterPage = lazy(() => import('./pages/DocumentRegisterPage').then(({ DocumentRegisterPage }) => ({ default: DocumentRegisterPage })));
 const SupplierRankingPage = lazy(() => import('./pages/SupplierRankingPage').then(({ SupplierRankingPage }) => ({ default: SupplierRankingPage })));
-const SurveyFormsPage = lazy(() => import('./pages/SurveyFormsPage').then(({ SurveyFormsPage }) => ({ default: SurveyFormsPage })));
+const SurveyFormsPage = lazy(() => import('./pages/EvaluationFormsPage').then(({ SurveyFormsPage }) => ({ default: SurveyFormsPage })));
 const PresentPage = lazy(() => import('./pages/PresentPage').then(({ PresentPage }) => ({ default: PresentPage })));
 const ArchivePage = lazy(() => import('./pages/ArchivePage').then(({ ArchivePage }) => ({ default: ArchivePage })));
 const ImportEvaluationsPage = lazy(() => import('./pages/ImportEvaluationsPage').then(({ ImportEvaluationsPage }) => ({ default: ImportEvaluationsPage })));
@@ -675,6 +675,11 @@ export default function App() {
     selectedSurveyTitle,
     userDisplayName,
   });
+  useEffect(() => {
+    const title = isPasswordRecovery ? 'Password Recovery' : account ? pagePresentation.title : 'Login';
+    document.title = `${title} | Supplier Management System`;
+  }, [account, isPasswordRecovery, pagePresentation.title]);
+
   // Safe routing guard redirecting users to permitted views
   useEffect(() => {
     if (!account) return;
@@ -1125,8 +1130,8 @@ export default function App() {
         return (
           <div className="panel p-8 text-center text-slate-500">
             <ShieldAlert size={36} className="mx-auto mb-2 text-rose-500" />
-            <p className="font-semibold">Survey not found or was deleted.</p>
-            <button onClick={() => goToPreviousPage('survey-forms')} className="primary-button mt-4">Return to Surveys</button>
+            <p className="font-semibold">Evaluation not found or was deleted.</p>
+            <button onClick={() => goToPreviousPage('survey-forms')} className="primary-button mt-4">Return to Evaluations</button>
           </div>
         );
       }
@@ -1359,7 +1364,7 @@ export default function App() {
                   {isAdmin ? 'All Notifications' : 'All Reminders'}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {isAdmin ? 'Survey submissions and document alerts.' : 'Your pending survey evaluation reminders.'}
+                  {isAdmin ? 'Evaluation submissions and document alerts.' : 'Your pending evaluation reminders.'}
                 </p>
               </div>
               <button

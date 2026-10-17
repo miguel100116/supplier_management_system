@@ -37,11 +37,11 @@ function renderFormsPage(isAdmin: boolean) {
 
 test('SMS-55 keeps the admin Forms controls while removing duplicate navigation and title actions', () => {
   const html = renderFormsPage(true);
-  assert.doesNotMatch(html, /Active Survey Forms|Interactive forms for evaluating|Search Templates|Archived Forms/);
+  assert.doesNotMatch(html, /Active Evaluation Forms|Interactive forms for evaluating|Search Templates|Archived Forms/);
   assert.match(html, /Create Form/);
   assert.match(html, /Select Forms/);
-  assert.match(html, /Search survey forms/);
-  assert.match(html, /Search survey title or description/);
+  assert.match(html, /Search evaluation forms/);
+  assert.match(html, /Search evaluation title or description/);
   assert.match(html, /Deadline range/);
   assert.match(html, /Reset/);
   assert.match(html, /<span class="font-bold text-slate-800 dark:text-slate-100">Example Form<\/span>/);
@@ -49,17 +49,17 @@ test('SMS-55 keeps the admin Forms controls while removing duplicate navigation 
   assert.match(html, /Modify/);
 });
 
-test('employee Forms keeps its existing context heading and survey actions', () => {
+test('employee Forms keeps its existing context heading and evaluation actions', () => {
   const html = renderFormsPage(false);
-  assert.match(html, /Active Survey Forms/);
+  assert.match(html, /Active Evaluation Forms/);
   assert.match(html, /View/);
-  assert.match(html, /Answer Survey/);
+  assert.match(html, /Answer Evaluation/);
 });
 
 test('SMS-56 puts the admin controls in one toolbar and counts changed sort and date range filters', () => {
   const html = renderFormsPage(true);
-  assert.match(html, /role="toolbar" aria-label="Survey forms controls"/);
-  assert.match(html, /role="group" aria-label="Survey category"/);
+  assert.match(html, /role="toolbar" aria-label="Evaluation forms controls"/);
+  assert.match(html, /role="group" aria-label="Evaluation category"/);
   assert.match(html, /<details class="relative shrink-0">/);
   assert.match(html, /Reset filters/);
   assert.match(html, /1 form/);

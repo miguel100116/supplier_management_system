@@ -144,7 +144,7 @@ export function PartnerCompaniesFilterToolbar({
         {isAdmin && (
           <div className="flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto">
             <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={onImportFileSelected} />
-            <button type="button" onClick={onOpenActiveCompanies} className="secondary-button min-h-10 flex-1 gap-1.5 px-3 text-xs font-bold sm:flex-none" title="View active companies by type">
+            <button type="button" onClick={onOpenActiveCompanies} className="secondary-button min-h-10 flex-1 gap-1.5 px-3 text-xs font-bold sm:flex-none" title="View active partners by type">
               <Building size={14} aria-hidden="true" /> Active by Type
             </button>
             <button type="button" onClick={onOpenRegister} className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#0866B1] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition duration-150 hover:bg-[#07528E] sm:flex-none">

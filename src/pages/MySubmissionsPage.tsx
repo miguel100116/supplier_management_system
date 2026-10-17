@@ -74,7 +74,7 @@ export function MySubmissionsPage({ responses, userEmail, onFillForm }: MySubmis
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search by company or type..."
+            placeholder="Search by partner or type..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -90,7 +90,7 @@ export function MySubmissionsPage({ responses, userEmail, onFillForm }: MySubmis
         <div className="panel text-center py-14">
           <ClipboardList size={32} className="mx-auto mb-3 text-slate-300 dark:text-slate-700" />
           <p className="font-semibold text-slate-600 dark:text-slate-300">You haven't submitted any evaluations yet.</p>
-          <p className="mt-1 text-sm text-slate-400">Once you fill out a survey, it'll show up here.</p>
+          <p className="mt-1 text-sm text-slate-400">Once you fill out a evaluation, it'll show up here.</p>
         </div>
       ) : filteredSubmissions.length === 0 ? (
         <div className="panel text-center py-10 text-slate-500">No submissions match "{search}".</div>
@@ -108,11 +108,11 @@ export function MySubmissionsPage({ responses, userEmail, onFillForm }: MySubmis
                 >
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
                     <div>
-                      <p className="text-xs text-slate-500 font-medium">Company</p>
+                      <p className="text-xs text-slate-500 font-medium">Partner</p>
                       <p className="font-semibold text-slate-900 dark:text-slate-100">{head.company}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium">Survey Type</p>
+                      <p className="text-xs text-slate-500 font-medium">Evaluation Type</p>
                       <p className="font-semibold">{head.surveyType}</p>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400">

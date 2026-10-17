@@ -59,11 +59,11 @@ export function PastResultsTab({
 
     const tables: ExportTable[] = [
       {
-        title: `Completed Survey Archive - ${survey.title}`,
+        title: `Completed Evaluation Archive - ${survey.title}`,
         columns: ['Property', 'Value'],
         rows: [
-          ['Survey Title', survey.title],
-          ['Survey Type', survey.surveyType],
+          ['Evaluation Title', survey.title],
+          ['Evaluation Type', survey.surveyType],
           ['Completion Date', new Date(survey.createdAt).toLocaleDateString()],
           ['Total Submissions', String(count)],
           ['Overall Score', formatCompositeScore(survey.surveyType, satisfactionScore).text],
@@ -88,7 +88,7 @@ export function PastResultsTab({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter past survey results by title or company..."
+            placeholder="Filter past evaluation results by title or partner..."
             className="field text-xs !mt-0"
             style={{ paddingLeft: '2.75rem' }}
           />
@@ -113,8 +113,8 @@ export function PastResultsTab({
         sortOptions={[
           { value: 'date-desc', label: 'Completion: newest first' },
           { value: 'date-asc', label: 'Completion: oldest first' },
-          { value: 'title-asc', label: 'Survey: A–Z' },
-          { value: 'title-desc', label: 'Survey: Z–A' },
+          { value: 'title-asc', label: 'Evaluation: A–Z' },
+          { value: 'title-desc', label: 'Evaluation: Z–A' },
         ]}
         sortValue={tableSort}
         onSortChange={setTableSort}
@@ -139,8 +139,8 @@ export function PastResultsTab({
           <table className="w-full min-w-[760px] text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 dark:bg-slate-900/80 dark:text-slate-300 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="px-4 py-3.5">Survey Name</th>
-                <th className="px-4 py-3.5">Company / Type</th>
+                <th className="px-4 py-3.5">Evaluation Name</th>
+                <th className="px-4 py-3.5">Partner / Type</th>
                 <th className="px-4 py-3.5">Period / Date</th>
                 <th className="px-4 py-3.5">Completion Rate</th>
                 <th className="px-4 py-3.5">Report Status</th>

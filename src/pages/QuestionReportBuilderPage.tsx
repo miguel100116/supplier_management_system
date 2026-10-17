@@ -220,12 +220,12 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
 
         const companyRows = companiesList.length > 0
           ? companiesList.map(comp => [comp])
-          : [['No companies evaluated']];
+          : [['No partners evaluated']];
 
         // 1. Metadata Table or Header containing list of evaluated companies
         tables.push({
-          title: `${typeLabel} Evaluation - Selected Companies`,
-          columns: ['Evaluated Companies'],
+          title: `${typeLabel} Evaluation - Selected Partners`,
+          columns: ['Evaluated Partners'],
           rows: companyRows,
         });
 
@@ -233,8 +233,8 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
         const columns = ['Question'];
         if (columnsVisibility.average) columns.push('Average Rating (%)');
         if (columnsVisibility.responses) columns.push('Responses');
-        if (columnsVisibility.highest) columns.push('Highest Scoring Company');
-        if (columnsVisibility.lowest) columns.push('Lowest Scoring Company');
+        if (columnsVisibility.highest) columns.push('Highest Scoring Partner');
+        if (columnsVisibility.lowest) columns.push('Lowest Scoring Partner');
 
         const rows = questionsList.map((row) => {
           const r: (string | number)[] = [row.questionText];
@@ -375,7 +375,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
           doc.setDrawColor(226, 232, 240);
           doc.setLineWidth(1);
           
-          const companiesLabel = `Evaluated Companies (${companiesList.length}):`;
+          const companiesLabel = `Evaluated Partners (${companiesList.length}):`;
           
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(9.5);
@@ -436,8 +436,8 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
           const tableHeaders = ['Question'];
           if (columnsVisibility.average) tableHeaders.push('Average (%)');
           if (columnsVisibility.responses) tableHeaders.push('Responses');
-          if (columnsVisibility.highest) tableHeaders.push('Highest Scoring Company');
-          if (columnsVisibility.lowest) tableHeaders.push('Lowest Scoring Company');
+          if (columnsVisibility.highest) tableHeaders.push('Highest Scoring Partner');
+          if (columnsVisibility.lowest) tableHeaders.push('Lowest Scoring Partner');
 
           const tableRows = questionsList.map((row) => {
             const r = [row.questionText];
@@ -569,7 +569,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Highest Scoring Company
+                  Highest Scoring Partner
                 </span>
               </label>
 
@@ -581,7 +581,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   className="h-4 w-4 rounded border-slate-300 text-[#0866B1] focus:ring-[#0866B1]"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Lowest Scoring Company
+                  Lowest Scoring Partner
                 </span>
               </label>
             </div>
@@ -668,7 +668,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                         {/* Companies callout list */}
                         <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/20 text-xs">
                           <span className="font-bold text-slate-700 dark:text-slate-300 block mb-2">
-                            Evaluated Companies ({companiesList.length}):
+                            Evaluated Partners ({companiesList.length}):
                           </span>
                           {companiesList.length > 0 && (
                             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-slate-600 dark:text-slate-400 leading-relaxed">
@@ -699,10 +699,10 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                                   <th className="px-2.5 py-1.5 font-semibold text-center w-16">Responses</th>
                                 )}
                                 {columnsVisibility.highest && (
-                                  <th className="px-2.5 py-1.5 font-semibold w-28">Highest Scoring Company</th>
+                                  <th className="px-2.5 py-1.5 font-semibold w-28">Highest Scoring Partner</th>
                                 )}
                                 {columnsVisibility.lowest && (
-                                  <th className="px-2.5 py-1.5 font-semibold w-28">Lowest Scoring Company</th>
+                                  <th className="px-2.5 py-1.5 font-semibold w-28">Lowest Scoring Partner</th>
                                 )}
                               </tr>
                             </thead>

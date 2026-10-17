@@ -84,7 +84,7 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
           });
         })
         .catch((error) => {
-          if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Unable to load active companies.');
+          if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Unable to load active partners.');
         })
         .finally(() => {
           if (!cancelled) setIsLoading(false);
@@ -120,13 +120,13 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">
           <div>
             <h2 id="active-companies-title" className="text-lg font-bold text-slate-900 dark:text-white">
-              Active Companies by Type
+              Active Partners by Type
             </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               View the latest list or select an earlier upload.
             </p>
           </div>
-          <button type="button" className="icon-button" onClick={onClose} aria-label="Close active companies">
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close active partners">
             <X size={19} />
           </button>
         </header>
@@ -134,7 +134,7 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
-              <Loader2 size={18} className="animate-spin" /> Loading active companies...
+              <Loader2 size={18} className="animate-spin" /> Loading active partners...
             </div>
           ) : loadError ? (
             <div className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">
@@ -195,7 +195,7 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
                         </div>
                       </>
                     ) : (
-                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No active-company upload is available yet.</p>
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No active-partner upload is available yet.</p>
                     )}
                   </section>
                 );

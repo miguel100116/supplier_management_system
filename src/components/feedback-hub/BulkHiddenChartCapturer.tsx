@@ -37,7 +37,7 @@ export interface SendViaGraphConfig {
 
 export interface BulkReportCaptureItem {
   company: Pick<PartnerCompany, 'id' | 'name' | 'type'>;
-  survey: Pick<CustomForm, 'id' | 'title' | 'surveyType'>;
+  survey: Pick<CustomForm, 'id' | 'title' | 'evaluationType'>;
   periodCovered?: string;
 }
 

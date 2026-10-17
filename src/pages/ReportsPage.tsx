@@ -55,20 +55,20 @@ export function ReportsPage({ responses, partnerCompanies = [], canExport = fals
   };
 
   const surveyReportTable: ExportTable = {
-    title: 'Survey Performance Summary',
-    columns: ['Survey Type', 'Average Rating (%)', 'Responses'],
+    title: 'Evaluation Performance Summary',
+    columns: ['Evaluation Type', 'Average Rating (%)', 'Responses'],
     rows: averageBySurveyType(responses).map((row) => [row.surveyType, `${formatNumber(row.average)}%`, row.responses]),
   };
 
   const topCompaniesTable: ExportTable = {
-    title: `Top Performing Companies (Top ${splitCount})`,
-    columns: ['Company', 'Average Score', 'Evaluations'],
+    title: `Top Performing Partners (Top ${splitCount})`,
+    columns: ['Partner', 'Average Score', 'Evaluations'],
     rows: topCompanies.map((row) => [row.company, formatNumber(row.average), row.evaluations]),
   };
 
   const leastRatedCompaniesTable: ExportTable = {
-    title: `Least Rated Companies (Bottom ${splitCount})`,
-    columns: ['Company', 'Average Score', 'Evaluations'],
+    title: `Least Rated Partners (Bottom ${splitCount})`,
+    columns: ['Partner', 'Average Score', 'Evaluations'],
     rows: leastRatedCompanies.map((row) => [row.company, formatNumber(row.average), row.evaluations]),
   };
 
@@ -92,7 +92,7 @@ export function ReportsPage({ responses, partnerCompanies = [], canExport = fals
   const handleCardExport = (format: ExportFormat, card: 'summary' | 'question' | 'survey' | 'companies') => {
     if (card === 'summary') runExport(format, 'Summary Report', [summaryTable, surveyReportTable], 'summary_report');
     else if (card === 'question') runExport(format, 'Question Report', [questionReportTable], 'question_report');
-    else if (card === 'companies') runExport(format, 'Companies Performance Report', [topCompaniesTable, leastRatedCompaniesTable], 'companies_report');
+    else if (card === 'companies') runExport(format, 'Partners Performance Report', [topCompaniesTable, leastRatedCompaniesTable], 'companies_report');
   };
 
   if (showSummaryBuilder) {
@@ -161,7 +161,7 @@ export function ReportsPage({ responses, partnerCompanies = [], canExport = fals
           onOpenBuilder={() => setShowSummaryBuilder(true)}
         />
         <ReportCard
-          title="Companies Report"
+          title="Partners Report"
           icon={Handshake}
           canExport={canExport}
           onExport={(format) => handleCardExport(format, 'companies')}

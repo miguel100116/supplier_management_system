@@ -223,12 +223,12 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     setError('');
 
     if (!company.trim() && !hasEvaluatedAll) {
-      setError('Please provide your organization or company name.');
+      setError('Please provide your organization or partner name.');
       return;
     }
 
     if (!selectedSurveyId) {
-      setError('Please select a survey form to respond to.');
+      setError('Please select a evaluation form to respond to.');
       return;
     }
 
@@ -247,7 +247,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     }
 
     // Try to load saved draft for this survey & company if it exists
-    const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company}`;
+    const draftKey = `evaluation_analytics_draft_${selectedSurveyId}_${company}`;
     const savedDraft = localStorage.getItem(draftKey);
     let draftRatings: Record<string, any> = {};
     let draftComments: Record<string, string> = {};
@@ -330,7 +330,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       finishExit();
       return;
     }
-    const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company}`;
+    const draftKey = `evaluation_analytics_draft_${selectedSurveyId}_${company}`;
     const draftData = {
       ratings,
       comments,
@@ -345,7 +345,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
   const handleExitWithoutSaving = () => {
     if (selectedSurveyId && company) {
-      const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company}`;
+      const draftKey = `evaluation_analytics_draft_${selectedSurveyId}_${company}`;
       localStorage.removeItem(draftKey);
     }
     finishExit();
@@ -641,7 +641,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     );
 
     if (selectedSurveyId && company) {
-      const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company.trim()}`;
+      const draftKey = `evaluation_analytics_draft_${selectedSurveyId}_${company.trim()}`;
       localStorage.removeItem(draftKey);
     }
 
@@ -667,8 +667,8 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     return (
       <div className="panel mx-auto max-w-2xl p-6 text-center sm:p-12" id="survey-filler-empty">
         <Info size={40} className="mx-auto text-amber-500 mb-4" />
-        <h3 className="text-xl font-bold">No Surveys Available</h3>
-        <p className="text-slate-500 dark:text-slate-400 mt-2">There are currently no published survey forms inside the system.</p>
+        <h3 className="text-xl font-bold">No Evaluations Available</h3>
+        <p className="text-slate-500 dark:text-slate-400 mt-2">There are currently no published evaluation forms inside the system.</p>
       </div>
     );
   }
@@ -726,7 +726,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             <p className="text-[10px] uppercase tracking-widest text-[#0866B1] font-bold dark:text-blue-300">Microsoft Forms Ingress</p>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Stakeholder Feedback Form</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Provide your details and complete the official MBS stakeholder evaluation survey. Your feedback directly impacts operations.
+              Provide your details and complete the official MBS stakeholder evaluation. Your feedback directly impacts operations.
             </p>
           </div>
 
@@ -734,9 +734,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-5 text-sm text-emerald-800 dark:bg-emerald-950/20 dark:border-emerald-900/40 flex items-start gap-3 shadow-xs">
               <CheckCircle size={20} className="text-emerald-500 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="font-bold">All Registered Companies Evaluated!</p>
+                <p className="font-bold">All Registered Partners Evaluated!</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  You have already successfully evaluated all registered partner companies matching the <strong>{activeSurvey?.surveyType}</strong> category. There are no additional partner evaluations required at this time.
+                  You have already successfully evaluated all registered partners matching the <strong>{activeSurvey?.surveyType}</strong> category. There are no additional partner evaluations required at this time.
                 </p>
               </div>
             </div>
@@ -756,7 +756,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
             {surveys.length > 1 ? (
               <div>
-                <label htmlFor="filler-survey" className="field-label">Survey Form to Answer *</label>
+                <label htmlFor="filler-survey" className="field-label">Evaluation Form to Answer *</label>
                 <select
                   id="filler-survey"
                   className="field text-sm font-semibold"
@@ -772,7 +772,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
               </div>
             ) : activeSurvey && (
               <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-2.5 text-xs text-slate-500 dark:bg-slate-900/40 dark:border-slate-800">
-                Survey Form: <strong className="text-slate-700 dark:text-slate-200">{activeSurvey.title}</strong> ({activeSurvey.surveyType})
+                Evaluation Form: <strong className="text-slate-700 dark:text-slate-200">{activeSurvey.title}</strong> ({activeSurvey.surveyType})
               </div>
             )}
 
@@ -813,7 +813,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 </div>
 
                 <div>
-                  <label htmlFor="filler-company" className="field-label">Select Partner Company to Evaluate *</label>
+                  <label htmlFor="filler-company" className="field-label">Select Partner to Evaluate *</label>
                   {matchingCompanies.length > 0 ? (
                     <select
                       id="filler-company"
@@ -848,7 +848,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                     id="filler-address"
                     type="text"
                     className="field"
-                    placeholder="Enter Company Address"
+                    placeholder="Enter Partner Address"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                   />
@@ -889,7 +889,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                       <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         We'll pre-fill this form with the ratings from your most recent {activeSurvey?.surveyType.toLowerCase()} evaluation
                         ({lastSubmissionForType.company}, {new Date(lastSubmissionForType.submissionDate).toLocaleDateString()}) — just adjust
-                        whatever's different for this company instead of rating every question from scratch.
+                        whatever's different for this partner instead of rating every question from scratch.
                       </span>
                     </span>
                   </label>
@@ -897,7 +897,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
               </>
             ) : (
               <div className="text-center py-6 text-slate-400 text-xs">
-                Fields are locked since all companies are evaluated.
+                Fields are locked since all partners are evaluated.
               </div>
             )}
 
@@ -936,7 +936,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{activeSurvey.description}</p>
             <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-blue-400/10">
               <div>
-                Company: <strong className="text-slate-700 dark:text-slate-200">{company}</strong>
+                Partner: <strong className="text-slate-700 dark:text-slate-200">{company}</strong>
               </div>
               <div className="hidden sm:inline text-slate-300">|</div>
               <div>
@@ -1354,7 +1354,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 <h3 className="text-lg font-bold text-slate-950 dark:text-white">Save Progress Draft?</h3>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                You're about to leave this survey before submitting it. Would you like to save your completed answers as a draft so you can resume later, or exit without saving?
+                You're about to leave this evaluation before submitting it. Would you like to save your completed answers as a draft so you can resume later, or exit without saving?
               </p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-950/60 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:justify-end border-t border-slate-100 dark:border-slate-800/50">

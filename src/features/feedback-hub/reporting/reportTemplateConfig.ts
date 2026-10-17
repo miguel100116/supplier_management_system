@@ -23,7 +23,7 @@ export const REPORT_TEMPLATE_BY_SURVEY_TYPE: Readonly<Record<SurveyType, ReportT
   Courier: {
     id: 'courier',
     surveyType: 'Courier',
-    surveyCardTitle: 'Courier Satisfaction Survey',
+    surveyCardTitle: 'Courier Satisfaction Evaluation',
     referenceFilename: 'Sample Format - Courier Performance Rating.docx',
     reportTitle: 'Courier Performance Report',
     chartColors: TEMPLATE_CHART_COLORS,
@@ -31,7 +31,7 @@ export const REPORT_TEMPLATE_BY_SURVEY_TYPE: Readonly<Record<SurveyType, ReportT
   Supplier: {
     id: 'supplier',
     surveyType: 'Supplier',
-    surveyCardTitle: 'Supplier Quality Survey',
+    surveyCardTitle: 'Supplier Quality Evaluation',
     referenceFilename: 'Sample Format - Supplier Performance Rating.docx',
     reportTitle: 'Supplier Performance Report',
     chartColors: TEMPLATE_CHART_COLORS,
@@ -39,7 +39,7 @@ export const REPORT_TEMPLATE_BY_SURVEY_TYPE: Readonly<Record<SurveyType, ReportT
   Subcontractor: {
     id: 'subcontractor',
     surveyType: 'Subcontractor',
-    surveyCardTitle: 'Subcontractor Performance Survey',
+    surveyCardTitle: 'Subcontractor Performance Evaluation',
     referenceFilename: 'Sample Format - Subcon Performance Rating.docx',
     reportTitle: 'Subcontractor Performance Report',
     chartColors: TEMPLATE_CHART_COLORS,

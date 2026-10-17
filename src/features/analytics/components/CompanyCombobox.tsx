@@ -129,7 +129,7 @@ export function CompanyCombobox({
       {isOpen && (
         <div id={listboxId} role="listbox" className="absolute z-20 mt-1.5 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-800 dark:bg-slate-950">
           {options.length === 0 ? (
-            <p className="px-3 py-3 text-center text-sm text-slate-400 dark:text-slate-500">No matching companies.</p>
+            <p className="px-3 py-3 text-center text-sm text-slate-400 dark:text-slate-500">No matching partners.</p>
           ) : (
             options.map((company, optionIndex) => (
               <button

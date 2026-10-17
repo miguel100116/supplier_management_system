@@ -174,17 +174,17 @@ export function resolveReportCompany(
   partnerCompanies: PartnerCompany[],
 ): PartnerCompany {
   if (!companyId) {
-    throw new CompanyReportDataError('COMPANY_REQUIRED', 'Select a partner company before generating the report.');
+    throw new CompanyReportDataError('COMPANY_REQUIRED', 'Select a partner before generating the report.');
   }
 
   const company = partnerCompanies.find((candidate) => candidate.id === companyId && !candidate.isArchived);
   if (!company) {
-    throw new CompanyReportDataError('COMPANY_NOT_FOUND', 'The selected partner company record could not be found.');
+    throw new CompanyReportDataError('COMPANY_NOT_FOUND', 'The selected partner record could not be found.');
   }
   if (company.type !== surveyType) {
     throw new CompanyReportDataError(
       'COMPANY_TYPE_MISMATCH',
-      `The selected company is not assigned to the ${surveyType} survey type.`,
+      `The selected partner is not assigned to the ${surveyType} evaluation type.`,
     );
   }
   return company;
@@ -221,7 +221,7 @@ export function filterResponsesForReport(
     if (sameNameRecords.length !== 1) {
       throw new CompanyReportDataError(
         'AMBIGUOUS_LEGACY_RESPONSES',
-        'Legacy survey responses cannot be matched to one unique partner record. Add company IDs before generating this report.',
+        'Legacy evaluation responses cannot be matched to one unique partner record. Add partner IDs before generating this report.',
       );
     }
   }

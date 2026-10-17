@@ -35,7 +35,7 @@ export function PasswordRecoveryPage({ onComplete }: PasswordRecoveryPageProps) 
       <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="password-recovery-title">
         <img src="/microgenesis_logo.png" alt="Microgenesis" className="mb-8 h-9 object-contain" />
         <h1 id="password-recovery-title" className="text-2xl font-semibold text-slate-900">Set a new password</h1>
-        <p className="mt-2 text-sm text-slate-500">Choose a password with at least eight characters for your verified company account.</p>
+        <p className="mt-2 text-sm text-slate-500">Choose a password with at least eight characters for your verified work account.</p>
 
         {error && (
           <p role="alert" className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">

@@ -46,8 +46,8 @@ export function SurveyFormsToolbar({
   const activeFilterCount = countActiveFormFilters(sort, deadlineFrom, deadlineTo);
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Survey forms controls">
-      <div className="segmented-control w-full max-w-full sm:w-auto" role="group" aria-label="Survey category">
+    <div className="mb-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Evaluation forms controls">
+      <div className="segmented-control w-full max-w-full sm:w-auto" role="group" aria-label="Evaluation category">
         {categoryOptions.map((option) => (
           <button
             key={option}
@@ -62,13 +62,13 @@ export function SurveyFormsToolbar({
       </div>
 
       <label className="relative min-w-0 flex-1 basis-24 sm:min-w-[160px]">
-        <span className="sr-only">Search survey forms</span>
+        <span className="sr-only">Search evaluation forms</span>
         <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Search survey title or description..."
+          placeholder="Search evaluation title or description..."
           className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#0866B1] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
         />
       </label>

@@ -406,7 +406,7 @@ export function PartnerCompaniesPage({
     setSuccessMessage('');
 
     if (!newName.trim()) {
-      setErrorMessage('Company name cannot be blank.');
+      setErrorMessage('Partner name cannot be blank.');
       return;
     }
 
@@ -437,7 +437,7 @@ export function PartnerCompaniesPage({
         newType === 'Supplier' ? newSupplierOrigin : undefined
       );
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to add the partner company.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to add the partner.');
       return;
     }
 
@@ -512,7 +512,7 @@ export function PartnerCompaniesPage({
       try {
         await onRemoveCompany(companyToDelete.id);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to remove the partner company.');
+        setErrorMessage(error instanceof Error ? error.message : 'Unable to remove the partner.');
         return;
       }
       setSuccessMessage(`Successfully removed partner "${companyToDelete.name}".`);
@@ -535,7 +535,7 @@ export function PartnerCompaniesPage({
     try {
       await onUpdateCompany(updated);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to update the partner company.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update the partner.');
       return false;
     }
     
@@ -759,7 +759,7 @@ export function PartnerCompaniesPage({
     try {
       await onUpdateCompany(updated);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to classify the partner company.');
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to classify the partner.');
       return;
     }
     setSelectedCompany(updated);
@@ -872,7 +872,7 @@ export function PartnerCompaniesPage({
                   </tr>
                 </tbody>
               </table>
-              <p className="px-4 py-2 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800">Every branch's Supplier Rank field, company-wide.</p>
+              <p className="px-4 py-2 text-[10px] text-slate-400 border-t border-slate-100 dark:border-slate-800">Every branch's Supplier Rank field, organization-wide.</p>
             </div>
           </div>
         )}
@@ -903,8 +903,8 @@ export function PartnerCompaniesPage({
         advancedFilterCount={advancedFilterCount}
         sortOptions={[
           { value: 'default', label: 'Default order' },
-          { value: 'name-asc', label: 'Company: A–Z' },
-          { value: 'name-desc', label: 'Company: Z–A' },
+          { value: 'name-asc', label: 'Partner: A–Z' },
+          { value: 'name-desc', label: 'Partner: Z–A' },
           { value: 'type-asc', label: 'Category: A-Z' },
           { value: 'type-desc', label: 'Category: Z-A' },
           { value: 'registeredAt-desc', label: 'Registered: newest first' },
@@ -960,8 +960,8 @@ export function PartnerCompaniesPage({
       {/*
       <TableFilterBar
         sortOptions={[
-          { value: 'name-asc', label: 'Company: A–Z' },
-          { value: 'name-desc', label: 'Company: Z–A' },
+          { value: 'name-asc', label: 'Partner: A–Z' },
+          { value: 'name-desc', label: 'Partner: Z–A' },
           { value: 'registeredAt-desc', label: 'Registered: newest first' },
           { value: 'registeredAt-asc', label: 'Registered: oldest first' },
           { value: 'docStatus-desc', label: 'Documents: most urgent first' },
@@ -1010,10 +1010,10 @@ export function PartnerCompaniesPage({
       {filteredCompanies.length === 0 ? (
         <div className="panel py-20 text-center text-slate-400">
           <Building size={48} className="mx-auto mb-3 opacity-30 text-slate-300" />
-          <p className="text-sm font-semibold">No companies found under this tab selection.</p>
+          <p className="text-sm font-semibold">No partners found under this tab selection.</p>
           <p className="text-xs mt-1 text-slate-400">
             {statusTab === 'Active' && 'There are no active partners.'}
-            {statusTab === 'Expired' && 'No companies currently have an expired document.'}
+            {statusTab === 'Expired' && 'No partners currently have an expired document.'}
             {statusTab === 'Incomplete' && 'Every partner profile is fully filled in.'}
             {statusTab === 'Archived' && 'The archive is currently empty.'}
           </p>
@@ -1029,7 +1029,7 @@ export function PartnerCompaniesPage({
                     onClick={() => handleSort('name')}
                   >
                     <div className="flex items-center gap-1">
-                      Company Name
+                      Partner Name
                       {sortConfig?.key === 'name' && (
                         sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
                       )}
@@ -1243,7 +1243,7 @@ export function PartnerCompaniesPage({
                 {selectedCompany.type === 'Uncategorized' && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1.5">
                     <AlertCircle size={12} />
-                    <span>Uncategorized partners are archived and excluded from surveys until classified.</span>
+                    <span>Uncategorized partners are archived and excluded from evaluations until classified.</span>
                   </p>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1299,7 +1299,7 @@ export function PartnerCompaniesPage({
                 <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
                   <div>
                     <label className="field-label text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                      Target Company Primary Email
+                      Target Partner Primary Email
                     </label>
                     <input
                       type="email"
@@ -1310,7 +1310,7 @@ export function PartnerCompaniesPage({
                         setSelectedCompany(updated);
                         onUpdateCompany(updated);
                       }}
-                      placeholder="e.g. contact@partnercompany.com"
+                      placeholder="e.g. contact@partnerpartner.com"
                       className="field text-xs py-1.5"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Used automatically when dispatching evaluation feedback reports to this partner.</p>
@@ -1325,11 +1325,11 @@ export function PartnerCompaniesPage({
                 <div>
                   {selectedCompany.isArchived ? (
                     <div className="bg-slate-100 border border-slate-200 text-slate-600 p-3 rounded-lg text-xs font-medium">
-                      This partner is archived. Archived partners are suspended and excluded from surveys/modifications.
+                      This partner is archived. Archived partners are suspended and excluded from evaluations/modifications.
                     </div>
                   ) : selectedCompanyDocSummary.status === 'Expired' ? (
                     <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-lg text-xs font-medium dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400">
-                      ⚠️ <strong>{selectedCompanyDocSummary.expiredCount} required document{selectedCompanyDocSummary.expiredCount === 1 ? ' is' : 's are'} EXPIRED.</strong> This company has been automatically disabled from evaluation forms. Renew the expired document(s) below to reactivate.
+                      ⚠️ <strong>{selectedCompanyDocSummary.expiredCount} required document{selectedCompanyDocSummary.expiredCount === 1 ? ' is' : 's are'} EXPIRED.</strong> This partner has been automatically disabled from evaluation forms. Renew the expired document(s) below to reactivate.
                     </div>
                   ) : selectedCompanyDocSummary.status === 'Missing' ? (
                     <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-lg text-xs font-medium dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400">
@@ -1561,7 +1561,7 @@ export function PartnerCompaniesPage({
                   className="secondary-button text-xs py-2 w-full sm:w-auto flex items-center justify-center gap-1.5"
                 >
                   <Archive size={14} />
-                  <span>{selectedCompany.isArchived ? "Restore to Active Registry" : "Archive Partner Company"}</span>
+                  <span>{selectedCompany.isArchived ? "Restore to Active Registry" : "Archive Partner"}</span>
                 </button>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -1742,12 +1742,12 @@ export function PartnerCompaniesPage({
 
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed text-left">
                     ✔ Marks "{renewalTarget.docName}" as provided/current with this expiry date.<br />
-                    ✔ If this was the company's last expired document, it becomes eligible for audits again.
+                    ✔ If this was the partner's last expired document, it becomes eligible for audits again.
                   </p>
 
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-[#a16207] dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400 text-left">
                     <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                    <span>This immediately updates the company's compliance record. Double-check the date before confirming.</span>
+                    <span>This immediately updates the partner's compliance record. Double-check the date before confirming.</span>
                   </div>
                 </div>
               )}
@@ -1827,7 +1827,7 @@ export function PartnerCompaniesPage({
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 text-right truncate">{flagConfirmTarget.docName}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Company</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Partner</span>
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 text-right truncate">{branchAwareCompanyLabel(selectedCompany, flagConfirmTarget.branch)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
@@ -1881,8 +1881,8 @@ export function PartnerCompaniesPage({
                 <Building size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Register Partner Company</h3>
-                <p className="text-xs text-slate-500">Add a single company, or upload the Master List to refresh the whole registry</p>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Register Partner</h3>
+                <p className="text-xs text-slate-500">Add a single partner, or upload the Master List to refresh the whole registry</p>
               </div>
             </div>
 
@@ -1919,10 +1919,10 @@ export function PartnerCompaniesPage({
             {registerModalTab === 'upload' && onPreviewMasterListImport ? (
               <div className="mt-6 space-y-4">
                 <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Upload the latest Master List Excel file to refresh the registry. Companies are matched to existing
+                  Upload the latest Master List Excel file to refresh the registry. Partners are matched to existing
                   records by name (fuzzy matching handles minor spelling/casing differences), so re-uploading a
                   refreshed file is safe: matches are merged as an extra branch/BP Code rather than duplicated, and
-                  only genuinely new or newly-accredited companies are added.
+                  only genuinely new or newly-accredited partners are added.
                 </div>
 
                 <ActiveCompanyUploadCards userEmail={currentUserEmail} />
@@ -1952,7 +1952,7 @@ export function PartnerCompaniesPage({
                 {importReplace && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-[#a16207] dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
                     <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                    <span>This permanently removes all current partner companies before importing. This cannot be undone.</span>
+                    <span>This permanently removes all current partners before importing. This cannot be undone.</span>
                   </div>
                 )}
 
@@ -1979,7 +1979,7 @@ export function PartnerCompaniesPage({
             ) : (
             <form onSubmit={handleAdd} className="space-y-4 mt-6">
               <div>
-                <label htmlFor="modal-reg-name" className="field-label">Company Name *</label>
+                <label htmlFor="modal-reg-name" className="field-label">Partner Name *</label>
                 <input
                   id="modal-reg-name"
                   type="text"
@@ -2116,7 +2116,7 @@ export function PartnerCompaniesPage({
                   className="bg-[#0866B1] hover:bg-[#07528E] text-white flex items-center justify-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-lg transition cursor-pointer"
                 >
                   <Plus size={14} />
-                  <span>Register Company</span>
+                  <span>Register Partner</span>
                 </button>
               </div>
             </form>
@@ -2181,7 +2181,7 @@ export function PartnerCompaniesPage({
 
             <div className="mt-4 grid grid-cols-1 gap-3 text-xs min-[420px]:grid-cols-2">
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400 font-medium block">New companies to create</span>
+                <span className="text-slate-400 font-medium block">New partners to create</span>
                 <strong className="text-slate-800 dark:text-slate-100 text-lg">{importPreview.stats.createdCompanies}</strong>
               </div>
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
@@ -2201,7 +2201,7 @@ export function PartnerCompaniesPage({
             {importPreview.changes.length > 0 && (
               <div className="mt-5">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                  Existing companies that will be updated ({importPreview.changes.length})
+                  Existing partners that will be updated ({importPreview.changes.length})
                 </h4>
                 <div className="max-h-56 overflow-y-auto rounded-xl border border-amber-200 bg-amber-50/40 dark:border-amber-900/40 dark:bg-amber-950/10 divide-y divide-amber-100 dark:divide-amber-900/30">
                   {importPreview.changes.map((c) => (
@@ -2283,7 +2283,7 @@ export function PartnerCompaniesPage({
 
             <div className="mt-5 grid grid-cols-1 gap-3 text-xs min-[420px]:grid-cols-2">
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                <span className="text-slate-400 font-medium block">New companies created</span>
+                <span className="text-slate-400 font-medium block">New partners created</span>
                 <strong className="text-slate-800 dark:text-slate-100 text-lg">{importResult.stats.createdCompanies}</strong>
               </div>
               <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
@@ -2313,7 +2313,7 @@ export function PartnerCompaniesPage({
             </div>
 
             <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-              Uncategorized companies are archived and excluded from surveys until manually classified. Download the full merge log below to audit exactly which rows matched which existing company.
+              Uncategorized partners are archived and excluded from evaluations until manually classified. Download the full merge log below to audit exactly which rows matched which existing partner.
             </p>
 
             <div className="flex items-center justify-end gap-3 mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
@@ -2349,11 +2349,11 @@ export function PartnerCompaniesPage({
           >
             <div className="flex items-center gap-3 text-rose-500">
               <Archive size={24} className="shrink-0" />
-              <h3 id="archive-partner-title" className="text-lg font-bold text-slate-900 dark:text-white">Archive Partner Company?</h3>
+              <h3 id="archive-partner-title" className="text-lg font-bold text-slate-900 dark:text-white">Archive Partner?</h3>
             </div>
 
             <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              Are you sure you want to archive <strong className="text-slate-800 dark:text-slate-200">"{companyToArchive.name}"</strong>? The company will move to the Archived registry and can be restored later.
+              Are you sure you want to archive <strong className="text-slate-800 dark:text-slate-200">"{companyToArchive.name}"</strong>? The partner will move to the Archived registry and can be restored later.
             </p>
 
             <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">

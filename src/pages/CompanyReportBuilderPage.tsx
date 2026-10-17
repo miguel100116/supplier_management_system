@@ -204,7 +204,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
       };
       const data = createCompanyReportData({
         survey: {
-          id: `company-report-${category.toLowerCase()}`,
+          id: `partner-report-${category.toLowerCase()}`,
           title: `Current ${category} responses`,
           surveyType: category,
         },
@@ -244,8 +244,8 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
           <span>Back to Reports</span>
         </button>
         <div className="text-right">
-          <h2 className="text-base font-semibold">Companies Report Builder</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Build a per-company PDF or Word report</p>
+          <h2 className="text-base font-semibold">Partners Report Builder</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Build a per-partner PDF or Word report</p>
         </div>
       </div>
 
@@ -268,14 +268,14 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">2. Company</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">2. Partner</h3>
             <select
               className="field mt-2"
               value={selectedCompany}
               onChange={(event) => setSelectedCompany(event.target.value)}
             >
               {companyOptions.length === 0 ? (
-                <option value="">No companies with data yet</option>
+                <option value="">No partners with data yet</option>
               ) : (
                 companyOptions.map((name) => (
                   <option key={name} value={name}>
@@ -360,7 +360,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
           <div className="max-h-[75vh] flex-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-200/70 p-6 dark:border-slate-800 dark:bg-slate-950/60 sm:p-10">
             {!composite ? (
               <div className="flex h-64 items-center justify-center text-center text-sm text-slate-400 dark:text-slate-500">
-                Select a category and company on the left to generate a preview.
+                Select a category and partner on the left to generate a preview.
               </div>
             ) : (
               <div className="mx-auto flex flex-col items-center gap-10">
@@ -375,7 +375,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                     <div className="pt-[16%]">
                       <img src="/microgenesis_logo.png" alt="Microgenesis" className="mx-auto h-14 w-auto" />
                       <div className="mx-auto mt-7 h-px w-20 bg-[#0866B1]" />
-                      <h1 className="mt-7 text-3xl font-bold text-slate-800 dark:text-slate-100">Company Performance Report</h1>
+                      <h1 className="mt-7 text-3xl font-bold text-slate-800 dark:text-slate-100">Partner Performance Report</h1>
                       <p className="mt-2 text-xl font-bold text-[#0866B1]">{composite.company}</p>
                       <p className="mt-1 text-base text-slate-500 dark:text-slate-400">
                         {category} Evaluation · Generated{' '}
@@ -628,14 +628,14 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
             <div className="border-b border-slate-100 pb-4 dark:border-slate-800">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Review Respondent Comments</h3>
               <p className="text-xs text-slate-500 mt-1 dark:text-slate-400">
-                Select which comments should reflect on the final Company Report for <strong className="text-slate-700 dark:text-slate-300">{selectedCompany}</strong>. Unselected comments will be hidden from the report and exports.
+                Select which comments should reflect on the final Partner Report for <strong className="text-slate-700 dark:text-slate-300">{selectedCompany}</strong>. Unselected comments will be hidden from the report and exports.
               </p>
             </div>
 
             <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
               {respondentComments.length === 0 ? (
                 <div className="text-center py-12 text-slate-400 text-sm italic">
-                  No comments have been submitted for this company and category yet.
+                  No comments have been submitted for this partner and category yet.
                 </div>
               ) : (
                 <>
@@ -785,7 +785,7 @@ function ReportPageHeader({ company }: { company: string }) {
       <img src="/microgenesis_logo.png" alt="Microgenesis" className="h-6 w-auto" />
       <div className="text-right">
         <p className="text-xs font-bold text-slate-700 dark:text-slate-200">{company}</p>
-        <p className="text-[10px] text-slate-400 dark:text-slate-500">Company Performance Report</p>
+        <p className="text-[10px] text-slate-400 dark:text-slate-500">Partner Performance Report</p>
       </div>
     </div>
   );

@@ -245,7 +245,7 @@ export function SupplierRankingPage({ partnerCompanies, onUpdateCompaniesBulk, s
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-950/60">
                   <th className="w-10 px-3 py-3" />
                   <th className="w-14 px-3 py-3">Rank</th>
-                  <th className="px-3 py-3">Company</th>
+                  <th className="px-3 py-3">Partner</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -459,7 +459,7 @@ export function SupplierRankingPage({ partnerCompanies, onUpdateCompaniesBulk, s
               <div>
                 <h3 className="font-bold text-slate-900 dark:text-white">Supplier Evaluation Still Ongoing</h3>
                 <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-                  The Top 20 ranking can't be changed while a Supplier survey is active and already has submissions
+                  The Top 20 ranking can't be changed while a Supplier evaluation is active and already has submissions
                   on file - it would shift who's eligible mid-collection. To save these changes, first stop the
                   ongoing Supplier evaluation and reset its form, then come back and try again.
                 </p>

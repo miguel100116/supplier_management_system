@@ -56,7 +56,7 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
               {group.hasAssignedForm ? `${group.answered}/${group.total}` : 'No active form'}
             </p>
             <p className="text-xs text-slate-400">
-              {group.hasAssignedForm ? 'companies evaluated this period' : `No published ${group.type.toLowerCase()} survey right now`}
+              {group.hasAssignedForm ? 'partners evaluated this period' : `No published ${group.type.toLowerCase()} evaluation right now`}
             </p>
             {group.hasAssignedForm && (
               <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
@@ -80,7 +80,7 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
               </div>
               {group.outstanding.length === 0 && (
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                  Companies no one has submitted a {group.type.toLowerCase()} evaluation for this period.
+                  Partners no one has submitted a {group.type.toLowerCase()} evaluation for this period.
                 </p>
               )}
 
@@ -106,15 +106,15 @@ export function OutstandingEvaluationsPage({ surveys, partnerCompanies, response
       {groups.every((g) => !g.hasAssignedForm) && (
         <StateMessage
           compact
-          title="No active survey forms"
-          message="Publish a survey form under Evaluations to start tracking outstanding company coverage."
+          title="No active evaluation forms"
+          message="Publish a evaluation form under Evaluations to start tracking outstanding partner coverage."
         />
       )}
       {groups.some((g) => g.hasAssignedForm) && groups.every((g) => !g.hasAssignedForm || g.outstanding.length === 0) && (
         <section className="panel flex items-center gap-3 border-emerald-100 dark:border-emerald-900/40">
           <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-            Every company with an active survey has at least one evaluation on record this period.
+            Every partner with an active evaluation has at least one evaluation on record this period.
           </p>
         </section>
       )}

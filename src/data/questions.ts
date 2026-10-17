@@ -353,21 +353,21 @@ export const surveyQuestions: QuestionDefinition[] = [
   {
     questionId: 'Q-CON-OVERALL-FEEDBACK',
     questionNumber: 46,
-    question: 'Overall Comments and Feedback on the Company',
+    question: 'Overall Comments and Feedback on the Partner',
     questionCategory: 'General',
     surveyTypes: ['Courier'],
   },
   {
     questionId: 'Q-SUP-OVERALL-FEEDBACK',
     questionNumber: 47,
-    question: 'Overall Comments and Feedback on the Company',
+    question: 'Overall Comments and Feedback on the Partner',
     questionCategory: 'General',
     surveyTypes: ['Supplier'],
   },
   {
     questionId: 'Q-SUB-OVERALL-FEEDBACK',
     questionNumber: 48,
-    question: 'Overall Comments and Feedback on the Company',
+    question: 'Overall Comments and Feedback on the Partner',
     questionCategory: 'General',
     surveyTypes: ['Subcontractor'],
   }

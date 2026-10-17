@@ -64,9 +64,9 @@ interface FilterableField {
 const FILTERABLE_FIELDS: FilterableField[] = [
   {
     key: 'company.name',
-    label: 'Company Name',
+    label: 'Partner Name',
     type: 'text',
-    placeholder: 'Enter company name…',
+    placeholder: 'Enter partner name…',
   },
   {
     key: 'branch.bpCode',
@@ -1197,7 +1197,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
   // overlay, pinning each cell to the real column's measured pixel width.
   const renderHeaderCells = (widths?: number[]) => {
     const fixedCols: { key: string; label: string; sortKeyValue: MatrixSortKey; extraTh?: string }[] = [
-      { key: 'company', label: 'Company', sortKeyValue: 'company', extraTh: 'sticky left-0 z-10' },
+      { key: 'company', label: 'Partner', sortKeyValue: 'company', extraTh: 'sticky left-0 z-10' },
       { key: 'compliance', label: 'Compliance', sortKeyValue: 'compliance', extraTh: 'min-w-[110px]' },
       { key: 'bpCode', label: 'BP Code', sortKeyValue: 'bpCode' },
       { key: 'ntType', label: 'Trade/Non-Trade', sortKeyValue: 'ntType', extraTh: 'min-w-[130px]' },
@@ -1395,7 +1395,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
                     <ChartCard title="Status Breakdown" subtitle={viewLabel} contentClassName="min-h-[27rem] sm:h-80 sm:min-h-0">
                       {overview.donutData.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-xs text-slate-400">
-                          No companies in this view yet.
+                          No partners in this view yet.
                         </div>
                       ) : (
                         <div
@@ -1595,7 +1595,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
                         <thead>
                           <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
                             <th className="py-2 pr-2">Expiry Date</th>
-                            <th className="py-2 px-2">Company</th>
+                            <th className="py-2 px-2">Partner</th>
                             <th className="py-2 px-2">Document</th>
                             <th className="py-2 pl-2 text-right">Days Left</th>
                           </tr>
@@ -1661,7 +1661,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
                   type="search"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search company or BP code..."
+                  placeholder="Search partner or BP code..."
                   className="field !mt-0 w-full py-2.5 !pl-9 text-sm"
                 />
                 {searchQuery && (
@@ -1947,7 +1947,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
         <div className="panel py-20 text-center text-slate-400">
           <Package size={48} className="mx-auto mb-3 opacity-30 text-slate-300" />
           <p className="text-sm font-semibold">
-            {hasAppliedFilters ? 'No records match the current filters.' : `No ${category.label} companies found.`}
+            {hasAppliedFilters ? 'No records match the current filters.' : `No ${category.label} partners found.`}
           </p>
           {hasAppliedFilters && (
             <button
@@ -2185,7 +2185,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
                 <th className="py-2 pr-2">Date &amp; Time</th>
                 <th className="py-2 px-2">User</th>
                 <th className="py-2 px-2">Category</th>
-                <th className="py-2 px-2">Company</th>
+                <th className="py-2 px-2">Partner</th>
                 <th className="py-2 px-2">Document</th>
                 <th className="py-2 pl-2">Change</th>
               </tr>
@@ -2300,7 +2300,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 text-right truncate">{flagFlow.docName}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Company</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Partner</span>
                   <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 text-right truncate">{branchAwareCompanyLabel(flagFlow.company, flagFlow.branch)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
@@ -2412,7 +2412,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
                       <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 text-right truncate">{expiryStatusTarget.docName}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Company</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Partner</span>
                       <span className="text-xs font-semibold text-slate-800 dark:text-slate-100 text-right truncate">{branchAwareCompanyLabel(expiryStatusTarget.company, expiryStatusTarget.branch)}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
@@ -2472,7 +2472,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
             </p>
             <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-[#a16207] dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
               <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-              <span>This immediately updates the company's compliance record. Double-check the date before confirming.</span>
+              <span>This immediately updates the partner's compliance record. Double-check the date before confirming.</span>
             </div>
             <label htmlFor="doc-register-renewal-date" className="field-label text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
               New Expiry Date

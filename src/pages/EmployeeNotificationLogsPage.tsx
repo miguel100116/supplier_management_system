@@ -133,7 +133,7 @@ export function EmployeeNotificationLogsPage({
     <div className="space-y-5">
       <section className="grid gap-4 sm:grid-cols-3">
         <SummaryCard label="Pending reminders" value={notifications.length} icon={Mail} />
-        <SummaryCard label="Companies to evaluate" value={totalPendingCompanies} icon={CheckSquare} accent="rose" />
+        <SummaryCard label="Partners to evaluate" value={totalPendingCompanies} icon={CheckSquare} accent="rose" />
         <SummaryCard label="Reminder frequency" value={frequencyLabel} icon={Clock} accent="green" />
       </section>
 
@@ -143,7 +143,7 @@ export function EmployeeNotificationLogsPage({
             <Mail size={16} className="text-red-500" />
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">Mgenesis Mail Inbox</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Reminders for surveys you still need to complete.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Reminders for evaluations you still need to complete.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export function EmployeeNotificationLogsPage({
               title={notifications.length === 0 ? 'Inbox is empty' : 'No reminders found'}
               message={
                 notifications.length === 0
-                  ? 'Amazing job! You have accomplished all assigned supplier surveys.'
+                  ? 'Amazing job! You have accomplished all assigned supplier evaluations.'
                   : 'Try adjusting your search to find what you\u2019re looking for.'
               }
             />
@@ -368,7 +368,7 @@ function MessageView({
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/40">
             <p className="mb-2 flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
               <CheckSquare size={14} className="text-[#0866B1] dark:text-blue-400" />
-              <span>Remaining Partner Companies to Evaluate ({notification.pendingCompanies.length}):</span>
+              <span>Remaining Partners to Evaluate ({notification.pendingCompanies.length}):</span>
             </p>
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {notification.pendingCompanies.map((c) => (
@@ -384,7 +384,7 @@ function MessageView({
           </div>
 
           <p>
-            Please accomplish this survey on or before{' '}
+            Please accomplish this evaluation on or before{' '}
             <span className="font-black text-rose-600 underline dark:text-rose-400">{notification.deadlineDate}</span>. Your
             direct feedback is crucial to evaluate our supply chain logistics, product quality, and partner adherence to
             SLAs.
@@ -395,7 +395,7 @@ function MessageView({
           <div className="rounded-lg border border-amber-200/50 bg-amber-50/60 p-3 text-xs text-amber-800 dark:border-amber-900/30 dark:bg-amber-950/10 dark:text-amber-400">
             <span className="font-bold">Automated Notification System:</span> This reminder is automatically dispatched{' '}
             <span className="font-bold">every {frequencyLabel}</span> in accordance with administrative policy, and will
-            continue until all partner companies under this survey have been fully evaluated.
+            continue until all partners under this evaluation have been fully evaluated.
           </div>
 
           <div className="pt-4">

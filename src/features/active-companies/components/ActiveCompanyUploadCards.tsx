@@ -58,7 +58,7 @@ export function ActiveCompanyUploadCards({ userEmail }: ActiveCompanyUploadCards
       await saveActiveCompanySnapshot(snapshot);
       setMessages((current) => ({
         ...current,
-        [surveyType]: { kind: 'success', text: `${companies.length} active companies saved.` },
+        [surveyType]: { kind: 'success', text: `${companies.length} active partners saved.` },
       }));
     } catch (error) {
       setMessages((current) => ({
@@ -87,10 +87,10 @@ export function ActiveCompanyUploadCards({ userEmail }: ActiveCompanyUploadCards
     <section className="border-t border-slate-200 pt-4 dark:border-slate-800" aria-labelledby="active-company-upload-title">
       <div>
         <h4 id="active-company-upload-title" className="text-xs font-bold text-slate-800 dark:text-slate-100">
-          Upload Active Company Lists
+          Upload Active Partner Lists
         </h4>
         <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-          Save a dated Courier, Supplier, or Subcontractor snapshot for the Active Companies history.
+          Save a dated Courier, Supplier, or Subcontractor snapshot for the Active Partners history.
         </p>
       </div>
 

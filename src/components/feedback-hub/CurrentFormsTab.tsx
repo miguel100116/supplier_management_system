@@ -55,7 +55,7 @@ export function CurrentFormsTab({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search active survey forms..."
+            placeholder="Search active evaluation forms..."
             className="field text-xs !mt-0"
             style={{ paddingLeft: '2.75rem' }}
           />
@@ -79,7 +79,7 @@ export function CurrentFormsTab({
       {filteredSurveys.length === 0 ? (
         <div className="panel space-y-2 p-6 text-center text-slate-500 sm:p-12">
           <AlertCircle size={32} className="mx-auto text-slate-400" />
-          <p className="font-semibold text-slate-700 dark:text-slate-300">No matching survey forms found</p>
+          <p className="font-semibold text-slate-700 dark:text-slate-300">No matching evaluation forms found</p>
           <p className="text-xs">Adjust search filters or create new evaluation forms under Evaluations → Forms.</p>
         </div>
       ) : (
@@ -164,7 +164,7 @@ export function CurrentFormsTab({
                   <h3 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-[#0866B1] transition line-clamp-2">
                     {survey.title}
                   </h3>
-                  <p className="mt-1 text-xs text-slate-500 line-clamp-2">{survey.description || 'Stakeholder evaluation survey.'}</p>
+                  <p className="mt-1 text-xs text-slate-500 line-clamp-2">{survey.description || 'Stakeholder evaluation.'}</p>
                 </div>
 
                 {/* Progress Footer */}
@@ -172,7 +172,7 @@ export function CurrentFormsTab({
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="text-slate-500 flex items-center gap-1">
                       <Users size={13} />
-                      Avg. Companies Evaluated
+                      Avg. Partners Evaluated
                     </span>
                     <span className="font-bold text-slate-800 dark:text-slate-200">
                       {responseCount} / {targetResponses}
@@ -198,7 +198,7 @@ export function CurrentFormsTab({
                   )}
 
                   <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-                    <span>{survey.deadlineDate ? `Deadline: ${survey.deadlineDate}` : 'Active Survey'}</span>
+                    <span>{survey.deadlineDate ? `Deadline: ${survey.deadlineDate}` : 'Active Evaluation'}</span>
                     <span className="font-semibold text-[#0866B1] dark:text-blue-300 flex items-center gap-0.5 group-hover:translate-x-0.5 transition">
                       View Details
                       <ChevronRight size={12} />

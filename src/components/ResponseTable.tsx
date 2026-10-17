@@ -43,8 +43,8 @@ export function ResponseTable({ responses }: ResponseTableProps) {
           sortOptions={[
             { value: 'date-desc', label: 'Date: newest first' },
             { value: 'date-asc', label: 'Date: oldest first' },
-            { value: 'company-asc', label: 'Company: A–Z' },
-            { value: 'company-desc', label: 'Company: Z–A' },
+            { value: 'company-asc', label: 'Partner: A–Z' },
+            { value: 'company-desc', label: 'Partner: Z–A' },
           ]}
           sortValue={tableSort}
           onSortChange={setTableSort}
@@ -66,7 +66,7 @@ export function ResponseTable({ responses }: ResponseTableProps) {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Company, survey, question…"
+              placeholder="Partner, evaluation, question…"
               className="field !mt-0 w-full py-2 text-xs sm:w-[220px]"
             />
           </label>
@@ -77,9 +77,9 @@ export function ResponseTable({ responses }: ResponseTableProps) {
           <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
             <tr>
               <th className="px-3 py-3">Response ID</th>
-              <th className="px-3 py-3">Survey</th>
+              <th className="px-3 py-3">Evaluation</th>
               <th className="px-3 py-3">Date</th>
-              <th className="px-3 py-3">Company</th>
+              <th className="px-3 py-3">Partner</th>
               <th className="px-3 py-3">Question</th>
               <th className="px-3 py-3">Rating</th>
               <th className="px-3 py-3">Comment</th>

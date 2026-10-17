@@ -154,7 +154,7 @@ export function ArchivePage({
     try {
       await onUpdateSurvey({ ...confirmSurvey, status: 'Running', archivedAt: undefined });
     } catch (error) {
-      setMutationError(error instanceof Error ? error.message : 'Unable to restore the survey.');
+      setMutationError(error instanceof Error ? error.message : 'Unable to restore the evaluation.');
       return;
     }
     setSuccessMessage(`Form "${confirmSurvey.title}" has been restored to Active status!`);
@@ -168,10 +168,10 @@ export function ArchivePage({
     try {
       await onUpdatePartnerCompany({ ...confirmPartnerCompany, isArchived: false, archivedAt: undefined });
     } catch (error) {
-      setMutationError(error instanceof Error ? error.message : 'Unable to restore the partner company.');
+      setMutationError(error instanceof Error ? error.message : 'Unable to restore the partner.');
       return;
     }
-    setSuccessMessage(`Company "${confirmPartnerCompany.name}" has been restored to Partners.`);
+    setSuccessMessage(`Partner "${confirmPartnerCompany.name}" has been restored to Partners.`);
     setConfirmPartnerCompany(null);
     setTimeout(() => setSuccessMessage(null), 4000);
   };
@@ -515,7 +515,7 @@ export function ArchivePage({
           <div className="space-y-1 flex-1 pr-12">
             <h3 className="text-lg font-bold text-slate-950 dark:text-white">Archived Partners</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-              View archived partner records and restore companies to the active registry.
+              View archived partner records and restore partners to the active registry.
             </p>
           </div>
           <span className="absolute top-6 right-6 inline-flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-black text-slate-700 dark:text-slate-300">
@@ -615,7 +615,7 @@ export function ArchivePage({
                     className="field !mt-0 w-full py-2 text-sm"
                     aria-label="Filter archived partners by type"
                   >
-                    <option value="All">All company types</option>
+                    <option value="All">All partner types</option>
                     {(['Courier', 'Supplier', 'Subcontractor', 'Uncategorized'] as PartnerCompanyType[]).map((type) => (
                       <option key={type} value={type}>{type}</option>
                     ))}
@@ -660,7 +660,7 @@ export function ArchivePage({
                 <table className="w-full min-w-[760px] border-collapse text-sm text-left">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
-                      <th className="px-4 py-3">Survey Title</th>
+                      <th className="px-4 py-3">Evaluation Title</th>
                       <th className="px-4 py-3">Category</th>
                       <th className="px-4 py-3">Date Created</th>
                       <th className="px-4 py-3">Date Archived</th>
@@ -724,7 +724,7 @@ export function ArchivePage({
                 <table className="w-full min-w-[680px] border-collapse text-sm text-left">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
-                      <th className="px-4 py-3">Company</th>
+                      <th className="px-4 py-3">Partner</th>
                       <th className="px-4 py-3">Type</th>
                       <th className="px-4 py-3">Date Archived</th>
                       <th className="px-4 py-3 text-right">Actions</th>
@@ -758,7 +758,7 @@ export function ArchivePage({
                             type="button"
                           >
                             <RefreshCw size={12} />
-                            <span>Restore Company</span>
+                            <span>Restore Partner</span>
                           </button>
                         </td>
                       </tr>
@@ -776,7 +776,7 @@ export function ArchivePage({
             {archiveSeries.length > 0 && (
               <ChartCard
                 title="Series Trend"
-                subtitle="Average score across named archive periods - track a company (or the overall portfolio) year over year"
+                subtitle="Average score across named archive periods - track a partner (or the overall portfolio) year over year"
                 action={
                   <div className="flex items-center gap-1.5 text-xs">
                     <TrendingUp size={14} className="text-slate-400" />
@@ -785,7 +785,7 @@ export function ArchivePage({
                       onChange={(e) => setTrendCompany(e.target.value)}
                       className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#0866B1] cursor-pointer"
                     >
-                      <option value="__overall__">Overall (all companies)</option>
+                      <option value="__overall__">Overall (all partners)</option>
                       {trendCompanies.map((c) => (
                         <option key={c} value={c}>{c}</option>
                       ))}
@@ -988,9 +988,9 @@ export function ArchivePage({
                 <RefreshCw size={24} className="animate-spin-slow" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Restore Survey Form?</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Restore Evaluation Form?</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Are you sure you want to restore the survey form <strong>"{confirmSurvey.title}"</strong> back to Active/Running status? Respondents will immediately be able to see and submit evaluations for this form.
+                  Are you sure you want to restore the evaluation form <strong>"{confirmSurvey.title}"</strong> back to Active/Running status? Respondents will immediately be able to see and submit evaluations for this form.
                 </p>
               </div>
             </div>
@@ -1022,7 +1022,7 @@ export function ArchivePage({
                 <Building2 size={24} />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Restore Company?</h3>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Restore Partner?</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   Are you sure you want to restore <strong>"{confirmPartnerCompany.name}"</strong> to the active Partners registry?
                 </p>

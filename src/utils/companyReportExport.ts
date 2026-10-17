@@ -542,7 +542,7 @@ export async function exportCompanyReportAsPDF(
     return blobUrl;
   }
   doc.save(filename);
-  logExport({ title: `Company Report - ${data.company}`, format: 'pdf', filename });
+  logExport({ title: `Partner Report - ${data.company}`, format: 'pdf', filename });
 }
 
 /* ------------------------------------------------------------------ */
@@ -916,5 +916,5 @@ export async function exportCompanyReportAsDocx(data: CompanyReportData) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-  logExport({ title: `Company Report - ${data.company}`, format: 'docx', filename });
+  logExport({ title: `Partner Report - ${data.company}`, format: 'docx', filename });
 }

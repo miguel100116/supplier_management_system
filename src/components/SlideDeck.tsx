@@ -102,7 +102,7 @@ function slideTitleFor(slide: Slide, index: number): string {
     case 'overview':
       return 'Overview';
     case 'comparison':
-      return 'Survey Comparison';
+      return 'Evaluation Comparison';
     case 'sections':
       return 'Category Breakdown';
     case 'leaderboard':
@@ -651,10 +651,10 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0866B1]">{SLIDE_EYEBROWS.comparison}</p>
           <h2 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl leading-tight">
-            {performanceMode === 'highest' ? 'Top Rated Companies' : 'Least Rated Companies'}
+            {performanceMode === 'highest' ? 'Top Rated Partners' : 'Least Rated Partners'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Compare stakeholder satisfaction rating of your partner companies.
+            Compare stakeholder satisfaction rating of your partners.
           </p>
         </div>
 
@@ -740,7 +740,7 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
               </ResponsiveContainer>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
-                No company data fits the current filters.
+                No partner data fits the current filters.
               </div>
             )}
           </div>
@@ -1130,9 +1130,9 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
       <div className="relative z-10 flex h-full min-h-0 flex-col">
       <div className="shrink-0">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0866B1]">{SLIDE_EYEBROWS.leaderboard}</p>
-        <h2 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">Company Leaderboard</h2>
+        <h2 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">Partner Leaderboard</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Top-ranked partners within each survey type. Click a company to view interactive breakdown & trends.
+          Top-ranked partners within each evaluation type. Click a partner to view interactive breakdown & trends.
         </p>
       </div>
       <div className={layoutConfig.containerClass}>
@@ -1310,7 +1310,7 @@ function SpotlightSlide({ slide }: { slide: Extract<Slide, { kind: 'spotlight' }
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
       <SlideBackdrop />
       <div className="relative z-10 flex h-full min-h-0 flex-col">
-      <SlideHeader eyebrow={SLIDE_EYEBROWS.spotlight} title="Company Spotlight" />
+      <SlideHeader eyebrow={SLIDE_EYEBROWS.spotlight} title="Partner Spotlight" />
       <div className="mt-5 grid flex-1 min-h-0 gap-5 lg:grid-cols-[1fr,1.1fr]">
         <div className="flex flex-col justify-center rounded-2xl border-2 border-slate-100 p-5">
           <ScoreBadge label={slide.band} hex={slide.hex} />
@@ -1364,7 +1364,7 @@ function NeedsAttentionSlide({ slide }: { slide: Extract<Slide, { kind: 'distrib
           <SlideHeader
             eyebrow={SLIDE_EYEBROWS.distribution}
             title="Partners Needing Attention"
-            subtitle="Companies trailing their own peer group (same survey type only), and the specific category dragging each one down."
+            subtitle="Partners trailing their own peer group (same evaluation type only), and the specific category dragging each one down."
           />
           {slide.naPercentage > 0 && (
             <span className="mt-1 shrink-0 rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
@@ -1423,7 +1423,7 @@ function NeedsAttentionSlide({ slide }: { slide: Extract<Slide, { kind: 'distrib
           <div className="mt-5 flex flex-1 flex-col items-center justify-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/40 text-center">
             <Trophy size={22} className="text-emerald-500" />
             <p className="text-sm font-semibold text-emerald-700">No partner is meaningfully trailing its peer group.</p>
-            <p className="text-xs text-slate-400">Every company is performing in line with (or above) its peers this period.</p>
+            <p className="text-xs text-slate-400">Every partner is performing in line with (or above) its peers this period.</p>
           </div>
         )}
       </div>

@@ -272,7 +272,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
       </section>
 
       {!responses.length && (
-        <StateMessage title="No survey data yet" message="Once evaluations start coming in, you'll be able to build a presentation here." />
+        <StateMessage title="No evaluation data yet" message="Once evaluations start coming in, you'll be able to build a presentation here." />
       )}
     </div>
   );

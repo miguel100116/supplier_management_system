@@ -25,7 +25,7 @@ test('SMS-60 puts archive search beside Filters and nests sort and date range in
   assert.doesNotMatch(html, /rounded-xl border border-slate-200 bg-slate-50\/70 p-3/);
 });
 
-test('SMS-60 counts only active sort, date, and tab-specific company filters', () => {
+test('SMS-60 counts only active sort, date, and tab-specific partner filters', () => {
   assert.equal(countActiveArchiveFilters('date-desc', '', '', 'All', 'surveys'), 0);
   assert.equal(countActiveArchiveFilters('name-asc', '', '', 'All', 'responses'), 1);
   assert.equal(countActiveArchiveFilters('date-desc', '2026-09-01', '2026-09-30', 'All', 'surveys'), 1);
