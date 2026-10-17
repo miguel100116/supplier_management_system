@@ -64,7 +64,7 @@ export function MySubmissionsPage({ responses, userEmail, onFillForm }: MySubmis
         {onFillForm && (
           <button onClick={onFillForm} className="primary-button inline-flex items-center gap-2 shrink-0" type="button">
             <FilePlus size={16} />
-            New Evaluation
+            Assigned Evaluations
           </button>
         )}
       </section>

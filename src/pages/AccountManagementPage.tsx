@@ -32,11 +32,11 @@ const PAGE_MODULES: { key: PageModuleKey; label: string; description: string }[]
   { key: 'reports', label: 'Reports', description: 'Create reports and access presentation and export workflows' },
   { key: 'present', label: 'Presentations', description: 'Presentation-ready evaluation results' },
   { key: 'partner-companies', label: 'Partners', description: 'Manage courier, supplier, and subcontractor partner records' },
-  { key: 'document-register', label: 'Compliance Documents', description: 'Track compliance documents across all partners' },
-  { key: 'renew-documents', label: 'Renew Compliance Documents', description: 'Action permission: update document expiry dates/status in Partners and Compliance Documents without requiring full Users & Access permissions' },
-  { key: 'supplier-ranking', label: 'Supplier Ranking', description: 'Curate and reorder the Top 20 Suppliers evaluable by default in Supplier evaluations' },
-  { key: 'account-management', label: 'Users & Access', description: 'Configure employee accounts, roles, ranks, and permissions' },
-  { key: 'notifications', label: 'Notification Logs', description: 'Audit trails of incoming evaluation responses' },
+  { key: 'document-register', label: 'Documents', description: 'Track compliance documents across all partners' },
+  { key: 'renew-documents', label: 'Renew Documents', description: 'Update document expiry dates and statuses without full Users permissions' },
+  { key: 'supplier-ranking', label: 'Ranking', description: 'Curate and reorder the Top 20 Suppliers evaluable by default in Supplier evaluations' },
+  { key: 'account-management', label: 'Users', description: 'Configure employee accounts, roles, ranks, and permissions' },
+  { key: 'notifications', label: 'Notifications', description: 'Audit trails of incoming evaluation responses' },
   { key: 'archive', label: 'Archive', description: 'Browse and restore archived partners, forms, and responses' },
 ];
 
