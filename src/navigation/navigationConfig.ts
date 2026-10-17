@@ -50,8 +50,7 @@ export const EVALUATION_WORKSPACE_VIEWS = [
   { key: 'survey-forms', label: 'Forms' },
   { key: 'explorer', label: 'Responses' },
   { key: 'pending-review', label: 'Coverage' },
-  { key: 'import-evaluations', label: 'Import Responses' },
-  { key: 'categories-manager', label: 'Category Settings' },
+  { key: 'categories-manager', label: 'Category Labels' },
 ] as const;
 
 export const REPORT_WORKSPACE_VIEWS = [

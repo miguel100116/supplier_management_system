@@ -91,7 +91,7 @@ test('page presentation keeps titles, breadcrumbs, and sidebar parents aligned',
     ],
   });
 
-  assert.equal(getPagePresentation('categories-manager', { isAdmin: true }).title, 'Category Settings');
+  assert.equal(getPagePresentation('categories-manager', { isAdmin: true }).title, 'Category Labels');
   assert.equal(getPagePresentation('create-form', { isAdmin: true }).sidebarKey, 'survey-forms');
   assert.equal(getPagePresentation('fill-form', { isAdmin: false }).title, 'New Evaluation');
   assert.equal(getPagePresentation('fill-form', { isAdmin: false }).sidebarKey, 'fill-form');

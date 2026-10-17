@@ -2,7 +2,6 @@ import { lazy, Suspense, useCallback, useMemo, useRef, useState, useEffect } fro
 import { createPortal } from 'react-dom';
 import { BarChart3, FileText, LayoutDashboard, Moon, Sun, FilePlus, ClipboardCheck, ArrowLeft, Clock3, LogOut, ShieldAlert, Users, UserCog, ClipboardList, X } from 'lucide-react';
 import { EvaluationWorkspace, isEvaluationWorkspacePage } from './features/evaluations/components/EvaluationWorkspace';
-import { ModuleWorkspace } from './components/ModuleWorkspace';
 import { AccountMenu } from './components/AccountMenu';
 import { NotificationBell } from './components/NotificationBell';
 import { EmployeeNotificationBell } from './components/EmployeeNotificationBell';
@@ -37,13 +36,11 @@ import { formatSessionTimeRemaining } from './utils/sessionTimeout';
 import { useModalEscape } from './hooks/useModalEscape';
 import { adminNav, employeeNav, type NavigationItem } from './config/navigation';
 import {
-  PARTNER_WORKSPACE_VIEWS,
-  REPORT_WORKSPACE_VIEWS,
   getPagePresentation,
-  isPartnerWorkspacePage,
-  isReportWorkspacePage,
   type PageKey,
 } from './navigation/navigationConfig';
+import { getIndexRedirect, getPagePath, getRoleGuardRedirect, resolveAppRoute } from './routes/appRouter';
+import { PATHS } from './routes/paths';
 
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ AnalyticsPage }) => ({ default: AnalyticsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })));
@@ -174,6 +171,7 @@ const adminNavItems = buildNavItems(adminNav);
 const employeeNavItems = buildNavItems(employeeNav);
 
 const allSurveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
+const getBrowserPath = () => `${window.location.pathname}${window.location.search}`;
 
 export default function App() {
   const [accountPersistenceError, setAccountPersistenceError] = useState<string | null>(null);
@@ -182,7 +180,7 @@ export default function App() {
     if (typeof window === 'undefined') return false;
     const hashType = new URLSearchParams(window.location.hash.slice(1)).get('type');
     const queryType = new URLSearchParams(window.location.search).get('type');
-    return hashType === 'recovery' || queryType === 'recovery';
+    return window.location.pathname === PATHS.passwordRecovery || hashType === 'recovery' || queryType === 'recovery';
   });
   // Gates the first paint until we've asked MSAL whether a real signed-in
   // account exists, so we never flash the app before auth is verified.
@@ -402,10 +400,9 @@ export default function App() {
     resetAllData,
   } = useSurveyData(accounts, account, isAdmin);
 
-  const [activePage, setActivePage] = useState<PageKey>('dashboard');
-  // SPA navigation has no URL history. Keep an explicit module history so
-  // page-level Back and Cancel controls return to where the user came from.
-  const pageHistoryRef = useRef<PageKey[]>([]);
+  const [currentPath, setCurrentPath] = useState(getBrowserPath);
+  const [activePage, setActivePage] = useState<PageKey>(() => resolveAppRoute(getBrowserPath())?.page ?? 'dashboard');
+  const pageHistoryRef = useRef<Array<{ page: PageKey; path: string }>>([]);
   const [isSupabaseHydrating, setIsSupabaseHydrating] = useState(isSupabaseConfigured);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -429,29 +426,45 @@ export default function App() {
     }
   };
 
-  const navigateTo = (targetPage: PageKey) => {
-    if (targetPage === activePage) return;
+  const setBrowserPath = useCallback((path: string, replace = false) => {
+    const method = replace ? 'replaceState' : 'pushState';
+    window.history[method]({}, '', path);
+    setCurrentPath(path);
+  }, []);
+
+  const navigateTo = (targetPage: PageKey, explicitPath?: string) => {
+    const targetPath = explicitPath ?? getPagePath(targetPage, Boolean(isAdmin), selectedSurveyId ?? editingSurveyId ?? undefined);
+    if (targetPage === activePage && targetPath === currentPath) return;
 
     navigateFrom(targetPage, () => {
-      pageHistoryRef.current.push(activePage);
+      pageHistoryRef.current.push({ page: activePage, path: currentPath });
       setActivePage(targetPage);
+      setBrowserPath(targetPath);
     });
   };
 
-  const resetNavigationTo = (targetPage: PageKey) => {
+  const navigatePath = (path: string) => {
+    const match = resolveAppRoute(path);
+    if (match?.page) navigateTo(match.page, path);
+  };
+
+  const resetNavigationTo = (targetPage: PageKey, explicitPath?: string) => {
     pageHistoryRef.current = [];
     setActivePage(targetPage);
+    setBrowserPath(explicitPath ?? getPagePath(targetPage, Boolean(isAdmin)), true);
   };
 
   const goToPreviousPage = (fallbackPage?: PageKey) => {
-    const previousPage = pageHistoryRef.current.at(-1) ?? fallbackPage;
-    if (!previousPage || previousPage === activePage) return;
+    const previous = pageHistoryRef.current.at(-1)
+      ?? (fallbackPage ? { page: fallbackPage, path: getPagePath(fallbackPage, Boolean(isAdmin)) } : null);
+    if (!previous || (previous.page === activePage && previous.path === currentPath)) return;
 
-    navigateFrom(previousPage, () => {
-      if (pageHistoryRef.current.at(-1) === previousPage) {
+    navigateFrom(previous.page, () => {
+      if (pageHistoryRef.current.at(-1) === previous) {
         pageHistoryRef.current.pop();
       }
-      setActivePage(previousPage);
+      setActivePage(previous.page);
+      setBrowserPath(previous.path, true);
     });
   };
   const [editingSurveyId, setEditingSurveyId] = useState<string | null>(null);
@@ -459,6 +472,33 @@ export default function App() {
   // Deep-link into Partner Companies' detail/edit panel for one specific
   // company (e.g. from a notification click-through).
   const [focusCompanyId, setFocusCompanyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handlePopState = () => setCurrentPath(getBrowserPath());
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!authChecked || isPasswordRecovery || (isSupabaseConfigured && isSupabaseHydrating && account)) return;
+
+    const guardedPath = getRoleGuardRedirect(currentPath, Boolean(account), Boolean(isAdmin));
+    const redirectedPath = guardedPath ?? getIndexRedirect(currentPath);
+    if (redirectedPath && redirectedPath !== currentPath) {
+      setBrowserPath(redirectedPath, true);
+      return;
+    }
+    if (!account) return;
+
+    const match = resolveAppRoute(currentPath);
+    if (!match?.page) return;
+    setActivePage(match.page);
+    if (match.params.partnerId) setFocusCompanyId(match.params.partnerId);
+    if (match.params.formId) setSelectedSurveyId(match.params.formId);
+    if (match.params.mode === 'edit') setEditingSurveyId(match.params.formId ?? null);
+    if (match.page === 'create-form' && match.params.mode !== 'edit') setEditingSurveyId(null);
+  }, [account, authChecked, currentPath, isAdmin, isPasswordRecovery, isSupabaseHydrating, setBrowserPath]);
+
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [darkMode, setDarkMode] = useState(false);
 
@@ -635,9 +675,6 @@ export default function App() {
     selectedSurveyTitle,
     userDisplayName,
   });
-  const activeNavigationPath = flatNavLeaves.find((page) => page.key === pagePresentation.sidebarKey)?.path
-    ?? (isAdmin ? adminNav[0].path : employeeNav[0].path);
-
   // Safe routing guard redirecting users to permitted views
   useEffect(() => {
     if (!account) return;
@@ -819,7 +856,6 @@ export default function App() {
     recordSessionActivity(email);
     setAccount(email);
     localStorage.setItem('user_account', email);
-    resetNavigationTo('dashboard');
   };
 
   const completePasswordRecovery = async () => {
@@ -827,7 +863,7 @@ export default function App() {
     setIsPasswordRecovery(false);
     setAccount(null);
     localStorage.removeItem('user_account');
-    window.history.replaceState({}, document.title, window.location.pathname);
+    setBrowserPath(PATHS.login, true);
   };
 
   // Hold the first paint until MSAL has been consulted, so the app never
@@ -953,12 +989,14 @@ export default function App() {
         onArchiveResponses={archiveResponsesForSurveys}
         onSelectSurvey={(id) => {
           setSelectedSurveyId(id);
-          navigateTo('view-form');
+          navigateTo('view-form', PATHS.admin.evaluations.workspace.form(id));
         }}
-        onNavigateToCreate={() => navigateTo('create-form')}
+        onNavigateToCreate={() => navigateTo('create-form', PATHS.admin.evaluations.workspace.newForm)}
         onFillForm={(id) => {
           setSelectedSurveyId(id);
-          navigateTo('fill-form');
+          navigateTo('fill-form', isAdmin
+            ? PATHS.admin.evaluations.workspace.form(id)
+            : PATHS.employee.fillEvaluation(id));
         }}
         isAdmin={isAdmin}
       />
@@ -1048,7 +1086,7 @@ export default function App() {
           responses={responses}
           onFillForm={(id) => {
             setSelectedSurveyId(id);
-            navigateTo('fill-form');
+            navigateTo('fill-form', PATHS.employee.fillEvaluation(id));
           }}
         />
       )
@@ -1070,12 +1108,12 @@ export default function App() {
               createdAt: currentSurvey?.createdAt || new Date().toISOString(),
             });
             setEditingSurveyId(null);
-            navigateTo('view-form');
+            navigateTo('view-form', PATHS.admin.evaluations.workspace.form(editingSurveyId));
           } else {
             const newSurvey = createSurvey(surveyData);
             if (newSurvey) {
               setSelectedSurveyId(newSurvey.id);
-              navigateTo('view-form');
+              navigateTo('view-form', PATHS.admin.evaluations.workspace.form(newSurvey.id));
             }
           }
         }}
@@ -1105,7 +1143,7 @@ export default function App() {
           }}
           onEdit={(id) => {
             setEditingSurveyId(id);
-            navigateTo('create-form');
+            navigateTo('create-form', PATHS.admin.evaluations.workspace.editForm(id));
           }}
           isAdmin={isAdmin}
         />
@@ -1177,7 +1215,7 @@ export default function App() {
       <Shell
         pages={visiblePages}
         activePage={pagePresentation.sidebarKey}
-        currentPath={activeNavigationPath}
+        currentPath={currentPath}
         onPageChange={(page) => {
           const targetPage = page as PageKey;
           navigateTo(targetPage);
@@ -1207,7 +1245,7 @@ export default function App() {
                   responses={responses}
                   onFillForm={(id) => {
                     setSelectedSurveyId(id);
-                    navigateTo('fill-form');
+                    navigateTo('fill-form', PATHS.employee.fillEvaluation(id));
                   }}
                   onViewAll={() => setIsNotificationModalOpen(true)}
                   variant="header"
@@ -1279,17 +1317,9 @@ export default function App() {
                     )}
                   >
                     {isAdmin && isEvaluationWorkspacePage(activePage) ? (
-                      <EvaluationWorkspace activePage={activePage} onNavigate={navigateTo}>
+                      <EvaluationWorkspace currentPath={currentPath} onNavigate={navigatePath}>
                         {pageContent}
                       </EvaluationWorkspace>
-                    ) : isAdmin && isPartnerWorkspacePage(activePage) ? (
-                      <ModuleWorkspace activePage={activePage} views={PARTNER_WORKSPACE_VIEWS} onNavigate={navigateTo} navigationLabel="Partner views">
-                        {pageContent}
-                      </ModuleWorkspace>
-                    ) : isAdmin && isReportWorkspacePage(activePage) ? (
-                      <ModuleWorkspace activePage={activePage} views={REPORT_WORKSPACE_VIEWS} onNavigate={navigateTo} navigationLabel="Report views">
-                        {pageContent}
-                      </ModuleWorkspace>
                     ) : pageContent}
                   </Suspense>
                   {isSupabaseConfigured && isRefreshing && (
@@ -1373,7 +1403,7 @@ export default function App() {
                       onFillForm={(id) => {
                         setIsNotificationModalOpen(false);
                         setSelectedSurveyId(id);
-                        navigateTo('fill-form');
+                        navigateTo('fill-form', PATHS.employee.fillEvaluation(id));
                       }}
                     />
                   )
