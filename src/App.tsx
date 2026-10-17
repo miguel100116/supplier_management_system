@@ -35,9 +35,8 @@ import { PageModuleKey, getDefaultPermissions, getEffectiveSurveyTypes, hasPageA
 import { clearSessionActivity, recordSessionActivity, useIdleSessionTimeout } from './hooks/useIdleSessionTimeout';
 import { formatSessionTimeRemaining } from './utils/sessionTimeout';
 import { useModalEscape } from './hooks/useModalEscape';
+import { adminNav, employeeNav, type NavigationItem } from './config/navigation';
 import {
-  ADMIN_PRIMARY_NAVIGATION,
-  EMPLOYEE_PRIMARY_NAVIGATION,
   PARTNER_WORKSPACE_VIEWS,
   REPORT_WORKSPACE_VIEWS,
   getPagePresentation,
@@ -128,22 +127,51 @@ const BOOTSTRAP_ADMIN_ACCOUNTS: AccountProfile[] = BOOTSTRAP_ADMIN_EMAILS.map((e
 
 const DEFAULT_ACCOUNTS: AccountProfile[] = [...BOOTSTRAP_ADMIN_ACCOUNTS];
 
-// Related secondary views live inside each module so every primary
-// destination is reachable from the sidebar with one click.
-const adminNavIcons = {
+const navigationIcons = {
   dashboard: LayoutDashboard,
-  'partner-companies': Users,
-  'survey-forms': ClipboardCheck,
+  partners: Users,
+  evaluations: ClipboardCheck,
   analytics: BarChart3,
   reports: FileText,
-  'account-management': UserCog,
-  archive: ClipboardList,
+  users: UserCog,
+  notifications: Clock3,
+  settings: UserCog,
+  'employee-home': LayoutDashboard,
+  'employee-evaluations': FilePlus,
+  'employee-submissions': ClipboardList,
+  'employee-notifications': Clock3,
+  'employee-profile': UserCog,
 } as const;
 
-const adminNavItems: NavItem<PageKey>[] = ADMIN_PRIMARY_NAVIGATION.map((item) => ({
-  ...item,
-  icon: adminNavIcons[item.key],
-}));
+const buildNavItems = (items: readonly NavigationItem[]): NavItem<PageKey>[] => items.map((item) => {
+  const icon = navigationIcons[item.id as keyof typeof navigationIcons] ?? LayoutDashboard;
+  if (item.children) {
+    return {
+      type: 'group',
+      id: item.id,
+      label: item.label,
+      path: item.path,
+      icon,
+      children: item.children.map((child) => ({
+        key: child.page,
+        label: child.label,
+        path: child.path,
+        end: child.end,
+      })),
+    };
+  }
+  return {
+    key: item.page,
+    label: item.label,
+    path: item.path,
+    end: item.end,
+    pinnedBottom: item.pinnedBottom,
+    icon,
+  };
+});
+
+const adminNavItems = buildNavItems(adminNav);
+const employeeNavItems = buildNavItems(employeeNav);
 
 const allSurveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
 
@@ -569,25 +597,6 @@ export default function App() {
   const activeSurveyTypes = filters.surveyType.length ? filters.surveyType : effectiveSurveyTypes;
 
 
-  // Employee sidebar: simple, task-focused, flat (no groups). Every
-  // authenticated employee gets the same 3 items regardless of rank -
-  // deeper per-rank data scoping still applies to the pages themselves via
-  // applyAccessFilter/userPermissions, just not to which nav items show.
-  const employeeNavItems: NavItem<PageKey>[] = useMemo(
-    () => {
-      const icons = {
-        dashboard: LayoutDashboard,
-        'fill-form': FilePlus,
-        'my-submissions': ClipboardList,
-      } as const;
-      return EMPLOYEE_PRIMARY_NAVIGATION.map((item) => ({
-        ...item,
-        icon: icons[item.key],
-      }));
-    },
-    []
-  );
-
   const visiblePages = useMemo<NavItem<PageKey>[]>(() => {
     const items = isAdmin ? adminNavItems : employeeNavItems;
     return items.map((item) => item.type === 'group'
@@ -602,7 +611,7 @@ export default function App() {
           ...item,
           disabled: !hasPageAccess(userPermissions.pages, item.key, isAdmin),
         });
-  }, [isAdmin, employeeNavItems, userPermissions.pages]);
+  }, [isAdmin, userPermissions.pages]);
 
   // Flattened lookup (groups expanded) used by the route-guard fallback.
   const flatNavLeaves = useMemo(
@@ -626,6 +635,8 @@ export default function App() {
     selectedSurveyTitle,
     userDisplayName,
   });
+  const activeNavigationPath = flatNavLeaves.find((page) => page.key === pagePresentation.sidebarKey)?.path
+    ?? (isAdmin ? adminNav[0].path : employeeNav[0].path);
 
   // Safe routing guard redirecting users to permitted views
   useEffect(() => {
@@ -1166,6 +1177,7 @@ export default function App() {
       <Shell
         pages={visiblePages}
         activePage={pagePresentation.sidebarKey}
+        currentPath={activeNavigationPath}
         onPageChange={(page) => {
           const targetPage = page as PageKey;
           navigateTo(targetPage);

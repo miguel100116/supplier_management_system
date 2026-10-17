@@ -1,12 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { scrollModuleToTop } from './Shell';
-import {
-  ADMIN_PRIMARY_NAVIGATION,
-  EMPLOYEE_PRIMARY_NAVIGATION,
-  getPagePresentation,
-} from '../navigation/navigationConfig';
+import { isNavigationPathActive, scrollModuleToTop } from './Shell';
+import { adminNav, employeeNav } from '../config/navigation';
+import { getPagePresentation } from '../navigation/navigationConfig';
+import { PATHS } from '../routes/paths';
 
 const APP_SOURCE = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
 const SURVEY_DATA_SOURCE = readFileSync(new URL('../hooks/useSurveyData.ts', import.meta.url), 'utf8');
@@ -47,14 +45,30 @@ test('realtime refreshes load only the application record type that changed', ()
 
 test('primary navigation exposes the approved role-specific terminology', () => {
   assert.deepEqual(
-    ADMIN_PRIMARY_NAVIGATION.map(({ label }) => label),
-    ['Dashboard', 'Partners', 'Evaluations', 'Analytics', 'Reports', 'Users & Access', 'Archive'],
+    adminNav.map(({ label }) => label),
+    ['Dashboard', 'Partners', 'Evaluations', 'Analytics', 'Reports', 'Users', 'Notifications', 'Settings'],
   );
   assert.deepEqual(
-    EMPLOYEE_PRIMARY_NAVIGATION.map(({ label }) => label),
-    ['Dashboard', 'New Evaluation', 'My Submissions'],
+    employeeNav.map(({ label }) => label),
+    ['Home', 'Assigned Evaluations', 'My Submissions', 'Notifications', 'Profile'],
   );
-  assert.doesNotMatch(APP_SOURCE, /type: 'group'/);
+  assert.match(APP_SOURCE, /type: 'group'/);
+});
+
+test('sidebar path matching highlights groups by prefix and Directory exactly', () => {
+  assert.equal(isNavigationPathActive(PATHS.admin.partners.documents, PATHS.admin.partners.root), true);
+  assert.equal(isNavigationPathActive(PATHS.admin.partners.documents, PATHS.admin.partners.root, true), false);
+  assert.equal(isNavigationPathActive(PATHS.admin.partners.root, PATHS.admin.partners.root, true), true);
+  assert.equal(isNavigationPathActive(PATHS.admin.analytics, PATHS.admin.partners.root), false);
+});
+
+test('sidebar exposes accessible navigation state and a pinned footer', () => {
+  const source = readFileSync(new URL('./Shell.tsx', import.meta.url), 'utf8');
+  assert.match(source, /aria-expanded=\{isExpanded\}/);
+  assert.match(source, /aria-current=\{active \? 'page'/);
+  assert.match(source, /aria-label="Primary navigation"/);
+  assert.match(source, /aria-label="Account navigation"/);
+  assert.match(source, /pinnedPages\.map/);
 });
 
 test('page presentation keeps titles, breadcrumbs, and sidebar parents aligned', () => {

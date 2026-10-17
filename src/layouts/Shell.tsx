@@ -4,6 +4,8 @@ import { ReactNode, useEffect, useState } from 'react';
 interface NavChild<T extends string> {
   key: T;
   label: string;
+  path: string;
+  end?: boolean;
   badgeCount?: number;
   disabled?: boolean;
 }
@@ -13,7 +15,10 @@ export interface NavLeaf<T extends string> {
   type?: 'link';
   key: T;
   label: string;
+  path: string;
   icon: LucideIcon;
+  end?: boolean;
+  pinnedBottom?: boolean;
   badgeCount?: number;
   disabled?: boolean;
 }
@@ -25,6 +30,7 @@ export interface NavGroup<T extends string> {
   type: 'group';
   id: string;
   label: string;
+  path: string;
   icon: LucideIcon;
   children: NavChild<T>[];
 }
@@ -42,6 +48,7 @@ export function scrollModuleToTop(target: ModuleScrollTarget = window) {
 interface ShellProps<T extends string> {
   pages: NavItem<T>[];
   activePage: T;
+  currentPath: string;
   onPageChange: (page: T) => void;
   title: string;
   action: ReactNode;
@@ -54,17 +61,26 @@ interface ShellProps<T extends string> {
 
 // Flattens groups so we can look up the active item's label/icon regardless
 // of whether it's a top-level link or nested inside a group.
-function flattenPages<T extends string>(pages: NavItem<T>[]): { key: T; label: string; icon: LucideIcon }[] {
+function flattenPages<T extends string>(pages: NavItem<T>[]): { key: T; label: string; path: string; end?: boolean; icon: LucideIcon }[] {
   return pages.flatMap((page) =>
     page.type === 'group'
-      ? page.children.map((child) => ({ key: child.key, label: child.label, icon: page.icon }))
-      : [{ key: page.key, label: page.label, icon: page.icon }]
+      ? page.children.map((child) => ({ key: child.key, label: child.label, path: child.path, end: child.end, icon: page.icon }))
+      : [{ key: page.key, label: page.label, path: page.path, end: page.end, icon: page.icon }]
   );
+}
+
+const normalizePath = (path: string) => path.split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/';
+
+export function isNavigationPathActive(currentPath: string, itemPath: string, end = false) {
+  const current = normalizePath(currentPath);
+  const item = normalizePath(itemPath);
+  return current === item || (!end && current.startsWith(`${item}/`));
 }
 
 export function Shell<T extends string>({
   pages,
   activePage,
+  currentPath,
   onPageChange,
   title,
   action,
@@ -79,20 +95,25 @@ export function Shell<T extends string>({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
   const flatPages = flattenPages(pages);
-  const activePageItem = flatPages.find((p) => p.key === activePage);
+  const activePageItem = flatPages
+    .filter((page) => isNavigationPathActive(currentPath, page.path, page.end))
+    .sort((left, right) => normalizePath(right.path).length - normalizePath(left.path).length)[0]
+    ?? flatPages.find((page) => page.key === activePage);
   const ActiveIcon = activePageItem?.icon ?? Menu;
+  const mainPages = pages.filter((page) => page.type === 'group' || !page.pinnedBottom);
+  const pinnedPages = pages.filter((page): page is NavLeaf<T> => page.type !== 'group' && page.pinnedBottom === true);
 
   // Auto-expand whichever group currently contains the active page, without
   // collapsing groups the user has already opened manually.
   useEffect(() => {
     const activeGroup = pages.find(
-      (page): page is NavGroup<T> => page.type === 'group' && page.children.some((child) => child.key === activePage)
+      (page): page is NavGroup<T> => page.type === 'group' && isNavigationPathActive(currentPath, page.path)
     );
     if (activeGroup) {
       setExpandedGroups((prev) => (prev.has(activeGroup.id) ? prev : new Set(prev).add(activeGroup.id)));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePage]);
+  }, [currentPath]);
 
   useEffect(() => {
     scrollModuleToTop();
@@ -161,21 +182,30 @@ export function Shell<T extends string>({
             {/* Backdrop: closes the menu on outside tap, sits above content but below the menu itself */}
             <div className="fixed inset-0 z-30 lg:hidden" onClick={() => setIsMobileNavOpen(false)} />
             <div className="absolute left-4 right-4 top-full mt-1.5 z-40 max-h-[70vh] overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white shadow-lg dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-950">
-              {pages.map((page) => {
+              {mainPages.map((page) => {
                 if (page.type === 'group') {
                   const GroupIcon = page.icon;
+                  const isExpanded = expandedGroups.has(page.id);
+                  const groupIsActive = isNavigationPathActive(currentPath, page.path);
                   return (
                     <div key={page.id} className="py-1">
-                      <div className="flex items-center gap-2 px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      <button
+                        type="button"
+                        aria-expanded={isExpanded}
+                        onClick={() => toggleGroup(page.id)}
+                        className={`flex w-full items-center gap-2 px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider ${groupIsActive ? 'text-[#0866B1] dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}
+                      >
                         <GroupIcon size={13} className="shrink-0" />
-                        <span className="truncate">{page.label}</span>
-                      </div>
-                      {page.children.map((child) => {
-                        const active = activePage === child.key;
+                        <span className="flex-1 truncate text-left">{page.label}</span>
+                        <ChevronDown size={13} className={`shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                      {isExpanded && page.children.map((child) => {
+                        const active = isNavigationPathActive(currentPath, child.path, child.end);
                         return (
                           <button
                             key={child.key}
                             type="button"
+                            aria-current={active ? 'page' : undefined}
                             disabled={child.disabled}
                             onClick={() => {
                               onPageChange(child.key);
@@ -199,11 +229,12 @@ export function Shell<T extends string>({
                 }
 
                 const Icon = page.icon;
-                const active = activePage === page.key;
+                const active = isNavigationPathActive(currentPath, page.path, page.end);
                 return (
                   <button
                     key={page.key}
                     type="button"
+                    aria-current={active ? 'page' : undefined}
                     disabled={page.disabled}
                     onClick={() => {
                       onPageChange(page.key);
@@ -244,17 +275,18 @@ export function Shell<T extends string>({
           </button>
 
           <aside className={`h-full flex flex-col justify-between py-6 transition-all duration-300 ${isSidebarCollapsed ? 'px-2' : 'px-3'} overflow-hidden`}>
-            <nav className="space-y-1 overflow-y-auto pr-1 flex-1">
-              {pages.map((page) => {
+            <nav aria-label="Primary navigation" className="space-y-1 overflow-y-auto pr-1 flex-1">
+              {mainPages.map((page) => {
                 if (page.type === 'group') {
                   const GroupIcon = page.icon;
                   const isExpanded = expandedGroups.has(page.id);
-                  const groupHasActiveChild = page.children.some((child) => child.key === activePage);
+                  const groupHasActiveChild = isNavigationPathActive(currentPath, page.path);
 
                   return (
                     <div key={page.id}>
                       <button
                         type="button"
+                        aria-expanded={isExpanded}
                         onClick={() => {
                           if (isSidebarCollapsed) setIsSidebarCollapsed(false);
                           toggleGroup(page.id);
@@ -278,11 +310,12 @@ export function Shell<T extends string>({
                       {isExpanded && !isSidebarCollapsed && (
                         <div className="mt-1 mb-1.5 pl-4 space-y-0.5 border-l border-slate-100 dark:border-slate-800">
                           {page.children.map((child) => {
-                            const active = activePage === child.key;
+                            const active = isNavigationPathActive(currentPath, child.path, child.end);
                             return (
                               <button
                                 key={child.key}
                                 type="button"
+                                aria-current={active ? 'page' : undefined}
                                 disabled={child.disabled}
                                 onClick={() => onPageChange(child.key)}
                                 title={child.disabled ? 'Access restricted by an administrator' : undefined}
@@ -310,12 +343,13 @@ export function Shell<T extends string>({
                 }
 
                 const Icon = page.icon;
-                const active = activePage === page.key;
+                const active = isNavigationPathActive(currentPath, page.path, page.end);
 
                 return (
                   <button
                     key={page.key}
                     type="button"
+                    aria-current={active ? 'page' : undefined}
                     disabled={page.disabled}
                     onClick={() => onPageChange(page.key)}
                     title={page.disabled ? 'Access restricted by an administrator' : isSidebarCollapsed ? page.label : undefined}
@@ -347,9 +381,29 @@ export function Shell<T extends string>({
                 );
               })}
             </nav>
-            {sidebarExtra && (
-              <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
-                {sidebarExtra(isSidebarCollapsed)}
+            {(pinnedPages.length > 0 || sidebarExtra) && (
+              <div className="mt-auto space-y-1 border-t border-slate-100 pt-4 dark:border-slate-800 shrink-0">
+                <nav aria-label="Account navigation" className="space-y-1">
+                  {pinnedPages.map((page) => {
+                    const Icon = page.icon;
+                    const active = isNavigationPathActive(currentPath, page.path, page.end);
+                    return (
+                      <button
+                        key={page.key}
+                        type="button"
+                        disabled={page.disabled}
+                        aria-current={active ? 'page' : undefined}
+                        onClick={() => onPageChange(page.key)}
+                        title={page.disabled ? 'Access restricted by an administrator' : isSidebarCollapsed ? page.label : undefined}
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${active ? 'bg-blue-50 text-[#0866B1] dark:bg-blue-950/60 dark:text-blue-200' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900'} ${isSidebarCollapsed ? 'justify-center px-2' : ''}`}
+                      >
+                        <Icon size={18} className="shrink-0" />
+                        {!isSidebarCollapsed && <span className="truncate">{page.label}</span>}
+                      </button>
+                    );
+                  })}
+                </nav>
+                {sidebarExtra && <div className={pinnedPages.length > 0 ? 'pt-2' : ''}>{sidebarExtra(isSidebarCollapsed)}</div>}
               </div>
             )}
           </aside>
