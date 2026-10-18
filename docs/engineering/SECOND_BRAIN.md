@@ -555,8 +555,18 @@ Evidence: `src/navigation/navigationConfig.ts`, `src/App.tsx`, `src/layouts/Shel
 
 Status: implemented locally; rendered desktop/mobile browser comparison and hosted Vercel verification remain pending.
 
-Decision: Retain the existing `PageKey`, permission, component, and persistence contracts while making browser paths canonical through `src/routes/paths.ts` and `src/routes/appRouter.ts`. The Admin shell groups Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History); Dashboard, Analytics, and Users remain direct destinations, with Notifications and Settings pinned at the bottom. Employees use Home, Assigned Evaluations, My Submissions, Notifications, and Profile. History API synchronization supplies deep links, back/forward behavior, role guards, and centralized redirects without adding a routing dependency.
+Decision: Retain the existing `PageKey`, permission, component, and persistence contracts while making browser paths canonical through `src/routes/paths.ts` and `src/routes/appRouter.ts`. The Admin shell groups Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History); Dashboard, Analytics, and Users remain direct destinations. Employees use Home, Assigned Evaluations, My Submissions, and Profile. Notifications and Settings remain routable but are not left-sidebar destinations. History API synchronization supplies deep links, back/forward behavior, role guards, and centralized redirects without adding a routing dependency.
 
 Consequences: User-visible terminology is Evaluation and Partner while legacy internal identifiers remain stable. Unauthenticated application paths resolve to `/login`; authenticated employees cannot enter `/admin/*`. Express 4 and Vercel serve `index.html` for client routes while excluding `/api`, and Vite emits root-relative assets. Existing Supabase RLS remains the authorization boundary; client guards are a usability layer.
 
 Evidence: `src/routes/paths.ts`, `src/routes/appRouter.ts`, `src/config/navigation.ts`, `src/layouts/Shell.tsx`, `src/layouts/WorkspaceLayout.tsx`, `src/App.tsx`, `server.ts`, `vite.config.ts`, `vercel.json`, and focused route/fallback tests.
+
+### 2026-10-18 - Compact sidebar and combined role manual
+
+Status: implemented locally.
+
+Decision: Remove Notifications and Settings from both role sidebars while retaining their routes and access through contextual header/account controls. Employee Profile remains a direct sidebar destination. Publish one user-friendly Admin and Employee manual in Word, with Markdown as its editable source and a repeatable local generator.
+
+Consequences: The sidebar focuses on primary work modules without removing notification or settings functionality. Onboarding guidance now follows the canonical URL-backed navigation and the agreed role workflows in one shareable document.
+
+Evidence: `src/config/navigation.ts`, `src/layouts/Shell.test.ts`, `src/routes/paths.test.ts`, `docs/user-guides/Supplier_Management_System_User_Manual.md`, `docs/user-guides/Supplier_Management_System_User_Manual.docx`, `scripts/generateUserManualDocument.mjs`, `README.md`, and `SYSTEM_TURNOVER.md`.

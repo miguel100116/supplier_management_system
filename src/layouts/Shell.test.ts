@@ -46,11 +46,11 @@ test('realtime refreshes load only the application record type that changed', ()
 test('primary navigation exposes the approved role-specific terminology', () => {
   assert.deepEqual(
     adminNav.map(({ label }) => label),
-    ['Dashboard', 'Partners', 'Evaluations', 'Analytics', 'Reports', 'Users', 'Notifications', 'Settings'],
+    ['Dashboard', 'Partners', 'Evaluations', 'Analytics', 'Reports', 'Users'],
   );
   assert.deepEqual(
     employeeNav.map(({ label }) => label),
-    ['Home', 'Assigned Evaluations', 'My Submissions', 'Notifications', 'Profile'],
+    ['Home', 'Assigned Evaluations', 'My Submissions', 'Profile'],
   );
   assert.match(APP_SOURCE, /type: 'group'/);
 });

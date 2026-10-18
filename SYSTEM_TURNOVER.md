@@ -273,4 +273,4 @@ Summarized from the project's git commit history (first commit July 18, 2026 thr
 
 ### Admin evaluation navigation
 
-Admins use grouped, URL-backed navigation: Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History), plus Dashboard, Analytics, and Users. Notifications and Settings are pinned at the bottom of the sidebar. Employees use Home, Assigned Evaluations, My Submissions, Notifications, and Profile. Existing permission and persistence keys remain unchanged.
+Admins use grouped, URL-backed navigation: Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History), plus Dashboard, Analytics, and Users. Employees use Home, Assigned Evaluations, My Submissions, and Profile. Notifications and Settings remain available outside the left sidebar. Existing permission and persistence keys remain unchanged.

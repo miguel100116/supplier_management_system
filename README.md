@@ -320,12 +320,19 @@ The system now uses explicit Supabase repository and adapter boundaries for shar
 
 ## 14. User Manuals
 
-Full, standalone user documentation lives in the [`docs/`](docs) folder as Word documents:
+The current role-based guide is available in two formats:
+
+- **[Supplier Management System User Manual (Word)](docs/user-guides/Supplier_Management_System_User_Manual.docx)** — a user-friendly document for sharing, printing, and onboarding.
+- **[Supplier Management System User Manual (Markdown)](docs/user-guides/Supplier_Management_System_User_Manual.md)** — the editable source for future updates.
+
+Earlier standalone role manuals also remain in the [`docs/`](docs) folder:
 
 - **[`docs/Admin_Manual.docx`](docs/Admin_Manual.docx)** — the complete administrator guide (account management, surveys, reports, compliance, imports, settings).
 - **[`docs/Employee_Manual.docx`](docs/Employee_Manual.docx)** — the complete employee guide (filling evaluations, submissions, notifications, profile).
 
 Both manuals are generated from source via the scripts in [`docs/_build/`](docs/_build) (`build-admin.cjs` / `build-employee.cjs`), so they can be regenerated if content changes.
+
+The combined manual can be regenerated with `node scripts/generateUserManualDocument.mjs`.
 
 For a condensed reference (roles matrix, workflow diagrams, FAQ), see [`SYSTEM_TURNOVER.md`](SYSTEM_TURNOVER.md).
 
@@ -366,4 +373,4 @@ This system is **pre-production**. The most important open items (verified again
 
 ### Admin evaluation navigation
 
-Admins use grouped, URL-backed navigation: Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History), plus Dashboard, Analytics, and Users. Notifications and Settings are pinned at the bottom of the sidebar. Employees use Home, Assigned Evaluations, My Submissions, Notifications, and Profile. Existing permission and persistence keys remain unchanged.
+Admins use grouped, URL-backed navigation: Partners (Directory, Documents, Feedback), Evaluations (Workspace, Archive, Import Responses), and Reports (Generate, Present, Export History), plus Dashboard, Analytics, and Users. Employees use Home, Assigned Evaluations, My Submissions, and Profile. Notifications and Settings remain available outside the left sidebar. Existing permission and persistence keys remain unchanged.

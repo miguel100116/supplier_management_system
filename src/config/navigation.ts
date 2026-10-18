@@ -39,14 +39,11 @@ export const adminNav = [
     ],
   },
   { id: 'users', label: 'Users', path: PATHS.admin.users.root, page: 'account-management' },
-  { id: 'notifications', label: 'Notifications', path: PATHS.admin.notifications, page: 'notifications', pinnedBottom: true },
-  { id: 'settings', label: 'Settings', path: PATHS.admin.settings, page: 'settings', pinnedBottom: true },
 ] as const satisfies readonly NavigationItem[];
 
 export const employeeNav = [
   { id: 'employee-home', label: 'Home', path: PATHS.employee.home, page: 'dashboard' },
   { id: 'employee-evaluations', label: 'Assigned Evaluations', path: PATHS.employee.evaluations, page: 'fill-form' },
   { id: 'employee-submissions', label: 'My Submissions', path: PATHS.employee.submissions, page: 'my-submissions' },
-  { id: 'employee-notifications', label: 'Notifications', path: PATHS.employee.notifications, page: 'notifications' },
   { id: 'employee-profile', label: 'Profile', path: PATHS.employee.profile, page: 'profile-settings' },
 ] as const satisfies readonly NavigationItem[];
