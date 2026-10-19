@@ -16,7 +16,7 @@ import Papa from 'papaparse';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { getQuestionMaxPoints, surveyTypeDisplayLabel } from '../data/questionWeights';
 import { isOverallCategory } from '../data/questionCategories';
-import { formatNumber, hasAnsweredItem, numericRating, averageRating } from '../utils/analytics';
+import { formatNumber, hasAnsweredItem, numericRating, averageRating } from '../features/analytics/domain/analytics';
 
 interface QuestionReportBuilderPageProps {
   responses: SurveyResponse[];

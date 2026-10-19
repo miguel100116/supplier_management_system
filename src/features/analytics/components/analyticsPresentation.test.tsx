@@ -8,7 +8,7 @@ import { AnalyticsDateRangeControls } from './AnalyticsDateRangeControls';
 import { AnalyticsPage } from '../../../pages/AnalyticsPage';
 
 const COMPANY_ANALYSIS_SOURCE = readFileSync(
-  new URL('../../../components/CompanyAnalysisPanel.tsx', import.meta.url),
+  new URL('./CompanyAnalysisPanel.tsx', import.meta.url),
   'utf8',
 );
 

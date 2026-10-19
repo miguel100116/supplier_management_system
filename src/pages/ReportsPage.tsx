@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Database, Download, FileBarChart, FileSpreadsheet, FileText, Table2, Handshake, Search } from 'lucide-react';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { formatNumber, getKpiSummary, questionPerformance, averageBySurveyType } from '../utils/analytics';
+import { formatNumber, getKpiSummary, questionPerformance, averageBySurveyType } from '../features/analytics/domain/analytics';
 import { formatCompositeScore } from '../data/questionWeights';
 import { getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
-import { ExportTable, exportTablesAsCSV, exportTablesAsExcel, exportTablesAsPDF } from '../utils/exporters';
+import { ExportTable, exportTablesAsCSV, exportTablesAsExcel, exportTablesAsPDF } from '../features/reports/services/exporters';
 import { CompanyReportBuilderPage } from './CompanyReportBuilderPage';
 import { QuestionReportBuilderPage } from './QuestionReportBuilderPage';
 import { SummaryReportBuilderPage } from './SummaryReportBuilderPage';

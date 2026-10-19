@@ -1,6 +1,6 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-10-16
+Last verified: 2026-10-19
 
 This document preserves durable engineering context for maintainers and coding agents. It is a map, not a substitute for reading the relevant code. Verify details before making consequential changes.
 
@@ -17,6 +17,18 @@ Canonical product documentation:
 - `docs/Admin_Manual.docx` and `docs/Employee_Manual.docx` — role-specific user manuals.
 
 ## Verified system map
+
+### Feature directory organization (2026-10-19)
+
+Verified: 52 existing files were relocated into their owning feature modules, including analytics panels, evaluation/scoring helpers, Feedback Hub components and types, notification state, report exporters, presentation generation, archive transfer, and partner/compliance helpers. Imports, the import CLI dependency, package test paths, and source-file test references use the new locations. Executable code, JSX, styles, storage keys, and database contracts are preserved. Shared pages, controls, hooks, authentication, and application persistence retain their existing ownership. See [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) for the current directory and module map. This is a file-organization pass; splitting large mixed-responsibility modules remains separate work.
+
+Verification on 2026-10-19: all 241 tests passed before and after the moves; TypeScript checks and the production build passed. A comparison of 265 source files confirmed equivalent executable syntax and JSX after normalizing relocated references, and compiled CSS matched the baseline byte for byte. Browser comparison was unavailable because the browser automation tool failed to initialize.
+
+### Reference material organization (2026-10-19)
+
+The root `reference-materials/` folder now contains seven legacy utilities in `scripts/`, seven extracted text/JSON files in `extracted/`, and the four reviewed CSVs in `source-data/`. Existing material was moved without regenerating the data. The normalized import planner and active-company seed test use the new CSV directory; original source filenames, reviewed hashes, and import identities are retained. The importer also accepts a direct CSV directory through its existing project-root parameter. Legacy utilities are still run from the repository root, with output/question paths pointing into `reference-materials/extracted/`. See [the reference README](../../reference-materials/README.md) for utility side effects and current paths. No import, source patching, or API extraction is performed by the folder moves.
+
+Verification: all 243 tests, TypeScript checks, and the production build passed after grouping the reference material. Tests include equivalent import plans for repository/direct CSV directories and patcher execution against synthetic files in a disposable workspace. All seven legacy utilities passed syntax checks; every moved data file retained its exact bytes.
 
 ### Runtime
 
@@ -63,7 +75,7 @@ Verified on 2026-09-21:
 - The TypeScript source under `src/` is roughly 65,000 lines across about 100 files.
 - Major concentration points include `src/hooks/useSurveyData.ts`, `src/App.tsx`, several page components above 1,000 lines, and a very large generated/static partner seed file.
 - `.vite/` cache files are tracked despite being generated artifacts.
-- Root-level extraction scripts, generated text, screenshots, forms, and data exports make source ownership and release contents less clear.
+- Historical extraction scripts, generated text/JSON, reviewed CSV sources, original screenshots, and the project charter are grouped under `reference-materials/`. Screenshot readers use `reference-materials/source-data/screenshots/`; the existing corrupted charter is preserved at `reference-materials/source-data/EFAS_Project_Charter.docx`.
 - The working tree contained pre-existing uncommitted application and configuration changes when these agent rules were added. Every task must refresh `git status` and preserve unrelated work.
 
 ## Architectural pressure points
@@ -149,7 +161,7 @@ Decision: Use `src/features/feedback-hub/reporting/` as the typed source for sur
 
 Consequences: Preview, print, queue, revision, and bulk generation share one report-data contract. The Word files remain visual references only; generated PDFs use current application data. Any future template or scoring change should update this module and its focused tests.
 
-Evidence: `src/features/feedback-hub/reporting/`, `src/utils/companyReportExport.ts`, `src/features/feedback-hub/reporting/companyReportData.test.ts`
+Evidence: `src/features/feedback-hub/reporting/`, `src/features/reports/services/companyReportExport.ts`, `src/features/feedback-hub/reporting/companyReportData.test.ts`
 
 ### 2026-09-15 - Additive normalized CSV import boundary
 
@@ -185,7 +197,7 @@ Decision: Keep normalized import tables immutable and seed a per-entity `applica
 
 Consequences: The main shared business modules, Feedback Hub records, and document-notification rules now persist across devices in staging. Device drafts/preferences and lightweight audit/export logs remain local. A confirmed user must exist before authenticated writes can be tested, and an approved profile must be promoted to Admin before shared registry/configuration edits can succeed.
 
-Evidence: `src/services/applicationRepository.ts`, `src/hooks/useSurveyData.ts`, `src/App.tsx`, `src/utils/feedbackHubStore.ts`, `src/utils/documentNotificationSettings.ts`, `supabase/migrations/202609160002_application_persistence.sql`, `supabase/migrations/202609160003_secondary_shared_modules.sql`, `supabase/verification/application_persistence_checks.sql`
+Evidence: `src/services/applicationRepository.ts`, `src/hooks/useSurveyData.ts`, `src/App.tsx`, `src/features/feedback-hub/services/feedbackHubStore.ts`, `src/features/notifications/services/documentNotificationSettings.ts`, `supabase/migrations/202609160002_application_persistence.sql`, `supabase/migrations/202609160003_secondary_shared_modules.sql`, `supabase/verification/application_persistence_checks.sql`
 
 ### 2026-09-17 - Canonical Document Tracker labels at the application boundary
 
@@ -209,7 +221,7 @@ Decision: Persist a bounded, timestamped set of read notification IDs per authen
 
 Consequences: Read state survives same-browser sessions and synchronizes across authenticated staging devices. Notification content remains derived from response and document records; no notifications are duplicated into the state record. The linked migration history confirmed `202609170003` locally and remotely after the push.
 
-Evidence: `src/utils/notificationReadState.ts`, `src/services/applicationRepository.ts`, `src/hooks/useSurveyData.ts`, `supabase/migrations/202609170003_notification_read_state.sql`
+Evidence: `src/features/notifications/domain/notificationReadState.ts`, `src/services/applicationRepository.ts`, `src/hooks/useSurveyData.ts`, `supabase/migrations/202609170003_notification_read_state.sql`
 
 ### 2026-09-18 - Inactivity-based session logout
 
@@ -233,7 +245,7 @@ Decision: Remove the demo authentication and Database Simulator paths, generated
 
 Consequences: A new browser no longer invents companies, accounts, evaluations, contacts, dates, or delivery results. Without configured authentication the app remains at the login screen. Clearing the local cache rehydrates shared records after the next authenticated load; CSV import/audit tables and staging application records are unchanged.
 
-Evidence: `src/App.tsx`, `src/pages/LoginPage.tsx`, `src/hooks/useSurveyData.ts`, `src/utils/feedbackHubStore.ts`, `src/pages/PartnersFeedbackHubPage.tsx`, `.env.example`
+Evidence: `src/App.tsx`, `src/pages/LoginPage.tsx`, `src/hooks/useSurveyData.ts`, `src/features/feedback-hub/services/feedbackHubStore.ts`, `src/pages/PartnersFeedbackHubPage.tsx`, `.env.example`
 
 ### 2026-09-21 - Complete shared-state cutover and Realtime invalidation
 
@@ -269,7 +281,7 @@ Decision: Use `TableFilterBar` and the pure helpers in `tableFilters.ts` for ope
 
 Consequences: Table controls now share responsive styling, reset behavior, local-date range semantics, and result counts without inventing expiration filters for tables that do not contain document data.
 
-Evidence: `src/components/TableFilterBar.tsx`, `src/utils/tableFilters.ts`, operational table consumers under `src/pages/` and `src/components/feedback-hub/`
+Evidence: `src/components/TableFilterBar.tsx`, `src/utils/tableFilters.ts`, operational table consumers under `src/pages/` and `src/features/feedback-hub/components/`
 
 ### 2026-09-22 - Analytics ranking consistency boundary
 
@@ -285,15 +297,15 @@ Evidence: `src/features/analytics/domain/rankings.ts`, `src/features/analytics/d
 
 Correction (2026-10-06): Analytics' Company Leaderboard had drifted back to grouping submissions by display name and recalculating ranking scores in the page. It now uses canonical company aggregation, stable company identity grouping, and displays the selected ranking score. All-N/A companies remain outside scored Analytics ranks. Separate partner-type lists are normalized when the All categories view combines them. Evidence: `getAnalyticsCompanyRankings` in `src/features/analytics/domain/rankings.ts` and its consumer in `src/pages/AnalyticsPage.tsx`.
 
-Correction (2026-10-07, superseding the prior benchmark-5 note): Analytics volume-weighted scores use Bayesian confidence weighting. For each scored peer group, `C` is the unweighted mean of peer company averages and `m` is the median peer response count, with a minimum of 3; the score is `(R × v + C × m) / (v + m)`. Analytics current, archived, and performance rankings use the canonical `computeRankScore` path. Evidence: `src/utils/analytics.ts`, `src/utils/scoring.ts`, and `src/features/analytics/domain/rankings.ts`.
+Correction (2026-10-07, superseding the prior benchmark-5 note): Analytics volume-weighted scores use Bayesian confidence weighting. For each scored peer group, `C` is the unweighted mean of peer company averages and `m` is the median peer response count, with a minimum of 3; the score is `(R × v + C × m) / (v + m)`. Analytics current, archived, and performance rankings use the canonical `computeRankScore` path. Evidence: `src/features/analytics/domain/analytics.ts`, `src/features/evaluations/domain/scoring.ts`, and `src/features/analytics/domain/rankings.ts`.
 
-Correction (2026-10-09): Pure Average ranking has been removed. Analytics current-period, archived-period, performance, and standalone company leaderboard rankings now use volume-weighted scores only; raw composite averages remain available for score and reporting metrics. Evidence: `src/features/analytics/domain/rankings.ts`, `src/utils/scoring.ts`, `src/pages/AnalyticsPage.tsx`, and `src/components/CompanyLeaderboardPanel.tsx`.
+Correction (2026-10-09): Pure Average ranking has been removed. Analytics current-period, archived-period, performance, and standalone company leaderboard rankings now use volume-weighted scores only; raw composite averages remain available for score and reporting metrics. Evidence: `src/features/analytics/domain/rankings.ts`, `src/features/evaluations/domain/scoring.ts`, `src/pages/AnalyticsPage.tsx`, and `src/features/analytics/components/CompanyLeaderboardPanel.tsx`.
 
-Correction (2026-10-09): Reports now use `getAnalyticsCompanyRankings` for volume-weighted company ordering and score display, with the same official, globally filtered response slice supplied to Analytics. Company report summaries and PDF/DOCX exports label the adjusted value as Volume-Weighted Score; rubric-based `compositeScore` remains unchanged for score breakdowns. Evidence: `src/App.tsx`, `src/pages/ReportsPage.tsx`, report builders, `src/features/feedback-hub/reporting/companyReportData.ts`, and `src/utils/companyReportExport.ts`.
+Correction (2026-10-09): Reports now use `getAnalyticsCompanyRankings` for volume-weighted company ordering and score display, with the same official, globally filtered response slice supplied to Analytics. Company report summaries and PDF/DOCX exports label the adjusted value as Volume-Weighted Score; rubric-based `compositeScore` remains unchanged for score breakdowns. Evidence: `src/App.tsx`, `src/pages/ReportsPage.tsx`, report builders, `src/features/feedback-hub/reporting/companyReportData.ts`, and `src/features/reports/services/companyReportExport.ts`.
 
 Correction (2026-10-06): Survey Forms → Modify → Ended now remains Completed even when its deadline is in the future, saves the status, and archives the active response rows for each ended partner type under a dated archive series. The Analytics Company Leaderboard Archives tab lists each category-period; selecting one opens a modal with its canonical company ranking. The same response rows are visible in Archive Center and remain restorable there. On remote persistence failure, the modal stays open with a retry message; the category archive is idempotent for that dated series. No partner registry records or database schema are changed. Evidence: `getSurveyStatus`, `SurveyFormsPage`, `archiveResponsesForSurveyTypes`, and `ArchivedCompanyRankings`.
 
-Correction (2026-10-08): Count a unique submission only when at least one evaluation rating or designated remark has a real answer. Numeric zero counts; blank, N/A, none, dash, and nil markers do not. Metadata such as Period Covered never counts. Meaningful text in unscored answer fields qualifies; explanatory comment details on a scored N/A do not. Imported Subcontractor matrix remarks qualify even though the importer stores them on matrix rating rows. Blank/N/A-only submissions are excluded from totals and completion progress, while numeric score averages continue to use numeric ratings. Period response counts and report/dashboard evaluation counts use the same rule. Evidence: `hasAnsweredItem` and `submissionCount` in `src/utils/analytics.ts`, plus `src/utils/scoring.ts`, `src/utils/surveyCompletion.ts`, and their UI consumers.
+Correction (2026-10-08): Count a unique submission only when at least one evaluation rating or designated remark has a real answer. Numeric zero counts; blank, N/A, none, dash, and nil markers do not. Metadata such as Period Covered never counts. Meaningful text in unscored answer fields qualifies; explanatory comment details on a scored N/A do not. Imported Subcontractor matrix remarks qualify even though the importer stores them on matrix rating rows. Blank/N/A-only submissions are excluded from totals and completion progress, while numeric score averages continue to use numeric ratings. Period response counts and report/dashboard evaluation counts use the same rule. Evidence: `hasAnsweredItem` and `submissionCount` in `src/features/analytics/domain/analytics.ts`, plus `src/features/evaluations/domain/scoring.ts`, `src/features/evaluations/domain/surveyCompletion.ts`, and their UI consumers.
 
 ### 2026-09-22 - Analytics presentation hierarchy
 
@@ -383,7 +395,7 @@ Decision: Resolve the 11 clean-install advisories without forced upgrades, use o
 
 Consequences: Local `npm audit` is clean. The workflow performs clean install, TypeScript checks, tests, build, dependency audit, secret scan, and build-artifact upload, but branch protection and a hosted run require a later authorized push and repository-owner configuration.
 
-Evidence: `package.json`, `package-lock.json`, `src/utils/exportDependencies.test.ts`, `.nvmrc`, `.github/workflows/verify.yml`, `docs/engineering/DEPENDENCY_SECURITY.md`.
+Evidence: `package.json`, `package-lock.json`, `src/features/reports/services/exportDependencies.test.ts`, `.nvmrc`, `.github/workflows/verify.yml`, `docs/engineering/DEPENDENCY_SECURITY.md`.
 
 ### 2026-09-24 - Response provenance execution readiness
 
@@ -423,13 +435,13 @@ Decision: The Admin import page accepts one or more `.csv`, `.xlsx`, or `.xls` e
 
 Consequences: Combined source archive metadata uses `surveyType: Combined` under the existing record type and private bucket; no new database migration is required. The archive phase rolls back earlier files if a later source cannot be stored; a failed/partial multi-request response write is not a database transaction and can still require refresh/retry. Multiple new-partner matches across normal files reconcile to one partner. CSV files each represent one recognized form.
 
-Evidence: `src/pages/ImportEvaluationsPage.tsx`, `src/utils/rawEvaluationImport.ts`, `src/hooks/useSurveyData.ts`, `src/features/evaluation-imports/domain/importArchive.ts`.
+Evidence: `src/pages/ImportEvaluationsPage.tsx`, `src/features/evaluation-imports/services/rawEvaluationImport.ts`, `src/hooks/useSurveyData.ts`, `src/features/evaluation-imports/domain/importArchive.ts`.
 
 ### 2026-10-06 - Isolated evaluation test imports and removal
 
 The Admin import page offers Test import with a unique `test-workbook:<uuid>` batch per selected source file. Test mode accepts single-category CSV exports or Excel workbooks with one or more recognized Supplier, Subcontractor, and Courier forms, including several files per category. Extensionless files with recognized CSV/XLSX MIME types receive the matching extension before archiving. Missing form categories are skipped only when their headers do not match; malformed recognized forms fail the preview. Test `client_csv` responses enter Analytics using `TESTIMPORT-*` IDs, preserving existing source-ID rows. Unmatched companies created for the test carry `testImportBatchId`, remain archived, and are excluded from subsequent company matching. Stored Source Files separates Active Imports from Import History. Active imports have an archive action that preserves their stored file and response data. Permanent removal is available only in History: ordinary imports lose only the selected stored source file and archive record, while test imports also delete tagged responses and temporary partners. Test cleanup rejects identity mismatches and partners referenced by other evaluations. Realtime invalidation refreshes Analytics. Test deletion spans multiple Supabase requests and is not atomic; a failed step leaves the archive entry available for retry. The archive migration is applied in staging; the multi-file test-import journey has not yet been verified there.
 
-Evidence: `src/features/evaluation-imports/domain/testImport.ts`, `evaluationFilePreview.ts`, their workbook/CSV/cleanup tests, `src/utils/rawEvaluationImport.ts`, `src/features/evaluation-imports/services/evaluationImportArchiveService.ts`, and `src/pages/ImportEvaluationsPage.tsx`.
+Evidence: `src/features/evaluation-imports/domain/testImport.ts`, `evaluationFilePreview.ts`, their workbook/CSV/cleanup tests, `src/features/evaluation-imports/services/rawEvaluationImport.ts`, `src/features/evaluation-imports/services/evaluationImportArchiveService.ts`, and `src/pages/ImportEvaluationsPage.tsx`.
 
 Ordinary source removal is history-only and deletes just the selected Storage object and `evaluation_import_archive` record. It never deletes linked ordinary responses, so removing an archived duplicate cannot remove the active copy or its current response data. The isolated test-import permanent-removal action deletes its tagged responses and temporary partners, and is likewise available only after archival. The client rechecks the stored archive identity before deletion, and Supabase Admin policies enforce access at the database and Storage boundaries. Test cleanup spans multiple Supabase requests and can require a retry after partial failure. This lifecycle is implemented locally and has not been exercised in an authenticated staging session.
 
@@ -590,7 +602,7 @@ Evidence: `src/App.tsx`, `src/features/evaluations/components/EvaluationWorkspac
 
 Decision: For a survey with a valid deadline, status remains Running or Paused through the deadline day and becomes Completed afterward; Archived always stays Archived. A future deadline supersedes a stale Completed value. Surveys without a valid deadline retain their saved manual status. The Forms page refreshes at the deadline boundary, and changing a deadline through Modify Settings reconciles the saved status.
 
-Evidence: src/utils/surveyStatus.ts, src/pages/SurveyFormsPage.tsx, src/utils/surveyCompletion.ts, src/utils/employeeNotifications.ts, src/utils/surveyStatus.test.ts.
+Evidence: src/features/evaluations/domain/surveyStatus.ts, src/pages/SurveyFormsPage.tsx, src/features/evaluations/domain/surveyCompletion.ts, src/features/notifications/domain/employeeNotifications.ts, src/features/evaluations/domain/surveyStatus.test.ts.
 
 
 ### 2026-10-02 - Survey response review and export
@@ -615,19 +627,19 @@ Evidence: `src/features/evaluation-imports/domain/importArchive.ts`, `services/e
 
 Decision: Open dialogs registered through useModalEscape share a reference-counted document scroll lock. The lock fixes the body at its current scroll position, compensates for scrollbar width, and restores the original inline styles and position when the last dialog closes. Popovers can opt out; the employee notification dropdown does so. Modal content remains independently scrollable with overscroll containment in the Active Companies, Settings, and Modify Settings views.
 
-Evidence: src/hooks/useModalScrollLock.ts, src/hooks/useModalEscape.ts, src/components/EmployeeNotificationBell.tsx, src/features/active-companies/components/ActiveCompaniesModal.tsx, src/App.tsx, src/pages/SurveyFormsPage.tsx, src/hooks/useModalScrollLock.test.ts.
+Evidence: src/hooks/useModalScrollLock.ts, src/hooks/useModalEscape.ts, src/features/notifications/components/EmployeeNotificationBell.tsx, src/features/active-companies/components/ActiveCompaniesModal.tsx, src/App.tsx, src/pages/SurveyFormsPage.tsx, src/hooks/useModalScrollLock.test.ts.
 
 ### 2026-10-09 - Evaluation company selection presets
 
 Decision: The Admin company picker offers active companies only. “Within the Top 20” is available for Courier, Supplier, and Subcontractor surveys. It follows the selected category's current official, volume-weighted Analytics leaderboard, then fills remaining spots with active unscored companies (alphabetically) until 20 companies are selected or the active registry is exhausted. “Active Companies” selects the full active list. The standalone Supplier Ranking module and curated `evaluationRank` fallback were removed. Surveys without a saved company selection include all active companies of their survey type. Explicit selections gate employee evaluation through `getSurveyEvaluationCompanies`; the leaderboard preset is saved as an ID snapshot so later score changes do not silently shift an active survey's company list.
 
-Evidence: `src/features/evaluations/domain/leaderboardSelection.ts`, `src/pages/SurveyFormsPage.tsx`, `src/utils/analytics.ts`, `src/pages/SurveyFillerPage.tsx`.
+Evidence: `src/features/evaluations/domain/leaderboardSelection.ts`, `src/pages/SurveyFormsPage.tsx`, `src/features/analytics/domain/analytics.ts`, `src/pages/SurveyFillerPage.tsx`.
 
 ### 2026-10-12 - Document expiry notification accuracy
 
 Decision: Expiry status uses local calendar dates and the shared compliance calculator. Company summaries inspect each branch independently and retain exact affected document details. Missing or invalid dates for expiry-bearing document types are Missing; AFS continues to use its fiscal-year `For Update` rule and is reported separately from a date-expired document. The admin header bell and Notification Logs include document, branch, due date, and configured early-milestone details. The status calculation refreshes every minute while the app is open.
 
-Evidence: `src/utils/compliance.ts`, `src/hooks/useSurveyData.ts`, `src/components/NotificationBell.tsx`, and `src/pages/NotificationLogsPage.tsx`.
+Evidence: `src/features/document-tracker/domain/compliance.ts`, `src/hooks/useSurveyData.ts`, `src/features/notifications/components/NotificationBell.tsx`, and `src/pages/NotificationLogsPage.tsx`.
 
 ### 2026-10-12 - Backdrop dismissal shares the modal Escape callback
 

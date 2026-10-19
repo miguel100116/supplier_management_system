@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, ChevronDown, ChevronUp, ClipboardList, FilePlus, Search } from 'lucide-react';
 import { SurveyResponse } from '../types/survey';
 import { isScoredQuestion } from '../data/questionWeights';
-import { submissionCount } from '../utils/analytics';
+import { submissionCount } from '../features/analytics/domain/analytics';
 import { Pagination } from '../components/Pagination';
 
 interface MySubmissionsPageProps {

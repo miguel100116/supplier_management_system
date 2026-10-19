@@ -7,8 +7,8 @@ import {
   ScoreBand,
 } from '../../../data/questionWeights';
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
-import { questionPerformance } from '../../../utils/analytics';
-import { CompanyComposite, computeCompanyComposite, getLeaderboard } from '../../../utils/scoring';
+import { questionPerformance } from '../../analytics/domain/analytics';
+import { CompanyComposite, computeCompanyComposite, getLeaderboard } from '../../evaluations/domain/scoring';
 import { getReportTemplateConfig, ReportTemplateConfig } from './reportTemplateConfig';
 
 export interface CompanyReportGraphSelection {

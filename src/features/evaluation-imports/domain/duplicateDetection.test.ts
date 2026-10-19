@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { RawEvalPreview } from '../../../utils/rawEvaluationImport';
+import type { RawEvalPreview } from '../services/rawEvaluationImport';
 import type { EvaluationImportArchive } from './importArchive';
 import { evaluationPreviewFingerprint, findEvaluationImportDuplicates } from './duplicateDetection';
 

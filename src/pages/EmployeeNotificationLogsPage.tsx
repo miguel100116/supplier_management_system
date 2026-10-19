@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Building2, CalendarDays, Check, ChevronDown, ClipboardList } from 'lucide-react';
 import { CustomForm, PartnerCompany, SurveyResponse } from '../types/survey';
-import { getEmployeePendingSurveys } from '../utils/employeeNotifications';
+import { getEmployeePendingSurveys } from '../features/notifications/domain/employeeNotifications';
 import {
   getReadIds,
   getDeletedIds,
@@ -9,7 +9,7 @@ import {
   markNotificationUnread,
   markNotificationsRead,
   subscribeNotificationState,
-} from '../utils/employeeNotificationState';
+} from '../features/notifications/services/employeeNotificationState';
 import { StateMessage } from '../components/StateMessage';
 
 interface EmployeeNotificationLogsPageProps {

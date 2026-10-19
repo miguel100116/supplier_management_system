@@ -15,8 +15,8 @@ import {
   UserCog,
   Users,
 } from 'lucide-react';
-import { getAdminActivity } from '../utils/adminActivityLog';
-import { getExportHistory } from '../utils/exportHistory';
+import { getAdminActivity } from '../features/account-management/services/adminActivityLog';
+import { getExportHistory } from '../features/reports/services/exportHistory';
 
 interface SettingsPageProps {
   email: string;

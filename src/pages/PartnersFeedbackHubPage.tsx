@@ -4,7 +4,7 @@ import {
   PartnerContact,
   QueuedReportEmail,
   FeedbackHubSettings,
-} from '../types/feedbackHub';
+} from '../features/feedback-hub/types';
 import {
   getPartnerContacts,
   savePartnerContacts,
@@ -12,16 +12,16 @@ import {
   saveSentReports,
   getFeedbackHubSettings,
   saveFeedbackHubSettings,
-} from '../utils/feedbackHubStore';
+} from '../features/feedback-hub/services/feedbackHubStore';
 
-import { CurrentFormsTab } from '../components/feedback-hub/CurrentFormsTab';
+import { CurrentFormsTab } from '../features/feedback-hub/components/CurrentFormsTab';
 import { PageDescription } from '../components/PageDescription';
-import { PastResultsTab } from '../components/feedback-hub/PastResultsTab';
-import { SentReportsTab } from '../components/feedback-hub/SentReportsTab';
-import { SendToPartnerWizard } from '../components/feedback-hub/SendToPartnerWizard';
-import { BulkHiddenChartCapturer, BulkReportCaptureItem } from '../components/feedback-hub/BulkHiddenChartCapturer';
+import { PastResultsTab } from '../features/feedback-hub/components/PastResultsTab';
+import { SentReportsTab } from '../features/feedback-hub/components/SentReportsTab';
+import { SendToPartnerWizard } from '../features/feedback-hub/components/SendToPartnerWizard';
+import { BulkHiddenChartCapturer, BulkReportCaptureItem } from '../features/feedback-hub/components/BulkHiddenChartCapturer';
 import { isMsalConfigured } from '../services/msalAuth';
-import { getSurveyCompletionSummary } from '../utils/surveyCompletion';
+import { getSurveyCompletionSummary } from '../features/evaluations/domain/surveyCompletion';
 import { SurveyAccount } from '../hooks/useSurveyData';
 
 import { FileText, Archive, Send, Clock, ShieldAlert, Sparkles, SendToBack } from 'lucide-react';

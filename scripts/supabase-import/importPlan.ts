@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import Papa from 'papaparse';
-import { FORM_SPECS, type ColumnDef } from '../../src/utils/rawEvaluationImport';
+import { FORM_SPECS, type ColumnDef } from '../../src/features/evaluation-imports/services/rawEvaluationImport';
 import { getCanonicalQuestionId, questionWeights } from '../../src/data/questionWeights';
 import type { SurveyType } from '../../src/types/survey';
 
@@ -374,6 +374,8 @@ function closestCompanyNames(rawName: string, companies: Record<string, unknown>
 }
 
 export function buildImportPlan(projectRoot: string, aliases: CompanyAliasInput[] = []): ImportPlan {
+  const repositorySources = resolve(projectRoot, 'reference-materials', 'source-data');
+  const sourceRoot = existsSync(repositorySources) ? repositorySources : projectRoot;
   const issues: ImportIssue[] = [];
   const sourceFiles: Record<string, unknown>[] = [];
   const companiesByKey = new Map<string, Record<string, unknown>>();
@@ -384,7 +386,7 @@ export function buildImportPlan(projectRoot: string, aliases: CompanyAliasInput[
   let masterExactDuplicatesSkipped = 0;
   let masterBlankBpCodes = 0;
 
-  const masterPath = resolve(projectRoot, FILES.master.fileName);
+  const masterPath = resolve(sourceRoot, FILES.master.fileName);
   const masterContents = readFileSync(masterPath);
   const canonicalMasterContents = canonicalCsvContents(masterContents);
   if (sha256(canonicalMasterContents) !== FILES.master.fileSha256) {
@@ -560,7 +562,7 @@ export function buildImportPlan(projectRoot: string, aliases: CompanyAliasInput[
 
   for (const surveyType of ['Supplier', 'Courier', 'Subcontractor'] as const) {
     const file = FILES[surveyType];
-    const filePath = resolve(projectRoot, file.fileName);
+    const filePath = resolve(sourceRoot, file.fileName);
     const contents = readFileSync(filePath);
     const canonicalContents = canonicalCsvContents(contents);
     if (sha256(canonicalContents) !== file.fileSha256) {

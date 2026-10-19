@@ -1,11 +1,11 @@
 import type { PageModuleKey } from '../utils/rbac';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ComplianceDocument, PartnerCompany, SurveyResponse } from '../types/survey';
-import type { NotificationReadState } from '../utils/notificationReadState';
+import type { NotificationReadState } from '../features/notifications/domain/notificationReadState';
 import {
   createNotificationReadState,
   parseNotificationReadState,
-} from '../utils/notificationReadState';
+} from '../features/notifications/domain/notificationReadState';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 import { parsePersistedProfile, type PersistedProfile } from '../features/account-management/domain/accountProfile';

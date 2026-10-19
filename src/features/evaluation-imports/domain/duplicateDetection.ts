@@ -1,4 +1,4 @@
-import type { RawEvalPreview } from '../../../utils/rawEvaluationImport';
+import type { RawEvalPreview } from '../services/rawEvaluationImport';
 import type { EvaluationImportArchive } from './importArchive';
 
 export type EvaluationImportDuplicateReason = 'matching-filename' | 'identical-content' | 'both';

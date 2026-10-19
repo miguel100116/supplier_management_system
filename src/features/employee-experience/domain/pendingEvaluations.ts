@@ -1,6 +1,6 @@
 import type { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
-import { getSurveyEvaluationCompanies } from '../../../utils/analytics';
-import { getSurveyStatus } from '../../../utils/surveyStatus';
+import { getSurveyEvaluationCompanies } from '../../analytics/domain/analytics';
+import { getSurveyStatus } from '../../evaluations/domain/surveyStatus';
 import { parseDDMMYYYY } from '../../../utils/time';
 
 export type EmployeeEvaluationFilter = 'All evaluations' | SurveyType;

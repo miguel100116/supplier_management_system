@@ -33,10 +33,10 @@ import {
 } from 'recharts';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { surveyTypeDisplayLabel, formatCompositeScore, getBand, ratingBands } from '../data/questionWeights';
-import { formatNumber, getScoreAxisDomain, questionPerformance } from '../utils/analytics';
-import { computeCompanyComposite, getCompanyTrend, getLeaderboard, getSectionPeerAverages } from '../utils/scoring';
-import { captureChartImage, exportCompanyReportAsDocx, exportCompanyReportAsPDF } from '../utils/companyReportExport';
-import { radarPointLabel } from '../utils/radarChartLabels';
+import { formatNumber, getScoreAxisDomain, questionPerformance } from '../features/analytics/domain/analytics';
+import { computeCompanyComposite, getCompanyTrend, getLeaderboard, getSectionPeerAverages } from '../features/evaluations/domain/scoring';
+import { captureChartImage, exportCompanyReportAsDocx, exportCompanyReportAsPDF } from '../features/reports/services/companyReportExport';
+import { radarPointLabel } from '../features/analytics/components/radarChartLabels';
 import {
   createCompanyReportData,
   getCompanyReportCommentId,

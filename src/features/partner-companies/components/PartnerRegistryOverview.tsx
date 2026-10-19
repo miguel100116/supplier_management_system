@@ -1,6 +1,6 @@
 import React from 'react';
 import { Building, Check, ChevronDown, ChevronRight, Plus } from 'lucide-react';
-import type { CategoryRankSummary } from '../../../utils/categorySummary';
+import type { CategoryRankSummary } from '../domain/categorySummary';
 
 type StatusTab = 'Active' | 'Expired' | 'Incomplete' | 'Archived';
 

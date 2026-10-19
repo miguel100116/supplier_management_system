@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Pagination } from '../components/Pagination';
 import type { SurveyType } from '../types/survey';
-import type { CompanyDecision, RawEvalImportSummary, RawEvalPreview } from '../utils/rawEvaluationImport';
+import type { CompanyDecision, RawEvalImportSummary, RawEvalPreview } from '../features/evaluation-imports/services/rawEvaluationImport';
 import { archiveEvaluationBatch, validateEvaluationBatchPreviews } from '../features/evaluation-imports/domain/evaluationBatch';
 import { detectEvaluationPreviews, normalizeEvaluationFile } from '../features/evaluation-imports/domain/evaluationFilePreview';
 import { useEvaluationImportArchives } from '../features/evaluation-imports/hooks/useEvaluationImportArchives';

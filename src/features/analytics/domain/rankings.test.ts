@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getBand } from '../../../data/questionWeights';
 import { SurveyResponse } from '../../../types/survey';
-import { getLeaderboard } from '../../../utils/scoring';
+import { getLeaderboard } from '../../evaluations/domain/scoring';
 import { getAnalyticsCompanyRankings, getCompanyPerformanceRanking, paginateAnalyticsItems, paginateCompanyRankings, rankCompanySummaries } from './rankings';
 
 function courierResponse(company: string, responseId: string, rating: number): SurveyResponse {

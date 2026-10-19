@@ -1,12 +1,12 @@
 import type { ApplicationRecordType } from './applicationRepository';
-import { hydrateAdminActivityFromSupabase } from '../utils/adminActivityLog';
-import { hydrateComplianceHistoryFromSupabase } from '../utils/complianceHistory';
-import { hydrateDocumentModificationsFromSupabase } from '../utils/documentModificationLog';
-import { hydrateNotificationSettingsFromSupabase } from '../utils/documentNotificationSettings';
-import { hydrateEmployeeNotificationStateFromSupabase } from '../utils/employeeNotificationState';
-import { hydrateExportHistoryFromSupabase } from '../utils/exportHistory';
-import { hydrateFeedbackHubFromSupabase } from '../utils/feedbackHubStore';
-import { hydrateReminderSettingsFromSupabase } from '../utils/reminderSettings';
+import { hydrateAdminActivityFromSupabase } from '../features/account-management/services/adminActivityLog';
+import { hydrateComplianceHistoryFromSupabase } from '../features/document-tracker/services/complianceHistory';
+import { hydrateDocumentModificationsFromSupabase } from '../features/document-tracker/services/documentModificationLog';
+import { hydrateNotificationSettingsFromSupabase } from '../features/notifications/services/documentNotificationSettings';
+import { hydrateEmployeeNotificationStateFromSupabase } from '../features/notifications/services/employeeNotificationState';
+import { hydrateExportHistoryFromSupabase } from '../features/reports/services/exportHistory';
+import { hydrateFeedbackHubFromSupabase } from '../features/feedback-hub/services/feedbackHubStore';
+import { hydrateReminderSettingsFromSupabase } from '../features/notifications/services/reminderSettings';
 
 export interface SharedStoreHydrationAccess {
   userEmail: string;
