@@ -55,7 +55,7 @@ export function CurrentFormsTab({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search active survey forms..."
+            placeholder="Search forms by form title or survey type..."
             className="field text-xs !mt-0"
             style={{ paddingLeft: '2.75rem' }}
           />
