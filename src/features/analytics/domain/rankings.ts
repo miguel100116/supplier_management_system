@@ -1,4 +1,4 @@
-import { formatCompositeScore } from '../../../data/questionWeights';
+import { formatCompositeScore, getBand, ratingBands, type ScoreBand } from '../../../data/questionWeights';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
 import { computeRankScore } from '../../../utils/analytics';
 import { computeCompanyComposite, getLeaderboard } from '../../../utils/scoring';
@@ -15,6 +15,30 @@ export type RankedCompany<T extends CompanyRankingCandidate> = T & { rankScore: 
 export interface AnalyticsCompanySummary extends CompanyRankingCandidate {
   average: number;
   rankScore: number;
+}
+
+const subcontractorBands: ScoreBand[] = [
+  { label: 'Top Performer', min: 1.5, hex: '#22c55e' },
+  { label: 'Good Performer', min: 1.0, hex: '#fb923c' },
+  { label: 'Marginal Performer', min: 0.5, hex: '#3b82f6' },
+  { label: 'Poor Performer', min: 0, hex: '#dc2626' },
+];
+
+export const analyticsBands: Record<SurveyType, ScoreBand[]> = {
+  ...ratingBands,
+  Subcontractor: subcontractorBands,
+};
+
+export function getAnalyticsScore(surveyType: SurveyType, percentScore: number): number {
+  return surveyType === 'Subcontractor'
+    ? Math.round(percentScore / 5 + Number.EPSILON) / 10
+    : formatCompositeScore(surveyType, percentScore).value;
+}
+
+export function getAnalyticsBand(surveyType: SurveyType, percentScore: number): ScoreBand {
+  if (surveyType !== 'Subcontractor') return getBand(surveyType, percentScore);
+  const score = getAnalyticsScore(surveyType, percentScore);
+  return subcontractorBands.find((band) => score >= band.min) ?? subcontractorBands[3];
 }
 
 /**
@@ -60,13 +84,14 @@ export interface PaginatedAnalyticsItems<T> {
 export function paginateAnalyticsItems<T>(
   items: T[],
   requestedPage: number,
+  pageSize = ANALYTICS_PAGE_SIZE,
 ): PaginatedAnalyticsItems<T> {
-  const totalPages = Math.max(1, Math.ceil(items.length / ANALYTICS_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const currentPage = Math.min(Math.max(0, requestedPage), totalPages - 1);
-  const startIndex = currentPage * ANALYTICS_PAGE_SIZE;
+  const startIndex = currentPage * pageSize;
 
   return {
-    items: items.slice(startIndex, startIndex + ANALYTICS_PAGE_SIZE),
+    items: items.slice(startIndex, startIndex + pageSize),
     currentPage,
     totalPages,
     startIndex,
@@ -76,8 +101,9 @@ export function paginateAnalyticsItems<T>(
 export function paginateCompanyRankings<T>(
   companies: T[],
   requestedPage: number,
+  pageSize = ANALYTICS_PAGE_SIZE,
 ): PaginatedAnalyticsItems<T> {
-  return paginateAnalyticsItems(companies, requestedPage);
+  return paginateAnalyticsItems(companies, requestedPage, pageSize);
 }
 
 /**

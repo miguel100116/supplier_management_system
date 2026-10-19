@@ -1138,7 +1138,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                             }}
                           />
                           {validationErrors[q.questionId] && (
-                            <p className="mt-2 flex items-center gap-1 text-xs font-semibold text-rose-500" role="alert">
+                            <p className={`${employeeExperience ? 'employee-rating-validation-message' : 'mt-2'} flex items-center gap-1 text-xs font-semibold text-rose-500`} role="alert">
                               <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500" />
                               {validationErrors[q.questionId]}
                             </p>

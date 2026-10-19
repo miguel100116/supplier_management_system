@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalEscape } from '../hooks/useModalEscape';
+import { Pagination } from '../components/Pagination';
 import {
   Plus,
   Trash,
@@ -14,14 +15,12 @@ import {
   X,
   ChevronUp,
   ChevronDown,
-  ChevronLeft,
   Clock,
   Settings,
   Archive,
   RefreshCw,
   FileText,
   Check,
-  ChevronRight,
   Upload,
   Loader2,
   Globe,
@@ -194,6 +193,7 @@ export function PartnerCompaniesPage({
   // Tabs: Active, Expired, Archived
   const [statusTab, setStatusTab] = useState<'Active' | 'Expired' | 'Incomplete' | 'Archived'>('Active');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(COMPANIES_PAGE_SIZE);
   // Affiliation filter
   const [activeTab, setActiveTab] = useState<PartnerCompanyType | 'All'>('All');
   // Local/Foreign sub-filter, only meaningful while activeTab === 'Supplier'
@@ -663,13 +663,13 @@ export function PartnerCompaniesPage({
     setCurrentPage(1);
   }, [statusTab, activeTab, originFilter, debouncedSearchQuery, sortConfig, registeredFrom, registeredTo, documentFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / COMPANIES_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / pageSize));
   // Clamp defensively (e.g. the list shrinks from a delete while on a later
   // page) so pagination stays correct without waiting for the effect above.
   const safePage = Math.min(currentPage, totalPages);
   const paginatedCompanies = useMemo(
-    () => filteredCompanies.slice((safePage - 1) * COMPANIES_PAGE_SIZE, safePage * COMPANIES_PAGE_SIZE),
-    [filteredCompanies, safePage]
+    () => filteredCompanies.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredCompanies, safePage, pageSize]
   );
 
   // Click handler to open company details modal
@@ -1099,37 +1099,9 @@ export function PartnerCompaniesPage({
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="panel px-5 py-3 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            Showing {(safePage - 1) * COMPANIES_PAGE_SIZE + 1}
-            &ndash;{Math.min(safePage * COMPANIES_PAGE_SIZE, filteredCompanies.length)} of {filteredCompanies.length}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCurrentPage(Math.max(1, safePage - 1))}
-              disabled={safePage <= 1}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer"
-            >
-              <ChevronLeft size={14} />
-              <span>Prev</span>
-            </button>
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-200 tabular-nums px-1">
-              Page {safePage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage(Math.min(totalPages, safePage + 1))}
-              disabled={safePage >= totalPages}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:pointer-events-none transition cursor-pointer"
-            >
-              <span>Next</span>
-              <ChevronRight size={14} />
-            </button>
-          </div>
-        </div>
-      )}
+      {filteredCompanies.length > 0 && <Pagination page={safePage} pageSize={pageSize} totalItems={filteredCompanies.length}
+        onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} ariaLabel="Partner companies pagination"
+        showPageControls={totalPages > 1 || pageSize !== COMPANIES_PAGE_SIZE} className="panel px-5" />}
 
       {/* PARTNER DETAILS & CONTRACT CONFIGURATION DRAWER/MODAL */}
       {selectedCompany && createPortal(
