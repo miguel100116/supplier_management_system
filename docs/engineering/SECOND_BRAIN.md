@@ -4,7 +4,7 @@ Last verified: 2026-10-16
 
 This document preserves durable engineering context for maintainers and coding agents. It is a map, not a substitute for reading the relevant code. Verify details before making consequential changes.
 
-Analytics Company Leaderboard displays Subcontractor scores to one decimal on the 0–2.0 scale and classifies the displayed value as Top Performer (1.5–2.0), Good Performer (1.0–1.4), Marginal Performer (0.5–0.9), or Poor Performer (≤0.4). Courier/Supplier retain their shared 0–100 bands. The selected category controls the Analytics legend and rating-scale text; All categories pairs category labels in the legend and shows the Courier/Supplier rating scale aligned to the right. Shared scoring bands and survey question rating controls remain unchanged. Evidence: `src/features/analytics/domain/rankings.ts` and `src/pages/AnalyticsPage.tsx`.
+Analytics Company Leaderboard displays Subcontractor scores to one decimal on the 0–2.0 scale and classifies the displayed value as Top Performer (1.5–2.0), Good Performer (1.0–1.4), Marginal Performer (0.5–0.9), or Poor Performer (≤0.4). Courier/Supplier retain their shared 0–100 bands. The selected category controls the Analytics legend and rating-scale text; All categories shows only the Courier/Supplier labels in the legend and their rating scale aligned to the right. Shared scoring bands and survey question rating controls remain unchanged. Evidence: `src/features/analytics/domain/rankings.ts` and `src/pages/AnalyticsPage.tsx`.
 
 ## Product intent
 

@@ -194,10 +194,10 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 sm:flex-nowrap">
                   <div role="group" aria-label="Company leaderboard color legend" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="text-xs font-semibold text-slate-500">Legend:</span>
-                    {ratingScale.map((band, index) => (
+                    {ratingScale.map((band) => (
                       <span key={band.label} className="inline-flex items-center gap-2 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
                         <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ backgroundColor: band.hex }} />
-                        {selectedType === 'All' ? `${band.label} / ${analyticsBands.Subcontractor[index].label}` : band.label}
+                        {band.label}
                       </span>
                     ))}
                   </div>
