@@ -166,8 +166,9 @@ export function surveyResponseRecordId(response: SurveyResponse): string {
   return `${response.responseId}:${response.questionId}`;
 }
 
-export async function loadApplicationRecords<T>(recordType: ApplicationRecordType): Promise<T[]> {
+export async function loadApplicationRecords<T>(recordType: ApplicationRecordType, options?: { ownRecords?: boolean }): Promise<T[]> {
   requireConfigured();
+  const ownerId = options?.ownRecords ? await currentUserId() : null;
   const values: T[] = [];
   let invalidCount = 0;
   const invalidReasons = new Map<string, number>();
@@ -196,12 +197,9 @@ export async function loadApplicationRecords<T>(recordType: ApplicationRecordTyp
     expectedCount: number,
   ): Promise<ApplicationRecordRow<T>[]> => {
     if (expectedCount <= 0) return [];
-    const { data, error } = await supabase
-      .from('application_records')
-      .select('record_id,payload,created_at')
-      .eq('record_type', recordType)
-      .order('record_id')
-      .range(from, to);
+    let query = supabase.from('application_records').select('record_id,payload,created_at').eq('record_type', recordType);
+    if (ownerId) query = query.eq('owner_id', ownerId);
+    const { data, error } = await query.order('record_id').range(from, to);
     if (error) throw new Error(`Unable to load ${recordType} records: ${error.message}`);
     const rows = (data ?? []) as unknown as ApplicationRecordRow<T>[];
     if (rows.length === 0) return [];
@@ -345,16 +343,16 @@ export async function upsertApplicationRecords<T>(
 export async function deleteApplicationRecords(
   recordType: ApplicationRecordType,
   recordIds: string[],
+  options?: { ownRecords?: boolean },
 ): Promise<void> {
   requireConfigured();
+  const ownerId = options?.ownRecords ? await currentUserId() : null;
   for (let index = 0; index < recordIds.length; index += WRITE_CHUNK_SIZE) {
     const ids = recordIds.slice(index, index + WRITE_CHUNK_SIZE);
     if (ids.length === 0) continue;
-    const { error } = await supabase
-      .from('application_records')
-      .delete()
-      .eq('record_type', recordType)
-      .in('record_id', ids);
+    let query = supabase.from('application_records').delete().eq('record_type', recordType).in('record_id', ids);
+    if (ownerId) query = query.eq('owner_id', ownerId);
+    const { error } = await query;
     if (error) {
       requestAuthoritativeRefresh(recordType);
       throw new Error(`Unable to delete ${recordType} records: ${error.message}`);

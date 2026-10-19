@@ -3,11 +3,14 @@ import { Plus, Trash, ArrowLeft, Save, AlertCircle, FileText, ChevronDown } from
 import { SurveyType, CustomForm } from '../types/survey';
 import { isValidDDMMYYYY } from '../utils/time';
 import { DEFAULT_CATEGORIES, OVERALL_CATEGORY } from '../data/questionCategories';
+import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog';
 
 interface CreateSurveyPageProps {
   onBack: () => void;
   onRequestCloseReady?: (requestClose: (() => void) | null) => void;
-  onSave: (survey: Omit<CustomForm, 'id' | 'createdAt'>) => void;
+  onRequestExitReady?: (guard: ((onAllowed: () => void, onCancelled?: () => void) => void) | null) => void;
+  onSave: (survey: Omit<CustomForm, 'id' | 'createdAt'>) => CustomForm | void | Promise<CustomForm | void>;
+  onSaved?: (savedForm: CustomForm | void) => void;
   surveyToEdit?: CustomForm;
   categoryLabels?: Record<SurveyType, string[]>;
 }
@@ -21,7 +24,7 @@ interface QuestionInput {
   validationRange?: { min: number; max: number; allowNa: boolean };
 }
 
-export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyToEdit, categoryLabels = DEFAULT_CATEGORIES }: CreateSurveyPageProps) {
+export function CreateSurveyPage({ onBack, onRequestCloseReady, onRequestExitReady, onSave, onSaved, surveyToEdit, categoryLabels = DEFAULT_CATEGORIES }: CreateSurveyPageProps) {
   const [title, setTitle] = useState(surveyToEdit ? surveyToEdit.title : '');
   const [surveyType, setSurveyType] = useState<SurveyType>(surveyToEdit ? surveyToEdit.surveyType : 'Courier');
   const [description, setDescription] = useState(surveyToEdit ? surveyToEdit.description : '');
@@ -42,16 +45,25 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
   );
   const [error, setError] = useState('');
   const initialFormSnapshot = useRef(JSON.stringify({ title, surveyType, description, maxRating, deadlineDate, questions }));
-  const handleBack = useCallback(() => {
+  const [pendingExit, setPendingExit] = useState<{ onAllowed: () => void; onCancelled?: () => void } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const saving = useRef(false);
+  const requestExit = useCallback((onAllowed: () => void, onCancelled?: () => void) => {
+    if (saving.current) { onCancelled?.(); return; }
     const currentSnapshot = JSON.stringify({ title, surveyType, description, maxRating, deadlineDate, questions });
-    if (currentSnapshot !== initialFormSnapshot.current && !window.confirm('Discard unsaved survey form changes?')) return;
-    onBack();
-  }, [deadlineDate, description, maxRating, onBack, questions, surveyType, title]);
+    if (currentSnapshot !== initialFormSnapshot.current) setPendingExit({ onAllowed, onCancelled });
+    else onAllowed();
+  }, [deadlineDate, description, maxRating, questions, surveyType, title]);
+  const handleBack = useCallback(() => requestExit(onBack), [onBack, requestExit]);
 
   useEffect(() => {
     onRequestCloseReady?.(handleBack);
     return () => onRequestCloseReady?.(null);
   }, [handleBack, onRequestCloseReady]);
+  useEffect(() => {
+    onRequestExitReady?.(requestExit);
+    return () => onRequestExitReady?.(null);
+  }, [requestExit, onRequestExitReady]);
 
   // The 5 categories currently defined for this survey type (Categories
   // Manager), plus the fixed "Overall" bucket for whole-company feedback -
@@ -85,25 +97,25 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
     setQuestions(next);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveForm = async () => {
+    if (saving.current) return false;
     setError('');
 
     if (!title.trim()) {
       setError('Please provide a survey title.');
-      return;
+      return false;
     }
 
     if (deadlineDate.trim() && !isValidDDMMYYYY(deadlineDate)) {
       setDeadlineError('Enter a valid deadline date in dd/mm/yyyy format (e.g. 05/03/2026).');
       setError('Please fix the deadline date before saving.');
-      return;
+      return false;
     }
     setDeadlineError('');
 
     if (questions.some((q) => !q.question.trim())) {
       setError('All questions must contain text. Please fill or remove empty questions.');
-      return;
+      return false;
     }
 
     const formattedQuestions = questions.map((q, idx) => ({
@@ -119,14 +131,28 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
       validationRange: q.validationRange || undefined,
     }));
 
-    onSave({
-      title: title.trim(),
-      surveyType,
-      description: description.trim() || `Custom survey for ${surveyType} stakeholders.`,
-      deadlineDate: deadlineDate.trim() || undefined,
-      maxRating,
-      questions: formattedQuestions as any,
-    });
+    saving.current = true;
+    setIsSaving(true);
+    try {
+      const savedForm = await onSave({
+        title: title.trim(),
+        surveyType,
+        description: description.trim() || `Custom survey for ${surveyType} stakeholders.`,
+        deadlineDate: deadlineDate.trim() || undefined,
+        maxRating,
+        questions: formattedQuestions as any,
+      });
+      initialFormSnapshot.current = JSON.stringify({ title, surveyType, description, maxRating, deadlineDate, questions });
+      return { savedForm };
+    } finally {
+      saving.current = false;
+      setIsSaving(false);
+    }
+  };
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    try { const result = await saveForm(); if (result) onSaved?.(result.savedForm); }
+    catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Unable to save changes. Please try again.'); }
   };
 
   return (
@@ -146,9 +172,10 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit}>
+        <fieldset disabled={isSaving} className="space-y-6 min-w-0">
         {error && (
-          <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose dark:bg-rose-950/30 dark:border-rose-900">
+          <div role="alert" className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose dark:bg-rose-950/30 dark:border-rose-900">
             <AlertCircle size={16} className="shrink-0" />
             <span>{error}</span>
           </div>
@@ -473,7 +500,22 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onSave, surveyTo
             <span>{surveyToEdit ? 'Save Changes' : 'Create and Publish Form'}</span>
           </button>
         </div>
+        </fieldset>
       </form>
+      {pendingExit && <UnsavedChangesDialog
+        description="You have unsaved form changes. Save them before leaving, discard them, or continue editing."
+        onContinue={() => { setPendingExit(null); pendingExit.onCancelled?.(); }}
+        onDiscard={() => {
+          initialFormSnapshot.current = JSON.stringify({ title, surveyType, description, maxRating, deadlineDate, questions });
+          setPendingExit(null);
+          pendingExit.onAllowed();
+        }}
+        onSave={async () => {
+          if (!await saveForm()) return false;
+          setPendingExit(null);
+          pendingExit.onAllowed();
+        }}
+      />}
     </div>
   );
 }

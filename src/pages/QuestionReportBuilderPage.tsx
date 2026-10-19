@@ -1,3 +1,5 @@
+import { saveReportDownload } from '../features/reports/services/exportHistory';
+import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
@@ -22,6 +24,7 @@ interface QuestionReportBuilderPageProps {
   responses: SurveyResponse[];
   partnerCompanies: PartnerCompany[];
   canExport?: boolean;
+  initialSettings?: ReportParameters;
   onBack: () => void;
 }
 
@@ -41,19 +44,19 @@ const BRAND = [0, 99, 169] as const;
 const LOGO_URL = '/microgenesis_logo.png';
 const LOGO_ASPECT = 498 / 1921; // height / width, from the source asset
 
-export function QuestionReportBuilderPage({ responses, partnerCompanies, canExport = false, onBack }: QuestionReportBuilderPageProps) {
+export function QuestionReportBuilderPage({ responses, partnerCompanies, canExport = false, onBack, initialSettings = {} }: QuestionReportBuilderPageProps) {
   // Option States
-  const [selectedTypes, setSelectedTypes] = useState<Record<SurveyType, boolean>>({
+  const [selectedTypes, setSelectedTypes] = useState<Record<SurveyType, boolean>>(initialSettings.selectedTypes ?? ({
     Courier: true,
     Supplier: true,
     Subcontractor: true,
-  });
-  const [columnsVisibility, setColumnsVisibility] = useState({
+  }));
+  const [columnsVisibility, setColumnsVisibility] = useState(initialSettings.columnsVisibility ?? ({
     average: true,
     responses: true,
     highest: true,
     lowest: true,
-  });
+  }));
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -203,12 +206,14 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
   };
 
   const handleExport = async (format: 'pdf' | 'csv' | 'excel') => {
+    if (!canExport) return;
     setIsExporting(format);
     setOpenMenu(false);
     try {
-      const timestamp = new Date().toISOString().slice(0, 10);
+      const recipe = { kind: 'question' as const, parameters: { selectedTypes, columnsVisibility } };
+
       const reportTitle = 'Question Performance Report';
-      const filenameBase = 'question_performance_report';
+
 
       // Build data structure for table exports
       const tables: { title: string; columns: string[]; rows: (string | number)[][] }[] = [];
@@ -269,8 +274,8 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
           const csvBody = Papa.unparse({ fields: table.columns, data: table.rows });
           return `${table.title}\n${csvBody}`;
         });
-        const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8;' });
-        triggerDownload(blob, `${filenameBase}_${timestamp}.csv`);
+        const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8' });
+        await saveReportDownload(blob, reportTitle, 'csv', recipe);
       } else if (format === 'excel') {
         const workbook = XLSX.utils.book_new();
         tables.forEach((table) => {
@@ -279,7 +284,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
           const name = table.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31);
           XLSX.utils.book_append_sheet(workbook, sheet, name);
         });
-        XLSX.writeFile(workbook, `${filenameBase}_${timestamp}.xlsx`);
+        await saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), reportTitle, 'excel', recipe);
       } else if (format === 'pdf') {
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         const marginLeft = 48;
@@ -478,23 +483,13 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
           drawHeaderAndFooter(doc, i, pageCount);
         }
 
-        doc.save(`${filenameBase}_${timestamp}.pdf`);
+        await saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
       }
     } finally {
       setIsExporting(null);
     }
   };
 
-  const triggerDownload = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="space-y-5 animate-in fade-in duration-300">

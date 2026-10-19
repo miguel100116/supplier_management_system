@@ -94,6 +94,12 @@ export function Shell<T extends string>({
   const contentHeading = pageHeading || title;
   const showModuleContext = !hideModuleContext && moduleLabel !== contentHeading;
 
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = `${title} | Supplier Management System`;
+    return () => { document.title = previousTitle; };
+  }, [title]);
+
   // Auto-expand whichever group currently contains the active page, without
   // collapsing groups the user has already opened manually.
   useEffect(() => {

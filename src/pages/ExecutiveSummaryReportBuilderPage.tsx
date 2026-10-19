@@ -1,3 +1,5 @@
+import { saveReportDownload } from '../features/reports/services/exportHistory';
+import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -54,6 +56,7 @@ interface ExecutiveSummaryReportBuilderPageProps {
   rankingResponses?: SurveyResponse[];
   partnerCompanies: PartnerCompany[];
   canExport?: boolean;
+  initialSettings?: ReportParameters;
   onBack: () => void;
 }
 
@@ -85,29 +88,30 @@ export function ExecutiveSummaryReportBuilderPage({
   partnerCompanies,
   canExport = false,
   onBack,
+  initialSettings = {},
 }: ExecutiveSummaryReportBuilderPageProps) {
   // Option States
-  const [selectedTypes, setSelectedTypes] = useState<Record<SurveyType, boolean>>({
+  const [selectedTypes, setSelectedTypes] = useState<Record<SurveyType, boolean>>(initialSettings.selectedTypes ?? ({
     Courier: true,
     Supplier: true,
     Subcontractor: true,
-  });
+  }));
 
-  const [questionThreshold, setQuestionThreshold] = useState<number>(85); // filter questions below this score
-  const [showCoverPage, setShowCoverPage] = useState(true);
-  const [showKpis, setShowKpis] = useState(true);
-  const [showChart, setShowChart] = useState(true);
-  const [showSurveyTable, setShowSurveyTable] = useState(true);
-  const [showQuestionTable, setShowQuestionTable] = useState(true);
-  const [showCompanyRankings, setShowCompanyRankings] = useState(true);
-  const [showRecommendations, setShowRecommendations] = useState(true);
-  const [showCustomNotes, setShowCustomNotes] = useState(true);
-  const [showDetailedQuestionReport, setShowDetailedQuestionReport] = useState(true);
+  const [questionThreshold, setQuestionThreshold] = useState<number>(initialSettings.questionThreshold ?? 85); // filter questions below this score
+  const [showCoverPage, setShowCoverPage] = useState(initialSettings.showCoverPage ?? true);
+  const [showKpis, setShowKpis] = useState(initialSettings.showKpis ?? true);
+  const [showChart, setShowChart] = useState(initialSettings.showChart ?? true);
+  const [showSurveyTable, setShowSurveyTable] = useState(initialSettings.showSurveyTable ?? true);
+  const [showQuestionTable, setShowQuestionTable] = useState(initialSettings.showQuestionTable ?? true);
+  const [showCompanyRankings, setShowCompanyRankings] = useState(initialSettings.showCompanyRankings ?? true);
+  const [showRecommendations, setShowRecommendations] = useState(initialSettings.showRecommendations ?? true);
+  const [showCustomNotes, setShowCustomNotes] = useState(initialSettings.showCustomNotes ?? true);
+  const [showDetailedQuestionReport, setShowDetailedQuestionReport] = useState(initialSettings.showDetailedQuestionReport ?? true);
 
-  const [preparedBy, setPreparedBy] = useState('Executive Operations Team');
-  const [customNotesText, setCustomNotesText] = useState(
+  const [preparedBy, setPreparedBy] = useState(initialSettings.preparedBy ?? 'Executive Operations Team');
+  const [customNotesText, setCustomNotesText] = useState(initialSettings.customNotesText ?? (
     'Overall system-wide supplier performance continues to maintain a solid average rating. Courier lines lead with highest consistency, while Subcontractors present minor documentation bottlenecks that require operational alignment. Action items have been flagged for key performance outliers.'
-  );
+  ));
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | null>(null);
@@ -464,12 +468,14 @@ export function ExecutiveSummaryReportBuilderPage({
   };
 
   const handleExport = async (format: 'pdf' | 'csv' | 'excel') => {
+    if (!canExport) return;
     setIsExporting(format);
     setExportMenuOpen(false);
     try {
-      const timestamp = new Date().toISOString().slice(0, 10);
+      const recipe = { kind: 'executive' as const, parameters: { selectedTypes, questionThreshold, showCoverPage, showKpis, showChart, showSurveyTable, showQuestionTable, showCompanyRankings, showRecommendations, showCustomNotes, showDetailedQuestionReport, preparedBy, customNotesText } };
+
       const reportTitle = 'Executive Briefing & Performance Report';
-      const filenameBase = 'executive_briefing_report';
+
 
       const tables: { title: string; columns: string[]; rows: (string | number)[][] }[] = [];
 
@@ -561,8 +567,8 @@ export function ExecutiveSummaryReportBuilderPage({
           const csvBody = Papa.unparse({ fields: table.columns, data: table.rows });
           return `${table.title}\n${csvBody}`;
         });
-        const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8;' });
-        triggerDownload(blob, `${filenameBase}_${timestamp}.csv`);
+        const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8' });
+        await saveReportDownload(blob, reportTitle, 'csv', recipe);
       } else if (format === 'excel') {
         const workbook = XLSX.utils.book_new();
         tables.forEach((table) => {
@@ -571,7 +577,7 @@ export function ExecutiveSummaryReportBuilderPage({
           const name = table.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31);
           XLSX.utils.book_append_sheet(workbook, sheet, name);
         });
-        XLSX.writeFile(workbook, `${filenameBase}_${timestamp}.xlsx`);
+        await saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), reportTitle, 'excel', recipe);
       } else if (format === 'pdf') {
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         const marginLeft = 48;
@@ -1073,7 +1079,7 @@ export function ExecutiveSummaryReportBuilderPage({
           });
         }
 
-        doc.save(`${filenameBase}_${timestamp}.pdf`);
+        await saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
       }
     } catch (e) {
       console.error('Export failed:', e);
@@ -1082,13 +1088,6 @@ export function ExecutiveSummaryReportBuilderPage({
     }
   };
 
-  const triggerDownload = (blob: Blob, filename: string) => {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
 
   return (
     <div className="flex flex-col gap-5 xl:flex-row h-full min-h-[calc(100vh-140px)] animate-fade-in" id="executive-briefing-root">

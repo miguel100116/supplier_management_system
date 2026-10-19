@@ -1,3 +1,5 @@
+import { saveReportDownload } from '../features/reports/services/exportHistory';
+import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
@@ -42,6 +44,7 @@ interface SummaryReportBuilderPageProps {
   rankingResponses?: SurveyResponse[];
   partnerCompanies?: PartnerCompany[];
   canExport?: boolean;
+  initialSettings?: ReportParameters;
   onBack: () => void;
 }
 
@@ -56,22 +59,22 @@ const COLORS = {
   Subcontractor: '#14b8a6',
 };
 
-export function SummaryReportBuilderPage({ responses, rankingResponses = responses, partnerCompanies = [], canExport = false, onBack }: SummaryReportBuilderPageProps) {
+export function SummaryReportBuilderPage({ responses, rankingResponses = responses, partnerCompanies = [], canExport = false, onBack, initialSettings = {} }: SummaryReportBuilderPageProps) {
   // Option States
-  const [selectedTypes, setSelectedTypes] = useState<Record<SurveyType, boolean>>({
+  const [selectedTypes, setSelectedTypes] = useState<Record<SurveyType, boolean>>(initialSettings.selectedTypes ?? ({
     Courier: true,
     Supplier: true,
     Subcontractor: true,
-  });
+  }));
 
-  const [showKpis, setShowKpis] = useState(true);
-  const [showChart, setShowChart] = useState(true);
-  const [showTable, setShowTable] = useState(true);
-  const [showTopCompanies, setShowTopCompanies] = useState(true);
-  const [showBottomCompanies, setShowBottomCompanies] = useState(true);
-  const [showQuestions, setShowQuestions] = useState(true);
+  const [showKpis, setShowKpis] = useState(initialSettings.showKpis ?? true);
+  const [showChart, setShowChart] = useState(initialSettings.showChart ?? true);
+  const [showTable, setShowTable] = useState(initialSettings.showTable ?? true);
+  const [showTopCompanies, setShowTopCompanies] = useState(initialSettings.showTopCompanies ?? true);
+  const [showBottomCompanies, setShowBottomCompanies] = useState(initialSettings.showBottomCompanies ?? true);
+  const [showQuestions, setShowQuestions] = useState(initialSettings.showQuestions ?? true);
 
-  const [chartMetric, setChartMetric] = useState<'responses' | 'rating'>('responses');
+  const [chartMetric, setChartMetric] = useState<'responses' | 'rating'>(initialSettings.chartMetric ?? 'responses');
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | null>(null);
@@ -203,12 +206,14 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
   };
 
   const handleExport = async (format: 'pdf' | 'csv' | 'excel') => {
+    if (!canExport) return;
     setIsExporting(format);
     setExportMenuOpen(false);
     try {
-      const timestamp = new Date().toISOString().slice(0, 10);
+      const recipe = { kind: 'summary' as const, parameters: { selectedTypes, showKpis, showChart, showTable, showTopCompanies, showBottomCompanies, showQuestions, chartMetric } };
+
       const reportTitle = 'Summary Report';
-      const filenameBase = 'summary_report';
+
 
       // 1. Prepare Tables Data for spreadsheets
       const tables: { title: string; columns: string[]; rows: (string | number)[][] }[] = [];
@@ -268,8 +273,8 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
           const csvBody = Papa.unparse({ fields: table.columns, data: table.rows });
           return `${table.title}\n${csvBody}`;
         });
-        const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8;' });
-        triggerDownload(blob, `${filenameBase}_${timestamp}.csv`);
+        const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8' });
+        await saveReportDownload(blob, reportTitle, 'csv', recipe);
       } else if (format === 'excel') {
         const workbook = XLSX.utils.book_new();
         tables.forEach((table) => {
@@ -278,7 +283,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
           const name = table.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31);
           XLSX.utils.book_append_sheet(workbook, sheet, name);
         });
-        XLSX.writeFile(workbook, `${filenameBase}_${timestamp}.xlsx`);
+        await saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), reportTitle, 'excel', recipe);
       } else if (format === 'pdf') {
         const doc = new jsPDF({ unit: 'pt', format: 'a4' });
         const marginLeft = 48;
@@ -585,7 +590,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
           }
         }
 
-        doc.save(`${filenameBase}_${timestamp}.pdf`);
+        await saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
       }
     } catch (e) {
       console.error('Export failed:', e);
@@ -594,13 +599,6 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
     }
   };
 
-  const triggerDownload = (blob: Blob, filename: string) => {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
 
   return (
     <div className="flex flex-col gap-5 xl:flex-row h-full min-h-[calc(100vh-140px)] animate-fade-in">

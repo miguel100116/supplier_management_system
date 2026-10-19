@@ -78,7 +78,7 @@ const PAGE_PATH_SEGMENTS: Record<PageKey, string> = {
   analytics: 'analytics',
   present: 'present-mode',
   explorer: 'explorer',
-  reports: 'generate-report',
+  reports: 'reports',
   notifications: 'notifications',
   'create-form': 'create-form',
   'view-form': 'view-form',
@@ -117,6 +117,7 @@ export function getPageKeyFromPathname(pathname: string, basePath = ''): PageKey
   if (segments.length !== 1) return 'dashboard';
 
   const segment = segments[0];
+  if (segment === 'export-history' || segment === 'generate-report') return 'reports';
   const canonicalPage = PAGE_KEYS_BY_PATH_SEGMENT.get(segment);
   if (canonicalPage) return canonicalPage;
   return PAGE_KEYS.has(segment as PageKey) ? segment as PageKey : 'dashboard';

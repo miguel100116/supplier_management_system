@@ -163,7 +163,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
               id="btn-edit-survey"
             >
               <Pencil size={20} />
-              <span>Edit Survey Form</span>
+              <span>Edit Evaluation Form</span>
             </button>
           )}
           

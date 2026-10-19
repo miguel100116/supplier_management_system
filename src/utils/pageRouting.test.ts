@@ -22,7 +22,7 @@ test('maps module pages to root-relative paths', () => {
   assert.equal(getPageKeyFromPathname('/dashboard'), 'dashboard');
 });
 
-test('uses the visible sidebar module names as canonical routes and keeps old routes working', () => {
+test('preserves canonical module paths and legacy aliases independently of sidebar labels', () => {
   const routes = [
     ['partner-companies', '/partners'],
     ['document-register', '/document-tracker'],
@@ -31,9 +31,8 @@ test('uses the visible sidebar module names as canonical routes and keeps old ro
     ['archive', '/archive-center'],
     ['import-evaluations', '/import-evaluation-responses'],
     ['categories-manager', '/evaluation-settings'],
-    ['reports', '/generate-report'],
+    ['reports', '/reports'],
     ['present', '/present-mode'],
-    ['export-history', '/export-history'],
     ['account-management', '/employees-users'],
   ] as const;
 
@@ -58,4 +57,10 @@ test('unknown, nested, and out-of-base paths fall back to dashboard', () => {
   assert.equal(getPageKeyFromPathname('/analytics/details'), 'dashboard');
   assert.equal(getPageKeyFromPathname('/elsewhere/analytics', '/app'), 'dashboard');
   assert.equal(getPageKeyFromPathname('/app/unknown', '/app'), 'dashboard');
+});
+
+test('legacy Reports routes resolve to the unified module', () => {
+  assert.equal(getPageKeyFromPathname('/export-history'), 'reports');
+  assert.equal(getPageKeyFromPathname('/generate-report'), 'reports');
+  assert.equal(getPageKeyFromPathname('/app/export-history', '/app'), 'reports');
 });
