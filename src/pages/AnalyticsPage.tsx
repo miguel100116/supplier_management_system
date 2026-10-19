@@ -4,11 +4,10 @@ import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContaine
 import { CompanyAnalysisPanel } from '../components/CompanyAnalysisPanel';
 import { PageDescription } from '../components/PageDescription';
 import { StateMessage } from '../components/StateMessage';
-import { formatCompositeScore, getBand, ratingBands } from '../data/questionWeights';
 import { ArchiveSeries, FilterState, PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { formatNumber, hasAnsweredItem, monthlyTrend, questionPerformance, responseVolume, seriesTrend, submissionCount, submissionScores, yearlyTrend } from '../utils/analytics';
 import { computeCompanyComposite } from '../utils/scoring';
-import { getAnalyticsCompanyRankings, paginateAnalyticsItems, paginateCompanyRankings } from '../features/analytics/domain/rankings';
+import { analyticsBands, getAnalyticsBand, getAnalyticsCompanyRankings, getAnalyticsScore, paginateAnalyticsItems, paginateCompanyRankings } from '../features/analytics/domain/rankings';
 import { QuestionPerformanceRow } from '../features/analytics/components/QuestionPerformanceRow';
 import { getValueColorBand } from '../features/analytics/domain/valueColorBand';
 import { AnalyticsDateRangeControls } from '../features/analytics/components/AnalyticsDateRangeControls';
@@ -83,10 +82,19 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
 
   const selectedType = filters.surveyType.length === 1 ? filters.surveyType[0] : 'All';
   const ratingScaleType: SurveyType = selectedType === 'All' ? 'Courier' : selectedType;
-  const ratingScale = ratingBands[ratingScaleType];
-  const ratingScaleText = ratingScale
-    .map((band, index) => `${band.label} ${band.min === 0 ? `≤${ratingScale[index - 1].min - 1}` : `${band.min}–${index === 0 ? 100 : ratingScale[index - 1].min - 1}`}`)
+  const ratingScale = analyticsBands[ratingScaleType];
+  const formatRatingScale = (type: SurveyType) => analyticsBands[type]
+    .map((band, index, bands) => {
+      if (type === 'Subcontractor') {
+        const maximum = index === 0 ? 2 : bands[index - 1].min - 0.1;
+        return `${band.label} ${band.min === 0 ? `≤${maximum.toFixed(1)}` : `${band.min.toFixed(1)}–${maximum.toFixed(1)}`}`;
+      }
+      return `${band.label} ${band.min === 0 ? `≤${bands[index - 1].min - 1}` : `${band.min}–${index === 0 ? 100 : bands[index - 1].min - 1}`}`;
+    })
     .join(' · ');
+  const ratingScaleText = selectedType === 'All'
+    ? formatRatingScale('Courier')
+    : formatRatingScale(selectedType);
   const totalSubmissions = useMemo(() => submissionCount(responses), [responses]);
   const scoredSubmissions = useMemo(() => submissionScores(responses), [responses]);
   const averageScore = scoredSubmissions.length ? scoredSubmissions.reduce((sum, submission) => sum + submission.score, 0) / scoredSubmissions.length : 0;
@@ -183,17 +191,17 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
               <div>
                 <div className="flex items-center gap-2"><Trophy size={18} className="text-[#0078a8]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-base font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Compare evaluated partners and select a company to review its category performance.</p>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 sm:flex-nowrap">
                   <div role="group" aria-label="Company leaderboard color legend" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="text-xs font-semibold text-slate-500">Legend:</span>
-                    {ratingScale.map((band) => (
+                    {ratingScale.map((band, index) => (
                       <span key={band.label} className="inline-flex items-center gap-2 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
                         <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ backgroundColor: band.hex }} />
-                        {band.label}
+                        {selectedType === 'All' ? `${band.label} / ${analyticsBands.Subcontractor[index].label}` : band.label}
                       </span>
                     ))}
                   </div>
-                  <div aria-label="Company leaderboard rating scale" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:justify-end sm:text-right">
+                  <div aria-label="Company leaderboard rating scale" className="flex flex-wrap items-start gap-x-2 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:ml-auto sm:max-w-[50%] sm:justify-end sm:text-right">
                     <span className="font-semibold text-slate-500">Rating scale:</span>
                     <span>{ratingScaleText}</span>
                   </div>
@@ -214,14 +222,14 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
               <ol key={columnIndex} start={column.startIndex + 1} className="min-w-0">
                 {column.items.map((company, index) => {
                   const style = typeStyles[company.type];
-                  const scoreBand = getBand(company.type, company.rankScore);
+                  const scoreBand = getAnalyticsBand(company.type, company.rankScore);
                   const rank = column.startIndex + index + 1;
                   return (
                     <li key={`${company.type}:${company.name}`} className={`min-w-0 border-b border-slate-100 dark:border-slate-800/70 ${rank % 2 === 1 ? 'bg-slate-50 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}`}>
                       <button type="button" onClick={() => setSelectedCompany(company)} className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-center px-2 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900/70 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]">
                         <span className="flex h-7 w-8 items-center justify-center rounded-md bg-slate-200 text-xs font-extrabold text-slate-800 dark:bg-slate-700 dark:text-slate-100">{rank}</span>
                         <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: scoreBand.hex }} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · <span style={{ color: scoreBand.hex }}>{scoreBand.label}</span></span></span>
-                        <span className="flex items-center justify-end gap-1 text-xs font-bold tabular-nums" style={{ color: scoreBand.hex }}>{company.rankScore.toFixed(1)}<ChevronRight size={13} /></span>
+                        <span className="flex items-center justify-end gap-1 text-xs font-bold tabular-nums" style={{ color: scoreBand.hex }}>{getAnalyticsScore(company.type, company.rankScore).toFixed(1)}<ChevronRight size={13} /></span>
                         <span className="hidden text-right text-[11px] font-medium tabular-nums text-slate-400 sm:block">{company.count}</span>
                       </button>
                     </li>
@@ -300,7 +308,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
           <aside role="dialog" aria-modal="true" aria-labelledby="company-detail-title" className="h-full w-full max-w-md overflow-y-auto bg-white shadow-2xl dark:bg-slate-950">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><span className="text-xs font-semibold text-slate-400">Company performance</span><button type="button" onClick={closeSelectedCompany} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close company details"><X size={18} /></button></div>
             <div className="space-y-6 p-5 sm:p-7">
-              <div><h2 id="company-detail-title" className="text-xl font-bold text-slate-900 dark:text-white">{selectedCompany.name}</h2><div className="mt-3 flex items-end gap-2"><span className="text-4xl font-bold tracking-tight text-[#0078a8]">{formatCompositeScore(selectedCompany.type, selectedCompany.scorePercentage).valueText}</span><span className="pb-1 text-sm text-slate-400">/ {selectedCompany.type === 'Subcontractor' ? '2.0' : '100'}</span></div><div className="mt-3 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${typeStyles[selectedCompany.type].soft}`}>{selectedCompany.type}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{getBand(selectedCompany.type, selectedCompany.scorePercentage).label}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{selectedCompany.count} forms</span></div></div>
+              <div><h2 id="company-detail-title" className="text-xl font-bold text-slate-900 dark:text-white">{selectedCompany.name}</h2><div className="mt-3 flex items-end gap-2"><span className="text-4xl font-bold tracking-tight text-[#0078a8]">{getAnalyticsScore(selectedCompany.type, selectedCompany.scorePercentage).toFixed(1)}</span><span className="pb-1 text-sm text-slate-400">/ {selectedCompany.type === 'Subcontractor' ? '2.0' : '100'}</span></div><div className="mt-3 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${typeStyles[selectedCompany.type].soft}`}>{selectedCompany.type}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{getAnalyticsBand(selectedCompany.type, selectedCompany.scorePercentage).label}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{selectedCompany.count} forms</span></div></div>
               <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Category results</h3><div className="mt-4 space-y-3">{selectedComposite?.sections.map((section) => (<div key={section.section}><div className="mb-1 flex justify-between gap-3 text-xs"><span className="truncate text-slate-600 dark:text-slate-300">{section.section}</span><span className="font-semibold tabular-nums">{section.percent.toFixed(0)}</span></div><div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800"><div className={`h-full rounded-full ${typeStyles[selectedCompany.type].bar}`} style={{ width: `${section.percent}%` }} /></div></div>))}</div></div>
               <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Lowest performance questions</h3><div className="mt-3 space-y-3">{selectedLowestQuestions.length ? selectedLowestQuestions.map((question) => (<div key={question.question} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800"><div className="flex items-start justify-between gap-3"><p className="text-xs leading-5 text-slate-700 dark:text-slate-200">{question.question}</p><span className="shrink-0 text-xs font-bold text-rose-600">{question.average.toFixed(1)}</span></div><p className="mt-1 text-[10px] text-slate-400">{question.responses} response{question.responses === 1 ? '' : 's'}</p></div>)) : <p className="text-xs text-slate-400">No scoreable question data is available.</p>}</div></div>
               <PlaceholderButton title="Open the full company report"><BarChart3 size={14} /> Open full company report</PlaceholderButton>
