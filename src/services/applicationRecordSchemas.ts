@@ -1,3 +1,4 @@
+import { validateReportRecipe } from '../features/reports/domain/reportHistory';
 import { parseActiveCompanySnapshot } from '../features/active-companies/domain/activeCompanySnapshots';
 import { parseEvaluationImportArchive } from '../features/evaluation-imports/domain/importArchive';
 import { LEGACY_OVERALL_CATEGORY, OVERALL_CATEGORY } from '../data/questionCategories';
@@ -334,6 +335,11 @@ function parseExportHistory(value: unknown, recordId: string, label: string): Js
   oneOf(candidate.format, ['pdf', 'csv', 'excel', 'docx'], `${label}.format`);
   text(candidate.filename, `${label}.filename`, { max: 2_000 });
   isoDate(candidate.exportedAt, `${label}.exportedAt`);
+  if (candidate.recipe !== undefined) validateReportRecipe(candidate.recipe);
+  if (candidate.fileDataUrl !== undefined) {
+    text(candidate.fileDataUrl, `${label}.fileDataUrl`, { max: 22_000_000 });
+    if (!/^data:(application\/(pdf|octet-stream|vnd\.openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document))|text\/csv)(;charset=[^;,]+)?;base64,[A-Za-z0-9+/]*={0,2}$/.test(String(candidate.fileDataUrl))) throw new Error('Invalid saved export file.');
+  }
   return candidate;
 }
 

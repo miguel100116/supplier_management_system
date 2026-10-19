@@ -19,7 +19,8 @@ import {
   VerticalAlign,
   WidthType,
 } from 'docx';
-import { logExport } from './exportHistory';
+import { saveReportDownload } from './exportHistory';
+import type { ReportRecipe } from '../domain/reportHistory';
 import {
   CompanyReportData,
   formatCategoryMetricLabel,
@@ -465,9 +466,10 @@ function addCommentTablePages(
 
 export async function exportCompanyReportAsPDF(
   data: CompanyReportData,
-  customFilename?: string,
+  _customFilename?: string,
   previewOnly?: boolean,
-  asDataUri?: boolean
+  asDataUri?: boolean,
+  recipe?: ReportRecipe
 ): Promise<string | undefined> {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' });
   const marginLeft = 42.5;
@@ -527,9 +529,6 @@ export async function exportCompanyReportAsPDF(
     doc.text(`Page ${i - 1} of ${pageCount - 1}`, pageWidth - marginLeft, pageHeight - 20, { align: 'right' });
   }
 
-  const companyClean = data.company.trim().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const filename = customFilename || `${companyClean}_Feedback_Report_${dateStr}.pdf`;
   if (asDataUri) {
     // Used for email attachments (see graphMailService.ts) - no object URL/
     // blob lifecycle to manage, just a base64 string ready to embed.
@@ -540,8 +539,7 @@ export async function exportCompanyReportAsPDF(
     const blobUrl = URL.createObjectURL(blob);
     return blobUrl;
   }
-  doc.save(filename);
-  logExport({ title: `Company Report - ${data.company}`, format: 'pdf', filename });
+  await saveReportDownload(doc.output('blob'), `Company Report - ${data.company}`, 'pdf', recipe ?? { kind: 'company', parameters: { category: data.surveyType, selectedCompany: data.company, ...(data.graphs ? { graphs: data.graphs } : {}), includeComments: data.includeComments } });
 }
 
 /* ------------------------------------------------------------------ */
@@ -580,7 +578,7 @@ async function imageParagraph(dataUrl: string | null | undefined, title: string,
   ];
 }
 
-export async function exportCompanyReportAsDocx(data: CompanyReportData) {
+export async function exportCompanyReportAsDocx(data: CompanyReportData, recipe?: ReportRecipe) {
   const logoDataUrl = await fetchLogoDataUrl();
   const logoBytes = logoDataUrl ? dataUrlToUint8Array(logoDataUrl) : null;
 
@@ -917,15 +915,5 @@ export async function exportCompanyReportAsDocx(data: CompanyReportData) {
   });
 
   const blob = await Packer.toBlob(doc);
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  const filenameSafe = data.company.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
-  const filename = `company_report_${filenameSafe}_${new Date().toISOString().slice(0, 10)}.docx`;
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-  logExport({ title: `Company Report - ${data.company}`, format: 'docx', filename });
+  await saveReportDownload(blob, `Company Report - ${data.company}`, 'docx', recipe ?? { kind: 'company', parameters: { category: data.surveyType, selectedCompany: data.company, ...(data.graphs ? { graphs: data.graphs } : {}), includeComments: data.includeComments } });
 }

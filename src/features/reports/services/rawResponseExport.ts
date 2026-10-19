@@ -2,7 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
 import { ExportTable, exportTablesAsCSV, exportTablesAsExcel } from './exporters';
-import { logExport } from './exportHistory';
+import { saveReportDownload } from './exportHistory';
 import { FORM_SPECS, MetaFieldKind } from '../../evaluation-imports/services/rawEvaluationImport';
 import { getCanonicalQuestionId } from '../../../data/questionWeights';
 
@@ -235,15 +235,11 @@ export function buildRawResponseExportTables(responses: SurveyResponse[], survey
 }
 
 export function exportRawResponsesAsExcel(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string) {
-  exportTablesAsExcel(buildRawResponseExportTables(responses, surveyType), filenameBase);
+  exportTablesAsExcel(buildRawResponseExportTables(responses, surveyType), filenameBase, { kind: 'raw', parameters: { category: surveyType } });
 }
 
 export function exportRawResponsesAsCSV(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string) {
-  exportTablesAsCSV(buildRawResponseExportTables(responses, surveyType), filenameBase);
-}
-
-function timestamp() {
-  return new Date().toISOString().slice(0, 10);
+  exportTablesAsCSV(buildRawResponseExportTables(responses, surveyType), filenameBase, { kind: 'raw', parameters: { category: surveyType } });
 }
 
 // Short informational columns ("Period Covered", "Project Name") stay
@@ -446,7 +442,5 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
     );
   }
 
-  const filename = `${filenameBase}_${timestamp()}.pdf`;
-  doc.save(filename);
-  logExport({ title: `Raw Data Export (${surveyType})`, format: 'pdf', filename });
+  void saveReportDownload(doc.output('blob'), `Raw Data Export (${surveyType})`, 'pdf', { kind: 'raw', parameters: { category: surveyType } });
 }

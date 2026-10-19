@@ -1668,7 +1668,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   }, [currentUserEmail, isAdmin]);
 
   // Create a new survey form
-  const createSurvey = (newForm: Omit<CustomForm, 'id' | 'createdAt'>) => {
+  const createSurvey = async (newForm: Omit<CustomForm, 'id' | 'createdAt'>) => {
     const id = `survey-${Date.now()}`;
     const createdAt = new Date().toISOString();
     const surveyWithId: CustomForm = {
@@ -1677,10 +1677,10 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       createdAt,
     };
 
+    if (isSupabaseConfigured) await persistRemoteAsync(upsertApplicationRecords('survey', [surveyWithId], (survey) => survey.id));
     const updatedSurveys = [surveyWithId, ...surveys];
     setSurveys(updatedSurveys);
     safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys));
-    persistRemote(replaceApplicationRecords('survey', updatedSurveys, (survey) => survey.id));
     return surveyWithId;
   };
 

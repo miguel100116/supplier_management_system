@@ -43,9 +43,20 @@ test('realtime refreshes load only the application record type that changed', ()
 
 test('Admin evaluation navigation groups the existing routes into one workspace', () => {
   const group = APP_SOURCE.slice(APP_SOURCE.indexOf("id: 'group-evaluations'"), APP_SOURCE.indexOf('// Single page already covers'));
-  assert.match(group, /key: 'survey-forms', label: 'Evaluation Workspace'/);
+  assert.match(group, /key: 'survey-forms', label: 'Workspace'/);
   assert.doesNotMatch(group, /key: 'categories-manager'/);
   assert.doesNotMatch(group, /key: 'explorer'|key: 'pending-review'/);
   assert.match(APP_SOURCE, /activePage=\{isAdminEvaluationWorkspace \? 'survey-forms' : activePage\}/);
   assert.match(EVALUATION_WORKSPACE_SOURCE, /key: 'categories-manager', label: 'Category Labels'/);
+});
+
+test('module titles follow sidebar labels, including all workspace views, and update browser titles', () => {
+  const titleSource = APP_SOURCE.slice(APP_SOURCE.indexOf('const activeTitle ='), APP_SOURCE.indexOf('const pageHeading ='));
+  assert.match(titleSource, /navigationPage = isAdminEvaluationWorkspace \? 'survey-forms' : activePage/);
+  assert.match(titleSource, /flatNavLeaves\.find\(\(page\) => page\.key === navigationPage\)\?\.label/);
+  assert.match(titleSource, /if \(navigationTitle\) return navigationTitle/);
+  assert.doesNotMatch(titleSource, /Administrative Partner Registry|Document Tracker|Account Management|Import Evaluation Responses/);
+  const shellSource = readFileSync(new URL('./Shell.tsx', import.meta.url), 'utf8');
+  assert.ok(shellSource.includes('document.title = `${title} | Supplier Management System`'));
+  assert.ok(shellSource.includes('document.title = previousTitle'));
 });

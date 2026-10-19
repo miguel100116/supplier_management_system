@@ -146,7 +146,7 @@ Every signed-in user has a Settings page for light/dark mode and signing out; Ad
 **Frequently Asked Questions**
 
 **How do I generate a report?**
-Go to Reports and choose a builder — Summary, Company, Question, or Executive Summary — then export it as PDF, Excel, or CSV.
+Go to Reports > Generate and choose a builder — Summary, Company, Question, or Executive Summary — then export it as PDF, Excel, or CSV. Reports > History keeps per-user saved downloads and builder options. Download again retrieves the original file; Regenerate uses saved options with current authorized data and filters. Clear log asks for confirmation. Legacy exports may lack retained files/options; files above 15 MB download without a retained copy and show an error.
 
 **How do I send a report to a partner company?**
 Open Partners Feedback Hub, select a completed survey, and use "Send Report to Partner" for one company, or "Bulk Sending" to queue reports for every completed company at once. The email (with a PDF report attached) is sent through Microsoft Graph as the signed-in Admin's own Microsoft account, so "Sign in with Microsoft" is required to use it.
@@ -156,6 +156,8 @@ Go to Survey Forms → Create, fill in the type, questions, deadline, and which 
 
 **How do I check which compliance documents are expiring soon?**
 Open the Document Tracker for the full list, or check the Notification Bell and Notification Logs for current document alerts. Alerts include the affected document, branch, due date, configured early milestones, and AFS update status.
+
+Document Tracker opens on All Categories and resets there after normal navigation away and back. Category tabs still filter the overview and register; explicit category URLs such as `?category=supplier-local` preserve their requested category.
 
 **How do I request access for a new employee?**
 Follow the procedure in [Section 1.3](#13-procedure-for-requesting-new-user-access) of this document — it starts with your mgenesis IT/Entra ID request, then an Admin adds the account in Account Management.
@@ -268,4 +270,4 @@ Summarized from the project's git commit history (first commit July 18, 2026 thr
 
 ### Admin evaluation navigation
 
-Admins open Evaluations > Evaluation Workspace and switch between Forms (form management), Responses (submitted answer inspection), and Coverage (company evaluation coverage). Archive Center and Import Evaluation Responses remain separate destinations. Evaluation Settings contains Category Labels. Existing route permissions and persistence contracts are unchanged.
+Admins open Evaluations > Workspace and switch between Forms (form management), Responses (submitted answer inspection), Coverage (company evaluation coverage), and Category Labels (scoring category display names). All four views share the same grouped tab layout and active-tab highlight. Archive and Import Responses remain separate destinations. Module headings and browser titles follow sidebar names, including Directory, Documents, Feedback, Workspace, Archive, Import Responses, and Users; descriptive subtitles are retained. Existing route permissions and persistence contracts are unchanged.

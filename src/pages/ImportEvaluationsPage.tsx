@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { Pagination } from '../components/Pagination';
-import type { SurveyType } from '../types/survey';
+import type { CustomForm, SurveyResponse, SurveyType } from '../types/survey';
 import type { CompanyDecision, RawEvalImportSummary, RawEvalPreview } from '../features/evaluation-imports/services/rawEvaluationImport';
 import { archiveEvaluationBatch, validateEvaluationBatchPreviews } from '../features/evaluation-imports/domain/evaluationBatch';
 import { detectEvaluationPreviews, normalizeEvaluationFile } from '../features/evaluation-imports/domain/evaluationFilePreview';
@@ -29,7 +29,7 @@ import { useModalEscape } from '../hooks/useModalEscape';
 import { PageDescription } from '../components/PageDescription';
 import { findEvaluationImportDuplicates, type EvaluationImportDuplicate } from '../features/evaluation-imports/domain/duplicateDetection';
 import { loadEvaluationImportResponseCounts } from '../features/evaluation-imports/services/evaluationImportArchiveService';
-import { classifyEvaluationImport, filterEvaluationImportArchives, type EvaluationImportTab } from '../features/evaluation-imports/domain/importClassification';
+import { classifyEvaluationImport, filterEvaluationImportArchives, getActiveEvaluationImportBatches, getLegacyActiveEvaluationImportIds, type EvaluationImportTab } from '../features/evaluation-imports/domain/importClassification';
 
 const SURVEY_TYPES: SurveyType[] = ['Supplier', 'Subcontractor', 'Courier'];
 const STORED_SOURCE_FILES_PAGE_SIZE = 10;
@@ -48,6 +48,9 @@ const FORM_CARDS: Array<{ surveyType: SurveyType; title: string; formLabel: stri
 
 interface ImportEvaluationsPageProps {
   currentUserEmail: string;
+  surveys: readonly CustomForm[];
+  responses: readonly SurveyResponse[];
+  archivedResponses: readonly SurveyResponse[];
   onPreview: (file: File, surveyType: SurveyType) => Promise<RawEvalPreview>;
   onCommitBatch: (entries: Array<{ preview: RawEvalPreview; decisions: Record<string, CompanyDecision> }>) => Promise<RawEvalImportSummary[]>;
 }
@@ -83,7 +86,7 @@ function sourceResponseCount(archive: EvaluationImportArchive, archives: readonl
   return counts.get(archive.importBatchId);
 }
 
-export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBatch }: ImportEvaluationsPageProps) {
+export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, archivedResponses, onPreview, onCommitBatch }: ImportEvaluationsPageProps) {
   const { archives, isLoading: isLoadingArchives, loadError: archiveLoadError, archiveSourceFile, discardPendingArchive, downloadSourceFile, removeTestImport, removeOrdinaryImport, recordReplacement, archiveImports, restoreArchive } = useEvaluationImportArchives(currentUserEmail);
   const fileInput = useRef<HTMLInputElement>(null);
   const selectAllArchiveRef = useRef<HTMLInputElement>(null);
@@ -114,9 +117,9 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
   const [archivePageSize, setArchivePageSize] = useState(STORED_SOURCE_FILES_PAGE_SIZE);
   const [importMode, setImportMode] = useState<'normal' | 'test'>('normal');
   const [archiveTab, setArchiveTab] = useState<EvaluationImportTab>('active');
-  const [archiveResponseCounts, setArchiveResponseCounts] = useState<Map<string, number>>(new Map());
-  const [isLoadingArchiveResponseCounts, setIsLoadingArchiveResponseCounts] = useState(true);
-  const [archiveResponseCountError, setArchiveResponseCountError] = useState('');
+  const [statusNow, setStatusNow] = useState(() => new Date());
+  const activeImportBatches = getActiveEvaluationImportBatches(surveys, responses);
+  const legacyActiveIds = getLegacyActiveEvaluationImportIds(archives, surveys, [...responses, ...archivedResponses]);
 
   const activeDuplicate = selectedFiles.find((item) => (item.duplicates?.length ?? 0) > 0 && !item.approvedReplacementId);
   const cancelDuplicateUpload = () => {
@@ -146,10 +149,10 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
   };
 
   const readyPreviews = selectedFiles.flatMap((item) => item.previews);
-  const activeArchiveCount = archives.filter((archive) => classifyEvaluationImport(archive, archiveResponseCounts) === 'active').length;
+  const activeArchiveCount = archives.filter((archive) => classifyEvaluationImport(archive, activeImportBatches, legacyActiveIds) === 'active').length;
   const historyArchiveCount = archives.length - activeArchiveCount;
   const selectedArchives = archives.filter((archive) => selectedArchiveIds.has(archive.id));
-  const statusFilteredArchives = filterEvaluationImportArchives(archives, archiveResponseCounts, archiveTab, 'all');
+  const statusFilteredArchives = filterEvaluationImportArchives(archives, activeImportBatches, archiveTab, 'all', legacyActiveIds);
   const filteredArchives = statusFilteredArchives.filter((archive) => {
     if (archiveFilter === 'all') return true;
     return archive.surveyType === archiveFilter || archive.surveyType === 'Combined';
@@ -168,18 +171,11 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
     .map((match) => [`${preview.surveyType}:${match.normalizedName}`, { surveyType: preview.surveyType, match }] as const))).values()];
 
   useEffect(() => {
-    let current = true;
-    setIsLoadingArchiveResponseCounts(true);
-    setArchiveResponseCountError('');
-    void loadEvaluationImportResponseCounts().then((counts) => {
-      if (current) setArchiveResponseCounts(counts);
-    }).catch(() => {
-      if (current) setArchiveResponseCountError('Unable to verify which source files still contribute evaluation responses.');
-    }).finally(() => {
-      if (current) setIsLoadingArchiveResponseCounts(false);
-    });
-    return () => { current = false; };
-  }, [archives, isImporting]);
+    const now = new Date();
+    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timer = setTimeout(() => setStatusNow(new Date()), nextDay.getTime() - now.getTime());
+    return () => clearTimeout(timer);
+  }, [statusNow]);
 
   useEffect(() => {
     if (selectAllArchiveRef.current) {
@@ -526,6 +522,10 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
 
   const confirmRestoreArchive = async () => {
     if (!archiveToRestore || isRestoringArchive) return;
+    if (classifyEvaluationImport({ ...archiveToRestore, importStatus: 'active' }, activeImportBatches) !== 'active') {
+      setArchiveActionError('This file needs current imported responses linked to an Active form in Workspace > Manage Access before it can be restored.');
+      return;
+    }
     setIsRestoringArchive(true);
     setArchiveActionError('');
     setArchiveActionSuccess('');
@@ -544,10 +544,6 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
   };
 
   const closeCompanyReview = () => {
-    const hasReviewChanges = SURVEY_TYPES.some((surveyType) =>
-      Object.values(decisions[surveyType]).some((decision) => decision !== 'add-as-partner'),
-    );
-    if (hasReviewChanges && !window.confirm('Close this review? Your company matching decisions will remain available if you reopen it.')) return;
     setIsReviewingCompanies(false);
   };
   useModalEscape(isReviewingCompanies, closeCompanyReview);
@@ -706,7 +702,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
               <div className="flex flex-wrap items-center gap-2">
                 {selectedArchives.length > 0 && <>
                   <button type="button" onClick={() => void handleDownloadArchive(selectedArchives[0])} disabled={downloadingArchiveId !== null || removingArchiveId !== null || isRemovingArchives} title="Download selected files" aria-label={`Download ${selectedArchives.length} selected source files`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><Download size={16} aria-hidden="true" /></button>
-                  {selectedArchives.some((archive) => classifyEvaluationImport(archive, archiveResponseCounts) === 'active') && <button type="button" onClick={() => setArchivesToMarkHistory(selectedArchives.filter((archive) => classifyEvaluationImport(archive, archiveResponseCounts) === 'active'))} disabled={downloadingArchiveId !== null || removingArchiveId !== null || isRemovingArchives || isArchivingImports} title="Archive selected imports" aria-label={`Archive ${selectedArchives.filter((archive) => classifyEvaluationImport(archive, archiveResponseCounts) === 'active').length} selected imports`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><Archive size={16} aria-hidden="true" /></button>}
+                  {selectedArchives.some((archive) => archive.importStatus !== 'historical') && <button type="button" onClick={() => setArchivesToMarkHistory(selectedArchives.filter((archive) => archive.importStatus !== 'historical'))} disabled={downloadingArchiveId !== null || removingArchiveId !== null || isRemovingArchives || isArchivingImports} title="Archive selected imports" aria-label={`Archive ${selectedArchives.filter((archive) => archive.importStatus !== 'historical').length} selected imports`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><Archive size={16} aria-hidden="true" /></button>}
                   {archiveTab === 'history' && <button type="button" onClick={() => requestArchiveRemoval(selectedArchives)} disabled={downloadingArchiveId !== null || removingArchiveId !== null || isRemovingArchives} title="Permanently remove selected history files" aria-label={`Permanently remove ${selectedArchives.length} selected source files`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/30"><Trash2 size={16} aria-hidden="true" /></button>}
                 </>}
                 <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -769,16 +765,13 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
               ))}
             </div>
           )}
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Archive moves active imports to History and keeps their evaluation responses. Permanently remove is available in History; removing a normal import keeps responses, while removing a test import also removes its responses and temporary partners.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Active follows the linked form in Workspace &gt; Manage Access. The newest standard CSV also qualifies for an active default form when legacy batch links are missing. Archived or replaced files stay in History. Archive keeps their evaluation responses. Permanently remove is available in History; removing a normal import keeps responses, while removing a test import also removes its responses and temporary partners.</p>
         </div>
         {archiveLoadError && <p role="alert" className="px-5 py-3 text-xs text-rose-600 dark:text-rose-400">{archiveLoadError}</p>}
         {archiveActionError && <p role="alert" className="px-5 py-3 text-xs text-rose-600 dark:text-rose-400">{archiveActionError}</p>}
         {archiveActionSuccess && <p role="status" className="px-5 py-3 text-xs text-emerald-700 dark:text-emerald-400">{archiveActionSuccess}</p>}
-        {archiveResponseCountError && <p role="alert" className="px-5 py-3 text-xs text-amber-700 dark:text-amber-400">{archiveResponseCountError} Persisted status values are still honored.</p>}
         {isLoadingArchives ? (
           <div className="flex items-center gap-2 px-5 py-5 text-xs text-slate-500" role="status"><Loader2 size={14} className="animate-spin" aria-hidden="true" />Loading stored files…</div>
-        ) : isLoadingArchiveResponseCounts ? (
-          <div className="flex items-center gap-2 px-5 py-5 text-xs text-slate-500" role="status"><Loader2 size={14} className="animate-spin" aria-hidden="true" />Checking linked evaluation responses…</div>
         ) : archives.length === 0 ? (
           <p className="px-5 py-5 text-xs text-slate-500 dark:text-slate-400">No source files have been archived yet.</p>
         ) : filteredArchives.length === 0 ? (
@@ -790,13 +783,14 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
                 <li key={archive.id} className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-start gap-3"><input type="checkbox" checked={selectedArchiveIds.has(archive.id)} onChange={(event) => { const selected = event.currentTarget.checked; setSelectedArchiveIds((current) => { const next = new Set(current); if (selected) next.add(archive.id); else next.delete(archive.id); return next; }); }} disabled={isRemovingArchives || removingArchiveId !== null || downloadingArchiveId !== null} aria-label={"Select " + archive.sourceFileName} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9] disabled:opacity-60" /><FileSpreadsheet size={16} className="mt-0.5 shrink-0 text-slate-400" aria-hidden="true" /><div className="min-w-0"><div className="flex min-w-0 items-center gap-2"><p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={archive.sourceFileName}>{archive.sourceFileName}</p>{archiveTab === 'active' && <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">Active</span>}</div><p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{isTestImportArchive(archive) ? 'Test import' : archive.surveyType === 'Combined' ? 'All evaluation categories' : archive.surveyType} · {formatFileSize(archive.fileSize)} · {new Date(archive.uploadedAt).toLocaleString()} · {archive.uploadedBy}</p></div></div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {archiveTab === 'history' && <button type="button" onClick={() => setArchiveToRestore(archive)} disabled={isRestoringArchive || removingArchiveId !== null || downloadingArchiveId !== null || isRemovingArchives} title="Restore to Active Imports" aria-label={`Restore ${archive.sourceFileName} to Active Imports`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><RotateCcw size={15} aria-hidden="true" /></button>}
+                    {archiveTab === 'history' && archive.importStatus === 'historical' && <button type="button" onClick={() => setArchiveToRestore(archive)} disabled={classifyEvaluationImport({ ...archive, importStatus: 'active' }, activeImportBatches) !== 'active' || isRestoringArchive || removingArchiveId !== null || downloadingArchiveId !== null || isRemovingArchives} title={classifyEvaluationImport({ ...archive, importStatus: 'active' }, activeImportBatches) === 'active' ? 'Restore to Active Imports' : 'Requires current imported responses and their Active Workspace form'} aria-label={`Restore ${archive.sourceFileName} to Active Imports`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><RotateCcw size={15} aria-hidden="true" /></button>}
                     <button type="button" onClick={() => void handleDownloadArchive(archive)} disabled={downloadingArchiveId !== null || removingArchiveId !== null || isRemovingArchives} title="Download file" aria-label={`Download ${archive.sourceFileName}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
                       {downloadingArchiveId === archive.id ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Download size={15} aria-hidden="true" />}
                     </button>
-                    {archiveTab === 'active' ? (
-                      <button type="button" onClick={() => setArchivesToMarkHistory(selectedArchiveIds.has(archive.id) ? selectedArchives.filter((item) => classifyEvaluationImport(item, archiveResponseCounts) === 'active') : [archive])} disabled={removingArchiveId !== null || downloadingArchiveId !== null || isRemovingArchives || isArchivingImports} title="Archive import" aria-label={`Archive ${archive.sourceFileName}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><Archive size={15} aria-hidden="true" /></button>
-                    ) : (
+                    {archive.importStatus !== 'historical' && (
+                      <button type="button" onClick={() => setArchivesToMarkHistory(selectedArchiveIds.has(archive.id) ? selectedArchives.filter((item) => item.importStatus !== 'historical') : [archive])} disabled={removingArchiveId !== null || downloadingArchiveId !== null || isRemovingArchives || isArchivingImports} title="Archive import" aria-label={`Archive ${archive.sourceFileName}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><Archive size={15} aria-hidden="true" /></button>
+                    )}
+                    {archiveTab === 'history' && (
                       <button type="button" onClick={() => requestArchiveRowRemoval(archive)} disabled={removingArchiveId !== null || downloadingArchiveId !== null || isRemovingArchives} title={isTestImportArchive(archive) ? 'Permanently remove test import' : 'Permanently remove file'} aria-label={`Permanently remove ${archive.sourceFileName}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:opacity-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/30">
                         {removingArchiveId === archive.id ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
                       </button>
@@ -828,7 +822,7 @@ export function ImportEvaluationsPage({ currentUserEmail, onPreview, onCommitBat
             <div className="mt-3 max-h-36 space-y-2 overflow-y-auto">
               {activeDuplicate.duplicates?.map(({ archive }) => (
                 <button key={archive.id} type="button" aria-pressed={activeDuplicate.selectedReplacementId === archive.id} onClick={() => chooseReplacement(activeDuplicate.id, archive.id)} className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-xs hover:border-[#0063a9] dark:border-slate-700 ${activeDuplicate.selectedReplacementId === archive.id ? 'border-[#0063a9] bg-blue-50 dark:bg-blue-950/30' : 'border-slate-200'}`}>
-                  <span className="min-w-0 truncate font-semibold text-slate-800 dark:text-slate-100">{archive.sourceFileName}</span><span className="shrink-0 text-slate-500">{archive.importStatus === 'historical' ? 'History' : 'Active'} · {archive.surveyType} · {new Date(archive.uploadedAt).toLocaleDateString()}</span>
+                  <span className="min-w-0 truncate font-semibold text-slate-800 dark:text-slate-100">{archive.sourceFileName}</span><span className="shrink-0 text-slate-500">{classifyEvaluationImport(archive, activeImportBatches, legacyActiveIds) === 'active' ? 'Active' : 'History'} · {archive.surveyType} · {new Date(archive.uploadedAt).toLocaleDateString()}</span>
                 </button>
               ))}
             </div>
