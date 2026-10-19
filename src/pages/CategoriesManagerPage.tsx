@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useModalEscape } from '../hooks/useModalEscape';
+import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog';
 import { PageDescription } from '../components/PageDescription';
 import { AlertTriangle, Ban, ChevronRight, Layers, PackageSearch, RotateCcw, Save, Truck, X } from 'lucide-react';
 import { SurveyType } from '../types/survey';
@@ -26,7 +27,9 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
   const [draftLabels, setDraftLabels] = useState<string[]>([]);
   const [pendingAction, setPendingAction] = useState<'save' | 'restore' | null>(null);
   const [validationError, setValidationError] = useState('');
-  useModalEscape(Boolean(pendingAction), () => setPendingAction(null), 60);
+  const [showUnsavedChanges, setShowUnsavedChanges] = useState(false);
+  const [closeAfterSave, setCloseAfterSave] = useState(false);
+  useModalEscape(Boolean(pendingAction), () => { setPendingAction(null); setCloseAfterSave(false); }, 60);
 
   const openEditor = (type: SurveyType) => {
     setOpenType(type);
@@ -39,11 +42,15 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
     setDraftLabels([]);
     setPendingAction(null);
     setValidationError('');
+    setShowUnsavedChanges(false);
+    setCloseAfterSave(false);
   };
 
   const requestCloseEditor = () => {
-    if (openType && !arraysEqual(draftLabels, categoryLabels[openType]) &&
-        !window.confirm('You have unsaved category changes. Discard them and close?')) return;
+    if (openType && !arraysEqual(draftLabels, categoryLabels[openType])) {
+      setShowUnsavedChanges(true);
+      return;
+    }
     closeEditor();
   };
 
@@ -61,15 +68,16 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
     const trimmed = draftLabels.map((l) => l.trim());
     if (trimmed.some((l) => !l)) {
       setValidationError('Every category needs a name - none can be blank.');
-      return;
+      return false;
     }
     const unique = new Set(trimmed.map((l) => l.toLowerCase()));
     if (unique.size !== trimmed.length) {
       setValidationError('Category names must be unique within this list.');
-      return;
+      return false;
     }
     setValidationError('');
     setPendingAction('save');
+    return true;
   };
 
   const requestRestore = () => {
@@ -92,6 +100,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
       setDraftLabels([...DEFAULT_CATEGORIES[openType]]);
     }
     setPendingAction(null);
+    if (closeAfterSave && pendingAction === 'save') closeEditor();
   };
 
   return (
@@ -201,6 +210,17 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
         </div>
       )}
 
+      {showUnsavedChanges && <UnsavedChangesDialog
+        description="You have unsaved category changes. Saving updates these labels throughout the system and requires confirmation."
+        onContinue={() => setShowUnsavedChanges(false)}
+        onDiscard={closeEditor}
+        onSave={() => {
+          if (!requestSave()) return false;
+          setCloseAfterSave(true);
+          setShowUnsavedChanges(false);
+        }}
+      />}
+
       {pendingAction && openType && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-xl border border-amber-100 bg-white p-6 shadow-2xl dark:border-amber-900/40 dark:bg-slate-950">
@@ -218,12 +238,12 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-3">
-              <button type="button" onClick={() => setPendingAction(null)} className="secondary-button text-sm">
+              <button type="button" onClick={() => { setPendingAction(null); setCloseAfterSave(false); }} className="secondary-button text-sm">
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={confirmPendingAction}
+                onClick={() => { try { confirmPendingAction(); } catch (error) { setValidationError(error instanceof Error ? error.message : 'Unable to save changes. Please try again.'); setPendingAction(null); } }}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white shadow-xs transition hover:bg-amber-700"
               >
                 Yes, Apply Changes

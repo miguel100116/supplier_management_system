@@ -10,12 +10,12 @@ import {
   YAxis,
 } from 'recharts';
 import { ArchiveSeries, CustomForm, PartnerCompany, PartnerCompanyType, SurveyResponse, SurveyType } from '../types/survey';
-import { exportArchivedResponsesAsExcel } from '../utils/archiveResponseTransfer';
-import type { ArchiveImportResult } from '../utils/archiveResponseTransfer';
+import { exportArchivedResponsesAsExcel } from '../features/archives/services/archiveResponseTransfer';
+import type { ArchiveImportResult } from '../features/archives/services/archiveResponseTransfer';
 import { ChartCard } from '../components/ChartCard';
 import { PageDescription } from '../components/PageDescription';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { seriesTrend, companySeriesTrend } from '../utils/analytics';
+import { seriesTrend, companySeriesTrend } from '../features/analytics/domain/analytics';
 import { compareDate, compareText, isWithinDateRange } from '../utils/tableFilters';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { useEvaluationImportArchives } from '../features/evaluation-imports/hooks/useEvaluationImportArchives';

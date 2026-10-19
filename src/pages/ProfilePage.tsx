@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Award, CalendarClock, ClipboardCheck, LogOut, Mail, MapPin, Moon, Sun, User } from 'lucide-react';
 import { SurveyResponse } from '../types/survey';
-import { hasAnsweredItem, submissionCount } from '../utils/analytics';
+import { hasAnsweredItem, submissionCount } from '../features/analytics/domain/analytics';
 import { EmployeeProfileSettings } from '../features/employee-experience/components/EmployeeProfileSettings';
 
 interface ProfilePageProps {

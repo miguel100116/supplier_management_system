@@ -1,3 +1,4 @@
+import { DOCUMENT_CATEGORIES, resolveDocumentCategory, companiesForDocumentCategory } from '../features/document-tracker/domain/documentCategories';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalEscape } from '../hooks/useModalEscape';
@@ -5,17 +6,17 @@ import { Pagination } from '../components/Pagination';
 import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, SlidersHorizontal, Trash2, Filter } from 'lucide-react';
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin } from '../types/survey';
-import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isNTBranch } from '../utils/compliance';
-import { getRequiredDocumentKeys, isExpiryDocument } from '../utils/documentRequirements';
-import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../utils/documentModificationLog';
-import { ComplianceSnapshot, getComplianceHistory, saveComplianceHistory } from '../utils/complianceHistory';
+import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isNTBranch } from '../features/document-tracker/domain/compliance';
+import { getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
+import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../features/document-tracker/services/documentModificationLog';
+import { ComplianceSnapshot, getComplianceHistory, saveComplianceHistory } from '../features/document-tracker/services/complianceHistory';
 import {
   DocNotificationRule,
   DEFAULT_NOTIFICATION_RULES,
   getNotificationSettings,
   saveNotificationSettings,
   restoreDefaultNotificationSettings,
-} from '../utils/documentNotificationSettings';
+} from '../features/notifications/services/documentNotificationSettings';
 import { ChartCard } from '../components/ChartCard';
 import { PageDescription } from '../components/PageDescription';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -29,6 +30,8 @@ import { scrollDocumentMatrixWithArrowKey } from '../features/document-tracker/c
 
 interface DocumentRegisterPageProps {
   partnerCompanies: PartnerCompany[];
+  categoryFromUrl?: string | null;
+  onCategoryChange?: (category: string) => void;
   onUpdateCompany: (company: PartnerCompany) => void;
   onRenewDocument: (
     companyId: string,
@@ -190,12 +193,8 @@ function describeFilterRow(row: FilterRow): string {
 // "LOCAL SUPPLIER" / "FOREIGN SUPPLIER" blocks: selecting a category filters
 // both the rows (companies of that category) AND which document columns show,
 // since Couriers/Subcontractors don't carry the Local/Foreign-specific docs.
-const CATEGORIES: { key: string; label: string; type: PartnerCompanyType; origin?: SupplierOrigin; icon: typeof Truck }[] = [
-  { key: 'supplier-local', label: 'Supplier (Local)', type: 'Supplier', origin: 'Local', icon: MapPin },
-  { key: 'supplier-foreign', label: 'Supplier (Foreign)', type: 'Supplier', origin: 'Foreign', icon: Globe },
-  { key: 'courier', label: 'Courier', type: 'Courier', icon: Truck },
-  { key: 'subcontractor', label: 'Subcontractor', type: 'Subcontractor', icon: Layers },
-];
+const CATEGORY_ICONS = { 'supplier-local': MapPin, 'supplier-foreign': Globe, courier: Truck, subcontractor: Layers };
+const CATEGORIES = DOCUMENT_CATEGORIES.map(category => ({ ...category, icon: CATEGORY_ICONS[category.key as keyof typeof CATEGORY_ICONS] }));
 
 // Pseudo-category: aggregates the Compliance Overview (KPIs/charts) across
 // every category at once, same idea as the client's mockup's top summary
@@ -377,9 +376,11 @@ function formatShortDate(dateString?: string): string {
   }
 }
 
-export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRenewDocument, canRenewDocuments, currentUserEmail = '', isAdmin = false }: DocumentRegisterPageProps) {
+export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange, partnerCompanies, onUpdateCompany, onRenewDocument, canRenewDocuments, currentUserEmail = '', isAdmin = false }: DocumentRegisterPageProps) {
   const isMobile = useIsMobile();
-  const [categoryKey, setCategoryKey] = useState<string>('supplier-local');
+  const [categoryKey, setCategoryKey] = useState(() => resolveDocumentCategory(categoryFromUrl));
+  useEffect(() => { setCategoryKey(resolveDocumentCategory(categoryFromUrl)); }, [categoryFromUrl]);
+  const selectCategory = (key: string) => { setCategoryKey(key); onCategoryChange?.(key); };
   const [searchQuery, setSearchQuery] = useState('');
   const [documentFilter, setDocumentFilter] = useState('all');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<DocumentStatusFilter>('all');
@@ -635,15 +636,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
   // search - this is what the Compliance Overview summarizes, so switching
   // categories updates the KPIs/charts but typing in the search box doesn't.
   // "All Categories" skips the type/origin filter entirely.
-  const categoryCompanies = useMemo(() => {
-    return partnerCompanies.filter((c) => {
-      if (c.isArchived) return false;
-      if (isAllView) return true;
-      if (c.type !== category.type) return false;
-      if (category.type === 'Supplier' && (c.supplierOrigin ?? 'Local') !== category.origin) return false;
-      return true;
-    });
-  }, [partnerCompanies, category, isAllView]);
+  const categoryCompanies = useMemo(() => companiesForDocumentCategory(partnerCompanies, categoryKey), [partnerCompanies, categoryKey]);
 
   // Companies with a normal + "-NT" BP Code merge into one PartnerCompany
   // (see masterListImport.ts), which is correct for Partner Companies'
@@ -1265,7 +1258,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-nowrap overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 dark:border-transparent dark:bg-slate-950 w-full sm:w-auto" style={{ scrollbarWidth: 'none' }}>
           <button
-            onClick={() => setCategoryKey(ALL_KEY)}
+            onClick={() => selectCategory(ALL_KEY)}
             className={`shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md py-2 px-4 text-xs font-bold transition-all duration-150 cursor-pointer ${
               isAllView
                 ? 'bg-[#0063a9] text-white shadow-xs'
@@ -1280,7 +1273,7 @@ export function DocumentRegisterPage({ partnerCompanies, onUpdateCompany, onRene
             return (
               <button
                 key={cat.key}
-                onClick={() => setCategoryKey(cat.key)}
+                onClick={() => selectCategory(cat.key)}
                 className={`shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md py-2 px-4 text-xs font-bold transition-all duration-150 cursor-pointer ${
                   categoryKey === cat.key
                     ? 'bg-[#0063a9] text-white shadow-xs'

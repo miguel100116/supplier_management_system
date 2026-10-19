@@ -146,7 +146,7 @@ Every signed-in user has a Settings page for light/dark mode and signing out; Ad
 **Frequently Asked Questions**
 
 **How do I generate a report?**
-Go to Reports and choose a builder — Summary, Company, Question, or Executive Summary — then export it as PDF, Excel, or CSV.
+Go to Reports > Generate and choose a builder — Summary, Company, Question, or Executive Summary — then export it as PDF, Excel, or CSV. Reports > History keeps per-user saved downloads and builder options. Download again retrieves the original file; Regenerate uses saved options with current authorized data and filters. Clear log asks for confirmation. Legacy exports may lack retained files/options; files above 15 MB download without a retained copy and show an error.
 
 **How do I send a report to a partner company?**
 Open Partners Feedback Hub, select a completed survey, and use "Send Report to Partner" for one company, or "Bulk Sending" to queue reports for every completed company at once. The email (with a PDF report attached) is sent through Microsoft Graph as the signed-in Admin's own Microsoft account, so "Sign in with Microsoft" is required to use it.
@@ -156,6 +156,8 @@ Go to Survey Forms → Create, fill in the type, questions, deadline, and which 
 
 **How do I check which compliance documents are expiring soon?**
 Open the Document Tracker for the full list, or check the Notification Bell and Notification Logs for current document alerts. Alerts include the affected document, branch, due date, configured early milestones, and AFS update status.
+
+Document Tracker opens on All Categories and resets there after normal navigation away and back. Category tabs still filter the overview and register; explicit category URLs such as `?category=supplier-local` preserve their requested category.
 
 **How do I request access for a new employee?**
 Follow the procedure in [Section 1.3](#13-procedure-for-requesting-new-user-access) of this document — it starts with your mgenesis IT/Entra ID request, then an Admin adds the account in Account Management.
@@ -241,7 +243,7 @@ Every item below was verified directly against the current source code, not infe
 | 4 | New confirmed users default to Employee; Admin edits require an approved `app_profiles` promotion. | A first-time user can submit evaluations but cannot edit shared registry/configuration data. | Promote an approved user in the Supabase dashboard after account confirmation. |
 | 5 | The old `supabase/schema.sql` draft contains anonymous test policies and is not applied. | Applying it as-is would weaken access controls. | Use only reviewed versioned migrations. |
 | 6 | A live-chat feature (Admin Chat Widget, Live Chat page, Employee Notifications Hub, chat service) was built across several commits and is now deleted in the working tree, but the deletion is not yet committed. | Whoever continues this project should confirm the removal is intentional before it is committed, since it removes real functionality. | Confirm with the project owner, then commit the removal explicitly (or restore the feature) rather than leaving it as an uncommitted change. |
-| 7 | `EFAS_Project_Charter.docx` (in the project root, tracked since the initial commit) is a corrupted Word file — its ZIP central directory offset is invalid. | It cannot be opened by Word, pandoc, or standard ZIP tooling; whatever project-charter content it held is currently inaccessible. | Locate a valid backup copy if one exists, or treat the content as lost and re-document the project charter separately. |
+| 7 | `reference-materials/source-data/EFAS_Project_Charter.docx` (tracked since the initial commit) is a corrupted Word file — its ZIP central directory offset is invalid. | It cannot be opened by Word, pandoc, or standard ZIP tooling; whatever project-charter content it held is currently inaccessible. | Locate a valid backup copy if one exists, or treat the content as lost and re-document the project charter separately. |
 | 8 | No User Manual, Quick Reference Guide, Known Issues log, or Release Notes existed in the repository before this handoff. | New team members previously had no onboarding documentation. | This document is the first pass at all four — keep it updated as the system changes. |
 | 9 | Lower-rank Analytics is intended to be company-wide, but its input is the raw `survey_response` projection restricted by RLS. | Supervisory users see only their department and Rank & File users see only their own records, so their charts cannot be company-wide. | Add a protected aggregate RPC/view; do not widen access to raw responses. See `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`. |
 | 10 | The UI can grant `renew-documents` to a non-Admin, while `partner_company` updates are Admin-only in RLS. | A delegated document renewal can appear optimistically in the browser and then fail to persist. | Add a narrowly validated renewal RPC or a server-side effective-permission rule before relying on delegated renewal. |
@@ -268,4 +270,4 @@ Summarized from the project's git commit history (first commit July 18, 2026 thr
 
 ### Admin evaluation navigation
 
-Admins open Evaluations > Evaluation Workspace and switch between Forms (form management), Responses (submitted answer inspection), and Coverage (company evaluation coverage). Archive Center and Import Evaluation Responses remain separate destinations. Evaluation Settings contains Category Labels. Existing route permissions and persistence contracts are unchanged.
+Admins open Evaluations > Workspace and switch between Forms (form management), Responses (submitted answer inspection), Coverage (company evaluation coverage), and Category Labels (scoring category display names). All four views share the same grouped tab layout and active-tab highlight. Archive and Import Responses remain separate destinations. Module headings and browser titles follow sidebar names, including Directory, Documents, Feedback, Workspace, Archive, Import Responses, and Users; descriptive subtitles are retained. Existing route permissions and persistence contracts are unchanged.

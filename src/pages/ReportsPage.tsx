@@ -1,10 +1,12 @@
+import { ExportHistoryPage } from './ExportHistoryPage';
+import type { ReportRecipe } from '../features/reports/domain/reportHistory';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Database, Download, FileBarChart, FileSpreadsheet, FileText, Table2, Handshake, Search } from 'lucide-react';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { formatNumber, getKpiSummary, questionPerformance, averageBySurveyType } from '../utils/analytics';
+import { formatNumber, getKpiSummary, questionPerformance, averageBySurveyType } from '../features/analytics/domain/analytics';
 import { formatCompositeScore } from '../data/questionWeights';
 import { getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
-import { ExportTable, exportTablesAsCSV, exportTablesAsExcel, exportTablesAsPDF } from '../utils/exporters';
+import { ExportTable, exportTablesAsCSV, exportTablesAsExcel, exportTablesAsPDF } from '../features/reports/services/exporters';
 import { CompanyReportBuilderPage } from './CompanyReportBuilderPage';
 import { QuestionReportBuilderPage } from './QuestionReportBuilderPage';
 import { SummaryReportBuilderPage } from './SummaryReportBuilderPage';
@@ -18,6 +20,7 @@ interface ReportsPageProps {
   companyReportResponses?: SurveyResponse[];
   partnerCompanies?: PartnerCompany[];
   canExport?: boolean;
+  initialRecipe?: ReportRecipe;
 }
 
 type ExportFormat = 'pdf' | 'csv' | 'excel';
@@ -28,12 +31,44 @@ function runExport(format: ExportFormat, reportTitle: string, tables: ExportTabl
   else exportTablesAsPDF(reportTitle, tables, filenameBase);
 }
 
-export function ReportsPage({ responses, rankingResponses = responses, companyReportResponses, partnerCompanies = [], canExport = false }: ReportsPageProps) {
-  const [showSummaryBuilder, setShowSummaryBuilder] = useState(false);
-  const [showCompanyBuilder, setShowCompanyBuilder] = useState(false);
-  const [showQuestionBuilder, setShowQuestionBuilder] = useState(false);
-  const [showExecutiveBuilder, setShowExecutiveBuilder] = useState(false);
-  const [showRawDataExport, setShowRawDataExport] = useState(false);
+export function ReportsPage(props: ReportsPageProps) {
+  const [tab, setTab] = useState(() => window.location.pathname.endsWith('/export-history') || new URLSearchParams(window.location.search).get('tab') === 'history' ? 'history' : 'generate');
+  const [recipe, setRecipe] = useState<ReportRecipe | undefined>(props.initialRecipe);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const sync = () => setTab(window.location.pathname.endsWith('/export-history') || new URLSearchParams(window.location.search).get('tab') === 'history' ? 'history' : 'generate');
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
+  const chooseTab = (next: string) => {
+    setTab(next);
+    const url = new URL(window.location.href);
+    if (next === 'history') url.searchParams.set('tab', 'history');
+    else url.searchParams.delete('tab');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+  };
+  return <div className="space-y-5">
+    <div role="tablist" aria-label="Reports" className="flex gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
+      {['generate', 'history'].map(value => <button key={value} type="button" role="tab" tabIndex={tab === value ? 0 : -1} onKeyDown={event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const next = event.key === 'Home' ? 'generate' : event.key === 'End' ? 'history' : value === 'generate' ? 'history' : 'generate';
+        chooseTab(next);
+        event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#reports-${next}`)?.focus();
+      }} aria-selected={tab === value} aria-controls="reports-panel" id={`reports-${value}`} className={tab === value ? 'primary-button' : 'secondary-button'} onClick={() => chooseTab(value)}>{value === 'generate' ? 'Generate' : 'History'}</button>)}
+    </div>
+    <div role="tabpanel" id="reports-panel" aria-labelledby={`reports-${tab}`}>
+      {tab === 'history' ? <ExportHistoryPage canExport={props.canExport} onRegenerate={saved => { setRecipe(saved); setRevision(value => value + 1); chooseTab('generate'); }} /> : <ReportGenerator key={revision} {...props} initialRecipe={recipe} />}
+    </div>
+  </div>;
+}
+
+function ReportGenerator({ initialRecipe, responses, rankingResponses = responses, companyReportResponses, partnerCompanies = [], canExport = false }: ReportsPageProps) {
+  const [showSummaryBuilder, setShowSummaryBuilder] = useState(initialRecipe?.kind === 'summary');
+  const [showCompanyBuilder, setShowCompanyBuilder] = useState(initialRecipe?.kind === 'company');
+  const [showQuestionBuilder, setShowQuestionBuilder] = useState(initialRecipe?.kind === 'question');
+  const [showExecutiveBuilder, setShowExecutiveBuilder] = useState(initialRecipe?.kind === 'executive');
+  const [showRawDataExport, setShowRawDataExport] = useState(initialRecipe?.kind === 'raw');
   const summary = getKpiSummary(responses);
   const allQuestionRows = questionPerformance(responses);
   const questionRows = allQuestionRows.slice(0, 5);
@@ -110,6 +145,7 @@ export function ReportsPage({ responses, rankingResponses = responses, companyRe
   if (showSummaryBuilder) {
     return (
       <SummaryReportBuilderPage
+        initialSettings={initialRecipe?.kind === 'summary' ? initialRecipe.parameters : undefined}
         responses={responses}
         rankingResponses={rankingResponses}
         partnerCompanies={partnerCompanies}
@@ -122,6 +158,7 @@ export function ReportsPage({ responses, rankingResponses = responses, companyRe
   if (showExecutiveBuilder) {
     return (
       <ExecutiveSummaryReportBuilderPage
+        initialSettings={initialRecipe?.kind === 'executive' ? initialRecipe.parameters : undefined}
         responses={responses}
         rankingResponses={rankingResponses}
         partnerCompanies={partnerCompanies}
@@ -134,6 +171,7 @@ export function ReportsPage({ responses, rankingResponses = responses, companyRe
   if (showCompanyBuilder) {
     return (
       <CompanyReportBuilderPage
+        initialSettings={initialRecipe?.kind === 'company' ? initialRecipe.parameters : undefined}
         responses={companyReportResponses ?? responses}
         partnerCompanies={partnerCompanies}
         canExport={canExport}
@@ -145,6 +183,7 @@ export function ReportsPage({ responses, rankingResponses = responses, companyRe
   if (showQuestionBuilder) {
     return (
       <QuestionReportBuilderPage
+        initialSettings={initialRecipe?.kind === 'question' ? initialRecipe.parameters : undefined}
         responses={responses}
         partnerCompanies={partnerCompanies}
         canExport={canExport}
@@ -156,6 +195,7 @@ export function ReportsPage({ responses, rankingResponses = responses, companyRe
   if (showRawDataExport) {
     return (
       <RawDataExportPage
+        initialCategory={initialRecipe?.parameters.category}
         responses={responses}
         canExport={canExport}
         onBack={() => setShowRawDataExport(false)}

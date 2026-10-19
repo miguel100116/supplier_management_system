@@ -11,10 +11,10 @@ import {
   Trophy,
   TrendingUp,
 } from 'lucide-react';
-import { SlideDeck } from '../components/SlideDeck';
+import { SlideDeck } from '../features/presentation/components/SlideDeck';
 import { StateMessage } from '../components/StateMessage';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { submissionCount } from '../utils/analytics';
+import { submissionCount } from '../features/analytics/domain/analytics';
 import {
   buildSlides,
   DATE_RANGE_OPTIONS,
@@ -23,7 +23,7 @@ import {
   filterByDateRange,
   PRESENTATION_CATEGORIES,
   PresentationCategoryId,
-} from '../utils/presentation';
+} from '../features/presentation/domain/presentation';
 
 interface PresentPageProps {
   responses: SurveyResponse[];

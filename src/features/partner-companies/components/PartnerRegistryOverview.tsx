@@ -1,6 +1,6 @@
 import React from 'react';
 import { Building, Check, ChevronDown, ChevronRight, Plus } from 'lucide-react';
-import type { CategoryRankSummary } from '../../../utils/categorySummary';
+import type { CategoryRankSummary } from '../domain/categorySummary';
 
 type StatusTab = 'Active' | 'Expired' | 'Incomplete' | 'Archived';
 
@@ -59,7 +59,7 @@ export function PartnerRegistryOverview({
     <>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-[30px]">Administrative Partner Registry</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-[30px]">Directory</h1>
           <p className="mt-1 text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">Manage accredited partner companies, compliance documentation, and branch accreditation company-wide.</p>
         </div>
         {isAdmin && (

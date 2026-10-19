@@ -3,20 +3,20 @@ import { useModalEscape } from '../hooks/useModalEscape';
 import { ClipboardList, Search, Eye, FormInput, X, Check, Award, Building2, CalendarClock, ArrowLeft, Archive, Send, Pencil, CircleCheck, Clock3, Info } from 'lucide-react';
 import { CustomForm, SurveyType, PartnerCompany, SurveyAccessRole } from '../types/survey';
 import { StateMessage } from '../components/StateMessage';
-import { CompletionStatusBar } from '../components/CompletionStatusBar';
+import { CompletionStatusBar } from '../features/evaluations/components/CompletionStatusBar';
 import { Pagination } from '../components/Pagination';
-import { getAllCompaniesOfType, getSurveyEvaluationCompanies, hasAnsweredItem } from '../utils/analytics';
-import { getReminderFrequency, saveReminderFrequency } from '../utils/reminderSettings';
+import { getAllCompaniesOfType, getSurveyEvaluationCompanies, hasAnsweredItem } from '../features/analytics/domain/analytics';
+import { getReminderFrequency, saveReminderFrequency } from '../features/notifications/services/reminderSettings';
 import { TableFilterBar } from '../components/TableFilterBar';
 import { SurveyFormsToolbar } from '../features/evaluations/components/SurveyFormsToolbar';
 import { compareDate, compareText, isWithinDateRange } from '../utils/tableFilters';
-import { getSurveyStatus } from '../utils/surveyStatus';
+import { getSurveyStatus } from '../features/evaluations/domain/surveyStatus';
 import { parseDDMMYYYY } from '../utils/time';
 import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domain/leaderboardSelection';
 import { CreateSurveyPage } from './CreateSurveyPage';
 import type { PersistedProfile } from '../features/account-management/domain/accountProfile';
 import { getEligibleFormRecipients, type DepartmentSurveyPermissions } from '../features/evaluations/domain/formRecipients';
-import { getAdminActivity, logAdminActivity, type AdminActivityEntry } from '../utils/adminActivityLog';
+import { getAdminActivity, logAdminActivity, type AdminActivityEntry } from '../features/account-management/services/adminActivityLog';
 
 interface SurveyFormsPageProps {
   surveys: CustomForm[];
@@ -218,6 +218,7 @@ export function SurveyFormsPage({
       setDistributionFeedback({ kind: 'success', text: 'Form changes saved. The updated questions are shown in the preview.' });
     } catch (error) {
       setPreviewEditError(error instanceof Error ? error.message : 'Unable to save the form changes. Please try again.');
+      throw error;
     } finally {
       setIsSavingPreviewEdit(false);
     }
@@ -909,7 +910,7 @@ export function SurveyFormsPage({
                               onClick={() => onSelectSurvey(survey.id)}
                               className="inline-flex items-center justify-center gap-2 w-36 rounded-lg border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 px-4 py-2 text-sm font-semibold transition cursor-pointer"
                               type="button"
-                              title="View survey details"
+                              title="View evaluation details"
                             >
                               <Eye size={16} />
                               <span>View</span>
@@ -1042,7 +1043,7 @@ export function SurveyFormsPage({
       )}
 
       {previewEditSurvey && (
-        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/45 p-2 sm:p-5" role="dialog" aria-modal="true" aria-label="Edit survey form">
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/45 p-2 sm:p-5" role="dialog" aria-modal="true" aria-label="Edit evaluation form">
           <section className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-900 sm:p-6"><div className="mb-3 flex justify-end"><button onClick={requestClosePreviewEdit} aria-label="Close editor"><X size={20}/></button></div>{previewEditError && <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{previewEditError}</p>}<CreateSurveyPage key={previewEditSurvey.id} surveyToEdit={previewEditSurvey} onBack={() => setPreviewEditSurveyId(null)} onRequestCloseReady={registerPreviewEditCloseRequest} onSave={handleSavePreviewEdit}/>{isSavingPreviewEdit && <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/25"><p className="rounded-lg bg-white px-5 py-3 font-semibold shadow">Saving form…</p></div>}</section>
         </div>
       )}
@@ -1640,7 +1641,7 @@ export function SurveyFormsPage({
                           }}
                           className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
                         />
-                        <span>Active Companies ({pickerCompanies.length})</span>
+                        <span>Active Partners ({pickerCompanies.length})</span>
                       </label>
                     </div>
 

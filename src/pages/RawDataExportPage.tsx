@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, Layers, PackageSearch, Table2, Truck } from 'lucide-react';
 import { SurveyResponse, SurveyType } from '../types/survey';
-import { exportRawResponsesAsCSV, exportRawResponsesAsExcel, exportRawResponsesAsPDF } from '../utils/rawResponseExport';
+import { exportRawResponsesAsCSV, exportRawResponsesAsExcel, exportRawResponsesAsPDF } from '../features/reports/services/rawResponseExport';
 
 interface RawDataExportPageProps {
   responses: SurveyResponse[];
   canExport?: boolean;
+  initialCategory?: SurveyType;
   onBack: () => void;
 }
 
@@ -17,7 +18,7 @@ const CATEGORY_CONFIG: { type: SurveyType; icon: typeof Truck; description: stri
   { type: 'Subcontractor', icon: Layers, description: 'Raw evaluation submissions for subcontractors, one merged sheet sorted by submission date.' },
 ];
 
-export function RawDataExportPage({ responses, canExport = false, onBack }: RawDataExportPageProps) {
+export function RawDataExportPage({ responses, canExport = false, onBack, initialCategory }: RawDataExportPageProps) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -32,7 +33,7 @@ export function RawDataExportPage({ responses, canExport = false, onBack }: RawD
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
-        {CATEGORY_CONFIG.map(({ type, icon, description }) => {
+        {CATEGORY_CONFIG.filter(item => !initialCategory || item.type === initialCategory).map(({ type, icon, description }) => {
           const typeResponses = responses.filter((r) => r.surveyType === type);
           const companyCount = new Set(typeResponses.map((r) => r.company)).size;
           return (

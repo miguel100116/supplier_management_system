@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarClock, ChevronLeft, Download, Search, SlidersHorizontal } from 'lucide-react';
 import type { CustomForm, SurveyResponse } from '../types/survey';
-import { getSurveyStatus } from '../utils/surveyStatus';
-import { logExport } from '../utils/exportHistory';
+import { getSurveyStatus } from '../features/evaluations/domain/surveyStatus';
+import { logExport } from '../features/reports/services/exportHistory';
 import {
   answerValue,
   buildSurveyResponseExport,

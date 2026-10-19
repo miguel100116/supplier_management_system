@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { BarChart3, FileText, LayoutDashboard, Moon, Sun, FilePlus, ClipboardCheck, ArrowLeft, Clock3, LogOut, ShieldAlert, Users, UserCog, ClipboardList, X } from 'lucide-react';
 import { EvaluationWorkspace, isEvaluationWorkspacePage } from './features/evaluations/components/EvaluationWorkspace';
 import { AccountMenu } from './components/AccountMenu';
-import { NotificationBell } from './components/NotificationBell';
-import { EmployeeNotificationBell } from './components/EmployeeNotificationBell';
+import { NotificationBell } from './features/notifications/components/NotificationBell';
+import { EmployeeNotificationBell } from './features/notifications/components/EmployeeNotificationBell';
 import { EmployeeWorkspacePage } from './features/employee-experience/components/EmployeeWorkspacePage';
 import type { EmployeeEvaluationFilter } from './features/employee-experience/domain/pendingEvaluations';
 import { Shell, NavItem } from './layouts/Shell';
@@ -32,9 +32,9 @@ import { isOfficialAnalyticsResponse } from './features/analytics/domain/respons
 import { filterCustomAnalyticsResponses, type AnalyticsDateRange } from './features/analytics/domain/dateRange';
 import { getVisibleSurveyForms } from './features/evaluations/domain/surveySelection';
 import type { SurveyFillerHandle } from './pages/SurveyFillerPage';
-import { logAdminActivity } from './utils/adminActivityLog';
+import { logAdminActivity } from './features/account-management/services/adminActivityLog';
 import { useSurveyData } from './hooks/useSurveyData';
-import { applyFilters, initialFilters, submissionCount } from './utils/analytics';
+import { applyFilters, initialFilters, submissionCount } from './features/analytics/domain/analytics';
 import { FilterState, SurveyType, CustomForm, SurveyResponse } from './types/survey';
 import { PageModuleKey, getDefaultPermissions, getEffectiveSurveyTypes, hasPageAccess, getDepartmentDefaultPermissions } from './utils/rbac';
 import { clearSessionActivity, recordSessionActivity, useIdleSessionTimeout } from './hooks/useIdleSessionTimeout';
@@ -133,15 +133,12 @@ const adminNavItems: NavItem<PageKey>[] = [
   {
     type: 'group',
     id: 'group-suppliers',
-    // "Partner Companies" (not "Suppliers") - the registry covers Couriers
-    // and Subcontractors too, and "Suppliers" is only one of those three
-    // categories.
-    label: 'Partner Companies',
+    label: 'Partners',
     icon: Users,
     children: [
-      { key: 'partner-companies', label: 'Partners' },
-      { key: 'document-register', label: 'Document Tracker' },
-      { key: 'partners-feedback-hub', label: 'Feedback Hub' },
+      { key: 'partner-companies', label: 'Directory' },
+      { key: 'document-register', label: 'Documents' },
+      { key: 'partners-feedback-hub', label: 'Feedback' },
     ],
   },
   {
@@ -150,9 +147,9 @@ const adminNavItems: NavItem<PageKey>[] = [
     label: 'Evaluations',
     icon: ClipboardCheck,
     children: [
-      { key: 'survey-forms', label: 'Evaluation Workspace' },
-      { key: 'archive', label: 'Archive Center' },
-      { key: 'import-evaluations', label: 'Import Evaluation Responses' },
+      { key: 'survey-forms', label: 'Workspace' },
+      { key: 'archive', label: 'Archive' },
+      { key: 'import-evaluations', label: 'Import Responses' },
     ],
   },
   // Single page already covers trends + company comparisons together, so
@@ -161,15 +158,14 @@ const adminNavItems: NavItem<PageKey>[] = [
   {
     type: 'group',
     id: 'group-reports',
-    label: 'Reports & Exports',
+    label: 'Reports',
     icon: FileText,
     children: [
-      { key: 'reports', label: 'Generate Report' },
-      { key: 'present', label: 'Present Mode' },
-      { key: 'export-history', label: 'Export History' },
+      { key: 'reports', label: 'Reports' },
+      { key: 'present', label: 'Present' },
     ],
   },
-  { key: 'account-management', label: 'Employees / Users', icon: UserCog },
+  { key: 'account-management', label: 'Users', icon: UserCog },
 ];
 
 const allSurveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
@@ -423,6 +419,9 @@ export default function App() {
     routeContext?: { surveyId?: string | null; editSurveyId?: string | null }
   ) => {
     const url = new URL(window.location.href);
+    if (page === 'reports' && url.pathname.endsWith('/export-history')) url.searchParams.set('tab', 'history');
+    if (page !== 'reports') url.searchParams.delete('tab');
+    if (page !== 'document-register') url.searchParams.delete('category');
     url.pathname = getPagePathname(page, ROUTE_BASE_PATH);
     url.searchParams.delete('surveyId');
     url.searchParams.delete('editSurveyId');
@@ -451,6 +450,7 @@ export default function App() {
     const routeParams = new URLSearchParams(window.location.search);
     return routeParams.get('surveyId') ?? routeParams.get('editSurveyId');
   });
+  const [editingSurveyId, setEditingSurveyId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('editSurveyId'));
   const [isEvaluationListOpen, setIsEvaluationListOpen] = useState(() => !new URLSearchParams(window.location.search).get('surveyId'));
   const [selectedEvaluationCompany, setSelectedEvaluationCompany] = useState('');
   const [employeeEvaluationFilter, setEmployeeEvaluationFilter] = useState<EmployeeEvaluationFilter>('All evaluations');
@@ -461,6 +461,9 @@ export default function App() {
     }
   }, [activePage]);
   const surveyFillerRef = useRef<SurveyFillerHandle>(null);
+  const createFormExitRef = useRef<((onAllowed: () => void, onCancelled?: () => void) => void) | null>(null);
+  const registerCreateFormExit = useCallback((guard: ((onAllowed: () => void, onCancelled?: () => void) => void) | null) => { createFormExitRef.current = guard; }, []);
+  const [documentCategory, setDocumentCategory] = useState<string | null>(() => new URLSearchParams(window.location.search).get('category'));
 
   // Any navigation away from the survey-filling page (sidebar Home logo, a
   // top-level nav item, or picking a different survey from the sidebar
@@ -468,10 +471,13 @@ export default function App() {
   // the respondent and offer to save a draft instead of silently discarding
   // their answers.
   const navigateFrom = (targetPage: PageKey, run: () => void) => {
+    const applyNavigation = () => { if (targetPage !== 'document-register') setDocumentCategory(null); run(); };
     if (activePage === 'fill-form' && targetPage !== 'fill-form' && surveyFillerRef.current) {
-      surveyFillerRef.current.attemptExit(run);
+      surveyFillerRef.current.attemptExit(applyNavigation);
+    } else if (activePage === 'create-form' && targetPage !== 'create-form' && createFormExitRef.current) {
+      createFormExitRef.current(applyNavigation);
     } else {
-      run();
+      applyNavigation();
     }
   };
 
@@ -484,6 +490,10 @@ export default function App() {
         updatePageUrl(targetPage, 'replace', routeContext);
       };
 
+      if (activePage === 'create-form' && routeContext?.editSurveyId !== undefined && routeContext.editSurveyId !== editingSurveyId && createFormExitRef.current) {
+        createFormExitRef.current(applyRouteContext);
+        return;
+      }
       const nextSurveyId = routeContext?.surveyId !== undefined ? routeContext.surveyId : currentSurveyId;
       if (shouldConfirmSurveySwitch(activePage, targetPage, currentSurveyId, nextSurveyId) && surveyFillerRef.current) {
         surveyFillerRef.current.attemptExit(applyRouteContext);
@@ -495,6 +505,7 @@ export default function App() {
 
     navigateFrom(targetPage, () => {
       pageHistoryRef.current.push(activePage);
+      if (targetPage === 'document-register') setDocumentCategory(new URLSearchParams(window.location.search).get('category'));
       if (routeContext?.surveyId !== undefined) setSelectedSurveyId(routeContext.surveyId);
       if (routeContext?.editSurveyId !== undefined) setEditingSurveyId(routeContext.editSurveyId);
       updatePageUrl(targetPage, 'push', routeContext);
@@ -540,9 +551,13 @@ export default function App() {
         updatePageUrl(targetPage, 'replace');
       }
       const routeParams = new URLSearchParams(window.location.search);
-      setSelectedSurveyId(routeParams.get('surveyId') ?? (targetPage === 'create-form' ? routeParams.get('editSurveyId') : null));
-      setEditingSurveyId(routeParams.get('editSurveyId'));
-      if (targetPage === activePage) return;
+      const changesEditor = activePage === 'create-form' && routeParams.get('editSurveyId') !== editingSurveyId;
+      const changesEvaluation = activePage === 'fill-form' && routeParams.get('surveyId') !== selectedSurveyId;
+      if (targetPage === activePage && !changesEditor && !changesEvaluation) {
+        setSelectedSurveyId(routeParams.get('surveyId') ?? null);
+        setDocumentCategory(targetPage === 'document-register' ? routeParams.get('category') : null);
+        return;
+      }
 
       const restoreCurrentHistoryEntry = () => {
         const traversal = browserHistoryRef.current.cancelPopNavigation(historyDelta);
@@ -553,12 +568,17 @@ export default function App() {
         window.history.go(traversal);
       };
       const acceptBrowserNavigation = () => {
+        setSelectedSurveyId(routeParams.get('surveyId') ?? (targetPage === 'create-form' ? routeParams.get('editSurveyId') : null));
+        setEditingSurveyId(routeParams.get('editSurveyId'));
+        setDocumentCategory(targetPage === 'document-register' ? routeParams.get('category') : null);
         pageHistoryRef.current = [];
         setActivePage(targetPage);
       };
 
       if (activePage === 'fill-form' && surveyFillerRef.current) {
         surveyFillerRef.current.attemptExit(acceptBrowserNavigation, restoreCurrentHistoryEntry);
+      } else if (activePage === 'create-form' && createFormExitRef.current) {
+        createFormExitRef.current(acceptBrowserNavigation, restoreCurrentHistoryEntry);
       } else {
         acceptBrowserNavigation();
       }
@@ -566,8 +586,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activePage, isPasswordRecovery]);
-  const [editingSurveyId, setEditingSurveyId] = useState<string | null>(() => new URLSearchParams(window.location.search).get('editSurveyId'));
+  }, [activePage, isPasswordRecovery, selectedSurveyId, editingSurveyId]);
 
   // Deep-link into Partner Companies' detail/edit panel for one specific
   // company (e.g. from a notification click-through).
@@ -760,22 +779,17 @@ export default function App() {
   const isAdminEvaluationWorkspace = isAdmin && isEvaluationWorkspacePage(activePage);
 
   const activeTitle = useMemo(() => {
-    if (isAdmin && isEvaluationWorkspacePage(activePage)) return 'Evaluation Workspace';
-    if (activePage === 'dashboard') {
-      return 'Dashboard';
-    }
-    if (activePage === 'partner-companies') return 'Administrative Partner Registry';
-    if (activePage === 'document-register') return 'Document Tracker';
-    if (activePage === 'account-management') return 'Account Management';
-    if (activePage === 'create-form') return editingSurveyId ? 'Edit Survey Form' : 'Create Survey Form';
+    const navigationPage = isAdminEvaluationWorkspace ? 'survey-forms' : activePage;
+    const navigationTitle = flatNavLeaves.find((page) => page.key === navigationPage)?.label;
+    if (navigationTitle) return navigationTitle;
+    if (activePage === 'create-form') return editingSurveyId ? 'Edit Evaluation Form' : 'Create Evaluation Form';
     if (activePage === 'view-form') {
       const selected = surveys.find((s) => s.id === selectedSurveyId);
-      return selected ? `Survey: ${selected.title}` : 'Survey Details';
+      return selected ? `Evaluation: ${selected.title}` : 'Evaluation Details';
     }
-    if (activePage === 'fill-form') return 'Fill Out Stakeholder Survey';
-    if (activePage === 'import-evaluations') return 'Import Evaluation Responses';
-    return flatNavLeaves.find((page) => page.key === activePage)?.label ?? 'Dashboard';
-  }, [activePage, selectedSurveyId, surveys, editingSurveyId, profile, isAdmin, flatNavLeaves]);
+    if (activePage === 'fill-form') return 'Fill Out Evaluation Survey';
+    return 'Dashboard';
+  }, [activePage, selectedSurveyId, surveys, editingSurveyId, isAdminEvaluationWorkspace, flatNavLeaves]);
 
   const pageHeading = useMemo(() => {
     if (activePage === 'dashboard') {
@@ -1130,6 +1144,14 @@ export default function App() {
     ),
     'document-register': (
       <DocumentRegisterPage
+        categoryFromUrl={documentCategory}
+        onCategoryChange={(category) => {
+          setDocumentCategory(category);
+          const url = new URL(window.location.href);
+          if (category === 'all') url.searchParams.delete('category');
+          else url.searchParams.set('category', category);
+          window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+        }}
         partnerCompanies={partnerCompanies}
         canRenewDocuments={canRenewDocuments}
         onUpdateCompany={updatePartnerCompany}
@@ -1291,28 +1313,27 @@ export default function App() {
     ),
     'create-form': (
       <CreateSurveyPage
+        key={editingSurveyId ?? 'new-form'}
+        onRequestExitReady={registerCreateFormExit}
+        onSaved={(savedForm) => {
+          if (savedForm) { setEditingSurveyId(null); navigateTo('view-form', { surveyId: savedForm.id }); }
+        }}
         onBack={() => {
           setEditingSurveyId(null);
           goToPreviousPage('survey-forms');
         }}
         surveyToEdit={editingSurveyId ? surveys.find(s => s.id === editingSurveyId) : undefined}
         categoryLabels={categoryLabels}
-        onSave={(surveyData) => {
+        onSave={async (surveyData) => {
           if (editingSurveyId) {
             const currentSurvey = surveys.find(s => s.id === editingSurveyId);
-            updateSurvey({
+            return await updateSurvey({
               ...surveyData,
               id: editingSurveyId,
               createdAt: currentSurvey?.createdAt || new Date().toISOString(),
             });
-            setEditingSurveyId(null);
-            navigateTo('view-form', { surveyId: selectedSurveyId });
-          } else {
-            const newSurvey = createSurvey(surveyData);
-            if (newSurvey) {
-              navigateTo('view-form', { surveyId: newSurvey.id });
-            }
           }
+          return await createSurvey(surveyData);
         }}
       />
     ),
@@ -1399,6 +1420,9 @@ export default function App() {
     'import-evaluations': (
       <ImportEvaluationsPage
         currentUserEmail={account || ''}
+        surveys={surveys}
+        responses={responses}
+        archivedResponses={archivedResponses}
         onPreview={previewRawEvaluations}
         onCommitBatch={commitRawEvaluationsBatch}
       />

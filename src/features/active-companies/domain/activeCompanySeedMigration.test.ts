@@ -19,7 +19,7 @@ test('seeds every distinct company from the three repository evaluation exports'
   const migration = readFileSync(MIGRATION_PATH, 'utf8');
 
   for (const { surveyType, fileName, expectedCount } of SEED_FILES) {
-    const file = readFileSync(path.join(ROOT, fileName));
+    const file = readFileSync(path.join(ROOT, 'reference-materials', 'source-data', fileName));
     const data = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer;
     const companies = parseActiveCompanyWorkbook(data, fileName, surveyType);
     const localSeed = REPOSITORY_ACTIVE_COMPANY_SEED.find((snapshot) => snapshot.surveyType === surveyType);

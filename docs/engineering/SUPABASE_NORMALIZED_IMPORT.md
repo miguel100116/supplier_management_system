@@ -6,7 +6,7 @@ Reverified on 2026-09-18: all four repository file hashes and source-row counts 
 
 ## Scope
 
-The process reads these repository files without modifying them:
+The process reads these files under `reference-materials/source-data/` without modifying them:
 
 - `Master List Tracker_V4_SMS Copy.csv`
 - `Microgenesis Supplier Evaluation Form.csv`
@@ -14,6 +14,8 @@ The process reads these repository files without modifying them:
 - `Microgenesis Subcontractor Evaluation Form.csv`
 
 The importer validates both the reviewed full-file SHA-256 checksum and the inspected header fingerprint of every file. Any source change stops the import until the changed file is inspected and the expected checksum is deliberately updated. The Master List header is found by the observed `#`, `BP Code`, and `BP Name` columns rather than by assuming row 1. Only rows after that header with a BP Name enter the business-data plan.
+
+The CSVs were relocated from the repository root on 2026-10-19 with their bytes and filenames preserved. Run the commands below from the repository root as before. `--project-root` accepts either a repository containing `reference-materials/source-data/` or a directory containing the four CSVs directly; when the nested source folder exists, the importer uses that folder for all four files. Source names stored in import records remain the original filenames.
 
 The additive migration is `supabase/migrations/202609150001_normalized_business_data.sql`. It does not alter the existing `suppliers` or `survey_responses` tables. All new tables have RLS enabled and grant no browser access yet.
 

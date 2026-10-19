@@ -1,3 +1,4 @@
+import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useModalEscape } from '../hooks/useModalEscape';
 import {
@@ -33,10 +34,10 @@ import {
 } from 'recharts';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { surveyTypeDisplayLabel, formatCompositeScore, getBand, ratingBands } from '../data/questionWeights';
-import { formatNumber, getScoreAxisDomain, questionPerformance } from '../utils/analytics';
-import { computeCompanyComposite, getCompanyTrend, getLeaderboard, getSectionPeerAverages } from '../utils/scoring';
-import { captureChartImage, exportCompanyReportAsDocx, exportCompanyReportAsPDF } from '../utils/companyReportExport';
-import { radarPointLabel } from '../utils/radarChartLabels';
+import { formatNumber, getScoreAxisDomain, questionPerformance } from '../features/analytics/domain/analytics';
+import { computeCompanyComposite, getCompanyTrend, getLeaderboard, getSectionPeerAverages } from '../features/evaluations/domain/scoring';
+import { captureChartImage, exportCompanyReportAsDocx, exportCompanyReportAsPDF } from '../features/reports/services/companyReportExport';
+import { radarPointLabel } from '../features/analytics/components/radarChartLabels';
 import {
   createCompanyReportData,
   getCompanyReportCommentId,
@@ -48,6 +49,7 @@ interface CompanyReportBuilderPageProps {
   responses: SurveyResponse[];
   partnerCompanies: PartnerCompany[];
   canExport?: boolean;
+  initialSettings?: ReportParameters;
   onBack: () => void;
 }
 
@@ -68,17 +70,17 @@ function formatMonthLabel(month: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 }
 
-export function CompanyReportBuilderPage({ responses, partnerCompanies, canExport, onBack }: CompanyReportBuilderPageProps) {
-  const [reportAudience, setReportAudience] = useState<ReportAudience>('internal');
-  const [category, setCategory] = useState<SurveyType>('Courier');
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
-  const [graphs, setGraphs] = useState({ bar: true, radar: true, trend: true, perQuestion: true });
-  const [includeComments, setIncludeComments] = useState(false);
+export function CompanyReportBuilderPage({ responses, partnerCompanies, canExport, onBack, initialSettings = {} }: CompanyReportBuilderPageProps) {
+  const [reportAudience, setReportAudience] = useState<ReportAudience>(initialSettings.reportAudience ?? 'internal');
+  const [category, setCategory] = useState<SurveyType>(initialSettings.category ?? 'Courier');
+  const [selectedCompany, setSelectedCompany] = useState<string>(initialSettings.selectedCompany ?? '');
+  const [graphs, setGraphs] = useState(initialSettings.graphs ?? ({ bar: true, radar: true, trend: true, perQuestion: true }));
+  const [includeComments, setIncludeComments] = useState(initialSettings.includeComments ?? false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState<'pdf' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const [selectedComments, setSelectedComments] = useState<Record<string, boolean>>({});
+  const [selectedComments, setSelectedComments] = useState<Record<string, boolean>>(initialSettings.selectedComments ?? ({}));
   const [isCommentsModalOpen, setIsCommentsModalOpen] = useState(false);
   const [tempSelectedComments, setTempSelectedComments] = useState<Record<string, boolean>>({});
   useModalEscape(isCommentsModalOpen, () => setIsCommentsModalOpen(false));
@@ -120,6 +122,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
         }
       }
 
+      if (category === initialSettings.category && selectedCompany === initialSettings.selectedCompany && initialSettings.selectedComments) savedSelection = initialSettings.selectedComments;
       const nextSelection: Record<string, boolean> = {};
       respondentComments.forEach((comment) => {
         const commentId = getCompanyReportCommentId(comment);
@@ -150,6 +153,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
 
   // Keep the company selection valid whenever the category changes.
   useEffect(() => {
+    if (selectedCompany === initialSettings.selectedCompany && category === initialSettings.category) return;
     if (!companyOptions.includes(selectedCompany)) {
       setSelectedCompany(companyOptions[0] ?? '');
     }
@@ -232,6 +236,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
   const handleExport = async (format: 'pdf' | 'docx') => {
     if (!composite || !selectedCompany) return;
     if (!selectedCompanyRecord) return;
+    if (!canExport) return;
     setIsExporting(format);
     setExportMenuOpen(false);
     try {
@@ -256,8 +261,8 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
         chartImages,
         selectedCommentIds: new Set(selectedCommentsList.map(getCompanyReportCommentId)),
       });
-      if (format === 'pdf') await exportCompanyReportAsPDF(data);
-      else await exportCompanyReportAsDocx(data);
+      if (format === 'pdf') await exportCompanyReportAsPDF(data, undefined, false, false, { kind: 'company' as const, parameters: { reportAudience, category, selectedCompany, graphs, includeComments, selectedComments } });
+      else await exportCompanyReportAsDocx(data, { kind: 'company' as const, parameters: { reportAudience, category, selectedCompany, graphs, includeComments, selectedComments } });
     } finally {
       setIsExporting(null);
     }
@@ -277,6 +282,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
 
   return (
     <div className="space-y-5">
+      {initialSettings.selectedCompany === selectedCompany && !companyOptions.includes(selectedCompany) && <p role="alert" className="text-sm text-amber-700">The saved company is unavailable in the current data. Select an available company before exporting.</p>}
       {/* Header / always-visible back option */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <button type="button" onClick={onBack} className="secondary-button">
@@ -284,7 +290,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
           <span>Back to Reports</span>
         </button>
         <div className="text-right">
-          <h2 className="text-base font-semibold">Companies Report Builder</h2>
+          <h2 className="text-base font-semibold">Partners Report Builder</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">Build a per-company PDF or Word report</p>
         </div>
       </div>

@@ -8,7 +8,7 @@ import { SurveyDateRangeQuestion } from '../features/evaluations/components/Surv
 import { RatingScale } from '../features/evaluations/components/RatingScale';
 import { resolveSelectableSurveyId } from '../features/evaluations/domain/surveySelection';
 import { getQuestionMaxPoints } from '../data/questionWeights';
-import { getSurveyEvaluationCompanies } from '../utils/analytics';
+import { getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
 import { EmployeeCompanyIcon } from '../features/employee-experience/components/EmployeeCompanyIcon';
 
 // Exposed to parent components (via ref) so that navigation triggered from
@@ -1243,7 +1243,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             {employeeExperience && <button type="button" className="draft-modal-close" aria-label="Close save progress dialog" onClick={handleCancelDraftModal}><X size={18} aria-hidden="true" /></button>}
             <div className={employeeExperience ? 'draft-modal-content' : 'p-6 space-y-4'}>
               <div className="draft-modal-heading">
-                <h2 id="draft-modal-title">Save your progress?</h2>
+                <h2 id="draft-modal-title">Unsaved changes</h2>
               </div>
               <p className="modal-subtitle" id="draft-modal-description">
                 You have an unfinished evaluation. Save your answers as a draft to continue later, or leave without saving.
@@ -1251,24 +1251,24 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
               {draftSaveError && <p className="draft-save-error" role="alert">{draftSaveError}</p>}
             </div>
             <div className={employeeExperience ? 'confirmation-actions' : 'bg-slate-50 dark:bg-slate-950/60 px-6 py-4 flex flex-col sm:flex-row gap-2 sm:justify-end border-t border-slate-100 dark:border-slate-800/50'}>
-              {!employeeExperience && <button
+              <button
                 type="button"
                 onClick={handleCancelDraftModal}
                 className="secondary-button order-last sm:order-none text-xs py-2"
-              >Cancel</button>}
+              >Continue Editing</button>
               <button
                 type="button"
                 onClick={handleExitWithoutSaving}
                 className={employeeExperience ? 'secondary-button exit-without-saving' : 'px-4 py-2 text-xs font-semibold rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-100 dark:text-rose-400 dark:bg-rose-950/30 dark:hover:bg-rose-950/60 dark:border-rose-900/40'}
               >
-                Exit Without Saving
+                Discard Changes
               </button>
               <button
                 type="button"
                 onClick={handleSaveDraft}
                 className={employeeExperience ? 'primary-button' : 'px-4 py-2 text-xs font-bold rounded-lg text-white bg-[#2187CD] hover:bg-[#176FAE] shadow-sm'}
               >
-                Save Draft & Exit
+                Save Changes
               </button>
             </div>
           </div>

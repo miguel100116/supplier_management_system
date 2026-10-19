@@ -4,7 +4,7 @@ import { ArchiveSeries, SurveyResponse, SurveyType } from '../../../types/survey
 import { formatCompositeScore } from '../../../data/questionWeights';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { getAnalyticsCompanyRankings } from '../domain/rankings';
-import { hasAnsweredItem } from '../../../utils/analytics';
+import { hasAnsweredItem } from '../domain/analytics';
 
 interface ArchivedCompanyRankingsProps {
   responses: SurveyResponse[];

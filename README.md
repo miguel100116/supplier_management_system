@@ -87,7 +87,7 @@ Each survey type's questions are grouped into **5 scored categories** plus a fix
 | **Supplier** | Documentation, Delivery, Price, Quality, Communication |
 | **Subcontractor** | Delivery, Documentation, Cost, Quality, Communication |
 
-- **Weighted rubric:** Each question carries a point value validated against the company's original paper evaluation forms (`src/data/questionWeights.ts`). Answers are scored, summed per category, and normalized so **every survey type shares one 0–100 composite axis** (`src/utils/scoring.ts`).
+- **Weighted rubric:** Each question carries a point value validated against the company's original paper evaluation forms (`src/data/questionWeights.ts`). Answers are scored, summed per category, and normalized so **every survey type shares one 0–100 composite axis** (`src/features/evaluations/domain/scoring.ts`).
 - **Score bands:** Composite scores map to labeled bands (e.g. Critical → Excellent). Companies with no scoreable answers yet get a distinct "No Score Yet" band instead of being mislabeled as failing.
 - **Ranking:** Analytics and company-ranking reports use Bayesian volume-weighted scoring: `(R × v + C × m) / (v + m)`, where `C` is the unweighted mean of peer company averages and `m` is the median peer response count (minimum 3) for the same partner type and reporting scope. Reports label the adjusted value **Volume-Weighted Score**; the rubric-based Composite Score remains unchanged.
 - **Renaming vs. rubric:** Admins can **rename** a category's display label via the **Categories Manager** without ever touching the underlying point values — display names are translated by slot position, keeping the validated rubric intact.
@@ -132,16 +132,20 @@ A **Data Scope** toggle further switches between *Current* (active period), *All
 
 ## 4. Modules
 
+The Admin sidebar groups **Directory**, **Documents**, and **Feedback** under **Partners**; **Workspace**, **Archive**, and **Import Responses** under **Evaluations**; and **Reports** and **Present** under the Reports group. Reports contains **Generate** and **History** tabs. Account management is labeled **Users**. Module headings and browser tab titles use these same navigation names; descriptive subtitles remain below the headings. These display labels do not change existing URLs or access permissions.
+
+Form headings use **Create Evaluation Form**, **Edit Evaluation Form**, **Evaluation Details**, and **Fill Out Evaluation Survey**. The company report screen is labeled **Partners Report Builder**; the evaluation company-picker preset is labeled **Active Partners**.
+
 | Module | What it does |
 |---|---|
 | **Dashboard** | Personalized performance indicators and KPIs. |
 | **Survey Forms** | View, fill, and publish feedback forms. Marking a form **Ended** archives the active results for its partner category; the category ranking remains available in Company Leaderboard → Archives and the archived responses remain in Archive Center. Legacy forms named with a leading Test/Tests label are hidden from employee evaluation choices and remain available to Admins. Respondent Info starts directly with the progress steps and has only “Proceed to Form Questions” in its footer; sidebar navigation and the later Questions Form Return actions remain available. Date-range questions support calendar pickers with month/year selection or typed `dd/mm/yyyy` dates; both dates are required and the end must be on or after the start. |
 | **Survey Explorer** | Review each survey submission, filter by respondent email, inspect answers, and export all or filtered responses to Excel. |
 | **Analytics** | Company statistical charts, trends, rankings, and company comparisons over the response data authorized for the current session. Company Leaderboard has Current rankings and Archives views; choosing an archived category-period opens its company ranking list. |
-| **Reports** | Summary / Company / Question / Executive-Summary builders + raw exports (PDF, Excel, CSV). |
+| **Reports** | Generate and History tabs for Summary / Company / Question / Executive-Summary builders and raw exports (PDF, Excel, CSV, Word where supported). Saved copies can be downloaded again; Regenerate opens saved builder options with current authorized data and filters. |
 | **Present** | Staggered slide-deck presentation builder (PDF/PPTX export). |
 | **Partner Companies** | Manage external courier, supplier, and subcontractor rosters, branches, documents, and the Admin-only dated Active Companies upload history. |
-| **Document Tracker** | Categorized compliance-document register across all partner companies. |
+| **Document Tracker** | Opens on All Categories with combined compliance figures. Category tabs filter the register; a valid `?category=supplier-local`, `supplier-foreign`, `courier`, or `subcontractor` link opens that category. Returning through normal navigation resets to All Categories. |
 | **Renew Compliance Documents** | Action permission: update document expiry/status without full Account Management access. |
 | **Partners Feedback Hub** | Send report cards to partner companies (single or bulk email via Microsoft Graph). |
 | **Account Management** | Create company-domain logins with a generated or customized initial password, and configure roles, ranks, departments, and per-user/per-department permissions. |
@@ -151,9 +155,13 @@ A **Data Scope** toggle further switches between *Current* (active period), *All
 | **Categories Manager** | Rename the display labels of scoring categories per survey type. |
 | **Settings / Profile** | A large modal opened from the account-session dropdown. Employees retain their full profile, impact, recent-submission, preference, and session view; Admins retain the complete Settings view with activity, import, and cache-management tools. |
 
+Reports uses `/reports`; `/generate-report` remains an alias, and `/export-history` redirects to `/reports?tab=history`. Export history is saved per authenticated user in Supabase. New Reports downloads retain their original file (up to 15 MB) and builder options; filenames use `sms_<report>_<UTC timestamp>_<unique suffix>.<extension>`. If history saving fails or the file exceeds the limit, the download still completes and an error is shown. Legacy entries without a saved file or options remain visible with unavailable actions disabled. Clear log requires confirmation and removes retained copies with their entries; it does not remove files already downloaded. Unattributed legacy browser caches are retained on the device and are not automatically assigned to a user.
+
 Form details show **Recent Form Submissions** in pages of 10, with the visible range and Previous/Next controls when needed.
 
-Select or drop one or more `.csv`, `.xlsx`, or `.xls` response exports on the Import Evaluation Responses page. Each file may contain one or more recognized forms; the normal **Import selected files** action accepts any category mix. Choose non-overlapping exports: duplicate source response IDs in one batch are rejected to prevent silent replacement. To check a batch without replacing existing evaluations, use **Test import**. Its responses appear in Analytics under the files' submission dates. In **Stored Source Files**, active imports can be moved to **Import History** with the archive action; this keeps the source file and all evaluation responses. Permanently remove is available only in Import History. Removing an ordinary archived file deletes that stored copy and its archive record while preserving evaluation responses and any other copies. Permanently removing a test import also deletes its tagged responses and temporary partner records. The selection X is shown only before importing. Ordinary imports may have replaced earlier responses; those earlier values cannot be restored by removing an archived source file, and ordinary partner records remain in the registry. If a temporary partner has since been referenced by another evaluation, test removal stops before deleting data.
+Unsaved form and category edits use an in-system warning with **Continue Editing**, **Discard Changes**, and **Save Changes** where available. Escape and backdrop dismissal continue editing. Form saves must pass validation and finish successfully before leaving; category saves retain their existing impact confirmation. Evaluation answers can be saved as a draft through the same action labels.
+
+Select or drop one or more `.csv`, `.xlsx`, or `.xls` response exports on the Import Evaluation Responses page. Each file may contain one or more recognized forms; the normal **Import selected files** action accepts any category mix. Choose non-overlapping exports: duplicate source response IDs in one batch are rejected to prevent silent replacement. To check a batch without replacing existing evaluations, use **Test import**. Its responses appear in Analytics under the files' submission dates. In **Stored Source Files**, **Active** requires current imported responses in that file's batch linked to an existing Active form in **Workspace > Manage Access**, including its deadline. An explicit response form ID is authoritative; older imports without one belong to their standard Workspace form. For legacy batches without response links, the newest standard Microgenesis CSV for an active default form also qualifies; explicitly archived/replaced files, test imports, and older copies do not. Files linked to deleted forms or archived responses remain in History even when another form of the same category is Active. Combined files qualify when their own batch links to any Active form; explicitly archived or replaced files remain in History until restored. Imports can be moved to **Import History** with the archive action; this keeps the source file and all evaluation responses. Permanently remove is available only in Import History. Removing an ordinary archived file deletes that stored copy and its archive record while preserving evaluation responses and any other copies. Permanently removing a test import also deletes its tagged responses and temporary partner records. The selection X is shown only before importing. Ordinary imports may have replaced earlier responses; those earlier values cannot be restored by removing an archived source file, and ordinary partner records remain in the registry. If a temporary partner has since been referenced by another evaluation, test removal stops before deleting data.
 
 ---
 
@@ -190,24 +198,32 @@ Supplier_Management_System/
 │   ├── App.tsx                 # Root: routing, RBAC resolution, data-scope wiring
 │   ├── main.tsx                # React entry point
 │   ├── layouts/Shell.tsx       # App shell (sidebar nav, header)
-│   ├── pages/                  # 31 page components (one per module/view)
-│   ├── components/             # 15 shared UI components (charts, bells, panels…)
-│   ├── services/               # Data source, MSAL auth, Graph mail, Supabase client
-│   ├── utils/                  # 29 domain utilities (rbac, scoring, exporters, compliance…)
+│   ├── pages/                  # Route composition, page layouts, workflow orchestration
+│   ├── components/             # Shared UI controls, charts, filters, and state messages
+│   ├── features/               # Feature-owned components, domain rules, services, and tests
+│   ├── services/               # Shared persistence, authentication, Graph, and Supabase access
+│   ├── utils/                  # Shared routing, permission, session, date, and table helpers
 │   ├── hooks/                  # useSurveyData (central data store), session and viewport hooks
 │   ├── data/                   # Survey questions, weights, and category definitions
-│   └── types/                  # TypeScript domain types (survey, feedbackHub)
+│   └── types/                  # Shared survey, partner, and application contracts
+├── reference-materials/         # Historical utilities, extracted form material, reviewed CSVs
+│   ├── scripts/                # Extraction, generation, and patch utilities
+│   ├── extracted/              # Existing extracted text, metadata, and question JSON
+│   └── source-data/            # Reviewed CSVs, original screenshots, and project charter
 ├── docs/
 │   ├── Admin_Manual.docx       # Full administrator manual
 │   ├── Employee_Manual.docx    # Full employee manual
 │   └── _build/                 # Scripts that generate the two .docx manuals
 ├── supabase/schema.sql         # DRAFT PostgreSQL schema (not yet applied)
 ├── server.ts                   # Express dev/production server
-├── screenshots/                # Reference screenshots (courier/supplier/subcontractor)
 ├── .env.example                # Environment variable template
 ├── SYSTEM_TURNOVER.md          # Detailed handoff / turnover documentation
 └── README.md                   # This file
 ```
+
+See [the feature directory map](docs/engineering/PROJECT_STRUCTURE.md) for ownership, moved modules, and shared boundaries. Tests remain beside the code they cover; `npm test` includes their current paths.
+
+See [reference materials](reference-materials/README.md) for the relocated utilities and CSV sources. Run legacy utilities from the repository root using their new paths. Normal application and build configuration remains at the root.
 
 ---
 
@@ -369,7 +385,7 @@ This system is **pre-production**. The most important open items (verified again
 | 3 | The first confirmed account defaults to Employee unless it uses the bootstrap `admin@mgenesis.com` identity. | Promote an approved user in `app_profiles` from the Supabase dashboard before testing Admin edits. |
 | 4 | The old draft `supabase/schema.sql` contains temporary anonymous policies and is not the applied staging schema. | Use versioned migrations only; never apply the draft file as-is. |
 | 5 | Microsoft login and Graph email are unavailable without Azure access. | Keep them disabled or obtain an approved Entra app registration later. |
-| 6 | `EFAS_Project_Charter.docx` in the project root is a corrupted Word file. | Restore from backup or re-document the charter separately. |
+| 6 | `reference-materials/source-data/EFAS_Project_Charter.docx` is a corrupted Word file. | Restore from backup or re-document the charter separately. |
 
 ---
 
@@ -393,4 +409,4 @@ This system is **pre-production**. The most important open items (verified again
 
 ### Admin evaluation navigation
 
-Admins open Evaluations > Evaluation Workspace and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), Coverage (company evaluation coverage), and Category Labels (display names for scoring categories). Archive Center and Import Evaluation Responses remain separate destinations. Existing route permissions and persistence contracts are unchanged.
+Admins open Evaluations > Workspace and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), Coverage (company evaluation coverage), and Category Labels (display names for scoring categories). All four views share the same grouped tab layout and active-tab highlight; tabs wrap on narrow screens. Archive and Import Responses remain separate destinations. Existing route permissions and persistence contracts are unchanged.

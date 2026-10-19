@@ -1,8 +1,8 @@
 import type { CustomForm, SurveyType } from '../../../types/survey';
 import { parseDDMMYYYY } from '../../../utils/time';
-import { getSurveyStatus } from '../../../utils/surveyStatus';
+import { getSurveyStatus } from '../../evaluations/domain/surveyStatus';
 
-const DEFAULT_SURVEY_IDS: Record<SurveyType, string> = {
+export const DEFAULT_SURVEY_IDS: Record<SurveyType, string> = {
   Courier: 'default-courier',
   Supplier: 'default-supplier',
   Subcontractor: 'default-subcontractor',

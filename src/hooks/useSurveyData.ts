@@ -7,23 +7,23 @@ import {
   MasterListSourceFile,
   mergeMasterListSourceFiles,
   prepareMasterListSourceFiles,
-} from '../utils/masterListImport';
-import { importArchivedResponsesFromFile, ArchiveImportResult } from '../utils/archiveResponseTransfer';
+} from '../features/partner-companies/services/masterListImport';
+import { importArchivedResponsesFromFile, ArchiveImportResult } from '../features/archives/services/archiveResponseTransfer';
 import {
   previewRawEvaluationImport as previewRawEvaluationImportFile,
   commitRawEvaluationImport as commitRawEvaluationImportRows,
   RawEvalPreview,
   RawEvalImportSummary,
   CompanyDecision,
-} from '../utils/rawEvaluationImport';
-import { logAdminActivity } from '../utils/adminActivityLog';
-import { computeCompanyDocumentSummary, computeDocumentStatus, EXPIRING_SOON_DAYS } from '../utils/compliance';
+} from '../features/evaluation-imports/services/rawEvaluationImport';
+import { logAdminActivity } from '../features/account-management/services/adminActivityLog';
+import { computeCompanyDocumentSummary, computeDocumentStatus, EXPIRING_SOON_DAYS } from '../features/document-tracker/domain/compliance';
 import { parseDeploymentEnvironment, submissionSourceForEnvironment } from '../features/analytics/domain/responseProvenance';
 import { reconcileEvaluationBatchPartners } from '../features/evaluation-imports/domain/evaluationBatch';
 import { prepareDefaultSurveysForReactivation } from '../features/evaluation-imports/domain/surveyReactivation';
 import { testImportToken } from '../features/evaluation-imports/domain/testImport';
-import { getRequiredDocumentKeys } from '../utils/documentRequirements';
-import { getNotificationSettings, NOTIFICATION_SETTINGS_CHANGED_EVENT } from '../utils/documentNotificationSettings';
+import { getRequiredDocumentKeys } from '../features/document-tracker/domain/documentRequirements';
+import { getNotificationSettings, NOTIFICATION_SETTINGS_CHANGED_EVENT } from '../features/notifications/services/documentNotificationSettings';
 import { loadNormalizedPartnerCompanies, normalizeDatabasePartnerCompany } from '../services/normalizedPartnerCompanies';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getSupabaseSessionEmail } from '../services/supabasePasswordAuth';
@@ -43,13 +43,13 @@ import {
   upsertApplicationRecords,
 } from '../services/applicationRepository';
 import { CATEGORIES_STORAGE_KEY, DEFAULT_CATEGORIES, LEGACY_OVERALL_CATEGORY, OVERALL_CATEGORY, getStoredCategoryLabels } from '../data/questionCategories';
-import type { NotificationReadState } from '../utils/notificationReadState';
+import type { NotificationReadState } from '../features/notifications/domain/notificationReadState';
 import {
   createNotificationReadState,
   newestNotificationReadState,
   notificationReadStateUserKey,
   parseNotificationReadState,
-} from '../utils/notificationReadState';
+} from '../features/notifications/domain/notificationReadState';
 import { createCoalescedTaskRunner } from '../utils/coalescedTask';
 
 // Versioned browser cache for the authenticated Partner Company registry.
@@ -1668,7 +1668,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   }, [currentUserEmail, isAdmin]);
 
   // Create a new survey form
-  const createSurvey = (newForm: Omit<CustomForm, 'id' | 'createdAt'>) => {
+  const createSurvey = async (newForm: Omit<CustomForm, 'id' | 'createdAt'>) => {
     const id = `survey-${Date.now()}`;
     const createdAt = new Date().toISOString();
     const surveyWithId: CustomForm = {
@@ -1677,10 +1677,10 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       createdAt,
     };
 
+    if (isSupabaseConfigured) await persistRemoteAsync(upsertApplicationRecords('survey', [surveyWithId], (survey) => survey.id));
     const updatedSurveys = [surveyWithId, ...surveys];
     setSurveys(updatedSurveys);
     safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys));
-    persistRemote(replaceApplicationRecords('survey', updatedSurveys, (survey) => survey.id));
     return surveyWithId;
   };
 
@@ -2426,7 +2426,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
   // Extra early heads-up notifications, per document type, configured via
   // the Document Register's "Add Notification" settings screen (see
-  // src/utils/documentNotificationSettings.ts) - on top of the standard
+  // src/features/notifications/services/documentNotificationSettings.ts) - on top of the standard
   // 30-day "Expiring Soon" alert already covered by documentNotifications
   // above. Defaults to the client's DTI Registration requirement ("Notify
   // admin at 60-day and 30-day expiration milestones"): the 30-day one is
