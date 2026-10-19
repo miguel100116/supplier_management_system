@@ -88,7 +88,7 @@ export function PastResultsTab({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter past survey results by title or company..."
+            placeholder="Search results by form title or survey type..."
             className="field text-xs !mt-0"
             style={{ paddingLeft: '2.75rem' }}
           />
