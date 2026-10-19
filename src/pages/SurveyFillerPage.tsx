@@ -8,7 +8,7 @@ import { SurveyDateRangeQuestion } from '../features/evaluations/components/Surv
 import { RatingScale } from '../features/evaluations/components/RatingScale';
 import { resolveSelectableSurveyId } from '../features/evaluations/domain/surveySelection';
 import { getQuestionMaxPoints } from '../data/questionWeights';
-import { getSurveyEvaluationCompanies } from '../utils/analytics';
+import { getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
 import { EmployeeCompanyIcon } from '../features/employee-experience/components/EmployeeCompanyIcon';
 
 // Exposed to parent components (via ref) so that navigation triggered from

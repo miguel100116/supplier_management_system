@@ -1,7 +1,7 @@
 import { formatCompositeScore, getBand, ratingBands, type ScoreBand } from '../../../data/questionWeights';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
-import { computeRankScore } from '../../../utils/analytics';
-import { computeCompanyComposite, getLeaderboard } from '../../../utils/scoring';
+import { computeRankScore } from './analytics';
+import { computeCompanyComposite, getLeaderboard } from '../../evaluations/domain/scoring';
 
 export interface CompanyRankingCandidate {
   name: string;

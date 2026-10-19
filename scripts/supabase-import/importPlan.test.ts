@@ -62,6 +62,13 @@ test('creates the same logical rows and identifiers on every run', () => {
   }
 });
 
+test('an explicit CSV directory produces the same import plan as the reorganized repository', () => {
+  const repositoryPlan = buildImportPlan(projectRoot);
+  const directSourcePlan = buildImportPlan(resolve(projectRoot, 'reference-materials', 'source-data'));
+
+  assert.deepEqual(directSourcePlan, repositoryPlan);
+});
+
 test('preserves Master List presentation rows outside the import dataset', () => {
   const plan = buildImportPlan(projectRoot);
   const masterSource = plan.sourceFiles.find((row) => row.source_key === 'master-list-v4-sms-copy');

@@ -1,6 +1,6 @@
 import type { PartnerCompany } from '../../../types/survey';
-import { normalizeCompanyName } from '../../../utils/masterListImport';
-import type { RawEvalCommitResult, RawEvalPreview } from '../../../utils/rawEvaluationImport';
+import { normalizeCompanyName } from '../../partner-companies/services/masterListImport';
+import type { RawEvalCommitResult, RawEvalPreview } from '../services/rawEvaluationImport';
 import type { EvaluationImportArchive } from './importArchive';
 import { testImportToken } from './testImport';
 

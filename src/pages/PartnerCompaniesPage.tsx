@@ -32,19 +32,19 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { AccreditationStatus, BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin, SurveyResponse, SurveyType } from '../types/survey';
-import { getMaxRatingForResponses } from '../utils/analytics';
-import { computeCompanyComposite } from '../utils/scoring';
+import { getMaxRatingForResponses } from '../features/analytics/domain/analytics';
+import { computeCompanyComposite } from '../features/evaluations/domain/scoring';
 import { formatCompositeScore } from '../data/questionWeights';
-import { branchAwareCompanyLabel, computeDocumentStatus, computeCompanyDocumentSummary, CompanyDocumentSummary, isNTBranch } from '../utils/compliance';
-import { computeCategoryRankSummary } from '../utils/categorySummary';
-import { getRequiredDocumentKeys, isExpiryDocument } from '../utils/documentRequirements';
-import { findMissingProfileFields, MISSING_FIELD_LABELS, MissingProfileField } from '../utils/dataCompleteness';
+import { branchAwareCompanyLabel, computeDocumentStatus, computeCompanyDocumentSummary, CompanyDocumentSummary, isNTBranch } from '../features/document-tracker/domain/compliance';
+import { computeCategoryRankSummary } from '../features/partner-companies/domain/categorySummary';
+import { getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
+import { findMissingProfileFields, MISSING_FIELD_LABELS, MissingProfileField } from '../features/partner-companies/domain/dataCompleteness';
 import {
   ImportResult,
   MasterListImportReview,
   MasterListSourceFile,
   masterListRowKey,
-} from '../utils/masterListImport';
+} from '../features/partner-companies/services/masterListImport';
 import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
 import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';

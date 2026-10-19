@@ -1,12 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, ChevronRight, Info, Trophy, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CompanyAnalysisPanel } from '../components/CompanyAnalysisPanel';
+import { CompanyAnalysisPanel } from '../features/analytics/components/CompanyAnalysisPanel';
 import { PageDescription } from '../components/PageDescription';
 import { StateMessage } from '../components/StateMessage';
 import { ArchiveSeries, FilterState, PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { formatNumber, hasAnsweredItem, monthlyTrend, questionPerformance, responseVolume, seriesTrend, submissionCount, submissionScores, yearlyTrend } from '../utils/analytics';
-import { computeCompanyComposite } from '../utils/scoring';
+import { formatNumber, hasAnsweredItem, monthlyTrend, questionPerformance, responseVolume, seriesTrend, submissionCount, submissionScores, yearlyTrend } from '../features/analytics/domain/analytics';
+import { computeCompanyComposite } from '../features/evaluations/domain/scoring';
 import { analyticsBands, getAnalyticsBand, getAnalyticsCompanyRankings, getAnalyticsScore, paginateAnalyticsItems, paginateCompanyRankings } from '../features/analytics/domain/rankings';
 import { QuestionPerformanceRow } from '../features/analytics/components/QuestionPerformanceRow';
 import { getValueColorBand } from '../features/analytics/domain/valueColorBand';

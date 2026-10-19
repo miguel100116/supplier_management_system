@@ -87,7 +87,7 @@ Each survey type's questions are grouped into **5 scored categories** plus a fix
 | **Supplier** | Documentation, Delivery, Price, Quality, Communication |
 | **Subcontractor** | Delivery, Documentation, Cost, Quality, Communication |
 
-- **Weighted rubric:** Each question carries a point value validated against the company's original paper evaluation forms (`src/data/questionWeights.ts`). Answers are scored, summed per category, and normalized so **every survey type shares one 0–100 composite axis** (`src/utils/scoring.ts`).
+- **Weighted rubric:** Each question carries a point value validated against the company's original paper evaluation forms (`src/data/questionWeights.ts`). Answers are scored, summed per category, and normalized so **every survey type shares one 0–100 composite axis** (`src/features/evaluations/domain/scoring.ts`).
 - **Score bands:** Composite scores map to labeled bands (e.g. Critical → Excellent). Companies with no scoreable answers yet get a distinct "No Score Yet" band instead of being mislabeled as failing.
 - **Ranking:** Analytics and company-ranking reports use Bayesian volume-weighted scoring: `(R × v + C × m) / (v + m)`, where `C` is the unweighted mean of peer company averages and `m` is the median peer response count (minimum 3) for the same partner type and reporting scope. Reports label the adjusted value **Volume-Weighted Score**; the rubric-based Composite Score remains unchanged.
 - **Renaming vs. rubric:** Admins can **rename** a category's display label via the **Categories Manager** without ever touching the underlying point values — display names are translated by slot position, keeping the validated rubric intact.
@@ -190,24 +190,32 @@ Supplier_Management_System/
 │   ├── App.tsx                 # Root: routing, RBAC resolution, data-scope wiring
 │   ├── main.tsx                # React entry point
 │   ├── layouts/Shell.tsx       # App shell (sidebar nav, header)
-│   ├── pages/                  # 31 page components (one per module/view)
-│   ├── components/             # 15 shared UI components (charts, bells, panels…)
-│   ├── services/               # Data source, MSAL auth, Graph mail, Supabase client
-│   ├── utils/                  # 29 domain utilities (rbac, scoring, exporters, compliance…)
+│   ├── pages/                  # Route composition, page layouts, workflow orchestration
+│   ├── components/             # Shared UI controls, charts, filters, and state messages
+│   ├── features/               # Feature-owned components, domain rules, services, and tests
+│   ├── services/               # Shared persistence, authentication, Graph, and Supabase access
+│   ├── utils/                  # Shared routing, permission, session, date, and table helpers
 │   ├── hooks/                  # useSurveyData (central data store), session and viewport hooks
 │   ├── data/                   # Survey questions, weights, and category definitions
-│   └── types/                  # TypeScript domain types (survey, feedbackHub)
+│   └── types/                  # Shared survey, partner, and application contracts
+├── reference-materials/         # Historical utilities, extracted form material, reviewed CSVs
+│   ├── scripts/                # Extraction, generation, and patch utilities
+│   ├── extracted/              # Existing extracted text, metadata, and question JSON
+│   └── source-data/            # Reviewed CSVs, original screenshots, and project charter
 ├── docs/
 │   ├── Admin_Manual.docx       # Full administrator manual
 │   ├── Employee_Manual.docx    # Full employee manual
 │   └── _build/                 # Scripts that generate the two .docx manuals
 ├── supabase/schema.sql         # DRAFT PostgreSQL schema (not yet applied)
 ├── server.ts                   # Express dev/production server
-├── screenshots/                # Reference screenshots (courier/supplier/subcontractor)
 ├── .env.example                # Environment variable template
 ├── SYSTEM_TURNOVER.md          # Detailed handoff / turnover documentation
 └── README.md                   # This file
 ```
+
+See [the feature directory map](docs/engineering/PROJECT_STRUCTURE.md) for ownership, moved modules, and shared boundaries. Tests remain beside the code they cover; `npm test` includes their current paths.
+
+See [reference materials](reference-materials/README.md) for the relocated utilities and CSV sources. Run legacy utilities from the repository root using their new paths. Normal application and build configuration remains at the root.
 
 ---
 
@@ -369,7 +377,7 @@ This system is **pre-production**. The most important open items (verified again
 | 3 | The first confirmed account defaults to Employee unless it uses the bootstrap `admin@mgenesis.com` identity. | Promote an approved user in `app_profiles` from the Supabase dashboard before testing Admin edits. |
 | 4 | The old draft `supabase/schema.sql` contains temporary anonymous policies and is not the applied staging schema. | Use versioned migrations only; never apply the draft file as-is. |
 | 5 | Microsoft login and Graph email are unavailable without Azure access. | Keep them disabled or obtain an approved Entra app registration later. |
-| 6 | `EFAS_Project_Charter.docx` in the project root is a corrupted Word file. | Restore from backup or re-document the charter separately. |
+| 6 | `reference-materials/source-data/EFAS_Project_Charter.docx` is a corrupted Word file. | Restore from backup or re-document the charter separately. |
 
 ---
 

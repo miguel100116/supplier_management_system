@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ClipboardList } from 'lucide-react';
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { getSurveyEvaluationCompanies, hasAnsweredItem } from '../utils/analytics';
+import { getSurveyEvaluationCompanies, hasAnsweredItem } from '../features/analytics/domain/analytics';
 import { StateMessage } from '../components/StateMessage';
 import { Pagination } from '../components/Pagination';
 

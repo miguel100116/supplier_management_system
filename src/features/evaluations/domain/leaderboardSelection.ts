@@ -1,6 +1,6 @@
 import type { PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { isOfficialAnalyticsResponse } from '../../analytics/domain/responseProvenance';
-import { getLeaderboard } from '../../../utils/scoring';
+import { getLeaderboard } from './scoring';
 
 export const EVALUATION_LEADERBOARD_SELECTION_SIZE = 20;
 

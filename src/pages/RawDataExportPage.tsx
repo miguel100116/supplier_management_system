@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, Layers, PackageSearch, Table2, Truck } from 'lucide-react';
 import { SurveyResponse, SurveyType } from '../types/survey';
-import { exportRawResponsesAsCSV, exportRawResponsesAsExcel, exportRawResponsesAsPDF } from '../utils/rawResponseExport';
+import { exportRawResponsesAsCSV, exportRawResponsesAsExcel, exportRawResponsesAsPDF } from '../features/reports/services/rawResponseExport';
 
 interface RawDataExportPageProps {
   responses: SurveyResponse[];

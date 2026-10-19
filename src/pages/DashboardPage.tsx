@@ -31,8 +31,8 @@ import {
   getSurveyEvaluationCompanies,
   hasAnsweredItem,
   computeRankScore,
-} from '../utils/analytics';
-import { computeCategoryRankSummary } from '../utils/categorySummary';
+} from '../features/analytics/domain/analytics';
+import { computeCategoryRankSummary } from '../features/partner-companies/domain/categorySummary';
 import { formatCompositeScore } from '../data/questionWeights';
 import { selectSurveyResponses } from '../features/evaluations/domain/surveyResponses';
 

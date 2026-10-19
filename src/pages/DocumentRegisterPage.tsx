@@ -5,17 +5,17 @@ import { Pagination } from '../components/Pagination';
 import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, SlidersHorizontal, Trash2, Filter } from 'lucide-react';
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin } from '../types/survey';
-import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isNTBranch } from '../utils/compliance';
-import { getRequiredDocumentKeys, isExpiryDocument } from '../utils/documentRequirements';
-import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../utils/documentModificationLog';
-import { ComplianceSnapshot, getComplianceHistory, saveComplianceHistory } from '../utils/complianceHistory';
+import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isNTBranch } from '../features/document-tracker/domain/compliance';
+import { getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
+import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../features/document-tracker/services/documentModificationLog';
+import { ComplianceSnapshot, getComplianceHistory, saveComplianceHistory } from '../features/document-tracker/services/complianceHistory';
 import {
   DocNotificationRule,
   DEFAULT_NOTIFICATION_RULES,
   getNotificationSettings,
   saveNotificationSettings,
   restoreDefaultNotificationSettings,
-} from '../utils/documentNotificationSettings';
+} from '../features/notifications/services/documentNotificationSettings';
 import { ChartCard } from '../components/ChartCard';
 import { PageDescription } from '../components/PageDescription';
 import { useIsMobile } from '../hooks/useIsMobile';

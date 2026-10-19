@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FileText, FileSpreadsheet, FileType, Trash2, Search } from 'lucide-react';
-import { clearExportHistory, ExportHistoryEntry, getExportHistory } from '../utils/exportHistory';
+import { clearExportHistory, ExportHistoryEntry, getExportHistory } from '../features/reports/services/exportHistory';
 import { StateMessage } from '../components/StateMessage';
 import { formatLogDate, formatLogTime, formatRelativeTime } from '../utils/time';
 

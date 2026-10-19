@@ -3,20 +3,20 @@ import { useModalEscape } from '../hooks/useModalEscape';
 import { ClipboardList, Search, Eye, FormInput, X, Check, Award, Building2, CalendarClock, ArrowLeft, Archive, Send, Pencil, CircleCheck, Clock3, Info } from 'lucide-react';
 import { CustomForm, SurveyType, PartnerCompany, SurveyAccessRole } from '../types/survey';
 import { StateMessage } from '../components/StateMessage';
-import { CompletionStatusBar } from '../components/CompletionStatusBar';
+import { CompletionStatusBar } from '../features/evaluations/components/CompletionStatusBar';
 import { Pagination } from '../components/Pagination';
-import { getAllCompaniesOfType, getSurveyEvaluationCompanies, hasAnsweredItem } from '../utils/analytics';
-import { getReminderFrequency, saveReminderFrequency } from '../utils/reminderSettings';
+import { getAllCompaniesOfType, getSurveyEvaluationCompanies, hasAnsweredItem } from '../features/analytics/domain/analytics';
+import { getReminderFrequency, saveReminderFrequency } from '../features/notifications/services/reminderSettings';
 import { TableFilterBar } from '../components/TableFilterBar';
 import { SurveyFormsToolbar } from '../features/evaluations/components/SurveyFormsToolbar';
 import { compareDate, compareText, isWithinDateRange } from '../utils/tableFilters';
-import { getSurveyStatus } from '../utils/surveyStatus';
+import { getSurveyStatus } from '../features/evaluations/domain/surveyStatus';
 import { parseDDMMYYYY } from '../utils/time';
 import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domain/leaderboardSelection';
 import { CreateSurveyPage } from './CreateSurveyPage';
 import type { PersistedProfile } from '../features/account-management/domain/accountProfile';
 import { getEligibleFormRecipients, type DepartmentSurveyPermissions } from '../features/evaluations/domain/formRecipients';
-import { getAdminActivity, logAdminActivity, type AdminActivityEntry } from '../utils/adminActivityLog';
+import { getAdminActivity, logAdminActivity, type AdminActivityEntry } from '../features/account-management/services/adminActivityLog';
 
 interface SurveyFormsPageProps {
   surveys: CustomForm[];

@@ -33,7 +33,7 @@ import {
   getKpiSummary,
   averageBySurveyType,
   questionPerformance
-} from '../utils/analytics';
+} from '../features/analytics/domain/analytics';
 import { formatCompositeScore, getBand, getRemarkText } from '../data/questionWeights';
 import { getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
 

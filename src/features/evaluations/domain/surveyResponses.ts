@@ -1,6 +1,6 @@
 import type { CustomForm, SurveyResponse } from '../../../types/survey';
 import { isScoredQuestion } from '../../../data/questionWeights';
-import { submissionScores } from '../../../utils/analytics';
+import { submissionScores } from '../../analytics/domain/analytics';
 
 export interface SurveySubmission {
   id: string;

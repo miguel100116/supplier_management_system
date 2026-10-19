@@ -46,7 +46,7 @@ import {
   getKpiSummary,
   averageBySurveyType,
   numericRating
-} from '../utils/analytics';
+} from '../features/analytics/domain/analytics';
 import { getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
 
 interface ExecutiveSummaryReportBuilderPageProps {
