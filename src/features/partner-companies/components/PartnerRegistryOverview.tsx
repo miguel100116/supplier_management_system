@@ -22,7 +22,7 @@ interface PartnerRegistryOverviewProps {
 
 const FAMILIES = ['Supplier-Local', 'Supplier-Foreign', 'Courier', 'Subcontractor'] as const;
 const STATUS_LABELS: Record<StatusTab, string> = {
-  Active: 'Active',
+  Active: 'Total',
   Incomplete: 'Incomplete Profile',
   Expired: 'Expired',
   Archived: 'Archived',
@@ -110,7 +110,7 @@ export function PartnerRegistryOverview({
                   onClick={() => onStatusChange(value)}
                   className={'inline-flex h-9 min-w-0 w-full cursor-pointer items-center justify-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[13px] font-medium transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--registry-blue)] focus-visible:ring-offset-1 @max-[280px]:h-auto @max-[280px]:min-h-9 @max-[280px]:flex-col @max-[280px]:gap-0 ' + (status === value ? 'bg-[var(--registry-blue)] text-white' : 'text-[color:var(--registry-text)] hover:bg-white/80 dark:hover:bg-slate-800')}
                 >
-                  <span>{value === 'Incomplete' ? 'Incomplete' : value}</span>
+                  <span>{value === 'Incomplete' ? 'Incomplete' : STATUS_LABELS[value]}</span>
                   <span className={'tabular-nums text-[13px] ' + (status === value ? 'text-white/80' : statusCounts[value] === 0 ? 'text-[color:var(--registry-muted)] opacity-60' : 'text-[color:var(--registry-muted)]')}>{statusCounts[value].toLocaleString()}</span>
                 </button>
               ))}
