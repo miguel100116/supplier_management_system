@@ -20,6 +20,12 @@ test('SMS-50 preserves archived and undated manual statuses', () => {
   assert.equal(getSurveyStatus({ status: 'Running', deadlineDate: 'bad date' }, afterDeadlineEnds), 'Running');
 });
 
+test('explicit manual endings remain ended before a future deadline until reopened', () => {
+  const ended = { status: 'Completed' as const, deadlineDate: '31/12/2026', manuallyEndedAt: '2026-10-20T00:00:00Z' };
+  assert.equal(getSurveyStatus(ended, beforeDeadlineEnds), 'Completed');
+  assert.equal(getSurveyStatus({ ...ended, status: 'Running', manuallyEndedAt: undefined }, beforeDeadlineEnds), 'Running');
+});
+
 test('SMS-50 does not treat a stale Completed value before a future deadline as manual completion', () => {
   const survey: CustomForm = {
     id: 'future-form',

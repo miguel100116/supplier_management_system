@@ -29,6 +29,29 @@ test('global header keeps the logo and renders no title text or separator', () =
   assert.doesNotMatch(headerSource ?? '', />\s*\/\s*</);
 });
 
+test('login audience switch shares responsive headings and validates the selected type before entering the app', () => {
+  const source = readFileSync(new URL('../pages/LoginPage.tsx', import.meta.url), 'utf8');
+  assert.match(source, /useState<LoginRole>\('Employee'\)/);
+  assert.match(source, /loginAudience === 'Admin' \? 'Vendor Management System' : 'Vendor Performance Evaluation'/);
+  assert.equal((source.match(/\{loginHeading\}/g) ?? []).length, 2);
+  assert.match(source, /role="group" aria-label="Account sign-in heading"/);
+  assert.match(source, /disabled=\{isMsSigningIn \|\| isPasswordSubmitting\}\s+aria-pressed=\{loginAudience === audience\}\s+onClick=\{\(\) => setLoginAudience\(audience\)\}/);
+  assert.equal((source.match(/await onLogin\(loginAudience,/g) ?? []).length, 3);
+  assert.match(APP_SOURCE, /if \(cancelled \|\| loginPending.current\) return;\s+setAccount\(email\)/);
+  assert.match(APP_SOURCE, /loginPending.current = true;[\s\S]*?await signInForRole\(role, authenticate\);[\s\S]*?setAccount\(email\);[\s\S]*?finally \{\s+loginPending.current = false/);
+  assert.doesNotMatch(source, /Supplier Management Performance Evaluation Survey Analytics/);
+});
+
+test('employee quick guide is beside the header actions instead of in the sidebar', () => {
+  const source = readFileSync(new URL('../features/employee-experience/components/EmployeeExperienceShell.tsx', import.meta.url), 'utf8');
+  const sidebar = source.match(/<aside\b[\s\S]*?<\/aside>/)?.[0] ?? '';
+  const header = source.match(/<header\b[\s\S]*?<\/header>/)?.[0] ?? '';
+
+  assert.doesNotMatch(sidebar, /sidebar-help|View quick guide|A little guidance/);
+  assert.match(header, /aria-label="View quick guide"[\s\S]*?aria-haspopup="dialog"[\s\S]*?onClick=\{\(\) => setIsHelpOpen\(true\)\}[\s\S]*?<Icon name="help" \/>[\s\S]*?\{action\}/);
+  assert.match(source, /useModalEscape\(isHelpOpen,/);
+});
+
 test('background data refresh keeps the active page mounted with an in-page loading indicator', () => {
   assert.match(APP_SOURCE, /\{pageContent\}[\s\S]*?isRefreshing[\s\S]*?Refreshing shared data/);
   assert.doesNotMatch(APP_SOURCE, /isRefreshing\s*\?\s*\([\s\S]*?Refreshing shared data[\s\S]*?\)\s*:\s*pageContent/);

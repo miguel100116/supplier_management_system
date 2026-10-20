@@ -8,7 +8,7 @@ Use your company email and the password provided by your administrator. Some dep
 
 ![Sign-in screen](screenshots/shared/sign-in.png)
 
-The employee menu usually has **Dashboard**, **New Evaluation**, and **My Submissions**. Your top-right bell shows reminders. The account menu opens your profile and settings. Your available forms depend on your assignments and access.
+The employee menu has **Home**, **Evaluations**, and **My submissions**. Your top-right bell shows reminders. Select the question mark beside the bell to open the quick guide. The account menu opens your profile and settings. Your available forms depend on your assignments and access.
 
 The pictures in this guide show a clean preview account with no assigned forms or submissions. The example email address and empty counts are not real company data. Your screen will show the information available to your account.
 

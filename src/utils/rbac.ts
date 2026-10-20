@@ -23,6 +23,20 @@ export interface UserPermissions {
   surveyTypes: SurveyType[];
 }
 
+export function getProfilePermissions(
+  profile: { role: string; designation: string; department: string; permissions?: UserPermissions } | null,
+  departments: Record<string, UserPermissions>,
+): UserPermissions {
+  if (!profile) return { pages: [], surveyTypes: [] };
+  if (profile.role === 'Admin') return getDefaultPermissions('Admin', profile.department);
+  const granted = profile.permissions ?? getDefaultPermissions(profile.designation, profile.department);
+  const ceiling = departments[profile.department] ?? getDepartmentDefaultPermissions(profile.department);
+  return {
+    pages: granted.pages.filter((page) => ceiling.pages.includes(page)),
+    surveyTypes: granted.surveyTypes.filter((type) => ceiling.surveyTypes.includes(type)),
+  };
+}
+
 /**
  * Account-level survey access is the permission boundary. A survey's own
  * department/designation settings can further narrow which forms an employee

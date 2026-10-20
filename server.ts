@@ -3,6 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { accountProvisioningClient, accountRequestErrorHandler, createAccountHandler } from './server/createAccount';
 import { loadServerEnvironment, publicRuntimeConfig } from './server/environment';
+import { analyticsHandler } from './server/analytics';
 
 async function startServer() {
   const isProduction =
@@ -10,6 +11,7 @@ async function startServer() {
   const env = loadServerEnvironment(isProduction ? 'production' : 'development');
   const app = express();
   const PORT = Number(env.PORT || 3000);
+  app.get('/api/analytics', analyticsHandler(accountProvisioningClient(env)));
 
   app.post('/api/admin/accounts', express.json({ limit: '8kb' }),
     createAccountHandler(accountProvisioningClient(env)));

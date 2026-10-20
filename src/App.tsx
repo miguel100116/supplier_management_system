@@ -8,10 +8,10 @@ import { EmployeeNotificationBell } from './features/notifications/components/Em
 import { EmployeeWorkspacePage } from './features/employee-experience/components/EmployeeWorkspacePage';
 import type { EmployeeEvaluationFilter } from './features/employee-experience/domain/pendingEvaluations';
 import { Shell, NavItem } from './layouts/Shell';
-import { LoginPage, MicrosoftAuth } from './pages/LoginPage';
+import { LoginPage } from './pages/LoginPage';
 import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage';
 import { restoreMicrosoftAccount, logoutMicrosoft, isMsalConfigured } from './services/msalAuth';
-import { signIntoSupabaseWithMicrosoft, signOutSupabase } from './services/authBridge';
+import { signInForRole, signOutSupabase, type LoginAttempt, type LoginRole } from './services/authBridge';
 import { isSupabaseConfigured, supabase } from './services/supabaseClient';
 import { getSupabaseSessionEmail } from './services/supabasePasswordAuth';
 import { createAccount } from './features/account-management/services/createAccount';
@@ -34,16 +34,17 @@ import { getVisibleSurveyForms } from './features/evaluations/domain/surveySelec
 import type { SurveyFillerHandle } from './pages/SurveyFillerPage';
 import { logAdminActivity } from './features/account-management/services/adminActivityLog';
 import { useSurveyData } from './hooks/useSurveyData';
+import { useCompanyWideAnalytics } from './features/analytics/hooks/useCompanyWideAnalytics';
 import { applyFilters, initialFilters, submissionCount } from './features/analytics/domain/analytics';
 import { FilterState, SurveyType, CustomForm, SurveyResponse } from './types/survey';
-import { PageModuleKey, getDefaultPermissions, getEffectiveSurveyTypes, hasPageAccess, getDepartmentDefaultPermissions } from './utils/rbac';
+import { PageModuleKey, getProfilePermissions, getEffectiveSurveyTypes, hasPageAccess, getDepartmentDefaultPermissions } from './utils/rbac';
 import { clearSessionActivity, recordSessionActivity, useIdleSessionTimeout } from './hooks/useIdleSessionTimeout';
 import { formatSessionTimeRemaining } from './utils/sessionTimeout';
 import { useModalEscape } from './hooks/useModalEscape';
 import { getPageKeyFromPathname, getPageNavigationMode, getPagePathname, shouldConfirmSurveySwitch, type PageKey } from './utils/pageRouting';
 import { createBrowserPageHistory } from './utils/pageHistory';
 
-const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ AnalyticsPage }) => ({ default: AnalyticsPage })));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ CompanyWideAnalyticsPage }) => ({ default: CompanyWideAnalyticsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })));
 const NotificationLogsPage = lazy(() => import('./pages/NotificationLogsPage').then(({ NotificationLogsPage }) => ({ default: NotificationLogsPage })));
 const EmployeeNotificationLogsPage = lazy(() => import('./pages/EmployeeNotificationLogsPage').then(({ EmployeeNotificationLogsPage }) => ({ default: EmployeeNotificationLogsPage })));
@@ -75,12 +76,8 @@ function applyAccessFilter(
   list: SurveyResponse[],
   profile: { email: string; role: string; designation: string; department: string } | null,
   effectiveSurveyTypes: SurveyType[],
-  activePage: string
 ): SurveyResponse[] {
   if (!profile) return [];
-  if (activePage === 'analytics') {
-    return list; // Analytics remains company-wide for all users
-  }
 
   if (profile.role === 'Admin' || profile.designation === 'Executive' || profile.designation === 'Director') {
     return list.filter((r) => effectiveSurveyTypes.includes(r.surveyType));
@@ -174,6 +171,7 @@ export default function App() {
   const [accountPersistenceError, setAccountPersistenceError] = useState<string | null>(null);
   const [realtimeSyncUnavailable, setRealtimeSyncUnavailable] = useState(false);
   const [account, setAccount] = useState<string | null>(null);
+  const loginPending = useRef(false);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => {
     if (typeof window === 'undefined') return false;
     const hashType = new URLSearchParams(window.location.hash.slice(1)).get('type');
@@ -329,31 +327,10 @@ export default function App() {
   );
 
   // centralize user permissions mapping based on active profile and overrides
-  const userPermissions = useMemo(() => {
-    if (!profile) return { pages: [] as PageModuleKey[], surveyTypes: [] as SurveyType[] };
-    
-    // The persisted Admin role always has full access. Ignore stale account
-    // overrides so they cannot narrow an administrator's modules or data.
-    if (profile.role === 'Admin') {
-      return {
-        pages: [
-          'dashboard', 'survey-forms', 'explorer', 'analytics', 'reports', 'present',
-          'partner-companies', 'document-register', 'renew-documents', 'partners-feedback-hub', 'account-management', 'notifications', 'archive', 'import-evaluations',
-        ] as PageModuleKey[],
-        surveyTypes: ['Courier', 'Supplier', 'Subcontractor'] as SurveyType[]
-      };
-    }
-
-    const defaults = getDefaultPermissions(profile.designation, profile.department);
-    const userPages = (profile.permissions?.pages ?? defaults.pages) as PageModuleKey[];
-    const userSurveyTypes = (profile.permissions?.surveyTypes ?? defaults.surveyTypes) as SurveyType[];
-
-    const deptPerms = departmentPermissions[profile.department] || getDepartmentDefaultPermissions(profile.department);
-    return {
-      pages: userPages.filter(p => deptPerms.pages.includes(p)) as PageModuleKey[],
-      surveyTypes: userSurveyTypes.filter(t => deptPerms.surveyTypes.includes(t)) as SurveyType[]
-    };
-  }, [profile, departmentPermissions]);
+  const userPermissions = useMemo(
+    () => getProfilePermissions(profile, departmentPermissions),
+    [profile, departmentPermissions],
+  );
 
   // Only the persisted system role confers administrator privileges. Page
   // permissions may expose a destination, but must never elevate a user to
@@ -631,6 +608,11 @@ export default function App() {
     return getEffectiveSurveyTypes(userPermissions.surveyTypes);
   }, [userPermissions.surveyTypes]);
 
+  const companyWideAnalytics = useCompanyWideAnalytics({
+    scope: dataScope, types: effectiveSurveyTypes, dateRange: analyticsDateRange, series: selectedSeriesIds,
+  }, JSON.stringify([profile?.email, userPermissions]),
+  authChecked && Boolean(account) && !isPasswordRecovery && !isSupabaseHydrating && hasPageAccess(userPermissions.pages, 'analytics', isAdmin));
+
   const canExport = useMemo(() => {
     if (!profile) return false;
     return profile.role === 'Admin' || profile.designation !== 'Rank & File';
@@ -638,8 +620,8 @@ export default function App() {
 
   // Centralized Data Isolation & Filtering based on user department/rank/permitted types
   const userAccessibleResponses = useMemo(
-    () => applyAccessFilter(responses, profile, effectiveSurveyTypes, activePage),
-    [responses, profile, effectiveSurveyTypes, activePage]
+    () => applyAccessFilter(responses, profile, effectiveSurveyTypes),
+    [responses, profile, effectiveSurveyTypes]
   );
 
   // The same active responses merged with every archived period, still
@@ -649,8 +631,8 @@ export default function App() {
   // is a safe, dedup-free union of the full history.
   const historyResponsesRaw = useMemo(() => [...responses, ...archivedResponses], [responses, archivedResponses]);
   const userAccessibleAllTimeResponses = useMemo(
-    () => applyAccessFilter(historyResponsesRaw, profile, effectiveSurveyTypes, activePage),
-    [historyResponsesRaw, profile, effectiveSurveyTypes, activePage]
+    () => applyAccessFilter(historyResponsesRaw, profile, effectiveSurveyTypes),
+    [historyResponsesRaw, profile, effectiveSurveyTypes]
   );
   // Custom includes active and archived history within the local calendar
   // dates; selecting named series optionally narrows it to those periods.
@@ -659,8 +641,8 @@ export default function App() {
     [historyResponsesRaw, analyticsDateRange, selectedSeriesIds]
   );
   const userAccessibleCustomResponses = useMemo(
-    () => applyAccessFilter(customScopedResponsesRaw, profile, effectiveSurveyTypes, activePage),
-    [customScopedResponsesRaw, profile, effectiveSurveyTypes, activePage]
+    () => applyAccessFilter(customScopedResponsesRaw, profile, effectiveSurveyTypes),
+    [customScopedResponsesRaw, profile, effectiveSurveyTypes]
   );
   // Whichever of the three the current toggle selects - this is what most
   // scope-aware pages (Dashboard/Reports/Present/Explorer) should consume.
@@ -671,9 +653,6 @@ export default function App() {
 
   const userAccessibleAllResponses = useMemo(() => {
     if (!profile) return [];
-    if (activePage === 'analytics') {
-      return responses;
-    }
 
     if (profile.role === 'Admin' || profile.designation === 'Executive' || profile.designation === 'Director') {
       return responses.filter(r => effectiveSurveyTypes.includes(r.surveyType));
@@ -694,7 +673,7 @@ export default function App() {
     }
 
     return responses.filter(r => effectiveSurveyTypes.includes(r.surveyType));
-  }, [responses, profile, effectiveSurveyTypes, activePage]);
+  }, [responses, profile, effectiveSurveyTypes]);
 
   const userAccessibleSurveys = useMemo(() => {
     return getVisibleSurveyForms(surveys, profile?.role === 'Admin').filter((survey) => {
@@ -728,11 +707,6 @@ export default function App() {
     () => applyFilters(officialAnalyticsResponses, filters),
     [officialAnalyticsResponses, filters],
   );
-  const analyticsArchivedResponses = useMemo(
-    () => archivedResponses.filter(isOfficialAnalyticsResponse),
-    [archivedResponses],
-  );
-  
   const activeSurveyTypes = filters.surveyType.length ? filters.surveyType : effectiveSurveyTypes;
 
 
@@ -832,7 +806,7 @@ export default function App() {
     if (isSupabaseConfigured) {
       let cancelled = false;
       const applyEmail = (email: string | null) => {
-        if (cancelled) return;
+        if (cancelled || loginPending.current) return;
         setAccount(email);
         if (email) localStorage.setItem('user_account', email);
         else localStorage.removeItem('user_account');
@@ -998,18 +972,20 @@ export default function App() {
     return () => window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshSharedStore);
   }, [account, profile, isAdmin]);
 
-  const handleLogin = async (email: string, auth?: MicrosoftAuth) => {
-    if (auth) {
-      const result = await signIntoSupabaseWithMicrosoft(auth.idToken, auth.nonce);
-      if (!result.ok) {
-        throw new Error(result.error || 'Unable to establish the required Supabase session.');
-      }
+  const handleLogin = async (role: LoginRole, authenticate: LoginAttempt) => {
+    if (loginPending.current) return;
+    loginPending.current = true;
+    try {
+      const email = await signInForRole(role, authenticate);
+      if (!email) return;
+      recordSessionActivity(email);
+      setAccount(email);
+      localStorage.setItem('user_account', email);
+      const requestedPage = getPageKeyFromPathname(window.location.pathname, ROUTE_BASE_PATH);
+      resetNavigationTo(requestedPage === 'login' ? 'dashboard' : requestedPage);
+    } finally {
+      loginPending.current = false;
     }
-    recordSessionActivity(email);
-    setAccount(email);
-    localStorage.setItem('user_account', email);
-    const requestedPage = getPageKeyFromPathname(window.location.pathname, ROUTE_BASE_PATH);
-    resetNavigationTo(requestedPage === 'login' ? 'dashboard' : requestedPage);
   };
 
   const completePasswordRecovery = async () => {
@@ -1170,7 +1146,7 @@ export default function App() {
         onNavigatePage={(p) => navigateTo(p as PageKey)}
         onMarkSurveyComplete={(id) => {
           const survey = surveys.find((candidate) => candidate.id === id);
-          if (survey) updateSurvey({ ...survey, status: 'Completed' });
+          if (survey) updateSurvey({ ...survey, status: 'Completed', manuallyEndedAt: survey.manuallyEndedAt || new Date().toISOString() });
         }}
       />
     ),
@@ -1213,9 +1189,9 @@ export default function App() {
     ),
     analytics: (
       <AnalyticsPage
-        responses={analyticsFilteredResponses}
-        archivedResponses={analyticsArchivedResponses}
+        analytics={companyWideAnalytics}
         activeSurveyTypes={activeSurveyTypes}
+        permittedSurveyTypes={effectiveSurveyTypes}
         filters={filters}
         setFilters={setFilters}
         dataScope={dataScope}
@@ -1225,7 +1201,6 @@ export default function App() {
         onChangeSelectedSeriesIds={setSelectedSeriesIds}
         dateRange={analyticsDateRange}
         onChangeDateRange={setAnalyticsDateRange}
-        partnerCompanies={userAccessiblePartnerCompanies}
       />
     ),
     present: <PresentPage responses={scopedAccessibleResponses} partnerCompanies={userAccessiblePartnerCompanies} />,

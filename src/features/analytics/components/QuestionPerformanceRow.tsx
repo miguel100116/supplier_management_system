@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatNumber } from '../domain/analytics';
 import { getValueColorBand } from '../domain/valueColorBand';
 
 interface QuestionPerformanceRowProps {
@@ -38,7 +39,7 @@ export function QuestionPerformanceRow({ rank, question, average }: QuestionPerf
         </span>
       </span>
       <span className={`shrink-0 pt-0.5 text-xs font-bold tabular-nums ${scoreColors.text}`}>
-        {average.toFixed(1)}
+        {formatNumber(average)}
       </span>
     </li>
   );

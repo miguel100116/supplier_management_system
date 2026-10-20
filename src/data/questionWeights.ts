@@ -114,8 +114,7 @@ export const ratingBands: Record<SurveyType, ScoreBand[]> = {
 // survey type (see computeCompanyComposite in scoring.ts).
 export function getBand(surveyType: SurveyType, percentScore: number): ScoreBand {
   const bands = ratingBands[surveyType];
-  const roundedScore = Math.round((percentScore + Number.EPSILON) * 10) / 10;
-  return bands.find((band) => roundedScore >= band.min) ?? bands[bands.length - 1];
+  return bands.find((band) => percentScore >= band.min) ?? bands[bands.length - 1];
 }
 
 // Full remark text for a band - same as the label, except the Courier/

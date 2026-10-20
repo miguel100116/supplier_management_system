@@ -8,17 +8,13 @@ import {
   requestSupabasePasswordReset,
 } from '../services/supabasePasswordAuth';
 import { PasswordInput } from '../components/PasswordInput';
+import type { LoginAttempt, LoginRole } from '../services/authBridge';
 
-// Passed up to App so it can establish the Supabase session (RLS) from the
-// Microsoft ID token. `auth` is optional only so non-Microsoft/dev callers
-// still type-check; the real sign-in path always provides it.
-export interface MicrosoftAuth {
-  idToken: string;
-  nonce: string;
-}
+// Keep the existing token contract available to sign-in callers.
+export type { MicrosoftAuth } from '../services/authBridge';
 
 interface LoginPageProps {
-  onLogin: (email: string, auth?: MicrosoftAuth) => Promise<void>;
+  onLogin: (role: LoginRole, authenticate: LoginAttempt) => Promise<void>;
 }
 
 // Ambient dot texture for the hero panel — kept extremely faint (2–5% via the
@@ -116,6 +112,8 @@ function HeroIllustration({ className }: { className?: string }) {
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
+  const [loginAudience, setLoginAudience] = useState<LoginRole>('Employee');
+  const loginHeading = loginAudience === 'Admin' ? 'Vendor Management System' : 'Vendor Performance Evaluation';
   const msalReady = isMsalConfigured();
   const [isMsSigningIn, setIsMsSigningIn] = useState(false);
   const [msError, setMsError] = useState('');
@@ -129,13 +127,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setMsError('');
     setIsMsSigningIn(true);
     try {
-      const result = await loginWithMicrosoft();
-      const normalized = result.email.trim().toLowerCase();
-      if (!normalized.endsWith('@mgenesis.com')) {
-        setMsError('Access is restricted to verified @mgenesis.com accounts.');
-        return;
-      }
-      await onLogin(normalized, { idToken: result.idToken, nonce: result.nonce });
+      await onLogin(loginAudience, async () => {
+        const result = await loginWithMicrosoft();
+        const normalized = result.email.trim().toLowerCase();
+        if (!normalized.endsWith('@mgenesis.com')) {
+          throw new Error('Access is restricted to verified @mgenesis.com accounts.');
+        }
+        return { email: normalized, auth: { idToken: result.idToken, nonce: result.nonce } };
+      });
     } catch (err) {
       setMsError(err instanceof Error ? err.message : 'Microsoft sign-in failed. Please try again.');
     } finally {
@@ -149,8 +148,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setPasswordMessage('');
     setIsPasswordSubmitting(true);
     try {
-      const authenticatedEmail = await signInWithSupabasePassword(email, password);
-      await onLogin(authenticatedEmail);
+      await onLogin(loginAudience, async () => ({ email: await signInWithSupabasePassword(email, password) }));
     } catch (err) {
       setPasswordError(err instanceof Error ? err.message : 'Unable to sign in.');
     } finally {
@@ -163,12 +161,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setPasswordMessage('');
     setIsPasswordSubmitting(true);
     try {
-      const result = await signUpWithSupabasePassword(email, password);
-      if (result.signedIn) {
-        await onLogin(result.email);
-      } else {
+      await onLogin(loginAudience, async () => {
+        const result = await signUpWithSupabasePassword(email, password);
+        if (result.signedIn) return { email: result.email };
         setPasswordMessage('Check your company email, confirm the account, then return here to sign in.');
-      }
+        return null;
+      });
     } catch (err) {
       setPasswordError(err instanceof Error ? err.message : 'Unable to create the account.');
     } finally {
@@ -205,7 +203,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <div className="mt-8 flex max-w-xs items-center gap-3 text-left">
             <img src="/smpesa_icon.png" alt="" className="h-9 w-9 shrink-0 object-contain" />
             <h1 className="min-w-0 text-xl font-medium leading-snug tracking-tight text-white">
-              Supplier Management Performance Evaluation Survey Analytics
+              {loginHeading}
             </h1>
           </div>
           <p className="mt-4 max-w-xs text-xs font-light leading-relaxed text-[#93aec9]">
@@ -240,7 +238,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 <div className="flex items-center gap-5">
                   <img src="/smpesa_icon.png" alt="" className="h-16 w-16 shrink-0 object-contain lg:h-20 lg:w-20" />
                   <h2 className="min-w-0 text-4xl font-medium leading-snug tracking-tight text-white lg:text-5xl">
-                    Supplier Management Performance Evaluation Survey Analytics
+                    {loginHeading}
                   </h2>
                 </div>
               </motion.div>
@@ -266,8 +264,23 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               className="mb-8 h-8 object-contain object-left md:mb-10 md:h-9"
             />
 
+            <div className="mb-6 flex gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="Account sign-in heading">
+              {(['Admin', 'Employee'] as const).map((audience) => (
+                <button
+                  key={audience}
+                  type="button"
+                  disabled={isMsSigningIn || isPasswordSubmitting}
+                  aria-pressed={loginAudience === audience}
+                  onClick={() => setLoginAudience(audience)}
+                  className={`flex-1 rounded-md px-2 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] focus-visible:ring-offset-2 ${loginAudience === audience ? 'bg-white text-[#0063a9] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  {audience} Account
+                </button>
+              ))}
+            </div>
+
             <div className="mb-7">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#0063a9]">SMPESA</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#0063a9]">{loginAudience} Account</p>
               <h1 className="mt-1.5 text-2xl font-medium text-slate-900">Welcome back</h1>
               <p className="mt-1.5 text-sm font-light text-slate-500">
                 {isSupabaseConfigured
@@ -277,7 +290,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </div>
 
             {(msError || passwordError) && (
-              <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose">
+              <p role="alert" className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose">
                 {msError || passwordError}
               </p>
             )}
@@ -318,7 +331,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 </div>
                 <button
                   type="submit"
-                  disabled={isPasswordSubmitting}
+                  disabled={isPasswordSubmitting || isMsSigningIn}
                   className="w-full rounded-lg bg-[#0063a9] py-2.5 text-sm font-semibold text-white transition hover:bg-[#00558f] disabled:opacity-70"
                 >
                   {isPasswordSubmitting ? 'Please wait…' : 'Sign in'}
@@ -326,7 +339,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 <button
                   type="button"
                   onClick={handleCreateAccount}
-                  disabled={isPasswordSubmitting || !email || password.length < 8}
+                  disabled={isPasswordSubmitting || isMsSigningIn || !email || password.length < 8}
                   className="w-full rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Create staging account
@@ -334,7 +347,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 <button
                   type="button"
                   onClick={handlePasswordResetRequest}
-                  disabled={isPasswordSubmitting || !email}
+                  disabled={isPasswordSubmitting || isMsSigningIn || !email}
                   className="w-full py-1.5 text-sm font-medium text-[#0063a9] transition hover:text-[#004f86] disabled:opacity-50"
                 >
                   Forgot password?
@@ -347,7 +360,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <button
                 type="button"
                 onClick={handleMicrosoftSignIn}
-                disabled={isMsSigningIn}
+                disabled={isMsSigningIn || isPasswordSubmitting}
                 className="flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-lg border border-slate-300 bg-white py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-70"
               >
                 <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
