@@ -130,7 +130,7 @@ const DOCUMENT_STATUS_STYLES: Record<DocumentStatus, string> = {
 };
 
 const STATUS_TAB_LABELS: Record<'Active' | 'Expired' | 'Incomplete' | 'Archived', string> = {
-  Active: 'Active',
+  Active: 'Total',
   Expired: 'Expired',
   Incomplete: 'Incomplete Profile',
   Archived: 'Archived',

@@ -48,6 +48,9 @@ test('registry overview presents live status counts and branch category/rank dis
   }
   assert.match(overview, /role="tablist" aria-labelledby="partner-status-heading"/);
   assert.match(overview, /aria-selected="true"/);
+  assert.match(overview, /aria-label="Total, 6 partners"/);
+  assert.match(overview, /<span>Total<\/span>/);
+  assert.doesNotMatch(overview, /<span>Active<\/span>/);
   assert.match(PARTNER_COMPANIES_SOURCE, /onStatusChange=\{setStatusTab\}/);
 });
 
@@ -55,7 +58,7 @@ test('registry filters keep search, category, origin, sorting, date, expiration,
   const noop = () => {};
   const base: ComponentProps<typeof PartnerCompaniesFilterToolbar> = {
     statusTab: 'Active',
-    statusLabels: { Active: 'Active', Expired: 'Expired', Incomplete: 'Incomplete Profile', Archived: 'Archived' },
+    statusLabels: { Active: 'Total', Expired: 'Expired', Incomplete: 'Incomplete Profile', Archived: 'Archived' },
     onStatusChange: noop,
     categoryTab: 'All',
     onCategoryChange: noop,
