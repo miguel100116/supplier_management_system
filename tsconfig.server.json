@@ -4,5 +4,5 @@
     "lib": ["ES2022", "DOM"], "types": ["node"], "strict": true,
     "esModuleInterop": true, "skipLibCheck": true, "noEmit": true
   },
-  "include": ["server.ts", "server/**/*.ts", "api/**/*.ts"]
+  "include": ["server.ts", "server/**/*.ts"]
 }
