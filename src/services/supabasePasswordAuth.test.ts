@@ -11,7 +11,8 @@ const user = { id: 'verified-user', email, email_confirmed_at: '2026-10-20T00:00
 function mockLogin(t: TestContext, profile: unknown) {
   const getUser = t.mock.method(supabase.auth, 'getUser', async () => ({ data: { user }, error: null }));
   const signOut = t.mock.method(supabase.auth, 'signOut', async () => ({ error: null }));
-  const fetch = t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    assert.equal(init?.method ?? 'GET', 'GET', 'Login must not create or modify authorization profiles');
     const url = new URL(String(input));
     assert.equal(url.pathname, '/rest/v1/app_profiles');
     assert.equal(url.searchParams.get('email'), `eq.${email}`);
@@ -76,6 +77,33 @@ test('credential errors and session-cleanup errors remain blocking', async (t) =
   await assert.rejects(signInForRole('Employee', authenticate), /Invalid credentials/);
   signOut.mock.mockImplementation(async () => { throw new Error('Sign out unavailable'); });
   await assert.rejects(signInForRole('Employee', authenticate), /Sign out unavailable/);
+});
+
+test('a confirmed Employee can sign in through an existing email-matched legacy profile with no user ID link', async (t) => {
+  const { signOut } = mockLogin(t, { email, role: 'Employee', user_id: null });
+  assert.equal(await signInForRole('Employee', async () => ({ email })), email);
+  assert.equal(signOut.mock.callCount(), 0);
+});
+
+test('an unlinked legacy Employee cannot enter through Admin Account', async (t) => {
+  const { signOut } = mockLogin(t, { email, role: 'Employee', user_id: null });
+  await assert.rejects(signInForRole('Admin', async () => ({ email })), /Select Employee Account/);
+  assert.equal(signOut.mock.callCount(), 1);
+});
+
+test('legacy compatibility never accepts an unlinked Admin, missing link field, or another user ID', async (t) => {
+  for (const profile of [
+    { email, role: 'Admin', user_id: null },
+    { email, role: 'Employee' },
+    { email, role: 'Employee', user_id: 'another-user' },
+    { email: 'another@mgenesis.com', role: 'Employee', user_id: null },
+  ]) {
+    await t.test(JSON.stringify(profile), async (t) => {
+      const { signOut } = mockLogin(t, profile);
+      await assert.rejects(signInForRole('Employee', async () => ({ email })), /Unable to verify your account type/);
+      assert.equal(signOut.mock.callCount(), 1);
+    });
+  }
 });
 
 test('password authentication accepts only normalized company email addresses', () => {
