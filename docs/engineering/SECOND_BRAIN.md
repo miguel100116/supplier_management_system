@@ -1,6 +1,10 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-10-20
+Last verified: 2026-10-21
+
+### 2026-10-21 - Vite dependency audit patch
+
+The merge verification audit reported high-severity launch-editor advisories against locked Vite 6.4.3. `package.json` now requires `vite: ^6.4.4`, and `package-lock.json` resolves 6.4.4 with its registry integrity hash. This is a patch within Vite 6; no audit exclusions or workflow changes were added. The [upstream advisory](https://github.com/advisories/GHSA-587h-7wmj-h5pm) identifies 6.4.4 as patched. A live `npm audit --audit-level=high` reports zero vulnerabilities. All 338 tests, all four TypeScript projects, the production build, and diff whitespace checks passed locally. Tests and build required execution outside the sandbox because subprocess creation was blocked with `spawn EPERM`. The existing large-bundle warning remains. Hosted verification still requires a pushed commit; no push, merge, or deployment was performed.
 
 This document preserves durable engineering context for maintainers and coding agents. It is a map, not a substitute for reading the relevant code. Verify details before making consequential changes.
 
