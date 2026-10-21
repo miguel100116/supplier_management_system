@@ -41,7 +41,7 @@ type CompanySummary = {
 };
 
 const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
-const panelClass = 'rounded-xl border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-950';
+const panelClass = 'rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950';
 const typeStyles: Record<SurveyType, { soft: string; bar: string }> = {
   Courier: { soft: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300', bar: 'bg-sky-600' },
   Supplier: { soft: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300', bar: 'bg-emerald-600' },
@@ -157,9 +157,9 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
       {dataScope === 'custom' && archiveSeries.length > 0 && (
         <div className={`${panelClass} flex flex-wrap items-center gap-2 p-3`}>
           <span className="mr-1 text-xs font-semibold text-slate-500">Archived periods (optional)</span>
-          <button type="button" onClick={() => onChangeSelectedSeriesIds?.([])} aria-pressed={!selectedSeriesIds.length} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${!selectedSeriesIds.length ? 'border-[#0078a8] bg-[#0078a8] text-white' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'}`}>All periods</button>
+          <button type="button" onClick={() => onChangeSelectedSeriesIds?.([])} aria-pressed={!selectedSeriesIds.length} className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${!selectedSeriesIds.length ? 'border-[#2187CD]/40 bg-[#eef7fc] text-[#176FAE] dark:bg-sky-950/30 dark:text-sky-300' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'}`}>All periods</button>
           {archiveSeries.map((series) => (
-            <button type="button" key={series.id} onClick={() => toggleSeries(series.id)} aria-pressed={selectedSeriesIds.includes(series.id)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${selectedSeriesIds.includes(series.id) ? 'border-[#0078a8] bg-[#0078a8] text-white' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'}`}>{series.label}</button>
+            <button type="button" key={series.id} onClick={() => toggleSeries(series.id)} aria-pressed={selectedSeriesIds.includes(series.id)} className={`rounded-md border px-3 py-1.5 text-xs font-semibold ${selectedSeriesIds.includes(series.id) ? 'border-[#2187CD]/40 bg-[#eef7fc] text-[#176FAE] dark:bg-sky-950/30 dark:text-sky-300' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300'}`}>{series.label}</button>
           ))}
         </div>
       )}
@@ -176,20 +176,44 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
   }
 
   return (
-    <div className="min-w-0 space-y-6 pb-10">
+    <div className="min-w-0 space-y-5 pb-10">
       {analyticsHeader}
 
-      <section aria-label="Analytics summary" className="grid gap-4 md:grid-cols-3">
+      <section aria-label="Analytics summary" className="grid overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:grid-cols-3 md:divide-x md:divide-slate-100 dark:md:divide-slate-800">
         <KpiCard label="Overall average score" value={`${formatNumber(averageScore, 0)}/100`} detail={`${scoredSubmissions.length} scored submissions in this view`} tooltip="The simple average of normalized submission scores in the selected reporting scope." />
         <KpiCard label="Evaluations" value={String(totalSubmissions)} detail="Distinct answered evaluation forms" tooltip="A unique response ID counts when at least one item has a nonblank answer other than N/A." />
         <KpiCard label="Partners evaluated" value={`${evaluatedPartnerCount}/${partnerDenominator}`} detail={partnerDenominator ? `${Math.round((evaluatedPartnerCount / partnerDenominator) * 100)}% coverage` : 'No eligible partners'} tooltip="Active eligible partners with at least one visible evaluation, compared with the active eligible partner registry." />
       </section>
 
+
+
+      <section aria-labelledby="analytics-detail-heading" className="space-y-4">
+        <div><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#2187CD]">Detailed analytics</p><h2 id="analytics-detail-heading" className="mt-1 text-base font-bold text-slate-900 dark:text-white">Trends and response quality</h2><p className="mt-1 text-xs text-slate-500">Explore changes over time, response volume, and question-level scores.</p></div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <article className={`${panelClass} p-4 sm:p-5`}>
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-bold">Rating trend</h3><p className="mt-1 text-xs text-slate-500">Average score and evaluation volume over time</p></div><select aria-label="Rating trend period" value={trendGranularity} onChange={(event) => setTrendGranularity(event.target.value as typeof trendGranularity)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="series">Survey period</option></select></div>
+            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="key" tick={{ fontSize: 10 }} /><YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 10 }} /><YAxis yAxisId="forms" orientation="right" allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Line yAxisId="score" type="monotone" dataKey="average" name="Average Score" stroke="#2187CD" strokeWidth={2} dot={{ r: 3 }} /><Line yAxisId="forms" type="monotone" dataKey="responses" name="Counted Forms" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} /></LineChart></ResponsiveContainer></div>
+          </article>
+          <article className={`${panelClass} p-4 sm:p-5`}>
+            <div className="mb-4">
+              <h3 className="text-sm font-bold">Response volume</h3>
+              <p className="mt-1 text-xs text-slate-500">Submitted evaluations by stakeholder category</p>
+              <div role="group" aria-label="Response volume color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-[10px] font-semibold text-slate-500">Response count:</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-green-500" />Green 90+</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-yellow-400" />Yellow 80–89</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-orange-500" />Orange 70–79</span>
+                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />Red under 70</span>
+              </div>
+            </div>
+            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={volumeData} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="surveyType" tick={{ fontSize: 10 }} /><YAxis allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="responses" radius={[6, 6, 0, 0]}>{volumeData.map((item) => <Cell key={item.surveyType} fill={responseVolumeBandColors[getValueColorBand(item.responses)]} />)}</Bar></BarChart></ResponsiveContainer></div>
+          </article>
+        </div>
       <section className={`${panelClass} overflow-hidden`} aria-labelledby="company-leaderboard-heading">
         <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
           <div>
               <div>
-                <div className="flex items-center gap-2"><Trophy size={18} className="text-[#0078a8]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-base font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
+                <div className="flex items-center gap-2"><Trophy size={17} className="text-[#2187CD]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-sm font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Compare evaluated partners and select a company to review its category performance.</p>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 sm:flex-nowrap">
                   <div role="group" aria-label="Company leaderboard color legend" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -208,9 +232,9 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
                 </div>
               </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-900 sm:grid-cols-4">
+          <div className="mt-4 flex flex-wrap gap-1 border-b border-slate-100 pb-3 dark:border-slate-800">
             {(['All', ...surveyTypes] as const).map((type) => (
-              <button type="button" key={type} onClick={() => selectType(type)} aria-pressed={selectedType === type} className={`rounded-md px-3 py-2 text-xs font-semibold transition ${selectedType === type ? 'bg-[#0078a8] text-white shadow-sm' : 'text-slate-500 hover:bg-white hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}>{type === 'All' ? 'All categories' : type}</button>
+              <button type="button" key={type} onClick={() => selectType(type)} aria-pressed={selectedType === type} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedType === type ? 'bg-[#eef7fc] text-[#176FAE] dark:bg-sky-950/30 dark:text-sky-300' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'}`}>{type === 'All' ? 'All categories' : type}</button>
             ))}
           </div>
         </div>
@@ -249,29 +273,6 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
           )}
         </div>
       </section>
-
-      <section aria-labelledby="analytics-detail-heading" className="space-y-4">
-        <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#0078a8]">Detailed analytics</p><h2 id="analytics-detail-heading" className="mt-1 text-lg font-bold text-slate-900 dark:text-white">Trends and response quality</h2><p className="mt-1 text-sm text-slate-500">Existing Analytics data remains available in the updated visual system.</p></div>
-        <div className="grid gap-4 xl:grid-cols-2">
-          <article className={`${panelClass} p-4 sm:p-5`}>
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-bold">Rating trend</h3><p className="mt-1 text-xs text-slate-500">Average score and evaluation volume over time</p></div><select value={trendGranularity} onChange={(event) => setTrendGranularity(event.target.value as typeof trendGranularity)} className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="series">Survey period</option></select></div>
-            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="key" tick={{ fontSize: 10 }} /><YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 10 }} /><YAxis yAxisId="forms" orientation="right" allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Line yAxisId="score" type="monotone" dataKey="average" name="Average Score" stroke="#0078a8" strokeWidth={3} dot={{ r: 3 }} /><Line yAxisId="forms" type="monotone" dataKey="responses" name="Counted Forms" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} /></LineChart></ResponsiveContainer></div>
-          </article>
-          <article className={`${panelClass} p-4 sm:p-5`}>
-            <div className="mb-4">
-              <h3 className="text-sm font-bold">Response volume</h3>
-              <p className="mt-1 text-xs text-slate-500">Submitted evaluations by stakeholder category</p>
-              <div role="group" aria-label="Response volume color legend" className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                <span className="text-[10px] font-semibold text-slate-500">Response count:</span>
-                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-green-500" />Green 90+</span>
-                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-yellow-400" />Yellow 80–89</span>
-                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-orange-500" />Orange 70–79</span>
-                <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600 dark:text-slate-300"><span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-500" />Red under 70</span>
-              </div>
-            </div>
-            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={volumeData} margin={{ top: 8, right: 8, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="surveyType" tick={{ fontSize: 10 }} /><YAxis allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Bar dataKey="responses" radius={[6, 6, 0, 0]}>{volumeData.map((item) => <Cell key={item.surveyType} fill={responseVolumeBandColors[getValueColorBand(item.responses)]} />)}</Bar></BarChart></ResponsiveContainer></div>
-          </article>
-        </div>
         <CompanyAnalysisPanel responses={responses} archiveSeries={archiveSeries} />
         <article className={`${panelClass} overflow-hidden`}>
           <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
@@ -308,7 +309,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
           <aside role="dialog" aria-modal="true" aria-labelledby="company-detail-title" className="h-full w-full max-w-md overflow-y-auto bg-white shadow-2xl dark:bg-slate-950">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><span className="text-xs font-semibold text-slate-400">Company performance</span><button type="button" onClick={closeSelectedCompany} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close company details"><X size={18} /></button></div>
             <div className="space-y-6 p-5 sm:p-7">
-              <div><h2 id="company-detail-title" className="text-xl font-bold text-slate-900 dark:text-white">{selectedCompany.name}</h2><div className="mt-3 flex items-end gap-2"><span className="text-4xl font-bold tracking-tight text-[#0078a8]">{getAnalyticsScore(selectedCompany.type, selectedCompany.scorePercentage).toFixed(1)}</span><span className="pb-1 text-sm text-slate-400">/ {selectedCompany.type === 'Subcontractor' ? '2.0' : '100'}</span></div><div className="mt-3 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${typeStyles[selectedCompany.type].soft}`}>{selectedCompany.type}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{getAnalyticsBand(selectedCompany.type, selectedCompany.scorePercentage).label}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{selectedCompany.count} forms</span></div></div>
+              <div><h2 id="company-detail-title" className="text-xl font-bold text-slate-900 dark:text-white">{selectedCompany.name}</h2><div className="mt-3 flex items-end gap-2"><span className="text-4xl font-bold tracking-tight text-[#2187CD]">{getAnalyticsScore(selectedCompany.type, selectedCompany.scorePercentage).toFixed(1)}</span><span className="pb-1 text-sm text-slate-400">/ {selectedCompany.type === 'Subcontractor' ? '2.0' : '100'}</span></div><div className="mt-3 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${typeStyles[selectedCompany.type].soft}`}>{selectedCompany.type}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{getAnalyticsBand(selectedCompany.type, selectedCompany.scorePercentage).label}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{selectedCompany.count} forms</span></div></div>
               <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Category results</h3><div className="mt-4 space-y-3">{selectedComposite?.sections.map((section) => (<div key={section.section}><div className="mb-1 flex justify-between gap-3 text-xs"><span className="truncate text-slate-600 dark:text-slate-300">{section.section}</span><span className="font-semibold tabular-nums">{section.percent.toFixed(0)}</span></div><div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800"><div className={`h-full rounded-full ${typeStyles[selectedCompany.type].bar}`} style={{ width: `${section.percent}%` }} /></div></div>))}</div></div>
               <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Lowest performance questions</h3><div className="mt-3 space-y-3">{selectedLowestQuestions.length ? selectedLowestQuestions.map((question) => (<div key={question.question} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800"><div className="flex items-start justify-between gap-3"><p className="text-xs leading-5 text-slate-700 dark:text-slate-200">{question.question}</p><span className="shrink-0 text-xs font-bold text-rose-600">{question.average.toFixed(1)}</span></div><p className="mt-1 text-[10px] text-slate-400">{question.responses} response{question.responses === 1 ? '' : 's'}</p></div>)) : <p className="text-xs text-slate-400">No scoreable question data is available.</p>}</div></div>
               <PlaceholderButton title="Open the full company report"><BarChart3 size={14} /> Open full company report</PlaceholderButton>
@@ -328,11 +329,11 @@ function AnalyticsHeader({ dataScope, onChangeDataScope }: { dataScope: 'current
           <PageDescription>Review evaluation results, identify performance gaps, and compare partner companies.</PageDescription>
         </div>
       </div>
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"><div className="grid grid-cols-3 rounded-lg bg-slate-100 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-4 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-[#0078a8] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-Weighted Based</span></div></div>
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800"><div role="group" aria-label="Analytics date scope" className="inline-flex w-fit gap-1 rounded-lg bg-slate-50 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-[11px] text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-Weighted Based</span></div></div>
     </header>
   );
 }
 
 function KpiCard({ label, value, detail, tooltip }: { label: string; value: string; detail: string; tooltip: string }) {
-  return <article className={`${panelClass} p-4 sm:p-5`}><div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400"><span>{label}</span><AnalyticsTooltip text={tooltip} /></div><p className="mt-2 text-2xl font-bold tracking-tight text-[#0078a8] sm:text-3xl">{value}</p><p className="mt-1 text-[11px] text-slate-400">{detail}</p></article>;
+  return <article className="px-4 py-4 first:pt-4 last:pb-4 md:px-5 md:py-4"><div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400"><span>{label}</span><AnalyticsTooltip text={tooltip} /></div><p className="mt-1.5 text-2xl font-bold tracking-tight text-[#2187CD]">{value}</p><p className="mt-1 text-[11px] text-slate-400">{detail}</p></article>;
 }

@@ -81,7 +81,7 @@ export function Pagination({
 
       <label className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 sm:justify-self-end">
         <select
-          className="h-8 w-14 min-w-14 shrink-0 rounded-md border border-slate-200 bg-white px-1 text-xs font-medium text-[#0063a9] outline-none transition focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-blue-300"
+          className="h-8 w-16 min-w-16 shrink-0 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-[#0063a9] outline-none transition focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-blue-300"
           value={pageSize}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
           aria-label="Items per page"

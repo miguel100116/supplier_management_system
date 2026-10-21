@@ -354,16 +354,16 @@ export function AccountManagementPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="admin-accounts-page space-y-6">
       {creationSuccess && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">Account created. The employee can sign in with the email and initial password.</p>}
       {/* Header section */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-        <div>
+      <div className="admin-accounts-toolbar flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Manage system access, roles, organizational details, and custom permissions for all user accounts.
+            <strong>{filteredAccounts.length}</strong> accounts shown · Manage system access, roles, organizational details, and custom permissions here.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="admin-accounts-actions flex items-center gap-3">
           <button
             onClick={handleOpenDepartmentAccess}
             className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200"
@@ -384,8 +384,8 @@ export function AccountManagementPage({
       </div>
 
       {/* Main Content */}
-      <div className="panel">
-        <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
+      <div className="admin-accounts-list panel">
+        <div className="admin-accounts-filters mb-4">
           <div className="mb-3 inline-flex flex-wrap items-center gap-1 rounded-lg bg-[#eef3ff] p-1 dark:bg-slate-800" role="group" aria-label="Filter accounts by system role">
               {(['All', 'Admin', 'Employee'] as const).map((tab) => (
                 <button
@@ -444,7 +444,7 @@ export function AccountManagementPage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table aria-label="Employee accounts" className="w-full min-w-[760px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">
                 <th className="pb-3 pl-2 font-medium">Account Email</th>

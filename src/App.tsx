@@ -1118,6 +1118,7 @@ export default function App() {
         isAdmin={isAdmin}
         userEmail={account || ''}
         onOpenSurveyResponses={(surveyId) => navigateTo('explorer', { surveyId })}
+        onNavigate={(page) => navigateTo(page)}
       />
     ),
     'partner-companies': (
@@ -1463,7 +1464,7 @@ export default function App() {
         }}
         title={activeTitle}
         pageHeading={pageHeading}
-        hidePageHeading={!isAdmin || activePage === 'partner-companies'}
+        hidePageHeading={!isAdmin || activePage === 'partner-companies' || activePage === 'dashboard'}
         hideModuleContext={activePage === 'dashboard' || activePage === 'account-management' || activePage === 'partner-companies'}
         compactPageHeader={activePage === 'analytics'}
         adminMode={isAdmin}

@@ -144,21 +144,21 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
   return (
     <div className="space-y-6" id="survey-details-page">
       {/* Header controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+      <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
         <button
           onClick={onBack}
-          className="secondary-button self-start px-6 py-3 text-base h-12 flex items-center justify-center gap-2"
+          className="secondary-button self-start px-3 py-2 text-[13px]"
           type="button"
           id="btn-back"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={16} />
           <span>Back to Surveys</span>
         </button>
         <div className="flex flex-wrap items-center gap-3">
           {isAdmin && onEdit && (
             <button
               onClick={() => onEdit(survey.id)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 px-6 py-3 text-base font-medium h-12 hover:bg-amber-100 transition cursor-pointer dark:bg-amber-950/20 dark:border-amber-900"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
               type="button"
               id="btn-edit-survey"
             >
@@ -169,22 +169,22 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
           
           <button
             onClick={() => setShowPreview(true)}
-            className="primary-button bg-[#0063a9] hover:bg-[#00528c] px-6 py-3 text-base h-12 flex items-center justify-center gap-2"
+            className="primary-button bg-[#2187CD] px-3 py-2 text-[13px]"
             type="button"
             id="btn-preview-survey"
           >
-            <Eye size={20} />
+            <Eye size={15} />
             <span>Preview</span>
           </button>
           
           {isCustom && isAdmin && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-50 border border-rose-200 text-rose px-6 py-3 text-base font-medium h-12 hover:bg-rose-100 transition cursor-pointer dark:bg-rose-950/20 dark:border-rose-900"
+              className="inline-flex items-center justify-center gap-2 rounded-md border border-rose-200 bg-white px-3 py-2 text-[13px] font-medium text-rose-700 transition hover:bg-rose-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
               type="button"
               id="btn-delete-survey"
             >
-              <Trash size={20} />
+              <Trash size={15} />
               <span>Delete Survey</span>
             </button>
           )}
@@ -192,17 +192,20 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
       </div>
 
       {/* Main Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,.8fr)]">
         {/* Left column - Info card & Questions */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="min-w-0 space-y-4">
           <div className="panel space-y-4">
             <div>
-              <span className="badge mb-2">{survey.surveyType} Audience</span>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white">{survey.title}</h3>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="badge">{survey.surveyType} Audience</span>
+                <span className="text-xs text-slate-400">{survey.questions.length} questions</span>
+              </div>
+              <h3 className="text-[19px] font-semibold tracking-[-.35px] text-slate-800 dark:text-white">{survey.title}</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5">{survey.description}</p>
             </div>
 
-            <div className="grid gap-4 border-t border-slate-100 pt-4 dark:border-slate-800 sm:grid-cols-4 text-xs text-slate-500 dark:text-slate-400">
+            <div className="grid gap-x-5 gap-y-3 border-t border-slate-100 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:grid-cols-2 xl:grid-cols-4">
               <div className="flex items-center gap-2">
                 <Calendar size={14} className="text-slate-400" />
                 <span>Created: {new Date(survey.createdAt).toLocaleDateString()}</span>
@@ -234,7 +237,7 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
                     </div>
                     <div className="flex-1 space-y-1">
                       <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{q.question}</p>
-                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300">
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-[#2187CD] dark:bg-blue-950/40 dark:text-blue-300">
                         {q.questionCategory}
                       </span>
                     </div>
@@ -279,17 +282,17 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
         {/* Right column - Performance / Stats */}
         <div className="space-y-6">
           <div className="panel space-y-4">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400">Supplier Management System Overview</h4>
+            <div className="border-b border-slate-100 pb-3 dark:border-slate-800"><h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Response overview</h4><p className="mt-1 text-xs text-slate-400">Counted submissions and average score</p></div>
             
             <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2">
-              <div className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/50">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Counted Submissions</p>
-                <p className="mt-1 break-words text-2xl font-bold tabular-nums text-slate-800 dark:text-white min-[420px]:text-3xl">{stats.total}</p>
+              <div className="rounded-md bg-slate-50 p-3.5 dark:bg-slate-900/50">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Counted submissions</p>
+                <p className="mt-1 break-words text-2xl font-semibold tabular-nums text-slate-800 dark:text-white">{stats.total}</p>
               </div>
 
-              <div className="rounded-lg bg-slate-50 p-4 text-center dark:bg-slate-900/50">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average Rating</p>
-                <p className="mt-1 break-words text-2xl font-bold tabular-nums text-[#0063a9] dark:text-blue-300 min-[420px]:text-3xl">{formatCompositeScore(survey.surveyType, stats.avg).text}</p>
+              <div className="rounded-md bg-slate-50 p-3.5 dark:bg-slate-900/50">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Average rating</p>
+                <p className="mt-1 break-words text-2xl font-semibold tabular-nums text-[#2187CD] dark:text-sky-300">{formatCompositeScore(survey.surveyType, stats.avg).text}</p>
               </div>
             </div>
 
@@ -385,14 +388,14 @@ export function SurveyDetailsPage({ survey, responses, partnerCompanies = [], us
                       <td className="px-4 py-3">{sub.respondentType}</td>
                       <td className="px-4 py-3">{new Date(sub.submissionDate).toLocaleString()}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300">
+                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#2187CD] dark:bg-blue-950/40 dark:text-blue-300">
                           {score}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => setSelectedSubmissionId(sub.responseId)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#0063a9] hover:underline dark:text-blue-300 cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#2187CD] hover:underline dark:text-blue-300 cursor-pointer"
                         >
                           <Eye size={13} />
                           <span>View Detail</span>

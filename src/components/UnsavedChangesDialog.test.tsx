@@ -54,6 +54,15 @@ function find(node: ReactNode, predicate: (element: ReactElement<any>) => boolea
   return matches[0];
 }
 
+function containsText(node: ReactNode, text: string): boolean {
+  let found = false;
+  React.Children.forEach(node, (child) => {
+    if (child === text) found = true;
+    else if (React.isValidElement(child)) found = containsText(child.props.children, text) || found;
+  });
+  return found;
+}
+
 function button(node: ReactNode, text: string) {
   return find(node, (element) => element.type === 'button' && element.props.children === text);
 }
@@ -186,7 +195,7 @@ test('discard permits a reentrant route guard without opening a second confirmat
 test('category save-and-leave preserves validation and requires impact confirmation before saving', () => {
   let saves = 0;
   const view = renderHooks(CategoriesManagerPage, { categoryLabels: DEFAULT_CATEGORIES, onRenameCategory: () => { saves++; }, onRestoreDefaults() {} });
-  find(view.render(), (element) => element.type === 'button' && element.props.className?.includes('panel text-left')).props.onClick();
+  find(view.render(), (element) => element.type === 'button' && containsText(element.props.children, 'Courier')).props.onClick();
   find(view.render(), (element) => element.type === 'input').props.onChange({ target: { value: '' } });
   find(view.render(), (element) => element.type === 'button' && element.props.title === 'Close').props.onClick();
   let dialog = find(view.render(), (element) => element.type === UnsavedChangesDialog);
