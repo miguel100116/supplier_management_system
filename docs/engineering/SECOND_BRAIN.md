@@ -2,6 +2,12 @@
 
 Last verified: 2026-10-21
 
+### 2026-10-21 - Vercel Analytics API route
+
+An unsigned read-only check of `https://supplier-management-system-green.vercel.app/api/analytics` returned Vercel HTTP 404 on 2026-10-21. The repository previously supplied this route only through the standalone Express listener. `api/analytics.ts` now exports an Express app for a Vercel Node.js Function, reusing `analyticsHandler` and the server credential adapter. It does not start a listener or change scoring, raw-response RLS, or the aggregate authorization boundary. The existing SPA rewrite excludes `/api/*`. Other API routes still require the standalone Express host.
+
+Vercel must supply `SUPABASE_URL` (or `VITE_SUPABASE_URL`) and server-only `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) for the same project as the frontend; redeploy after configuration changes. No credentials were read or changed. An unsigned deployed request should return JSON HTTP 401; authenticated live verification remains required after deployment. Rollback is the previous deployment or a code revert. Evidence: `api/analytics.ts`, `server/vercelAnalytics.test.ts`, `server/analytics.test.ts`, `vercel.json`, and README deployment instructions. All 340 tests, all four TypeScript projects, production build, and diff whitespace checks passed locally. The existing large-bundle warning remains; no Vercel build or signed-in browser verification was performed. No push or deployment was performed for this fix.
+
 ### 2026-10-21 - Vite dependency audit patch
 
 The merge verification audit reported high-severity launch-editor advisories against locked Vite 6.4.3. `package.json` now requires `vite: ^6.4.4`, and `package-lock.json` resolves 6.4.4 with its registry integrity hash. This is a patch within Vite 6; no audit exclusions or workflow changes were added. The [upstream advisory](https://github.com/advisories/GHSA-587h-7wmj-h5pm) identifies 6.4.4 as patched. A live `npm audit --audit-level=high` reports zero vulnerabilities. All 338 tests, all four TypeScript projects, the production build, and diff whitespace checks passed locally. Tests and build required execution outside the sandbox because subprocess creation was blocked with `spawn EPERM`. The existing large-bundle warning remains. Hosted verification still requires a pushed commit; no push, merge, or deployment was performed.
