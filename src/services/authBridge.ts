@@ -44,7 +44,11 @@ export async function signInForRole(role: LoginRole, authenticate: LoginAttempt)
       throw new Error('Unable to verify this account. Please sign in again.');
     }
     const profile = await supabase.from('app_profiles').select('email,user_id,role').eq('email', email).maybeSingle();
-    if (profile.error || !profile.data || profile.data.email !== email || profile.data.user_id !== user.id
+    // Legacy Employee profiles may have a null link: the schema permits it,
+    // and profile RLS identifies the owner by the verified JWT email. Never
+    // infer a role, accept a conflicting link, or use this exception for Admins.
+    const legacyEmployee = profile.data?.role === 'Employee' && profile.data.user_id === null;
+    if (profile.error || !profile.data || profile.data.email !== email || (!legacyEmployee && profile.data.user_id !== user.id)
       || (profile.data.role !== 'Admin' && profile.data.role !== 'Employee')) {
       throw new Error('Unable to verify your account type. Please contact your administrator.');
     }
