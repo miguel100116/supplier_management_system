@@ -1,6 +1,5 @@
 node_modules/
 dist/
-server-build/
 .vite/
 graphify-out/
 .mcp.json

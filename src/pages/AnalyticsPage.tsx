@@ -13,13 +13,10 @@ import { AnalyticsDateRangeControls } from '../features/analytics/components/Ana
 import type { AnalyticsDateRange } from '../features/analytics/domain/dateRange';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { Pagination } from '../components/Pagination';
-import { buildAnalyticsSnapshot, selectAnalyticsView, type AnalyticsSnapshot } from '../features/analytics/domain/analyticsSnapshot';
-import type { CompanyWideAnalyticsState } from '../features/analytics/hooks/useCompanyWideAnalytics';
+import { buildAnalyticsSnapshot } from '../features/analytics/domain/analyticsSnapshot';
 
 interface AnalyticsPageProps {
   responses: SurveyResponse[];
-  snapshot?: AnalyticsSnapshot;
-  status?: { title: string; message: string };
   activeSurveyTypes: SurveyType[];
   permittedSurveyTypes?: SurveyType[];
   filters: FilterState;
@@ -73,15 +70,7 @@ function AnalyticsTooltip({ text }: { text: string }) {
   );
 }
 
-export function CompanyWideAnalyticsPage(props: Omit<AnalyticsPageProps, 'responses' | 'archivedResponses' | 'partnerCompanies' | 'snapshot' | 'status' | 'permittedSurveyTypes'> & { analytics: CompanyWideAnalyticsState; permittedSurveyTypes: SurveyType[] }) {
-  const { key, views, error } = props.analytics;
-  const snapshot = views ? selectAnalyticsView(views, props.filters.surveyType) : undefined;
-  const unavailable = error ?? (views && !snapshot ? 'Your account does not have access to this Analytics category.' : undefined);
-  return <AnalyticsPage key={`${key}:${props.filters.surveyType.join(',')}:${snapshot ? 'ready' : 'pending'}`} {...props} responses={[]} snapshot={snapshot}
-    status={unavailable ? { title: 'Analytics unavailable', message: unavailable } : !snapshot ? { title: 'Loading Analytics', message: 'Loading company-wide evaluation summaries.' } : undefined} />;
-}
-
-export function AnalyticsPage({ responses, snapshot, status, activeSurveyTypes, permittedSurveyTypes = ['Courier', 'Supplier', 'Subcontractor'], filters, setFilters, dataScope = 'current', onChangeDataScope, archiveSeries = [], selectedSeriesIds = [], onChangeSelectedSeriesIds, dateRange = { from: '', to: '' }, onChangeDateRange, partnerCompanies = [], archivedResponses = [] }: AnalyticsPageProps) {
+export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTypes = ['Courier', 'Supplier', 'Subcontractor'], filters, setFilters, dataScope = 'current', onChangeDataScope, archiveSeries = [], selectedSeriesIds = [], onChangeSelectedSeriesIds, dateRange = { from: '', to: '' }, onChangeDateRange, partnerCompanies = [], archivedResponses = [] }: AnalyticsPageProps) {
   const [companySelection, setSelectedCompany] = useState<Pick<CompanySummary, 'name' | 'type'> | null>(null);
   const [trendGranularity, setTrendGranularity] = useState<'monthly' | 'yearly' | 'series'>('monthly');
   const [leaderboardPage, setLeaderboardPage] = useState(0);
@@ -99,7 +88,7 @@ export function AnalyticsPage({ responses, snapshot, status, activeSurveyTypes, 
   const ratingScaleText = selectedType === 'All'
     ? formatRatingScale('Courier')
     : formatRatingScale(selectedType);
-  const summary = useMemo(() => snapshot ?? buildAnalyticsSnapshot(responses, activeSurveyTypes, partnerCompanies, archiveSeries), [snapshot, responses, activeSurveyTypes, partnerCompanies, archiveSeries]);
+  const summary = useMemo(() => buildAnalyticsSnapshot(responses, activeSurveyTypes, partnerCompanies, archiveSeries), [responses, activeSurveyTypes, partnerCompanies, archiveSeries]);
   const { totalSubmissions, scoredSubmissionCount, averageScore, evaluatedPartnerCount, partnerDenominator } = summary;
   const companySummaries = summary.companies;
   const selectedCompany = companySummaries.find((company) => company.name === companySelection?.name && company.type === companySelection.type) ?? null;
@@ -171,8 +160,6 @@ export function AnalyticsPage({ responses, snapshot, status, activeSurveyTypes, 
       )}
     </>
   );
-
-  if (status) return <div className="space-y-5">{analyticsHeader}{categoryTabs}<StateMessage {...status} /></div>;
 
   if (!summary.hasResponses && !archivedResponses.length) {
     return (

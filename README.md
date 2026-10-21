@@ -51,7 +51,7 @@ It is a role-aware platform: what each employee sees — which modules, which da
 | Capability | Description |
 |---|---|
 | **Partner evaluation surveys** | Create, publish, and fill structured feedback forms scoped to specific departments, ranks, and companies. |
-| **Real-time analytics** | Every submission instantly refreshes company-wide charts, trends, and comparisons. |
+| **Real-time analytics** | Loaded submissions refresh charts, trends, and comparisons within the signed-in user's authorized response scope. |
 | **Scoring & ranking** | Weighted, rubric-based scoring converts raw answers into a normalized 0–100 composite score and a ranked leaderboard per partner type. |
 | **Compliance document tracking** | A categorized register of every partner's compliance documents, with configurable expiry milestones and "expiring soon / expired" alerts. |
 | **Report generation** | Summary, per-company, per-question, and executive-summary report builders, exportable to PDF, Excel, and CSV. |
@@ -119,14 +119,14 @@ An Admin can **override** access per individual account ("Custom Overrides"), or
 
 ### 3.4 Data Scoping & Isolation
 
-Beyond *which modules* a user sees, the system controls *which response data* they see (`applyAccessFilter` in `src/App.tsx` for individual responses; `/api/analytics` for summaries):
+Beyond *which modules* a user sees, the system controls *which response data* they see (`applyAccessFilter` in `src/App.tsx`, including Analytics):
 
 | Who | Sees which survey responses |
 |---|---|
 | Admin / Executive / Director | Every response (within their permitted survey types) |
 | Supervisory | Only their own department's responses |
 | Rank & File | Only their own submissions |
-| **Analytics (everyone)** | **Company-wide and aggregate-only** within permitted survey categories, regardless of rank |
+| **Analytics** | Uses the same authorized response scope above, within permitted survey categories |
 
 A **Data Scope** toggle further switches between *Current* (active period), *All-Time* (active + all archived periods), and *Custom* (Analytics submission-date calendars across active and archived history, optionally narrowed to selected archived series). Custom ranges include both selected dates in the user's local time zone; either boundary can be left blank. The calendar controls remain available when no responses match.
 
@@ -143,7 +143,7 @@ Form headings use **Create Evaluation Form**, **Edit Evaluation Form**, **Evalua
 | **Dashboard** | Personalized performance indicators and KPIs. |
 | **Survey Forms** | View, fill, and publish feedback forms. Manage Access and the Forms table use the same deadline-aware status, including explicit manual endings. Marking a form **Ended** archives the active results for its partner category; the category ranking remains available in Company Leaderboard → Archives and the archived responses remain in Archive Center. Legacy forms named with a leading Test/Tests label are hidden from employee evaluation choices and remain available to Admins. Respondent Info starts directly with the progress steps and has only “Proceed to Form Questions” in its footer; sidebar navigation and the later Questions Form Return actions remain available. Date-range questions support calendar pickers with month/year selection or typed `dd/mm/yyyy` dates; both dates are required and the end must be on or after the start. |
 | **Survey Explorer** | Review each survey submission, filter by respondent email, inspect answers, and export all or filtered responses to Excel. |
-| **Analytics** | Company-wide charts, trends, rankings, and company comparisons returned as protected server aggregates within permitted survey categories. Company Leaderboard has Current rankings and Archives views; choosing an archived category-period opens its company ranking list. |
+| **Analytics** | Charts, trends, rankings, and company comparisons calculated locally from authorized loaded responses within permitted survey categories. Company Leaderboard has Current rankings and Archives views; choosing an archived category-period opens its company ranking list. |
 | **Reports** | Generate and History tabs for Summary / Company / Question / Executive-Summary builders and raw exports (PDF, Excel, CSV, Word where supported). Saved copies can be downloaded again; Regenerate opens saved builder options with current authorized data and filters. |
 | **Present** | Staggered slide-deck presentation builder (PDF/PPTX export). |
 | **Partner Companies** | Manage external courier, supplier, and subcontractor rosters, branches, documents, and the Admin-only dated Active Companies upload history. |
@@ -169,7 +169,7 @@ Select or drop one or more `.csv`, `.xlsx`, or `.xls` response exports on the Im
 
 ## 5. Architecture & Tech Stack
 
-The application is a **single-page React app** with an Express server for development, production static hosting, protected account provisioning, and company-wide Analytics summaries.
+The application is a **single-page React app** with an Express server for development, production static hosting, and protected account provisioning.
 
 | Layer | Technology |
 |---|---|
@@ -237,7 +237,7 @@ See [reference materials](reference-materials/README.md) for the relocated utili
 
 **Staging backend:** The normalized migrations under [`supabase/migrations`](supabase/migrations) are applied to the dedicated staging project. Imported normalized tables remain the immutable source/audit layer. `app_profiles` and per-entity `application_records` are the editable frontend store and are published to Supabase Realtime. RLS scopes evaluation rows by profile, permits employees to insert only their own submissions and operational entries, and restricts shared configuration/registry writes by role. Authorization helpers live in an unexposed `private` schema. The older [`supabase/schema.sql`](supabase/schema.sql) remains an unapplied draft.
 
-The verified frontend/backend contract, record-type matrix, Realtime routing, and known authorization gaps are documented in [`docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`](docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md). Company-wide Analytics now uses the protected Express `GET /api/analytics` endpoint; raw response RLS remains unchanged. The API verifies the company identity, account permissions, and department ceiling before calculating summaries with the existing scoring rules. Current, All-Time, and Custom scopes retain official provenance and inclusive local-day filtering. Analytics preloads once the signed-in account permissions are available and retains its summaries across page navigation. Each scope request loads All Categories and every permitted category summary together. Category tabs switch immediately using these in-memory summaries without another API request; changing the reporting scope, dates, or archived periods loads a new set. Summaries refresh in the background on local invalidation, window focus, and every minute; overlapping refresh events are coalesced instead of restarting an in-flight request. API errors show an unavailable state rather than scoped or partial totals. This requires the Express host or the Vercel Analytics Function and its server-only `SUPABASE_SECRET_KEY` (legacy service-role keys are also accepted); static hosting and `npm run preview` cannot provide this endpoint. Deployment and live role verification remain required; no migration is needed.
+The verified frontend/backend contract, record-type matrix, Realtime routing, and known authorization gaps are documented in [`docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`](docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md). Analytics calculates locally from the existing authorized response store. Current, All-Time, and Custom scopes retain official provenance, CSV identity reconciliation, inclusive local-day filtering, and optional archive-period selection. Category selection recalculates from the filtered loaded responses. Analytics does not request `/api/analytics` or require a server-only key; existing Supabase hydration, RLS, and Realtime refresh remain authoritative. Lower-rank users see their authorized response scope, not company-wide aggregates. No database migration is needed.
 
 ---
 
@@ -323,11 +323,9 @@ Cleanup targets only whole `survey_response` groups marked `test_submission`, or
 
 ## 12. Deployment
 
-`npm run build` also runs `npm run build:analytics-api`, bundling the Analytics server imports into `server-build/analytics.cjs`. The small `api/analytics.mjs` entry loads that bundle; `vercel.json` includes it in the Function. Keep `server-build/` outside the public `dist/` directory and out of Git. Do not replace the build with a bare `vite build`: that omits the API bundle. The regression test builds the same bundle and loads the entry in plain Node, without the development TypeScript loader.
+The production build produces a static client plus a small Express server that serves it and provides `/api/health`, public runtime configuration, and protected account provisioning. Configure the server-only Supabase key for account provisioning. Analytics runs in the client using its authenticated Supabase response store and needs no separate Analytics API.
 
-The production build produces a static client plus a small Express server that serves it and provides `/api/health`, protected account provisioning, and aggregate `/api/analytics`. Configure the server-only Supabase key for the protected APIs. A static-only host must route these APIs to the Express host.
-
-For Vercel deployments, the root `vercel.json` rewrites frontend paths to `index.html` so direct links and browser refreshes reach the client router. `/api/*` is excluded from that rewrite. `api/analytics.mjs` provides `/api/analytics` as a Node.js Function using the same protected handler as Express. Set `SUPABASE_URL` (or `VITE_SUPABASE_URL`) and server-only `SUPABASE_SECRET_KEY` (or legacy `SUPABASE_SERVICE_ROLE_KEY`) in the applicable Vercel environment, pointing to the same Supabase project as the frontend, then redeploy. Never prefix the secret with `VITE_`. Other APIs still require the Express host. After deployment, an unsigned request to `/api/analytics` must return JSON with HTTP 401, rather than Vercel's 404; verify signed-in Analytics separately. Rollback uses the previous deployment or a code revert.
+For Vercel SPA deployments, the root `vercel.json` rewrites frontend paths to `index.html` so direct links and browser refreshes reach the client router. `/api/*` is excluded from that rewrite and must be served by the configured API host when needed for account provisioning. There is no Vercel Analytics Function or separate Analytics server bundle.
 
 ```bash
 npm run build

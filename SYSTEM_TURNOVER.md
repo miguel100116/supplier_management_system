@@ -54,7 +54,7 @@ Every account's default module access and visible survey data types are computed
 | Executive | Dashboard, Analytics, Reports, Present, Notification Logs (a reduced, summary-focused set) |
 | Admin (role) | Every module, regardless of designation, including Account Management, Renew Compliance Documents, and Import Evaluation Responses |
 
-*Data-scoping for survey responses is enforced by the applied versioned RLS migrations: Admin, Executive, and Director see every response; Supervisory sees their own department's responses; Rank & File sees only their own submissions. Analytics now obtains company-wide summaries for permitted survey categories through the protected Express `/api/analytics` endpoint, independently of these scoped raw rows. It requires the server-only Supabase key and deployment of the Express API. Live role verification remains pending; see `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`.*
+*Data-scoping for survey responses is enforced by the applied versioned RLS migrations: Admin, Executive, and Director see every response; Supervisory sees their own department's responses; Rank & File sees only their own submissions. Analytics calculates locally from these authorized loaded responses and requires no aggregate API or server-only Analytics key. Live role verification remains pending; see `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`.*
 
 ### 1.2 Admin Account Details
 
@@ -65,7 +65,7 @@ An Admin account has unrestricted access to every module in the system:
 | Dashboard | Personalized performance indicators and KPIs |
 | Survey Forms | View, fill, and publish feedback forms |
 | Survey Explorer | Analyze complete survey response records |
-| Analytics | Company-wide statistical charts and trends |
+| Analytics | Statistical charts and trends within the authorized response scope |
 | Reports | Generate custom report cards and raw exports |
 | Present | Staggered slide-deck presentation builder |
 | Partner Companies | Manage external courier, supplier, and subcontractor rosters |
@@ -128,7 +128,7 @@ The system is organized into modules, each shown or hidden in the navigation acc
 | Dashboard | Personalized performance indicators and KPIs |
 | Survey Forms | View, fill, and publish feedback forms |
 | Survey Explorer | Analyze complete survey response records |
-| Analytics | Company-wide statistical charts and trends |
+| Analytics | Statistical charts and trends within the authorized response scope |
 | Reports | Generate custom report cards and raw exports |
 | Present | Staggered slide-deck presentation builder |
 | Partner Companies | Manage external courier, supplier, and subcontractor rosters |
@@ -218,7 +218,7 @@ A condensed cheat-sheet of who gets what, by default:
 | 2 | Admin | Publishes the form (status: Running). |
 | 3 | Employee / Partner | Fills out the form if their department/rank/company is in scope. |
 | 4 | System | Records one response row per answered question and updates the Notification Bell and Notification Logs. |
-| 5 | All eligible users | See the new data reflected in Dashboard, Analytics (company-wide for everyone), and — for their own scope — Survey Explorer and Reports. |
+| 5 | All eligible users | See the new data reflected in Dashboard, Analytics, Survey Explorer, and Reports within their authorized response scope. |
 | 6 | Admin | Archives a completed survey's responses into an Archive Series once it is no longer active. |
 | 7 | Authorized users | Browse or restore archived submissions from the Archive Center. |
 
@@ -245,7 +245,7 @@ Every item below was verified directly against the current source code, not infe
 | 6 | A live-chat feature (Admin Chat Widget, Live Chat page, Employee Notifications Hub, chat service) was built across several commits and is now deleted in the working tree, but the deletion is not yet committed. | Whoever continues this project should confirm the removal is intentional before it is committed, since it removes real functionality. | Confirm with the project owner, then commit the removal explicitly (or restore the feature) rather than leaving it as an uncommitted change. |
 | 7 | `reference-materials/source-data/EFAS_Project_Charter.docx` (tracked since the initial commit) is a corrupted Word file — its ZIP central directory offset is invalid. | It cannot be opened by Word, pandoc, or standard ZIP tooling; whatever project-charter content it held is currently inaccessible. | Locate a valid backup copy if one exists, or treat the content as lost and re-document the project charter separately. |
 | 8 | No User Manual, Quick Reference Guide, Known Issues log, or Release Notes existed in the repository before this handoff. | New team members previously had no onboarding documentation. | This document is the first pass at all four — keep it updated as the system changes. |
-| 9 | Company-wide Analytics uses the protected Express `/api/analytics` endpoint; hosted verification remains pending. | Static-only deployments or a missing server Supabase key show Analytics unavailable; no scoped-data fallback is used. | Deploy the Express API with its server-only key and verify every permitted role against the same reporting scope. Raw-response RLS is unchanged. See `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`. |
+| 9 | Company-wide aggregate Analytics was reverted on 2026-10-21. | Analytics now uses authorized loaded responses; lower ranks do not receive company-wide totals. | Keep raw-response RLS unchanged. A future company-wide feature requires a separately approved aggregate boundary and live role verification. |
 | 10 | The UI can grant `renew-documents` to a non-Admin, while `partner_company` updates are Admin-only in RLS. | A delegated document renewal can appear optimistically in the browser and then fail to persist. | Add a narrowly validated renewal RPC or a server-side effective-permission rule before relying on delegated renewal. |
 | 11 | Managerial and Director defaults expose Archive Center, while existing response UPDATE/DELETE operations are Admin-only in RLS. | Archive, restore, and permanent-delete mutations fail remotely for those non-Admin roles. | Decide whether Archive Center is Admin-only or implement an authorized server-side archive operation. |
 
