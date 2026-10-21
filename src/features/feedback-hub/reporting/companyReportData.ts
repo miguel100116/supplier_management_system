@@ -1,14 +1,12 @@
 import { getLiveCategoryLabel } from '../../../data/questionCategories';
 import {
-  formatCompositeScore,
-  getBand,
   questionWeights,
-  ratingBands,
   ScoreBand,
 } from '../../../data/questionWeights';
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
-import { questionPerformance } from '../../analytics/domain/analytics';
-import { CompanyComposite, computeCompanyComposite, getLeaderboard } from '../../evaluations/domain/scoring';
+import { formatNumber, questionPerformance } from '../../analytics/domain/analytics';
+import { CompanyComposite, computeCompanyComposite } from '../../evaluations/domain/scoring';
+import { analyticsBands, formatAnalyticsScore, getAnalyticsBand } from '../../analytics/domain/rankings';
 import { getReportTemplateConfig, ReportTemplateConfig } from './reportTemplateConfig';
 
 export interface CompanyReportGraphSelection {
@@ -106,8 +104,9 @@ export interface CreateCompanyReportDataInput {
   chartImages?: CompanyReportChartImages;
   logoDataUrl?: string;
   // Feedback Hub leaves this enabled. The standalone Company Report Builder
-  // can opt out because it reports across all current surveys of one type.
+  // can opt out because its inputs already follow the selected reporting scope.
   scopeToSurveyId?: boolean;
+  includeArchived?: boolean;
 }
 
 export interface GetCompanyReportCommentResponsesInput {
@@ -116,6 +115,7 @@ export interface GetCompanyReportCommentResponsesInput {
   partnerCompanies: PartnerCompany[];
   responses: SurveyResponse[];
   scopeToSurveyId?: boolean;
+  includeArchived?: boolean;
   commentScope?: CompanyReportCommentScope;
   selectedCommentIds?: ReadonlySet<string>;
 }
@@ -147,10 +147,6 @@ function safeFinite(value: number | null | undefined): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-function roundToOneDecimal(value: number): number {
-  return Number(safeFinite(value).toFixed(1));
-}
-
 export function calculateCategoryPercentage(
   achieved: number | null | undefined,
   maximum: number | null | undefined,
@@ -158,16 +154,15 @@ export function calculateCategoryPercentage(
   const safeMaximum = safeFinite(maximum);
   if (safeMaximum <= 0) return 0;
   const raw = (safeFinite(achieved) / safeMaximum) * 100;
-  return roundToOneDecimal(Math.min(100, Math.max(0, raw)));
+  return Math.min(100, Math.max(0, raw));
 }
 
 export function formatReportNumber(value: number | null | undefined): string {
-  const rounded = roundToOneDecimal(value ?? 0);
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return formatNumber(safeFinite(value));
 }
 
 export function formatReportPercentage(value: number | null | undefined): string {
-  const clamped = roundToOneDecimal(Math.min(100, Math.max(0, safeFinite(value))));
+  const clamped = Math.min(100, Math.max(0, safeFinite(value)));
   return `${formatReportNumber(clamped)}%`;
 }
 
@@ -220,10 +215,11 @@ export function filterResponsesForReport(
   partnerCompanies: PartnerCompany[],
   responses: SurveyResponse[],
   scopeToSurveyId = true,
+  includeArchived = false,
 ): SurveyResponse[] {
   const legacyMatches = responses.some(
     (response) =>
-      !response.archived &&
+      (includeArchived || !response.archived) &&
       response.surveyType === survey.surveyType &&
       !response.companyId &&
       response.company === company.name,
@@ -245,7 +241,7 @@ export function filterResponsesForReport(
   }
 
   return responses.filter((response) => {
-    if (response.archived || response.surveyType !== survey.surveyType) return false;
+    if ((!includeArchived && response.archived) || response.surveyType !== survey.surveyType) return false;
     if (scopeToSurveyId && response.surveyId && response.surveyId !== survey.id) return false;
     if (response.companyId) return response.companyId === company.id;
     return response.company === company.name;
@@ -295,6 +291,7 @@ export function getCompanyReportCommentResponses(
     input.partnerCompanies,
     input.responses,
     input.scopeToSurveyId ?? true,
+    input.includeArchived ?? false,
   );
   return selectCompanyReportCommentResponses(
     reportResponses,
@@ -339,12 +336,12 @@ function buildCategoryRows(
     const category = getLiveCategoryLabel(surveyType, canonicalCategory);
     const section = composite?.sections.find((candidate) => candidate.section === category);
     const sectionPercentage = calculateCategoryPercentage(section?.percent, 100);
-    const achieved = roundToOneDecimal((maximum * sectionPercentage) / 100);
-    const percentage = calculateCategoryPercentage(achieved, maximum);
+    const achieved = (maximum * sectionPercentage) / 100;
+    const percentage = sectionPercentage;
     return {
       category,
       achieved,
-      maximum: roundToOneDecimal(maximum),
+      maximum,
       percentage,
       responses: section?.responses ?? 0,
       color: colors[index % colors.length] ?? '#4F81BD',
@@ -353,7 +350,7 @@ function buildCategoryRows(
 }
 
 function buildRatingScale(surveyType: SurveyType): CompanyReportRatingBand[] {
-  return ratingBands[surveyType].map((band) => ({
+  return analyticsBands[surveyType].map((band) => ({
     ...band,
     displayMinimum: band.min,
   }));
@@ -377,27 +374,16 @@ export function createCompanyReportData(input: CreateCompanyReportDataInput): Co
     partnerCompanies,
     responses,
     scopeToSurveyId,
+    input.includeArchived ?? false,
   );
   // The stable company ID is authoritative. Normalize a stale historical
   // display name only for this pure scoring call so partner renames do not
   // make otherwise valid ID-scoped responses disappear.
   const composite = computeReportComposite(company.name, survey.surveyType, reportResponses);
-  const peerResponses = responses.filter((response) =>
-    !response.archived &&
-    response.surveyType === survey.surveyType &&
-    (!scopeToSurveyId || !response.surveyId || response.surveyId === survey.id),
-  );
-  const peerLeaderboard = getLeaderboard(peerResponses, survey.surveyType);
-  const rankedCompany = peerLeaderboard.find(
-    (candidate) => candidate.companyId === company.id,
-  ) ?? peerLeaderboard.find(
-    (candidate) => candidate.company === company.name,
-  );
-  const volumeWeightedScore = composite?.hasScore
-    ? rankedCompany?.rankScore ?? composite.compositeScore
-    : null;
+  // Analytics ranks the canonical rubric composite, not a peer confidence adjustment.
+  const volumeWeightedScore = composite?.hasScore ? composite.compositeScore : null;
   const volumeWeightedBand = composite?.hasScore && volumeWeightedScore !== null
-    ? getBand(survey.surveyType, volumeWeightedScore)
+    ? getAnalyticsBand(survey.surveyType, volumeWeightedScore)
     : composite?.band ?? null;
   const template = getReportTemplateConfig(survey.surveyType);
   const includeComments = input.includeComments ?? true;
@@ -445,6 +431,6 @@ export function createCompanyReportData(input: CreateCompanyReportDataInput): Co
 
 export function getReportAverageText(data: CompanyReportData): string {
   return data.composite?.hasScore && data.volumeWeightedScore !== null
-    ? formatCompositeScore(data.surveyType, data.volumeWeightedScore).text
+    ? formatAnalyticsScore(data.surveyType, data.volumeWeightedScore)
     : 'N/A';
 }

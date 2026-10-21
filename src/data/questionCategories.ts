@@ -59,6 +59,7 @@ function cloneDefaults(): Record<SurveyType, string[]> {
 export function getStoredCategoryLabels(): Record<SurveyType, string[]> {
   const defaults = cloneDefaults();
   try {
+    if (typeof localStorage === 'undefined') return defaults;
     const raw = localStorage.getItem(CATEGORIES_STORAGE_KEY);
     if (!raw) return defaults;
     const parsed = JSON.parse(raw);

@@ -20,6 +20,7 @@ import { logAdminActivity } from '../features/account-management/services/adminA
 import { computeCompanyDocumentSummary, computeDocumentStatus, EXPIRING_SOON_DAYS } from '../features/document-tracker/domain/compliance';
 import { parseDeploymentEnvironment, submissionSourceForEnvironment } from '../features/analytics/domain/responseProvenance';
 import { reconcileEvaluationBatchPartners } from '../features/evaluation-imports/domain/evaluationBatch';
+import { createImportedResponseFilter } from '../features/evaluation-imports/services/importedResponseIdentity';
 import { prepareDefaultSurveysForReactivation } from '../features/evaluation-imports/domain/surveyReactivation';
 import { testImportToken } from '../features/evaluation-imports/domain/testImport';
 import { getRequiredDocumentKeys } from '../features/document-tracker/domain/documentRequirements';
@@ -1440,7 +1441,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
       const normalizedCompanies = companies.map(normalizeDatabasePartnerCompany).map(normalizePartnerCompany);
       const normalizedSurveys = storedSurveys.map(normalizeCustomForm);
-      const normalizedResponses = storedResponses.map(normalizeSurveyResponse);
+      const normalizedResponses = storedResponses.map(normalizeSurveyResponse).filter(await createImportedResponseFilter(storedResponses));
+      if (cancelled) return;
       setPartnerCompanies(normalizedCompanies);
       setSurveys(normalizedSurveys);
       responsesRef.current = normalizedResponses;
@@ -1543,7 +1545,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
             : await loadApplicationRecordsByIds<SurveyResponse>('survey_response', recordIds);
           if (cancelled) return;
           const normalizedResponses = storedResponses.map(normalizeSurveyResponse);
-          const nextResponses = shouldRefreshAll
+          const mergedResponses = shouldRefreshAll
             ? normalizedResponses
             : mergeApplicationRecordsById(
               responsesRef.current,
@@ -1551,6 +1553,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
               recordIds,
               surveyResponseRecordId,
             );
+          const nextResponses = mergedResponses.filter(await createImportedResponseFilter(mergedResponses));
+          if (cancelled) return;
           responsesRef.current = nextResponses;
           hasHydratedResponses = true;
           setResponses(nextResponses);
@@ -2208,8 +2212,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // responseId (IMPORT-{TYPE}-{id}), so a re-run replaces those exact rows in
   // place instead of duplicating them. Companies the admin chose "add as
   // partner" for are created as minimal, unaccredited registry entries.
-  const commitRawEvaluations = (preview: RawEvalPreview, decisions: Record<string, CompanyDecision>): RawEvalImportSummary => {
+  const commitRawEvaluations = async (preview: RawEvalPreview, decisions: Record<string, CompanyDecision>): Promise<RawEvalImportSummary> => {
     const { responses: newRows, newPartnerCompanies, summary } = commitRawEvaluationImportRows(preview, decisions);
+    const keepResponse = await createImportedResponseFilter(newRows);
 
     const newIds = new Set(newRows.map((r) => r.responseId));
     const replaced = new Set(responses.filter((r) => newIds.has(r.responseId)).map((r) => r.responseId)).size;
@@ -2221,7 +2226,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     // commit to resolve silently clobbers the others.
     setResponses((prevResponses) => {
       const untouched = prevResponses.filter((r) => !newIds.has(r.responseId));
-      const updatedResponses = [...untouched, ...newRows];
+      const updatedResponses = [...untouched, ...newRows].filter(keepResponse);
       safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updatedResponses)));
       persistRemote(upsertApplicationRecords('survey_response', newRows, surveyResponseRecordId));
       return updatedResponses;
@@ -2254,6 +2259,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       ...commitRawEvaluationImportRows(preview, decisions),
     })));
     const allRows = committed.flatMap((entry) => entry.responses);
+    const keepResponse = await createImportedResponseFilter(allRows);
     const recordIds = allRows.map(surveyResponseRecordId);
     if (new Set(recordIds).size !== recordIds.length) {
       throw new Error('This batch contains duplicate response IDs. No responses were imported.');
@@ -2263,7 +2269,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     const addedCompaniesById = new Map<string, PartnerCompany>();
     committed.forEach((entry) => entry.newPartnerCompanies.forEach((company) => addedCompaniesById.set(company.id, company)));
     const newCompanies = [...addedCompaniesById.values()].map(normalizePartnerCompany);
-    const previousImportedResponses = responses.filter((response) => newIds.has(response.responseId));
+    const previousImportedResponses = responses.filter((response) => newIds.has(response.responseId) || !keepResponse(response));
     const newCompanyIds = new Set(newCompanies.map((company) => company.id));
     const previousCompanies = partnerCompanies.filter((company) => newCompanyIds.has(company.id));
 
@@ -2271,7 +2277,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     // The remote write continues below; if it fails, restore just these IDs
     // and let the repository's authoritative refresh reconcile any partial save.
     setResponses((current) => {
-      const updatedResponses = [...current.filter((response) => !newIds.has(response.responseId)), ...allRows];
+      const updatedResponses = [...current.filter((response) => !newIds.has(response.responseId)), ...allRows].filter(keepResponse);
       safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updatedResponses)));
       return updatedResponses;
     });

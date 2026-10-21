@@ -19,17 +19,18 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ArchiveSeries, SurveyResponse, SurveyType } from '../../../types/survey';
+import { ArchiveSeries, SurveyType } from '../../../types/survey';
 import { surveyTypeDisplayLabel } from '../../../data/questionWeights';
-import { getCompanyTrend, getCompanyTrendBySeries, getLeaderboard, getPeerAverageTrend, getPeerAverageTrendBySeries, getSectionPeerAverages } from '../../evaluations/domain/scoring';
+import { formatNumber } from '../domain/analytics';
+import type { CompanyAnalysisData } from '../domain/analyticsSnapshot';
 import { CompanyCombobox } from './CompanyCombobox';
 
 interface CompanyAnalysisPanelProps {
-  responses: SurveyResponse[];
+  analysis: CompanyAnalysisData;
+  surveyTypes: SurveyType[];
   archiveSeries?: ArchiveSeries[];
 }
 
-const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
 
 // Distinct, high-contrast colors for the primary company and the
 // comparison series (peer average or another company).
@@ -70,9 +71,9 @@ function formatMonthLabel(month: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 }
 
-export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyAnalysisPanelProps) {
+export function CompanyAnalysisPanel({ analysis, surveyTypes, archiveSeries = [] }: CompanyAnalysisPanelProps) {
   const isMobile = useIsMobile();
-  const [surveyType, setSurveyType] = useState<SurveyType>('Courier');
+  const [surveyType, setSurveyType] = useState<SurveyType>(analysis[0]?.type ?? 'Courier');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
@@ -82,8 +83,9 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
 
   const [chartView, setChartView] = useState<'radar' | 'bar'>('radar');
 
-  const leaderboard = useMemo(() => getLeaderboard(responses, surveyType), [responses, surveyType]);
-  const peerAverages = useMemo(() => getSectionPeerAverages(responses, surveyType), [responses, surveyType]);
+  const category = analysis.find((item) => item.type === surveyType);
+  const leaderboard = category?.companies ?? [];
+  const peerAverages = category?.peerAverages ?? [];
 
   const companyOptions = useMemo(() => leaderboard.map((c) => c.company), [leaderboard]);
 
@@ -135,20 +137,8 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
     return computeAxisDomain(chartData, [activeComposite.company, compareLabel]);
   }, [chartData, activeComposite, compareLabel]);
 
-  const primaryTrend = useMemo(() => {
-    if (!selectedCompany) return [];
-    return getCompanyTrend(responses, selectedCompany, surveyType);
-  }, [responses, selectedCompany, surveyType]);
-
-  // Comparison trend: the chosen company's own trajectory, or the peer average trajectory
-  // (excluding the primary company so it doesn't average against itself)
-  const compareTrend = useMemo(() => {
-    if (!selectedCompany) return [];
-    if (compareComposite) {
-      return getCompanyTrend(responses, compareComposite.company, surveyType);
-    }
-    return getPeerAverageTrend(responses, surveyType, selectedCompany);
-  }, [responses, selectedCompany, compareComposite, surveyType]);
+  const primaryTrend = activeComposite?.monthly ?? [];
+  const compareTrend = compareComposite?.monthly ?? activeComposite?.peerMonthly ?? [];
 
   const trendData = useMemo(() => {
     if (!activeComposite) return [];
@@ -172,10 +162,10 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
   // trend across periods/years" view.
   const seriesTrendData = useMemo(() => {
     if (!activeComposite) return [];
-    const primary = getCompanyTrendBySeries(responses, activeComposite.company, surveyType, archiveSeries);
+    const primary = activeComposite.series;
     const compare = compareComposite
-      ? getCompanyTrendBySeries(responses, compareComposite.company, surveyType, archiveSeries)
-      : getPeerAverageTrendBySeries(responses, surveyType, archiveSeries, selectedCompany ?? undefined);
+      ? compareComposite.series
+      : activeComposite.peerSeries;
 
     const seriesIds = [...new Set([...primary.map((t) => t.seriesId), ...compare.map((t) => t.seriesId)])];
     const createdAtById = new Map(archiveSeries.map((s) => [s.id, s.createdAt]));
@@ -192,7 +182,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
         [compareLabel]: c?.score ?? null,
       };
     });
-  }, [responses, activeComposite, compareComposite, surveyType, archiveSeries, selectedCompany, compareLabel]);
+  }, [activeComposite, compareComposite, archiveSeries, compareLabel]);
 
   // Yearly view: average every month that falls in the same year into one point per key.
   const yearlyTrendData = useMemo(() => {
@@ -218,7 +208,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
       .map(([year, bucket]) => {
         const row: Record<string, number | string | null> = { month: year, label: year };
         keys.forEach((key) => {
-          row[key] = bucket.counts[key] ? Number((bucket.sums[key] / bucket.counts[key]).toFixed(1)) : null;
+          row[key] = bucket.counts[key] ? bucket.sums[key] / bucket.counts[key] : null;
         });
         return row;
       });
@@ -259,7 +249,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
     setCompareCompany(null);
   };
 
-  if (!responses.length) return null;
+  if (!analysis.some((item) => item.companies.length)) return null;
 
   return (
     <section className="panel space-y-4">
@@ -399,7 +389,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
                       fillOpacity={0.3}
                     />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Tooltip formatter={(value) => [`${value}%`, 'Score']} />
+                    <Tooltip formatter={(value) => [`${typeof value === 'number' ? formatNumber(value) : value}%`, 'Score']} />
                   </RadarChart>
                 ) : (
                   <BarChart data={chartData} margin={{ top: 10, right: 20, bottom: 10, left: -8 }}>
@@ -413,13 +403,13 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
                       height={isMobile ? 48 : 28}
                     />
                     <YAxis domain={sectionAxisDomain} width={isMobile ? 34 : 44} tickFormatter={(value: number) => `${value}%`} tick={{ fontSize: isMobile ? 9 : 12 }} />
-                    <Tooltip formatter={(value) => [`${value}%`, 'Score']} />
+                    <Tooltip formatter={(value) => [`${typeof value === 'number' ? formatNumber(value) : value}%`, 'Score']} />
                     <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} />
                     <Bar dataKey={activeComposite.company} fill={PRIMARY_COLOR} radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey={activeComposite.company} position="top" formatter={(value) => `${typeof value === 'number' ? Math.round(value) : value}%`} style={{ fontSize: isMobile ? 8 : 10, fontWeight: 700 }} />
+                      <LabelList dataKey={activeComposite.company} position="top" formatter={(value) => `${typeof value === 'number' ? formatNumber(value) : value}%`} style={{ fontSize: isMobile ? 8 : 10, fontWeight: 700 }} />
                     </Bar>
                     <Bar dataKey={compareLabel} fill={COMPARE_COLOR} radius={[4, 4, 0, 0]}>
-                      <LabelList dataKey={compareLabel} position="top" formatter={(value) => `${typeof value === 'number' ? Math.round(value) : value}%`} style={{ fontSize: isMobile ? 8 : 10, fontWeight: 700 }} />
+                      <LabelList dataKey={compareLabel} position="top" formatter={(value) => `${typeof value === 'number' ? formatNumber(value) : value}%`} style={{ fontSize: isMobile ? 8 : 10, fontWeight: 700 }} />
                     </Bar>
                   </BarChart>
                 )}
@@ -469,7 +459,7 @@ export function CompanyAnalysisPanel({ responses, archiveSeries = [] }: CompanyA
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="label" minTickGap={isMobile ? 20 : 8} tick={{ fontSize: isMobile ? 9 : 11 }} />
                   <YAxis domain={trendAxisDomain} width={isMobile ? 34 : 44} tickFormatter={(value: number) => `${value}%`} tick={{ fontSize: isMobile ? 9 : 11 }} />
-                  <Tooltip formatter={(value) => [`${value}%`, 'Score']} />
+                  <Tooltip formatter={(value) => [`${typeof value === 'number' ? formatNumber(value) : value}%`, 'Score']} />
                   <Legend wrapperStyle={{ fontSize: isMobile ? 10 : 12 }} />
                   <Line
                     type="monotone"

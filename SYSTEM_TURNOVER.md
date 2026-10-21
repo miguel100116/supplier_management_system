@@ -54,7 +54,7 @@ Every account's default module access and visible survey data types are computed
 | Executive | Dashboard, Analytics, Reports, Present, Notification Logs (a reduced, summary-focused set) |
 | Admin (role) | Every module, regardless of designation, including Account Management, Renew Compliance Documents, and Import Evaluation Responses |
 
-*Data-scoping for survey responses is enforced by the applied versioned RLS migrations: Admin, Executive, and Director see every response; Supervisory sees their own department's responses; Rank & File sees only their own submissions. The product intends Analytics to remain company-wide and aggregate-only for every rank, but lower-rank sessions currently hydrate from these already-scoped raw rows. A protected aggregate RPC/view is still required; see `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`.*
+*Data-scoping for survey responses is enforced by the applied versioned RLS migrations: Admin, Executive, and Director see every response; Supervisory sees their own department's responses; Rank & File sees only their own submissions. Analytics now obtains company-wide summaries for permitted survey categories through the protected Express `/api/analytics` endpoint, independently of these scoped raw rows. It requires the server-only Supabase key and deployment of the Express API. Live role verification remains pending; see `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`.*
 
 ### 1.2 Admin Account Details
 
@@ -203,10 +203,10 @@ A condensed cheat-sheet of who gets what, by default:
 
 | Step | Actor | Action |
 |---|---|---|
-| 1 | User | Opens the login page and either enters an @mgenesis.com email + password, or clicks "Sign in with Microsoft" (if configured). |
+| 1 | User | Selects Admin Account or Employee Account, then enters an @mgenesis.com email + password, or clicks "Sign in with Microsoft" (if configured). |
 | 2 | System | Rejects any email that does not end in @mgenesis.com. |
 | 3 | System | Verifies the password with Supabase Auth. Microsoft sign-in, when configured, must also establish a Supabase session. |
-| 4 | System | Looks up the signed-in email in the Accounts list to resolve Role, Designation, and Department. |
+| 4 | System | Verifies the confirmed Supabase identity and linked account profile. If the stored role differs from the selected account type, login stops, the new session is cleared, and the user is told which account type to select. Missing/unverifiable profiles also block login. Role, Designation, and Department come from the persisted profile. |
 | 5 | System | Computes the account's permitted pages and survey types (role/designation/department defaults, or a saved per-account override). |
 | 6 | User | Lands on the Dashboard with only the permitted modules visible in the navigation. |
 
@@ -245,7 +245,7 @@ Every item below was verified directly against the current source code, not infe
 | 6 | A live-chat feature (Admin Chat Widget, Live Chat page, Employee Notifications Hub, chat service) was built across several commits and is now deleted in the working tree, but the deletion is not yet committed. | Whoever continues this project should confirm the removal is intentional before it is committed, since it removes real functionality. | Confirm with the project owner, then commit the removal explicitly (or restore the feature) rather than leaving it as an uncommitted change. |
 | 7 | `reference-materials/source-data/EFAS_Project_Charter.docx` (tracked since the initial commit) is a corrupted Word file — its ZIP central directory offset is invalid. | It cannot be opened by Word, pandoc, or standard ZIP tooling; whatever project-charter content it held is currently inaccessible. | Locate a valid backup copy if one exists, or treat the content as lost and re-document the project charter separately. |
 | 8 | No User Manual, Quick Reference Guide, Known Issues log, or Release Notes existed in the repository before this handoff. | New team members previously had no onboarding documentation. | This document is the first pass at all four — keep it updated as the system changes. |
-| 9 | Lower-rank Analytics is intended to be company-wide, but its input is the raw `survey_response` projection restricted by RLS. | Supervisory users see only their department and Rank & File users see only their own records, so their charts cannot be company-wide. | Add a protected aggregate RPC/view; do not widen access to raw responses. See `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`. |
+| 9 | Company-wide Analytics uses the protected Express `/api/analytics` endpoint; hosted verification remains pending. | Static-only deployments or a missing server Supabase key show Analytics unavailable; no scoped-data fallback is used. | Deploy the Express API with its server-only key and verify every permitted role against the same reporting scope. Raw-response RLS is unchanged. See `docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`. |
 | 10 | The UI can grant `renew-documents` to a non-Admin, while `partner_company` updates are Admin-only in RLS. | A delegated document renewal can appear optimistically in the browser and then fail to persist. | Add a narrowly validated renewal RPC or a server-side effective-permission rule before relying on delegated renewal. |
 | 11 | Managerial and Director defaults expose Archive Center, while existing response UPDATE/DELETE operations are Admin-only in RLS. | Archive, restore, and permanent-delete mutations fail remotely for those non-Admin roles. | Decide whether Archive Center is Admin-only or implement an authorized server-side archive operation. |
 

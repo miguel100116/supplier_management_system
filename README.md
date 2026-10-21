@@ -89,7 +89,9 @@ Each survey type's questions are grouped into **5 scored categories** plus a fix
 
 - **Weighted rubric:** Each question carries a point value validated against the company's original paper evaluation forms (`src/data/questionWeights.ts`). Answers are scored, summed per category, and normalized so **every survey type shares one 0–100 composite axis** (`src/features/evaluations/domain/scoring.ts`).
 - **Score bands:** Composite scores map to labeled bands (e.g. Critical → Excellent). Companies with no scoreable answers yet get a distinct "No Score Yet" band instead of being mislabeled as failing.
-- **Ranking:** Analytics and company-ranking reports use Bayesian volume-weighted scoring: `(R × v + C × m) / (v + m)`, where `C` is the unweighted mean of peer company averages and `m` is the median peer response count (minimum 3) for the same partner type and reporting scope. Reports label the adjusted value **Volume-Weighted Score**; the rubric-based Composite Score remains unchanged.
+- **Ranking:** Analytics and generated company-ranking reports use the normalized rubric composite, with matching score formatting and rating bands. Scores display exactly two decimal places without rounding up (89.999 becomes 89.99); calculations retain full precision and ratings use the unrounded value. Subcontractor displays on the 0–2 scale with Top/Good/Marginal/Poor Performer bands; Courier/Supplier retain their 0–100 bands. Other consumers of `getLeaderboard` still have the separate Bayesian confidence-weighted rank score available. Reports and Analytics must use the same filters and authorized data scope for direct comparison.
+- **CSV re-uploads:** Analytics recognizes original UUID submissions and their matching standard `IMPORT-*` re-upload identities once when company, timestamp, respondent, form, and archive period agree. Stored source records and additional client evaluations are preserved; CSV reference totals are not limits on new data.
+- **Generated report content:** Summaries, question tables, and company rankings use the same authorized official response cohort. Company preview/export follows stable company IDs and the selected archive scope. Evaluated-company lists require actual answered evaluations. Executive findings require scored data; custom notes start blank and saved notes remain user-provided.
 - **Renaming vs. rubric:** Admins can **rename** a category's display label via the **Categories Manager** without ever touching the underlying point values — display names are translated by slot position, keeping the validated rubric intact.
 
 - **Counted forms:** A unique submission counts when at least one evaluation rating or designated remark has a real answer. Numeric zero counts; blank, N/A, none, dash, and nil markers do not. Metadata such as Period Covered never counts. Blank/N/A-only forms are excluded from totals and completion counts; score averages still use numeric ratings.
@@ -117,14 +119,14 @@ An Admin can **override** access per individual account ("Custom Overrides"), or
 
 ### 3.4 Data Scoping & Isolation
 
-Beyond *which modules* a user sees, the system controls *which response data* they see (`applyAccessFilter` in `src/App.tsx`):
+Beyond *which modules* a user sees, the system controls *which response data* they see (`applyAccessFilter` in `src/App.tsx` for individual responses; `/api/analytics` for summaries):
 
 | Who | Sees which survey responses |
 |---|---|
 | Admin / Executive / Director | Every response (within their permitted survey types) |
 | Supervisory | Only their own department's responses |
 | Rank & File | Only their own submissions |
-| **Analytics (everyone)** | **Always company-wide and aggregate-only**, regardless of rank |
+| **Analytics (everyone)** | **Company-wide and aggregate-only** within permitted survey categories, regardless of rank |
 
 A **Data Scope** toggle further switches between *Current* (active period), *All-Time* (active + all archived periods), and *Custom* (Analytics submission-date calendars across active and archived history, optionally narrowed to selected archived series). Custom ranges include both selected dates in the user's local time zone; either boundary can be left blank. The calendar controls remain available when no responses match.
 
@@ -139,9 +141,9 @@ Form headings use **Create Evaluation Form**, **Edit Evaluation Form**, **Evalua
 | Module | What it does |
 |---|---|
 | **Dashboard** | Personalized performance indicators and KPIs. |
-| **Survey Forms** | View, fill, and publish feedback forms. Marking a form **Ended** archives the active results for its partner category; the category ranking remains available in Company Leaderboard → Archives and the archived responses remain in Archive Center. Legacy forms named with a leading Test/Tests label are hidden from employee evaluation choices and remain available to Admins. Respondent Info starts directly with the progress steps and has only “Proceed to Form Questions” in its footer; sidebar navigation and the later Questions Form Return actions remain available. Date-range questions support calendar pickers with month/year selection or typed `dd/mm/yyyy` dates; both dates are required and the end must be on or after the start. |
+| **Survey Forms** | View, fill, and publish feedback forms. Manage Access and the Forms table use the same deadline-aware status, including explicit manual endings. Marking a form **Ended** archives the active results for its partner category; the category ranking remains available in Company Leaderboard → Archives and the archived responses remain in Archive Center. Legacy forms named with a leading Test/Tests label are hidden from employee evaluation choices and remain available to Admins. Respondent Info starts directly with the progress steps and has only “Proceed to Form Questions” in its footer; sidebar navigation and the later Questions Form Return actions remain available. Date-range questions support calendar pickers with month/year selection or typed `dd/mm/yyyy` dates; both dates are required and the end must be on or after the start. |
 | **Survey Explorer** | Review each survey submission, filter by respondent email, inspect answers, and export all or filtered responses to Excel. |
-| **Analytics** | Company statistical charts, trends, rankings, and company comparisons over the response data authorized for the current session. Company Leaderboard has Current rankings and Archives views; choosing an archived category-period opens its company ranking list. |
+| **Analytics** | Company-wide charts, trends, rankings, and company comparisons returned as protected server aggregates within permitted survey categories. Company Leaderboard has Current rankings and Archives views; choosing an archived category-period opens its company ranking list. |
 | **Reports** | Generate and History tabs for Summary / Company / Question / Executive-Summary builders and raw exports (PDF, Excel, CSV, Word where supported). Saved copies can be downloaded again; Regenerate opens saved builder options with current authorized data and filters. |
 | **Present** | Staggered slide-deck presentation builder (PDF/PPTX export). |
 | **Partner Companies** | Manage external courier, supplier, and subcontractor rosters, branches, documents, and the Admin-only dated Active Companies upload history. |
@@ -167,7 +169,7 @@ Select or drop one or more `.csv`, `.xlsx`, or `.xls` response exports on the Im
 
 ## 5. Architecture & Tech Stack
 
-The application is a **single-page React app** with a thin Express server used only for local dev/preview and production static hosting.
+The application is a **single-page React app** with an Express server for development, production static hosting, protected account provisioning, and company-wide Analytics summaries.
 
 | Layer | Technology |
 |---|---|
@@ -235,7 +237,7 @@ See [reference materials](reference-materials/README.md) for the relocated utili
 
 **Staging backend:** The normalized migrations under [`supabase/migrations`](supabase/migrations) are applied to the dedicated staging project. Imported normalized tables remain the immutable source/audit layer. `app_profiles` and per-entity `application_records` are the editable frontend store and are published to Supabase Realtime. RLS scopes evaluation rows by profile, permits employees to insert only their own submissions and operational entries, and restricts shared configuration/registry writes by role. Authorization helpers live in an unexposed `private` schema. The older [`supabase/schema.sql`](supabase/schema.sql) remains an unapplied draft.
 
-The verified frontend/backend contract, record-type matrix, Realtime routing, and known authorization gaps are documented in [`docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`](docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md). In particular, lower-rank company-wide aggregate Analytics, delegated document renewal, and non-Admin archive mutations require dedicated server-side authorization work before production; the client must not bypass those boundaries.
+The verified frontend/backend contract, record-type matrix, Realtime routing, and known authorization gaps are documented in [`docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`](docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md). Company-wide Analytics now uses the protected Express `GET /api/analytics` endpoint; raw response RLS remains unchanged. The API verifies the company identity, account permissions, and department ceiling before calculating summaries with the existing scoring rules. Current, All-Time, and Custom scopes retain official provenance and inclusive local-day filtering. Analytics preloads once the signed-in account permissions are available and retains its summaries across page navigation. Each scope request loads All Categories and every permitted category summary together. Category tabs switch immediately using these in-memory summaries without another API request; changing the reporting scope, dates, or archived periods loads a new set. Summaries refresh in the background on local invalidation, window focus, and every minute; overlapping refresh events are coalesced instead of restarting an in-flight request. API errors show an unavailable state rather than scoped or partial totals. This requires the Express host and its server-only `SUPABASE_SECRET_KEY` (legacy service-role keys are also accepted); static hosting and `npm run preview` cannot provide this endpoint. Deployment and live role verification remain required; no migration is needed.
 
 ---
 
@@ -244,6 +246,7 @@ The verified frontend/backend contract, record-type matrix, Realtime routing, an
 Staging signs users in with **Supabase email and password** because the team does not have access to the Microsoft Entra tenant. Only `@mgenesis.com` addresses are accepted, and email confirmation is enabled in the staging Supabase project.
 
 - **Email domain is enforced:** only `@mgenesis.com` addresses are accepted.
+- **Account type must match:** select Admin Account or Employee Account before signing in. The selected type must match the confirmed Supabase user's linked account profile. A mismatch clears the new session and asks you to select the correct type; missing or unverifiable profiles require administrator setup.
 - **Password management:** passwords belong to Supabase Auth. Use **Forgot password** on the login page for recovery; configure the hosted recovery redirect allowlist.
 - **Add Account:** a signed-in Admin enters a verified employee's company email and access profile. The form generates a fresh 20-character password; the Admin can reveal, copy, regenerate, or replace it with a custom password of at least 16 characters (up to 72 UTF-8 bytes). Copy it before saving and share it through the approved private channel. The login becomes confirmed after its profile is saved, so the employee can sign in immediately. Passwords are not saved in application profiles, browser storage, or activity logs.
 - **Account creation server:** `POST /api/admin/accounts` requires the Express host (`npm run dev` or built `npm start`) and server environment variables `SUPABASE_URL` (or `VITE_SUPABASE_URL`) and `SUPABASE_SECRET_KEY`, all for the same Supabase project. Use a secret key or legacy service-role key only in the server environment. Static hosting and `npm run preview` do not provide this API. Missing configuration produces an error rather than a profile-only success. See [account operations](docs/engineering/AUTH_OPERATIONS.md).
@@ -252,7 +255,7 @@ Staging signs users in with **Supabase email and password** because the team doe
 
 > **Security boundary:** browser access uses the publishable key plus authenticated RLS. Secret/service-role keys must never be placed in `VITE_*` variables.
 
-**Bootstrap admins:** The approved bootstrap identities are maintained in `src/App.tsx` and `supabase/seed_admins.sql` so a fresh deployment can authorize the initial administrators. Admin rights are authorization records; set an approved employee's System Role to `Admin` to grant them.
+**Bootstrap admins:** Approved administrators need a persisted Admin row in `app_profiles`, linked to their confirmed Supabase user through `user_id`. The frontend fallback identities in `src/App.tsx` do not satisfy explicit login validation. The legacy `supabase/seed_admins.sql` targets `accounts` and does not provision this current profile contract. Admin rights are authorization records; set an approved employee's System Role to `Admin` to grant them.
 
 ---
 
@@ -320,7 +323,7 @@ Cleanup targets only whole `survey_response` groups marked `test_submission`, or
 
 ## 12. Deployment
 
-The production build produces a static client plus a small Express server that serves it and provides an `/api/health` health check.
+The production build produces a static client plus a small Express server that serves it and provides `/api/health`, protected account provisioning, and aggregate `/api/analytics`. Configure the server-only Supabase key for the protected APIs. A static-only host must route these APIs to the Express host.
 
 For Vercel SPA deployments, the root `vercel.json` rewrites frontend paths to `index.html` so direct links and browser refreshes reach the client router. `/api/*` is excluded from that rewrite and must be served by the configured API host.
 
@@ -410,3 +413,5 @@ This system is **pre-production**. The most important open items (verified again
 ### Admin evaluation navigation
 
 Admins open Evaluations > Workspace and switch between Forms (form management), Responses (submission list, answer inspection, and Excel export), Coverage (company evaluation coverage), and Category Labels (display names for scoring categories). All four views share the same grouped tab layout and active-tab highlight; tabs wrap on narrow screens. Archive and Import Responses remain separate destinations. Existing route permissions and persistence contracts are unchanged.
+
+For Courier and Supplier forms, open **Send Form** and check the specific companies to evaluate from that category's Top 20 list. **Select top 20 couriers/suppliers** checks the full list; uncheck any companies you do not want to include. At least one company must be checked before **Confirm & Save Selection**. This uses the existing Manage Access Top 20 preset and saves only the checked company IDs, including for already-active forms. The final in-app popup shows the form, company count and eligible employee count; only **Yes, proceed** saves the distribution. **Go back**, Escape or backdrop dismissal returns to review without sending. Cancelling a company draft uses an in-app discard prompt. Opening or cancelling does not change existing assignments. Existing recipient permissions and deadline checks still apply.

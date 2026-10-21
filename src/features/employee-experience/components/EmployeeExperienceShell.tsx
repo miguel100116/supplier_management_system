@@ -77,14 +77,6 @@ export function EmployeeExperienceShell<T extends string>({ pages, activePage, o
             );
           })}
         </nav>
-        <div className="sidebar-bottom">
-          <div className="sidebar-help">
-            <span className="help-symbol"><Icon name="help" size={22} /></span>
-            <h4>A little guidance?</h4>
-            <p>Everything you need to know about your evaluations.</p>
-            <button type="button" onClick={() => setIsHelpOpen(true)}>View quick guide <Icon name="arrow" size={15} /></button>
-          </div>
-        </div>
       </aside>
 
       <div className="main-shell">
@@ -105,6 +97,16 @@ export function EmployeeExperienceShell<T extends string>({ pages, activePage, o
             {activePage !== homePage?.key && <><Icon name="chevron" size={13} /><span>{pageTitle}</span></>}
           </div>
           <div className="topbar-right">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="View quick guide"
+              aria-haspopup="dialog"
+              title="View quick guide"
+              onClick={() => setIsHelpOpen(true)}
+            >
+              <Icon name="help" />
+            </button>
             {action}
           </div>
         </header>

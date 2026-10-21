@@ -12,8 +12,53 @@ import {
   getOverallFeedbackQuestionId,
 } from './companyReportData';
 import { REPORT_TEMPLATE_BY_SURVEY_TYPE } from './reportTemplateConfig';
+import { analyticsBands, formatAnalyticsScore, getAnalyticsBand, getAnalyticsCompanyRankings } from '../../analytics/domain/rankings';
+import { getReportAverageText } from './companyReportData';
 
 const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
+
+test('standalone company report exports retain the archived data supplied by the selected scope', () => {
+  const survey = makeSurvey('Courier');
+  const company = makeCompany('partner', 'Partner', 'Courier');
+  const weight = questionWeights.Courier[0];
+  const current = makeResponse({ responseId: 'current', survey, company, questionId: weight.questionId,
+    question: 'Criterion', category: weight.section, rating: weight.maxPoints });
+  const archived = { ...current, responseId: 'archived', archived: true, seriesId: 'past', rating: 0 };
+  const report = createCompanyReportData({ survey, companyId: company.id, partnerCompanies: [company],
+    responses: [current, archived], scopeToSurveyId: false, includeArchived: true });
+  assert.equal(report.volumeWeightedScore, 50);
+  assert.equal(report.composite?.evaluationCount, 2);
+  const currentSurveyReport = createCompanyReportData({ survey, companyId: company.id, partnerCompanies: [company], responses: [current, archived] });
+  assert.equal(currentSurveyReport.volumeWeightedScore, 100);
+});
+
+for (const type of surveyTypes) {
+  test(`${type} generated company report uses the Analytics leaderboard score, label and scale`, () => {
+    const survey = makeSurvey(type);
+    const company = makeCompany('target', 'Target Partner', type);
+    const peer = makeCompany('peer', 'Peer Partner', type);
+    const weight = questionWeights[type][0];
+    const responses = [
+      makeResponse({ responseId: 'target-1', survey, company, questionId: weight.questionId, question: 'Scored criterion', category: weight.section, rating: weight.maxPoints * 0.78964 }),
+      ...Array.from({ length: 12 }, (_, index) => makeResponse({ responseId: `peer-${index}`, survey, company: peer, questionId: weight.questionId, question: 'Scored criterion', category: weight.section, rating: weight.maxPoints })),
+    ];
+    const ranking = getAnalyticsCompanyRankings(responses, [type]).find((entry) => entry.name === company.name)!;
+    const report = createCompanyReportData({ survey, companyId: company.id, partnerCompanies: [company, peer], responses });
+    assert.equal(report.volumeWeightedScore, ranking.rankScore);
+    assert.ok(Math.abs(ranking.rankScore - 78.964) < 1e-10);
+    assert.notEqual(ranking.rankScore, Number(ranking.rankScore.toFixed(1)));
+    for (const category of report.categoryRows.filter((row) => row.responses > 0)) {
+      assert.equal(category.percentage, report.composite!.sections.find((section) => section.section === category.category)!.percent);
+    }
+    assert.deepEqual(report.volumeWeightedBand, getAnalyticsBand(type, ranking.rankScore));
+    assert.equal(getReportAverageText(report), formatAnalyticsScore(type, ranking.rankScore));
+    assert.deepEqual(report.ratingScale.map(({ displayMinimum, ...band }) => band), analyticsBands[type]);
+    if (type === 'Subcontractor') {
+      assert.equal(getReportAverageText(report), '1.57 / 2.0');
+      assert.equal(report.volumeWeightedBand?.label, 'Top Performer');
+    }
+  });
+}
 
 function makeSurvey(surveyType: SurveyType): CustomForm {
   return {
@@ -91,7 +136,7 @@ test('maps every survey card type to the exact retained Word reference', () => {
 });
 
 test('formats category labels with safe, clamped percentages', () => {
-  assert.equal(calculateCategoryPercentage(22, 30), 73.3);
+  assert.equal(calculateCategoryPercentage(22, 30), (22 / 30) * 100);
   assert.equal(calculateCategoryPercentage(18, 20), 90);
   assert.equal(calculateCategoryPercentage(10, 0), 0);
   assert.equal(calculateCategoryPercentage(Number.NaN, 20), 0);
@@ -100,7 +145,7 @@ test('formats category labels with safe, clamped percentages', () => {
   assert.equal(calculateCategoryPercentage(25, 20), 100);
   assert.equal(
     formatCategoryMetricLabel({ achieved: 22, maximum: 30, percentage: 73.3 }),
-    '22 / 30 (73.3%)',
+    '22.00 / 30.00 (73.30%)',
   );
 });
 

@@ -136,9 +136,9 @@ function computeCompanyCompositeFromResponses(
     }
     return {
       section: liveSection,
-      earned: Number(v.earned.toFixed(1)),
+      earned: v.earned,
       possible: v.possible,
-      percent: v.possible ? Number(Math.min(100, Math.max(0, (v.earned / v.possible) * 100)).toFixed(1)) : 0,
+      percent: v.possible ? Math.min(100, Math.max(0, (v.earned / v.possible) * 100)) : 0,
       responses: v.responses,
     };
   });
@@ -148,7 +148,7 @@ function computeCompanyCompositeFromResponses(
   const rawComposite = hasScore
     ? normalizedSubmissionScores.reduce((sum, item) => sum + item.score, 0) / normalizedSubmissionScores.length
     : 0;
-  const compositeScore = Number(Math.min(100, Math.max(0, rawComposite)).toFixed(1));
+  const compositeScore = Math.min(100, Math.max(0, rawComposite));
 
   const mean = percentScores.length ? percentScores.reduce((a, b) => a + b, 0) / percentScores.length : 0;
   const variance = percentScores.length
@@ -167,8 +167,8 @@ function computeCompanyCompositeFromResponses(
     // unscored questions. All-N/A and blank-only forms are excluded.
     evaluationCount: submissionCount(companyResponses),
     hasScore,
-    stdDev: Number(Math.sqrt(variance).toFixed(1)),
-    naRate: applicableCount ? Number(((naCount / applicableCount) * 100).toFixed(1)) : 0,
+    stdDev: Math.sqrt(variance),
+    naRate: applicableCount ? (naCount / applicableCount) * 100 : 0,
     // No peer group available in isolation - getLeaderboard recomputes this
     // against the full peer set once every company's composite is known.
     rankScore: compositeScore,
@@ -320,7 +320,7 @@ export function getSectionPeerAverages(responses: SurveyResponse[], surveyType: 
 
   return [...sectionTotals.entries()].map(([section, v]) => ({
     section,
-    average: Number((v.sum / v.count).toFixed(1)),
+    average: v.sum / v.count,
   }));
 }
 
@@ -358,7 +358,7 @@ export function getPeerAverageTrend(responses: SurveyResponse[], surveyType: Sur
       .map((company) => computeCompanyComposite(company, surveyType, monthResponses))
       .filter((c): c is CompanyComposite => c !== null && c.hasScore)
       .map((c) => c.compositeScore);
-    const average = scores.length ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : null;
+    const average = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
     return { month, score: average };
   });
 }
@@ -398,7 +398,7 @@ export function getPeerAverageTrendBySeries(responses: SurveyResponse[], surveyT
       .map((company) => computeCompanyComposite(company, surveyType, seriesResponses))
       .filter((c): c is CompanyComposite => c !== null && c.hasScore)
       .map((c) => c.compositeScore);
-    const average = scores.length ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)) : null;
+    const average = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
     return { seriesId, label: seriesById.get(seriesId)?.label ?? 'Unknown', score: average };
   });
 }

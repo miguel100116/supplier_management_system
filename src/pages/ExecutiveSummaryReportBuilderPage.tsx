@@ -40,16 +40,17 @@ import {
   Legend
 } from 'recharts';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { getQuestionMaxPoints, surveyTypeDisplayLabel, formatCompositeScore, getBand, getRemarkText } from '../data/questionWeights';
+import { getQuestionMaxPoints, surveyTypeDisplayLabel, getRemarkText } from '../data/questionWeights';
 import { isOverallCategory } from '../data/questionCategories';
 import {
   formatNumber,
-  hasAnsweredItem,
   getKpiSummary,
   averageBySurveyType,
-  numericRating
+  numericRating,
+  submissionScores,
 } from '../features/analytics/domain/analytics';
-import { getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
+import { formatAnalyticsScore, getAnalyticsBand, getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
+import { getEvaluatedCompanyNames } from '../features/reports/domain/reportContent';
 
 interface ExecutiveSummaryReportBuilderPageProps {
   responses: SurveyResponse[];
@@ -109,9 +110,7 @@ export function ExecutiveSummaryReportBuilderPage({
   const [showDetailedQuestionReport, setShowDetailedQuestionReport] = useState(initialSettings.showDetailedQuestionReport ?? true);
 
   const [preparedBy, setPreparedBy] = useState(initialSettings.preparedBy ?? 'Executive Operations Team');
-  const [customNotesText, setCustomNotesText] = useState(initialSettings.customNotesText ?? (
-    'Overall system-wide supplier performance continues to maintain a solid average rating. Courier lines lead with highest consistency, while Subcontractors present minor documentation bottlenecks that require operational alignment. Action items have been flagged for key performance outliers.'
-  ));
+  const [customNotesText, setCustomNotesText] = useState(initialSettings.customNotesText ?? '');
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | null>(null);
@@ -253,13 +252,7 @@ export function ExecutiveSummaryReportBuilderPage({
     };
 
     ALL_SURVEY_TYPES.forEach((type) => {
-      const companiesForType = partnerCompanies
-        .filter((c) => c.type === type && !c.isArchived)
-        .map((c) => c.name);
-      const evaluatedFromResponses = Array.from(
-        new Set(responses.filter((r) => r.surveyType === type && hasAnsweredItem(r)).map((r) => r.company))
-      );
-      map[type] = Array.from(new Set([...companiesForType, ...evaluatedFromResponses])).sort();
+      map[type] = getEvaluatedCompanyNames(responses, partnerCompanies, type);
     });
 
     return map;
@@ -350,6 +343,8 @@ export function ExecutiveSummaryReportBuilderPage({
   // Automated Strategic Action Items based on actual data
   const generatedRecommendations = useMemo(() => {
     const items: { type: 'alert' | 'success' | 'action'; title: string; text: string }[] = [];
+    const scoredTypes = new Set(submissionScores(filteredResponses).map((submission) => submission.surveyType));
+    if (!scoredTypes.size) return items;
 
     // General average score check
     if (summary.averageRating >= 85) {
@@ -362,13 +357,13 @@ export function ExecutiveSummaryReportBuilderPage({
       items.push({
         type: 'alert',
         title: 'Core Performance Advisory',
-        text: `The general system-wide score has dropped to ${formatNumber(summary.averageRating)}%. Operations management should initiate structured monthly reviews for least performing divisions.`,
+        text: `The general system-wide score is ${formatNumber(summary.averageRating)}%. Operations management should initiate structured monthly reviews for least performing divisions.`,
       });
     }
 
     // Survey Type Outliers
     if (surveyPerformance.length > 0) {
-      const sortedPerformance = [...surveyPerformance].sort((a, b) => a.average - b.average);
+      const sortedPerformance = surveyPerformance.filter((row) => scoredTypes.has(row.surveyType)).sort((a, b) => a.average - b.average);
       const lowestCat = sortedPerformance[0];
       const highestCat = sortedPerformance[sortedPerformance.length - 1];
 
@@ -376,7 +371,7 @@ export function ExecutiveSummaryReportBuilderPage({
         items.push({
           type: 'alert',
           title: `Focus Required on ${lowestCat.surveyType} Category`,
-          text: `Average rating for "${lowestCat.surveyType}" is lagging at ${formatCompositeScore(lowestCat.surveyType, lowestCat.average).text}. Priority should be given to identifying root workflow bottlenecks in this division.`,
+          text: `Average rating for "${lowestCat.surveyType}" is lagging at ${formatAnalyticsScore(lowestCat.surveyType, lowestCat.average)}. Priority should be given to identifying root workflow bottlenecks in this division.`,
         });
       }
 
@@ -384,7 +379,7 @@ export function ExecutiveSummaryReportBuilderPage({
         items.push({
           type: 'success',
           title: `Benchmark Set by ${highestCat.surveyType} Division`,
-          text: `The ${highestCat.surveyType} group is outstanding with an average rating of ${formatCompositeScore(highestCat.surveyType, highestCat.average).text}. We recommend documenting their workflow practices to establish a standard company-wide template.`,
+          text: `The ${highestCat.surveyType} group is outstanding with an average rating of ${formatAnalyticsScore(highestCat.surveyType, highestCat.average)}. We recommend documenting their workflow practices to establish a standard company-wide template.`,
         });
       }
     }
@@ -405,12 +400,12 @@ export function ExecutiveSummaryReportBuilderPage({
       items.push({
         type: 'action',
         title: `Supplier SLA Review Required`,
-        text: `"${worstCompany.company}" stands as the lowest ranked evaluated partner with a score of ${formatCompositeScore(worstCompany.surveyType, worstCompany.average).text}. Initiate formal communication regarding performance improvement targets.`,
+        text: `"${worstCompany.company}" stands as the lowest ranked evaluated partner with a score of ${formatAnalyticsScore(worstCompany.surveyType, worstCompany.average)}. Initiate formal communication regarding performance improvement targets.`,
       });
     }
 
     return items;
-  }, [summary, surveyPerformance, questionStats, leastRatedCompanies]);
+  }, [summary, surveyPerformance, questionStats, leastRatedCompanies, filteredResponses]);
 
   // Recharts Chart Data
   const chartData = useMemo(() => {
@@ -500,7 +495,7 @@ export function ExecutiveSummaryReportBuilderPage({
         tables.push({
           title: 'Survey Division Breakdown',
           columns: ['Survey Category', 'Average Score', 'Total Submissions'],
-          rows: surveyPerformance.map((r) => [r.surveyType, formatCompositeScore(r.surveyType, r.average).text, r.responses]),
+          rows: surveyPerformance.map((r) => [r.surveyType, formatAnalyticsScore(r.surveyType, r.average), r.responses]),
         });
       }
 
@@ -523,13 +518,13 @@ export function ExecutiveSummaryReportBuilderPage({
       if (showCompanyRankings) {
         tables.push({
           title: 'Highest Rated Partners',
-          columns: ['Partner Company', 'Survey Type', 'Volume-Weighted Score', 'Submissions Count', 'Remarks'],
-          rows: topCompanies.map((r) => [r.company, r.surveyType, formatCompositeScore(r.surveyType, r.average).text, r.evaluations, getRemarkText(getBand(r.surveyType, r.average))]),
+          columns: ['Partner Company', 'Survey Type', 'Leaderboard Score', 'Submissions Count', 'Remarks'],
+          rows: topCompanies.map((r) => [r.company, r.surveyType, formatAnalyticsScore(r.surveyType, r.average), r.evaluations, getRemarkText(getAnalyticsBand(r.surveyType, r.average))]),
         });
         tables.push({
           title: 'Lowest Rated Partners (Operational Alert)',
-          columns: ['Partner Company', 'Survey Type', 'Volume-Weighted Score', 'Submissions Count', 'Remarks'],
-          rows: leastRatedCompanies.map((r) => [r.company, r.surveyType, formatCompositeScore(r.surveyType, r.average).text, r.evaluations, getRemarkText(getBand(r.surveyType, r.average))]),
+          columns: ['Partner Company', 'Survey Type', 'Leaderboard Score', 'Submissions Count', 'Remarks'],
+          rows: leastRatedCompanies.map((r) => [r.company, r.surveyType, formatAnalyticsScore(r.surveyType, r.average), r.evaluations, getRemarkText(getAnalyticsBand(r.surveyType, r.average))]),
         });
       }
 
@@ -766,7 +761,7 @@ export function ExecutiveSummaryReportBuilderPage({
           const tableHeaders = ['Survey Division Category', 'Average Score', 'Total Submitted Evaluations'];
           const tableRows = surveyPerformance.map((row) => [
             row.surveyType,
-            formatCompositeScore(row.surveyType, row.average).text,
+            formatAnalyticsScore(row.surveyType, row.average),
             String(row.responses),
           ]);
 
@@ -882,22 +877,22 @@ export function ExecutiveSummaryReportBuilderPage({
           cursorY += 20;
 
           if (topCompanies.length > 0) {
-            const tableHeaders = ['Rank', 'Partner Company Name', 'Survey Type', 'Volume-Weighted Score', 'Remarks'];
+            const tableHeaders = ['Rank', 'Partner Company Name', 'Survey Type', 'Leaderboard Score', 'Remarks'];
             const tableRows = topCompanies.map((row, idx) => [
               `#${idx + 1}`,
               row.company,
               row.surveyType,
-              formatCompositeScore(row.surveyType, row.average).text,
-              getRemarkText(getBand(row.surveyType, row.average)),
+              formatAnalyticsScore(row.surveyType, row.average),
+              getRemarkText(getAnalyticsBand(row.surveyType, row.average)),
             ]);
 
-            const leastHeaders = ['Alert Rank', 'Partner Company Name', 'Survey Type', 'Volume-Weighted Score', 'Remarks'];
+            const leastHeaders = ['Alert Rank', 'Partner Company Name', 'Survey Type', 'Leaderboard Score', 'Remarks'];
             const leastRows = leastRatedCompanies.map((row, idx) => [
               `ALERT #${idx + 1}`,
               row.company,
               row.surveyType,
-              formatCompositeScore(row.surveyType, row.average).text,
-              getRemarkText(getBand(row.surveyType, row.average)),
+              formatAnalyticsScore(row.surveyType, row.average),
+              getRemarkText(getAnalyticsBand(row.surveyType, row.average)),
             ]);
 
             const startY = cursorY;
@@ -1461,7 +1456,7 @@ export function ExecutiveSummaryReportBuilderPage({
                           {surveyPerformance.map((row) => (
                             <tr key={row.surveyType} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                               <td className="p-2 font-medium">{row.surveyType}</td>
-                              <td className="p-2 text-right font-semibold text-[#0063a9]">{formatCompositeScore(row.surveyType, row.average).text}</td>
+                              <td className="p-2 text-right font-semibold text-[#0063a9]">{formatAnalyticsScore(row.surveyType, row.average)}</td>
                               <td className="p-2 text-right text-slate-500">{row.responses}</td>
                             </tr>
                           ))}
@@ -1577,19 +1572,19 @@ export function ExecutiveSummaryReportBuilderPage({
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Rank</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Partner Company Name</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Survey Type</th>
-                              <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Volume-Weighted Score</th>
+                              <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Leaderboard Score</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Remarks</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-emerald-100/50 dark:divide-emerald-900/20 text-slate-700 dark:text-slate-300">
                             {topCompanies.map((c, idx) => {
-                              const band = getBand(c.surveyType, c.average);
+                              const band = getAnalyticsBand(c.surveyType, c.average);
                               return (
                                 <tr key={`${c.surveyType}:${c.company}`} className="hover:bg-emerald-50/10">
                                   <td className="p-2 font-bold text-emerald-600">#{idx + 1}</td>
                                   <td className="p-2 font-medium">{c.company}</td>
                                   <td className="p-2 text-slate-500">{c.surveyType}</td>
-                                  <td className="p-2 text-right font-black text-emerald-600">{formatCompositeScore(c.surveyType, c.average).text}</td>
+                                  <td className="p-2 text-right font-black text-emerald-600">{formatAnalyticsScore(c.surveyType, c.average)}</td>
                                   <td className="p-2 text-right">
                                     <span className="badge" style={{ backgroundColor: `${band.hex}1a`, color: band.hex }}>{getRemarkText(band)}</span>
                                   </td>
@@ -1616,19 +1611,19 @@ export function ExecutiveSummaryReportBuilderPage({
                               <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Alert Rank</th>
                               <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Partner Company Name</th>
                               <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Survey Type</th>
-                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase text-right">Volume-Weighted Score</th>
+                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase text-right">Leaderboard Score</th>
                               <th className="p-2 font-bold text-rose-700 text-[9px] uppercase text-right">Remarks</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-rose-100/50 dark:divide-rose-900/20 text-slate-700 dark:text-slate-300">
                             {leastRatedCompanies.map((c, idx) => {
-                              const band = getBand(c.surveyType, c.average);
+                              const band = getAnalyticsBand(c.surveyType, c.average);
                               return (
                                 <tr key={`${c.surveyType}:${c.company}`} className="hover:bg-rose-50/10">
                                   <td className="p-2 font-bold text-rose-500">ALERT #{idx + 1}</td>
                                   <td className="p-2 font-medium">{c.company}</td>
                                   <td className="p-2 text-slate-500">{c.surveyType}</td>
-                                  <td className="p-2 text-right font-black text-rose-500">{formatCompositeScore(c.surveyType, c.average).text}</td>
+                                  <td className="p-2 text-right font-black text-rose-500">{formatAnalyticsScore(c.surveyType, c.average)}</td>
                                   <td className="p-2 text-right">
                                     <span className="badge" style={{ backgroundColor: `${band.hex}1a`, color: band.hex }}>{getRemarkText(band)}</span>
                                   </td>
