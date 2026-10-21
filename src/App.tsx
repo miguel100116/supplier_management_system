@@ -34,7 +34,6 @@ import { getVisibleSurveyForms } from './features/evaluations/domain/surveySelec
 import type { SurveyFillerHandle } from './pages/SurveyFillerPage';
 import { logAdminActivity } from './features/account-management/services/adminActivityLog';
 import { useSurveyData } from './hooks/useSurveyData';
-import { useCompanyWideAnalytics } from './features/analytics/hooks/useCompanyWideAnalytics';
 import { applyFilters, initialFilters, submissionCount } from './features/analytics/domain/analytics';
 import { FilterState, SurveyType, CustomForm, SurveyResponse } from './types/survey';
 import { PageModuleKey, getProfilePermissions, getEffectiveSurveyTypes, hasPageAccess, getDepartmentDefaultPermissions } from './utils/rbac';
@@ -44,7 +43,7 @@ import { useModalEscape } from './hooks/useModalEscape';
 import { getPageKeyFromPathname, getPageNavigationMode, getPagePathname, shouldConfirmSurveySwitch, type PageKey } from './utils/pageRouting';
 import { createBrowserPageHistory } from './utils/pageHistory';
 
-const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ CompanyWideAnalyticsPage }) => ({ default: CompanyWideAnalyticsPage })));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ AnalyticsPage }) => ({ default: AnalyticsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })));
 const NotificationLogsPage = lazy(() => import('./pages/NotificationLogsPage').then(({ NotificationLogsPage }) => ({ default: NotificationLogsPage })));
 const EmployeeNotificationLogsPage = lazy(() => import('./pages/EmployeeNotificationLogsPage').then(({ EmployeeNotificationLogsPage }) => ({ default: EmployeeNotificationLogsPage })));
@@ -608,11 +607,6 @@ export default function App() {
     return getEffectiveSurveyTypes(userPermissions.surveyTypes);
   }, [userPermissions.surveyTypes]);
 
-  const companyWideAnalytics = useCompanyWideAnalytics({
-    scope: dataScope, types: effectiveSurveyTypes, dateRange: analyticsDateRange, series: selectedSeriesIds,
-  }, JSON.stringify([profile?.email, userPermissions]),
-  authChecked && Boolean(account) && !isPasswordRecovery && !isSupabaseHydrating && hasPageAccess(userPermissions.pages, 'analytics', isAdmin));
-
   const canExport = useMemo(() => {
     if (!profile) return false;
     return profile.role === 'Admin' || profile.designation !== 'Rank & File';
@@ -706,6 +700,10 @@ export default function App() {
   const analyticsFilteredResponses = useMemo(
     () => applyFilters(officialAnalyticsResponses, filters),
     [officialAnalyticsResponses, filters],
+  );
+  const analyticsArchivedResponses = useMemo(
+    () => userAccessibleAllTimeResponses.filter((response) => response.archived && isOfficialAnalyticsResponse(response)),
+    [userAccessibleAllTimeResponses],
   );
   const activeSurveyTypes = filters.surveyType.length ? filters.surveyType : effectiveSurveyTypes;
 
@@ -1189,7 +1187,9 @@ export default function App() {
     ),
     analytics: (
       <AnalyticsPage
-        analytics={companyWideAnalytics}
+        responses={analyticsFilteredResponses}
+        archivedResponses={analyticsArchivedResponses}
+        partnerCompanies={userAccessiblePartnerCompanies}
         activeSurveyTypes={activeSurveyTypes}
         permittedSurveyTypes={effectiveSurveyTypes}
         filters={filters}

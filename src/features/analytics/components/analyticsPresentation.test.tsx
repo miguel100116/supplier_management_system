@@ -5,8 +5,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QuestionPerformanceRow } from './QuestionPerformanceRow';
 import { AnalyticsDateRangeControls } from './AnalyticsDateRangeControls';
-import { AnalyticsPage, CompanyWideAnalyticsPage } from '../../../pages/AnalyticsPage';
-import { buildAnalyticsSnapshot, buildAnalyticsViews, selectAnalyticsView } from '../domain/analyticsSnapshot';
+import { AnalyticsPage } from '../../../pages/AnalyticsPage';
+import { applyFilters, initialFilters } from '../domain/analytics';
 import type { SurveyResponse, SurveyType } from '../../../types/survey';
 import { ExecutiveSummaryReportBuilderPage } from '../../../pages/ExecutiveSummaryReportBuilderPage';
 import { QuestionReportBuilderPage } from '../../../pages/QuestionReportBuilderPage';
@@ -129,29 +129,7 @@ test('custom calendars and period selection remain available when no analytics m
   }
 });
 
-test('loading and failure states never display partial response-based company figures', () => {
-  const globals = globalThis as typeof globalThis & { React?: typeof React };
-  const previous = globals.React;
-  globals.React = React;
-  try {
-    const props = { responses: [], activeSurveyTypes: ['Courier' as const], filters: { surveyType: [], questionId: '', rating: 'All' as const, company: '', search: '' }, setFilters: () => undefined };
-    for (const title of ['Loading Analytics', 'Analytics unavailable']) {
-      const markup = renderToStaticMarkup(<AnalyticsPage {...props} status={{ title, message: 'Company-wide summaries are unavailable.' }} dataScope="custom" />);
-      assert.match(markup, new RegExp(title));
-      assert.match(markup, /id="analytics-date-from"/);
-      assert.doesNotMatch(markup, /Analytics summary|Overall average score|Company Leaderboard/);
-    }
-    const snapshot = buildAnalyticsSnapshot([], ['Courier'], [], []);
-    const empty = renderToStaticMarkup(<AnalyticsPage {...props} snapshot={snapshot} />);
-    assert.match(empty, /No analytics available/);
-    assert.match(empty, /aria-label="Analytics categories"/);
-    for (const category of ['All categories', 'Courier', 'Supplier', 'Subcontractor']) assert.match(empty, new RegExp(`>${category}</button>`));
-  } finally {
-    globals.React = previous;
-  }
-});
-
-test('preloaded category views render their own figures immediately and keep every permitted tab available', () => {
+test('local category views render their supplied response scope and keep every permitted tab available', () => {
   const globals = globalThis as typeof globalThis & { React?: typeof React };
   const previous = globals.React;
   globals.React = React;
@@ -162,11 +140,9 @@ test('preloaded category views render their own figures immediately and keep eve
       company: `Example ${type}`, questionId: ['Q01', 'Q-SUP-04', 'Q-SUB-04-a'][index], questionNumber: 1,
       question: `Synthetic ${type} question`, questionCategory: 'Delivery', rating: 1, comment: '',
     }));
-    const views = buildAnalyticsViews(responses, types, [], []);
     for (const type of [undefined, ...types, undefined]) {
       const selected = type ? [type] : [];
-      const markup = renderToStaticMarkup(<AnalyticsPage responses={[]} activeSurveyTypes={type ? [type] : types} permittedSurveyTypes={types}
-        snapshot={selectAnalyticsView(views, selected)} filters={{ surveyType: selected, questionId: '', rating: 'All', company: '', search: '' }} setFilters={() => undefined} />);
+      const markup = renderToStaticMarkup(<AnalyticsPage responses={applyFilters(responses, { ...initialFilters, surveyType: selected })} activeSurveyTypes={type ? [type] : types} permittedSurveyTypes={types} filters={{ surveyType: selected, questionId: '', rating: 'All', company: '', search: '' }} setFilters={() => undefined} />);
       assert.match(markup, /Analytics summary/);
       assert.doesNotMatch(markup, /Loading Analytics|Analytics unavailable/);
       for (const category of types) assert.match(markup, new RegExp(`>${category}</button>`));
@@ -180,20 +156,22 @@ test('preloaded category views render their own figures immediately and keep eve
   }
 });
 
-test('returning to Analytics renders the summaries retained by the signed-in application', () => {
+test('Analytics renders loaded responses without calling an aggregate API', (t) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Analytics must use loaded responses'); });
   const globals = globalThis as typeof globalThis & { React?: typeof React };
   const previous = globals.React;
   globals.React = React;
   try {
-    const views = buildAnalyticsViews([{
+    const responses: SurveyResponse[] = [{
       responseId: 'retained', company: 'Retained Partner', surveyType: 'Courier', respondentType: 'Employee',
       submissionDate: '2026-10-01T00:00:00Z', questionId: 'Q01', questionNumber: 1, question: 'Criterion',
       questionCategory: 'Delivery', rating: 15, comment: '',
-    }], ['Courier'], [], []);
-    const markup = renderToStaticMarkup(<CompanyWideAnalyticsPage analytics={{ key: 'authenticated-scope', views }}
+    }];
+    const markup = renderToStaticMarkup(<AnalyticsPage responses={responses}
       activeSurveyTypes={['Courier']} permittedSurveyTypes={['Courier']}
       filters={{ surveyType: [], questionId: '', rating: 'All', company: '', search: '' }} setFilters={() => undefined} />);
     assert.match(markup, /Retained Partner/);
+    assert.equal(fetchMock.mock.callCount(), 0);
     assert.match(markup, /Analytics summary/);
     assert.doesNotMatch(markup, /Loading Analytics/);
   } finally {
