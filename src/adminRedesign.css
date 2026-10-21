@@ -1,0 +1,347 @@
+/* Admin-only composition layer. Employee markup and styles are intentionally out of scope. */
+.admin-workspace {
+  --admin-content-gap: 18px;
+}
+
+.admin-workspace .admin-main:not(:has(.dashboard-page)) {
+  padding: 30px clamp(22px, 2.55vw, 38px) 36px;
+  font-size: 14px;
+}
+
+.admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading {
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading h1 {
+  font-size: 25px;
+  letter-spacing: -.55px;
+  line-height: 1.25;
+}
+
+.admin-workspace .admin-main :is(.panel, [class*="rounded-xl"][class*="border"][class*="bg-white"]) {
+  box-shadow: none;
+}
+
+.admin-workspace .admin-main :is(.panel, .admin-accounts-list, .archive-list-panel) {
+  border-color: var(--border);
+  border-radius: 9px;
+  background: var(--surface-card);
+}
+
+.admin-workspace .admin-main :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-height: 36px;
+  border-color: var(--border);
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 13px;
+}
+
+.admin-workspace .admin-main :is(button.primary-button, button.secondary-button) {
+  min-height: 36px;
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Shared portal geometry; each workflow retains its own width and structure. */
+body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :not(.fixed) {
+  max-height: min(860px, calc(100dvh - 28px));
+  overscroll-behavior: contain;
+}
+
+.admin-workspace .admin-main table {
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-workspace .admin-main :is(th, td) {
+  overflow-wrap: anywhere;
+}
+
+.admin-workspace .admin-main thead th {
+  color: #718096;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: .045em;
+}
+
+.admin-workspace .admin-main tbody tr {
+  border-color: var(--border);
+}
+
+.admin-workspace .admin-main :is(.admin-directory-page, .admin-documents-page, .admin-survey-forms-page, .admin-analytics-page, .admin-reports-page, .admin-presentation-page, .admin-response-explorer-page, .admin-feedback-page, .admin-archive-page, .admin-import-page, .admin-accounts-page, .admin-evaluation-workspace) {
+  min-width: 0;
+}
+
+.admin-directory-page,
+.admin-documents-page,
+.admin-survey-forms-page,
+.admin-analytics-page,
+.admin-reports-page,
+.admin-presentation-page,
+.admin-response-explorer-page,
+.admin-feedback-page,
+.admin-archive-page,
+.admin-import-page,
+.admin-accounts-page,
+.admin-evaluation-workspace {
+  display: grid;
+  align-content: start;
+  gap: var(--admin-content-gap);
+}
+
+.admin-workspace .admin-main :is(.admin-directory-page, .admin-documents-page, .admin-survey-forms-page, .admin-analytics-page, .admin-reports-page, .admin-presentation-page, .admin-response-explorer-page, .admin-feedback-page, .admin-archive-page, .admin-import-page, .admin-accounts-page, .admin-evaluation-workspace) > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0;
+}
+
+/* Directory: make registry actions, status and filters one working surface. */
+.admin-directory-page .admin-directory-header {
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-directory-page .admin-directory-header > .flex {
+  gap: 8px;
+}
+
+.admin-directory-page #partner-company-search,
+.admin-directory-page .field {
+  min-height: 36px;
+}
+
+.admin-directory-page [role="tablist"] button {
+  min-height: 34px;
+}
+
+.admin-directory-page .panel {
+  border-radius: 9px;
+}
+
+.admin-directory-page table th,
+.admin-directory-page table td {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* Documents: keep summary controls and the register aligned to the same grid. */
+.admin-documents-page > .flex:has([aria-label="Filter document register by category"]) {
+  justify-content: flex-start;
+  min-height: 48px;
+  padding: 5px 7px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.admin-documents-page [aria-label="Filter document register by category"] button {
+  min-height: 34px;
+  padding-inline: 12px;
+  font-weight: 600;
+}
+
+.admin-documents-page table th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  background: var(--surface-card);
+}
+
+.admin-documents-page table td,
+.admin-documents-page table th {
+  padding-inline: 11px;
+}
+
+/* Evaluation workspace: tabs belong to the workspace, not a separate card. */
+.admin-evaluation-tabs {
+  gap: 4px;
+  margin-top: -5px;
+}
+
+.admin-evaluation-tabs button {
+  min-height: 40px;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+
+.admin-survey-forms-page > section.panel {
+  overflow: hidden;
+}
+
+.admin-survey-forms-page > section.panel > header {
+  padding: 16px 19px 13px;
+}
+
+.admin-survey-forms-page table th,
+.admin-survey-forms-page table td {
+  padding: 10px 12px;
+}
+
+/* Response review: keep form selection visible beside the selected form's work. */
+.admin-response-explorer-page {
+  grid-template-columns: minmax(230px, .34fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 0 18px;
+}
+
+.admin-response-explorer-page > section:first-child {
+  position: sticky;
+  top: 96px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+}
+
+.admin-response-explorer-page > section:first-child + section {
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-response-explorer-page > section:first-child + section > header {
+  margin: -20px -20px 0;
+  padding: 16px 20px;
+}
+
+/* Analytics and reports: consistent chart proportions and useful plot space. */
+.admin-analytics-page > section[aria-label="Analytics summary"] {
+  border-radius: 9px;
+}
+
+.admin-analytics-page > section[aria-labelledby="analytics-detail-heading"] {
+  gap: 16px;
+}
+
+.admin-analytics-page .recharts-responsive-container {
+  min-height: 230px;
+}
+
+.admin-reports-page [role="tablist"] {
+  gap: 18px;
+  padding-bottom: 0;
+}
+
+.admin-reports-page [role="tab"] {
+  min-height: 40px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 3px;
+  background: transparent;
+  color: #65748a;
+  box-shadow: none;
+}
+
+.admin-reports-page [role="tab"][aria-selected="true"] {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: transparent;
+}
+
+.admin-reports-page [role="tabpanel"] > .space-y-6 {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+/* Directory detail is a single scrollable record with a stable identity header. */
+.admin-partner-details-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(920px, calc(100vw - 36px));
+  max-height: min(820px, calc(100dvh - 36px));
+  padding: 0;
+  border-radius: 10px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-partner-details-header {
+  position: sticky;
+  z-index: 3;
+  top: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 86px;
+  padding: 17px 58px 17px 24px;
+  background: var(--surface-card);
+}
+
+.admin-partner-details-header h3 {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.admin-partner-details-dialog > :not(.admin-partner-details-header):not(.admin-partner-dialog-actions) {
+  margin-right: 24px;
+  margin-left: 24px;
+}
+
+.admin-partner-details-dialog > .admin-partner-classification {
+  margin-top: 18px;
+}
+
+.admin-partner-details-dialog .admin-partner-classification > div:last-child,
+.admin-partner-details-dialog .admin-partner-core-details > div > div:has(> div > input),
+.admin-partner-details-dialog .admin-partner-core-details > div > div:has(> div.grid) {
+  border-color: var(--border);
+  border-radius: 7px;
+  background: var(--background);
+}
+
+.admin-partner-details-dialog .admin-partner-core-details {
+  align-items: start;
+  gap: 22px;
+  margin-top: 20px;
+}
+
+.admin-partner-details-dialog .admin-partner-core-details > div {
+  min-width: 0;
+}
+
+.admin-partner-details-dialog .admin-partner-dialog-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  flex: 0 0 auto;
+  margin: auto 0 0;
+  padding: 13px 24px;
+  background: var(--surface-card);
+}
+
+.dark .admin-partner-details-header,
+.dark .admin-partner-details-dialog .admin-partner-dialog-actions {
+  background: var(--surface-card);
+}
+
+@media (max-width: 1050px) {
+  .admin-response-explorer-page {
+    grid-template-columns: minmax(190px, .3fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-workspace .admin-main:not(:has(.dashboard-page)) { padding: 25px 22px 30px; }
+  .admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading { margin-bottom: 17px; }
+  .admin-response-explorer-page { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .admin-response-explorer-page > section:first-child {
+    position: static;
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-workspace .admin-main:not(:has(.dashboard-page)) { padding: 22px 16px 26px; }
+  .admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading h1 { font-size: 23px; }
+  .admin-directory-page .admin-directory-header { align-items: stretch; flex-direction: column; }
+  .admin-directory-page .admin-directory-header > .flex { width: 100%; }
+  .admin-directory-page .admin-directory-header > .flex > button { flex: 1 1 auto; }
+  .admin-evaluation-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .admin-evaluation-tabs button { flex: 0 0 auto; padding-inline: 11px; }
+  .admin-partner-details-dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  .admin-partner-details-header { min-height: 72px; padding: 14px 48px 14px 16px; }
+  .admin-partner-details-dialog > :not(.admin-partner-details-header):not(.admin-partner-dialog-actions) { margin-right: 16px; margin-left: 16px; }
+  .admin-partner-details-dialog .admin-partner-core-details { grid-template-columns: minmax(0, 1fr); }
+  .admin-partner-details-dialog .admin-partner-dialog-actions { align-items: stretch; padding: 12px 16px; }
+}

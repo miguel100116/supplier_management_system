@@ -1236,7 +1236,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   };
 
   return (
-    <div className="space-y-5">
+    <div className="admin-documents-page space-y-5">
       <PageDescription>Monitor partner compliance documents, track expiring or expired items, and send notifications to partners.</PageDescription>
       {mutationError && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-300">

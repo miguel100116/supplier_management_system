@@ -809,7 +809,7 @@ export function PartnerCompaniesPage({
   };
 
   return (
-    <div className="space-y-5" id="partner-companies-page">
+    <div className="admin-directory-page space-y-5" id="partner-companies-page">
       {/* Messages */}
       {successMessage && (
         <div className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 text-xs font-semibold flex items-center gap-2 dark:bg-emerald-950/20 dark:border-emerald-900 dark:text-emerald-400">
@@ -1113,8 +1113,8 @@ export function PartnerCompaniesPage({
 
       {/* PARTNER DETAILS & CONTRACT CONFIGURATION DRAWER/MODAL */}
       {selectedCompany && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-transparent dark:bg-slate-950 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+        <div className="admin-dialog-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
+          <div className="admin-partner-details-dialog w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-transparent dark:bg-slate-950 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             {/* Close Button */}
             <button
               onClick={() => setSelectedCompany(null)}
@@ -1126,7 +1126,7 @@ export function PartnerCompaniesPage({
             </button>
 
             {/* Modal Header */}
-            <div className="flex items-start gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="admin-partner-details-header flex items-start gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
               <div className="rounded-xl bg-[#2187CD]/10 p-3 text-[#2187CD] dark:bg-blue-950/40 dark:text-blue-400 shrink-0 mt-1">
                 <Building size={24} />
               </div>
@@ -1160,7 +1160,7 @@ export function PartnerCompaniesPage({
                 Supplier-Foreign/Subcontractor) is driven entirely by this, so it's editable
                 by the same role that can renew documents. Master-List rows that imported with
                 no recognizable category land here as Uncategorized/archived until classified. */}
-            <div className="mt-6">
+            <div className="admin-partner-classification mt-6">
               <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                 <Tag size={14} />
                 <span>Partner Classification</span>
@@ -1213,7 +1213,7 @@ export function PartnerCompaniesPage({
             </div>
 
             {/* Core Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className="admin-partner-core-details grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               
               {/* Left Column: Contact + Registration */}
               <div className="space-y-4">
@@ -1488,7 +1488,7 @@ export function PartnerCompaniesPage({
 
             {/* Administrative Action Footer */}
             {isAdmin && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-8 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="admin-partner-dialog-actions flex flex-col sm:flex-row items-center justify-between gap-3 mt-8 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => toggleArchive(selectedCompany)}

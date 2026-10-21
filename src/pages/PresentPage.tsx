@@ -101,7 +101,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="admin-presentation-page space-y-5">
       <header className="border-b border-slate-200 pb-4 dark:border-slate-800">
         <div className="flex items-start gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eef7fc] text-[#2187CD]">

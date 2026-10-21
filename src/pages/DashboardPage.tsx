@@ -23,7 +23,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
+import { PartnerCompany, PartnerCompanyType, SurveyResponse, SurveyType } from '../types/survey';
 import {
   submissionCount,
   averageRating,
@@ -84,9 +84,21 @@ interface DashboardPageProps {
   onNavigate?: (page: AdminDashboardDestination) => void;
 }
 
-export function DashboardDataScopeToggle({ scope, onChange }: { scope: 'current' | 'all-time'; onChange: (scope: 'current' | 'all-time') => void }) {
+export function DashboardDataScopeFilter({ scope, onChange }: { scope: 'current' | 'all-time'; onChange: (scope: 'current' | 'all-time') => void }) {
   return (
-    <div className="admin-dashboard-scope" role="group" aria-label="Choose performance reporting period" title="Choose whether performance reflects only the current period or every archived period combined">
+    <label className="admin-dashboard-period-filter">
+      <span>Reporting period</span>
+      <select aria-label="Reporting period" value={scope} onChange={(event) => onChange(event.target.value as 'current' | 'all-time')}>
+        <option value="current">Current Period</option>
+        <option value="all-time">All-Time</option>
+      </select>
+    </label>
+  );
+}
+
+export function DashboardDataScopeToggle({ scope, onChange, currentLabel = 'Current Period', className = 'admin-dashboard-scope' }: { scope: 'current' | 'all-time'; onChange: (scope: 'current' | 'all-time') => void; currentLabel?: string; className?: string }) {
+  return (
+    <div className={className} role="group" aria-label="Choose performance reporting period" title="Choose whether performance reflects only the current period or every archived period combined">
       {(['current', 'all-time'] as const).map((value) => (
         <button
           key={value}
@@ -95,11 +107,22 @@ export function DashboardDataScopeToggle({ scope, onChange }: { scope: 'current'
           aria-pressed={scope === value}
           className={`admin-dashboard-scope-button${scope === value ? ' is-selected' : ''}`}
         >
-          {value === 'current' ? 'Current Period' : 'All-Time'}
+          {value === 'current' ? currentLabel : 'All-Time'}
         </button>
       ))}
     </div>
   );
+}
+
+const dashboardPartnerTypeClass: Record<PartnerCompanyType, string> = {
+  Courier: 'courier',
+  Supplier: 'supplier',
+  Subcontractor: 'subcontractor',
+  Uncategorized: 'uncategorized',
+};
+
+function DashboardPartnerType({ type }: { type: PartnerCompanyType }) {
+  return <span className={`admin-dashboard-category-badge ${dashboardPartnerTypeClass[type]}`}>{type}</span>;
 }
 
 export function AdminDashboardControlBanner({ onNavigate }: { onNavigate?: (page: AdminDashboardDestination) => void }) {
@@ -211,6 +234,7 @@ export function DashboardPage({
   const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [catalogTab, setCatalogTab] = useState<'All' | 'Analytics' | 'Surveys' | 'Submissions'>('All');
+  const [documentStatusFilter, setDocumentStatusFilter] = useState<'expired' | 'missing' | 'expiring'>('expired');
   const [showConfigMenu, setShowConfigMenu] = useState<string | null>(null);
   const [headerPortalTarget, setHeaderPortalTarget] = useState<Element | null>(null);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
@@ -526,6 +550,14 @@ export function DashboardPage({
         || b.summary.expiringSoonCount - a.summary.expiringSoonCount
         || a.company.name.localeCompare(b.company.name);
     });
+  const expiredForUpdateCount = documentFollowups.reduce((sum, item) => sum + item.summary.expiredCount + item.summary.forUpdateCount, 0);
+  const missingDocumentCount = documentFollowups.reduce((sum, item) => sum + item.summary.missingCount, 0);
+  const expiringSoonDocumentCount = documentFollowups.reduce((sum, item) => sum + item.summary.expiringSoonCount, 0);
+  const visibleDocumentFollowups = documentFollowups.filter(({ summary }) => {
+    if (documentStatusFilter === 'expired') return summary.expiredCount + summary.forUpdateCount > 0;
+    if (documentStatusFilter === 'missing') return summary.missingCount > 0;
+    return summary.expiringSoonCount > 0;
+  });
 
   const evaluationCycle = useMemo(() => surveys
     .map((survey: any) => ({
@@ -632,135 +664,80 @@ export function DashboardPage({
 
           <AdminDashboardControlBanner onNavigate={onNavigate} />
 
-          <div className="admin-dashboard-grid">
-            <div className="admin-dashboard-column">
-            <section className="admin-dashboard-panel admin-dashboard-attention admin-dashboard-followup" aria-labelledby="admin-dashboard-attention-title">
-              <div className="admin-dashboard-panel-heading">
+          <section className="admin-dashboard-brief" aria-label="Operational overview">
+            <div><span className="admin-dashboard-brief-label">Partners needing document review</span><strong>{isLoading || error ? '—' : documentFollowups.length}</strong></div>
+            <div><span className="admin-dashboard-brief-label">Running evaluation forms</span><strong className="is-running">{isLoading || error ? '—' : evaluationCycle.filter(({ status }) => status === 'Running').length}</strong></div>
+            <div><span className="admin-dashboard-brief-label">Paused evaluation forms</span><strong className="is-paused">{isLoading || error ? '—' : evaluationCycle.filter(({ status }) => status === 'Paused').length}</strong></div>
+          </section>
+
+          <div className="admin-dashboard-ledger">
+            <section className="admin-dashboard-ledger-section" aria-labelledby="admin-dashboard-attention-title">
+              <div className="admin-dashboard-ledger-heading">
                 <div>
-                  <h2 id="admin-dashboard-attention-title">Document follow-up</h2>
+                  <h2 id="admin-dashboard-attention-title">Partner documents</h2>
                   <p>{isLoading || error ? 'Partner document status is temporarily unavailable.' : `${documentFollowups.length} partner${documentFollowups.length === 1 ? '' : 's'} with document items to review`}</p>
                 </div>
-                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('document-register')}>Open Document Tracker <ArrowRight size={14} /></button>}
+                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('document-register')}>Open Document Tracker <ArrowRight size={13} /></button>}
               </div>
-
-              {!isLoading && !error && (
-                <div className="admin-dashboard-issue-summary" aria-label="Document follow-up counts">
-                  <span className="is-expired"><strong>{documentFollowups.reduce((sum, item) => sum + item.summary.expiredCount + item.summary.forUpdateCount, 0)}</strong><small>expired / for update</small></span>
-                  <span className="is-missing"><strong>{documentFollowups.reduce((sum, item) => sum + item.summary.missingCount, 0)}</strong><small>missing</small></span>
-                  <span className="is-expiring"><strong>{documentFollowups.reduce((sum, item) => sum + item.summary.expiringSoonCount, 0)}</strong><small>expiring soon</small></span>
-                </div>
-              )}
-
-              {isLoading || error ? (
-                <p className="admin-dashboard-empty">Follow-up items will appear when partner data is available.</p>
-              ) : documentFollowups.length === 0 ? (
-                <p className="admin-dashboard-empty">No missing, expired, or soon-to-expire partner documents need review.</p>
-              ) : (
-                <div className="admin-dashboard-followups">
-                  {documentFollowups.slice(0, 5).map(({ company, summary }) => (
-                    <button type="button" className="admin-dashboard-followup-row" key={company.id} onClick={() => onNavigate?.('document-register')}>
-                      <span className="admin-dashboard-followup-copy">
-                        <span className="admin-dashboard-company-line">
-                          <strong>{company.name}</strong>
-                          <small className="admin-dashboard-partner-type">{company.type}</small>
-                        </span>
-                        <small className="admin-dashboard-followup-detail">
-                          {summary.expiredCount + summary.forUpdateCount > 0 && <span className="is-expired">{summary.expiredCount + summary.forUpdateCount} expired / for update</span>}
-                          {summary.missingCount > 0 && <span>{summary.missingCount} missing</span>}
-                          {summary.expiringSoonCount > 0 && <span>{summary.expiringSoonCount} expiring soon</span>}
-                        </small>
-                      </span>
-                      <ArrowRight size={15} aria-hidden="true" />
-                    </button>
-                  ))}
-                  {documentFollowups.length > 5 && <p className="admin-dashboard-list-footnote">Showing 5 of {documentFollowups.length} partners requiring follow-up.</p>}
-                </div>
-              )}
+              {!isLoading && !error && <div className="admin-dashboard-document-filters" role="group" aria-label="Filter partner documents by status">
+                <button type="button" className={documentStatusFilter === 'expired' ? 'is-selected' : ''} aria-pressed={documentStatusFilter === 'expired'} onClick={() => setDocumentStatusFilter('expired')}>Expired / for update <span className="admin-dashboard-filter-count">{expiredForUpdateCount}</span></button>
+                <button type="button" className={documentStatusFilter === 'missing' ? 'is-selected' : ''} aria-pressed={documentStatusFilter === 'missing'} onClick={() => setDocumentStatusFilter('missing')}>Missing <span className="admin-dashboard-filter-count">{missingDocumentCount}</span></button>
+                <button type="button" className={documentStatusFilter === 'expiring' ? 'is-selected' : ''} aria-pressed={documentStatusFilter === 'expiring'} onClick={() => setDocumentStatusFilter('expiring')}>Expiring soon <span className="admin-dashboard-filter-count">{expiringSoonDocumentCount}</span></button>
+              </div>}
+              {isLoading || error ? <p className="admin-dashboard-empty">Follow-up items will appear when partner data is available.</p> : visibleDocumentFollowups.length === 0 ? <p className="admin-dashboard-empty">No partners have documents in this status.</p> : <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-work-table admin-dashboard-document-table" aria-label="Partners requiring document follow-up">
+                <thead><tr><th scope="col">Partner</th><th scope="col">Type</th><th scope="col">Expired / update</th><th scope="col">Missing</th><th scope="col">Expiring soon</th><th scope="col"><span className="sr-only">Open partner documents</span></th></tr></thead>
+                <tbody>{visibleDocumentFollowups.slice(0, 5).map(({ company, summary }) => <tr key={company.id}>
+                  <th scope="row">{onNavigate ? <button type="button" className="admin-dashboard-record-link" onClick={() => onNavigate('document-register')}>{company.name}</button> : company.name}</th><td><DashboardPartnerType type={company.type} /></td>
+                  <td className={summary.expiredCount + summary.forUpdateCount > 0 ? 'is-expired' : ''}>{summary.expiredCount + summary.forUpdateCount}</td><td>{summary.missingCount}</td><td>{summary.expiringSoonCount}</td>
+                  <td><button type="button" className="admin-dashboard-row-action" aria-label={`Open documents for ${company.name}`} onClick={() => onNavigate?.('document-register')}><ArrowRight size={15} aria-hidden="true" /></button></td>
+                </tr>)}</tbody>
+              </table></div>}
+              {!isLoading && !error && visibleDocumentFollowups.length > 5 && <p className="admin-dashboard-list-footnote">Showing 5 of {visibleDocumentFollowups.length} partners with documents in this status.</p>}
             </section>
 
-            <section className="admin-dashboard-panel admin-dashboard-cycles" aria-labelledby="admin-dashboard-cycles-title">
-              <div className="admin-dashboard-panel-heading">
-                <div>
-                  <h2 id="admin-dashboard-cycles-title">Forms in progress</h2>
-                  <p>{evaluationCycle.filter(({ status }) => status === 'Running').length} running · {evaluationCycle.filter(({ status }) => status === 'Paused').length} paused</p>
-                </div>
-                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('survey-forms')}>Manage forms <ArrowRight size={14} /></button>}
+            <section className="admin-dashboard-ledger-section" aria-labelledby="admin-dashboard-cycles-title">
+              <div className="admin-dashboard-ledger-heading">
+                <div><h2 id="admin-dashboard-cycles-title">Evaluation forms in progress</h2><p>{evaluationCycle.filter(({ status }) => status === 'Running').length} running · {evaluationCycle.filter(({ status }) => status === 'Paused').length} paused</p></div>
+                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('survey-forms')}>Manage forms <ArrowRight size={13} /></button>}
               </div>
-              {isLoading || error ? (
-                <p className="admin-dashboard-empty">Evaluation form status is temporarily unavailable.</p>
-              ) : evaluationCycle.length === 0 ? (
-                <p className="admin-dashboard-empty">No evaluation forms are currently running or paused.</p>
-              ) : (
-                <div className="admin-dashboard-cycle-list">
-                  {evaluationCycle.slice(0, 4).map(({ survey, status, responses: responseCount }) => (
-                    <div className="admin-dashboard-cycle-row" key={survey.id}>
-                      <div className="admin-dashboard-cycle-copy">
-                        <strong title={survey.title}>{survey.title}</strong>
-                        <small>{survey.surveyType}{survey.deadlineDate ? ` · Closes ${survey.deadlineDate}` : ' · No close date'}</small>
-                      </div>
-                      <span className={`admin-dashboard-cycle-status ${status.toLowerCase()}`}>{status}</span>
-                      {onOpenSurveyResponses ? (
-                        <button type="button" className="admin-dashboard-response-link" disabled={responseCount === 0} onClick={() => onOpenSurveyResponses(survey.id)}>{responseCount} responses</button>
-                      ) : <span className="admin-dashboard-response-count">{responseCount} responses</span>}
-                    </div>
-                  ))}
-                  {evaluationCycle.length > 4 && <p className="admin-dashboard-list-footnote">Showing 4 of {evaluationCycle.length} forms. Open Evaluation Workspace to see all.</p>}
-                </div>
-              )}
+              {isLoading || error ? <p className="admin-dashboard-empty">Evaluation form status is temporarily unavailable.</p> : evaluationCycle.length === 0 ? <p className="admin-dashboard-empty">No evaluation forms are currently running or paused.</p> : <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-work-table admin-dashboard-form-table" aria-label="Evaluation forms in progress">
+                <thead><tr><th scope="col">Form</th><th scope="col">Partner type</th><th scope="col">Closes</th><th scope="col">Status</th><th scope="col">Responses</th></tr></thead>
+                <tbody>{evaluationCycle.slice(0, 4).map(({ survey, status, responses: responseCount }) => <tr key={survey.id}>
+                  <th scope="row" title={survey.title}>{onNavigate ? <button type="button" className="admin-dashboard-record-link" aria-label={`Manage evaluation form ${survey.title}`} onClick={() => onNavigate('survey-forms')}>{survey.title}</button> : survey.title}</th><td><DashboardPartnerType type={survey.surveyType} /></td><td>{survey.deadlineDate || 'No close date'}</td><td><span className={`admin-dashboard-cycle-status ${status.toLowerCase()}`}>{status}</span></td>
+                  <td>{onOpenSurveyResponses ? <button type="button" className="admin-dashboard-response-link" disabled={responseCount === 0} aria-label={`Open ${responseCount} responses for ${survey.title} (${survey.surveyType})`} onClick={() => onOpenSurveyResponses(survey.id)}>{responseCount} responses</button> : <span className="admin-dashboard-response-count">{responseCount} responses</span>}</td>
+                </tr>)}</tbody>
+              </table></div>}
+              {!isLoading && !error && evaluationCycle.length > 4 && <p className="admin-dashboard-list-footnote">Showing 4 of {evaluationCycle.length} forms. Open Evaluation Workspace to see all.</p>}
             </section>
 
-            </div>
-            <div className="admin-dashboard-column">
-            <section className="admin-dashboard-panel admin-dashboard-snapshot" aria-labelledby="admin-dashboard-performance-title">
-              <div className="admin-dashboard-panel-heading">
-                <div>
-                  <h2 id="admin-dashboard-performance-title">Evaluation snapshot</h2>
-                  <p>{dataScope === 'all-time' ? 'All-time records' : 'Current period'}{surveyTypeFilter.length ? ` · ${surveyTypeFilter.join(', ')}` : ' · All partner types'}</p>
+            <section className="admin-dashboard-ledger-section" aria-labelledby="admin-dashboard-performance-title">
+              <div className="admin-dashboard-ledger-heading">
+                <div><h2 id="admin-dashboard-performance-title">Evaluation results</h2><p>{dataScope === 'all-time' ? 'All-time records' : 'Current period'}{surveyTypeFilter.length ? ` · ${surveyTypeFilter.join(', ')}` : ' · All partner types'}</p></div>
+                <div className="admin-dashboard-heading-actions">
+                  {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>View analytics <ArrowRight size={13} /></button>}
                 </div>
-                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>View analytics <ArrowRight size={14} /></button>}
               </div>
-              {onChangeDataScope && <div className="admin-dashboard-performance-toolbar"><span>Reporting period</span><DashboardDataScopeToggle scope={dataScope} onChange={onChangeDataScope} /></div>}
-              <table className="admin-dashboard-performance-table" aria-label="Average partner evaluation score by type">
-                <thead><tr><th scope="col">Partner type</th><th scope="col">Average score</th><th scope="col">Evaluations</th></tr></thead>
-                <tbody>
-                  {performanceByType.map(({ type, count, average }) => (
-                    <tr key={type}>
-                      <th scope="row" className="admin-dashboard-performance-type">{type}</th>
-                      <td><span className="admin-dashboard-performance-score"><strong>{count > 0 ? average.toFixed(1) : String.fromCharCode(8212)}</strong><small>/ 100</small><i aria-hidden="true"><b style={{ width: `${Math.max(0, Math.min(100, average))}%` }} /></i></span></td>
-                      <td className="admin-dashboard-performance-count">{count} evaluations</td>
-                    </tr>
-                  ))}
-                  {performanceByType.every(({ count }) => count === 0) && <tr><td colSpan={3} className="admin-dashboard-performance-empty">No evaluations are available for this scope.</td></tr>}
-                </tbody>
-              </table>
+              {onChangeDataScope && <DashboardDataScopeToggle scope={dataScope} onChange={onChangeDataScope} currentLabel="Custom" className="admin-dashboard-document-filters" />}
+              <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-performance-table" aria-label="Average partner evaluation score by type">
+                <thead><tr><th scope="col">Partner type</th><th scope="col">Average rubric score</th><th scope="col">Evaluations</th></tr></thead>
+                <tbody>{performanceByType.map(({ type, count, average }) => <tr key={type}>
+                  <th scope="row" className="admin-dashboard-performance-type">{type}</th><td><span className="admin-dashboard-performance-score"><strong>{count > 0 ? average.toFixed(1) : String.fromCharCode(8212)}</strong><small>/ 100</small><i aria-hidden="true"><b style={{ width: `${Math.max(0, Math.min(100, average))}%` }} /></i></span></td><td className="admin-dashboard-performance-count">{count} evaluations</td>
+                </tr>)}{performanceByType.every(({ count }) => count === 0) && <tr><td colSpan={3} className="admin-dashboard-performance-empty">No evaluations are available for this scope.</td></tr>}</tbody>
+              </table></div>
             </section>
 
-            <section className="admin-dashboard-panel admin-dashboard-activity" aria-labelledby="admin-dashboard-activity-title">
-              <div className="admin-dashboard-panel-heading">
-                <div>
-                  <h2 id="admin-dashboard-activity-title">Recent submissions</h2>
-                  <p>Latest completed evaluations in the current period</p>
-                </div>
-                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>Explore results <ArrowRight size={14} /></button>}
-              </div>
-              {isLoading || error ? (
-                <p className="admin-dashboard-empty">Recent submissions are temporarily unavailable.</p>
-              ) : recentSubmissions.length === 0 ? (
-                <p className="admin-dashboard-empty">No evaluations have been submitted in the current period.</p>
-              ) : (
-                <div className="admin-dashboard-recent-list">
-                  {recentSubmissions.slice(0, 4).map((response) => (
-                    <div className="admin-dashboard-recent-row" key={response.responseId}>
-                      <span><strong>{response.company}</strong><small>{response.surveyType} · {response.submissionDateInferredFrom ? 'Inferred date · ' : ''}{response.submissionDate}</small></span>
-                      <span className="admin-dashboard-recent-score">{typeof response.score === 'number' ? formatCompositeScore(response.surveyType, response.score).text : 'Unscored'}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <section className="admin-dashboard-ledger-section" aria-labelledby="admin-dashboard-activity-title">
+              <div className="admin-dashboard-ledger-heading"><div><h2 id="admin-dashboard-activity-title">Recent submissions</h2><p>Latest completed evaluations in the current period</p></div>{onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>Explore results <ArrowRight size={13} /></button>}</div>
+              {isLoading || error ? <p className="admin-dashboard-empty">Recent submissions are temporarily unavailable.</p> : recentSubmissions.length === 0 ? <p className="admin-dashboard-empty">No evaluations have been submitted in the current period.</p> : <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-work-table admin-dashboard-recent-table" aria-label="Recent evaluation submissions">
+                <thead><tr><th scope="col">Partner</th><th scope="col">Partner type</th><th scope="col">Submitted</th><th scope="col">Rubric score</th></tr></thead>
+                <tbody>{recentSubmissions.slice(0, 4).map((response) => <tr key={response.responseId}><th scope="row">{onOpenSurveyResponses && response.surveyId ? <button type="button" className="admin-dashboard-record-link" onClick={() => onOpenSurveyResponses(response.surveyId!)}>{response.company}</button> : onNavigate ? <button type="button" className="admin-dashboard-record-link" onClick={() => onNavigate('analytics')}>{response.company}</button> : response.company}</th><td><DashboardPartnerType type={response.surveyType} /></td><td>{response.submissionDateInferredFrom ? <><span className="sr-only">Inferred date: </span>{response.submissionDate}</> : response.submissionDate}</td><td className="admin-dashboard-recent-score">{typeof response.score === 'number' ? formatCompositeScore(response.surveyType, response.score).text : 'Unscored'}</td></tr>)}</tbody>
+              </table></div>}
             </section>
-
-            </div>
           </div>
+          <footer className="admin-dashboard-footer">
+            <span>Microgenesis · Administrator workspace</span>
+            <span>Partner evaluations</span>
+          </footer>
         </>
       )}
 

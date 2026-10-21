@@ -3,51 +3,38 @@ import {
   Award,
   Building2,
   ClipboardList,
-  Download,
-  History,
   LogOut,
   Mail,
   MapPin,
   Moon,
-  RefreshCw,
   RotateCcw,
   Sun,
-  UserCog,
   Users,
 } from 'lucide-react';
 import { getAdminActivity } from '../features/account-management/services/adminActivityLog';
-import { getExportHistory } from '../features/reports/services/exportHistory';
 
 interface SettingsPageProps {
+  modalLayout?: boolean;
   email: string;
   role?: string;
   designation?: string;
   department?: string;
   darkMode: boolean;
   onToggleDarkMode: () => void;
-  onResetSystemData: () => void;
   onLogout: () => void;
   accountsCount: number;
   activePartnerCompaniesCount: number;
   totalResponsesCount: number;
 }
 
-interface ActivityRow {
-  id: string;
-  label: string;
-  detail?: string;
-  timestamp: string;
-  kind: 'reset' | 'accounts' | 'export';
-}
-
 export function SettingsPage({
+  modalLayout = false,
   email,
   role,
   designation,
   department,
   darkMode,
   onToggleDarkMode,
-  onResetSystemData,
   onLogout,
   accountsCount,
   activePartnerCompaniesCount,
@@ -64,46 +51,19 @@ export function SettingsPage({
   useEffect(() => {
     const refresh = () => setTick((t) => t + 1);
     window.addEventListener('admin-activity-updated', refresh);
-    window.addEventListener('export-history-updated', refresh);
     return () => {
       window.removeEventListener('admin-activity-updated', refresh);
-      window.removeEventListener('export-history-updated', refresh);
     };
   }, []);
 
-  const activity = useMemo<ActivityRow[]>(() => {
-    const adminRows: ActivityRow[] = getAdminActivity().map((a) => ({
-      id: a.id,
-      label: a.action,
-      detail: a.details,
-      timestamp: a.timestamp,
-      kind: a.action.toLowerCase().includes('reset') ? 'reset' : 'accounts',
-    }));
-    const exportRows: ActivityRow[] = getExportHistory().map((e) => ({
-      id: e.id,
-      label: `Exported "${e.title}"`,
-      detail: e.filename,
-      timestamp: e.exportedAt,
-      kind: 'export',
-    }));
-    return [...adminRows, ...exportRows].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 8);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick]);
-
   const lastReset = useMemo(() => getAdminActivity().find((a) => a.action.toLowerCase().includes('reset')), [tick]);
 
-  const activityIcon = (kind: ActivityRow['kind']) => {
-    if (kind === 'reset') return <RotateCcw size={15} className="text-rose-500 shrink-0" />;
-    if (kind === 'export') return <Download size={15} className="text-[#0063a9] dark:text-blue-400 shrink-0" />;
-    return <UserCog size={15} className="text-emerald-500 shrink-0" />;
-  };
-
   return (
-    <div className="space-y-5">
+    <div className={modalLayout ? 'admin-settings-modal-content' : 'space-y-5'}>
       <section className="panel">
         <h3 className="text-base font-semibold mb-1">System Snapshot</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">A quick read on the state of the system right now.</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="settings-snapshot-grid grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 px-4 py-3">
             <div className="flex items-center gap-1.5 text-slate-400">
               <Users size={13} />
@@ -137,10 +97,10 @@ export function SettingsPage({
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div className="settings-modal-groups grid grid-cols-1 gap-5 xl:grid-cols-2">
       <section className="panel">
         <h3 className="text-base font-semibold mb-1">Account</h3>
-        <div className="mt-3 flex items-center gap-4">
+        <div className="settings-account-identity mt-3 flex items-center gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#0063a9]/10 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300 font-bold">
             {initials}
           </div>
@@ -152,7 +112,7 @@ export function SettingsPage({
             <p className="text-xs text-slate-500 dark:text-slate-400">{role === 'Admin' ? 'System Administrator' : 'Employee'}</p>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+        <div className="settings-account-details mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 pt-4 border-t border-slate-100 dark:border-slate-800">
           {designation && (
             <div className="flex items-center gap-2.5">
               <Award size={15} className="text-slate-400 shrink-0" />
@@ -171,7 +131,7 @@ export function SettingsPage({
       <section className="panel">
         <h3 className="text-base font-semibold mb-1">Appearance</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Applies to everyone using this browser session.</p>
-        <div className="flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-800 px-4 py-3">
+        <div className="settings-appearance-row flex items-center justify-between rounded-lg border border-slate-200 dark:border-slate-800 px-4 py-3">
           <div className="flex items-center gap-3">
             {darkMode ? <Moon size={18} className="text-blue-400" /> : <Sun size={18} className="text-amber-500" />}
             <div>
@@ -192,27 +152,6 @@ export function SettingsPage({
       </section>
 
       <section className="panel xl:col-span-2">
-        <h3 className="text-base font-semibold mb-1">System Tools</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Administrative data-management tools.</p>
-
-        <div className="space-y-3">
-          <button
-            onClick={onResetSystemData}
-            type="button"
-            className="flex w-full items-center justify-between gap-3 rounded-lg border border-rose-200 dark:border-rose-900/50 px-4 py-3 text-left hover:bg-rose-50 dark:hover:bg-rose-950/20 transition cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <RefreshCw size={18} className="text-rose-500 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-rose-600 dark:text-rose-400">Clear Local Cache</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Clear cached frontend records and reload shared data.</p>
-              </div>
-            </div>
-          </button>
-        </div>
-      </section>
-
-      <section className="panel xl:col-span-2">
         <h3 className="text-base font-semibold mb-1">Session</h3>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Sign out of the Supplier Management System on this device.</p>
         <button
@@ -226,37 +165,6 @@ export function SettingsPage({
       </section>
       </div>
 
-      <section className="panel">
-        <div className="flex items-center gap-2 mb-1">
-          <History size={16} className="text-[#0063a9] dark:text-blue-400" />
-          <h3 className="text-base font-semibold">Recent Activity</h3>
-        </div>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-          The last database resets, account changes, and exports on this device.
-        </p>
-
-        {activity.length === 0 ? (
-          <p className="text-sm text-slate-400 py-6 text-center">No admin activity logged yet.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {activity.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-3.5 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-900/40 transition"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {activityIcon(item.kind)}
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 truncate">{item.label}</p>
-                    {item.detail && <p className="text-xs text-slate-400 truncate">{item.detail}</p>}
-                  </div>
-                </div>
-                <span className="text-xs text-slate-400 shrink-0">{new Date(item.timestamp).toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

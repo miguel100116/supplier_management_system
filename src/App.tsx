@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { BarChart3, FileText, LayoutDashboard, Moon, Sun, FilePlus, ClipboardCheck, ArrowLeft, Clock3, LogOut, ShieldAlert, Users, UserCog, ClipboardList, X } from 'lucide-react';
+import { BarChart3, FileText, LayoutDashboard, FilePlus, ClipboardCheck, ArrowLeft, Clock3, LogOut, ShieldAlert, Users, UserCog, ClipboardList, X } from 'lucide-react';
 import { EvaluationWorkspace, isEvaluationWorkspacePage } from './features/evaluations/components/EvaluationWorkspace';
 import { AccountMenu } from './components/AccountMenu';
 import { NotificationBell } from './features/notifications/components/NotificationBell';
@@ -381,7 +381,6 @@ export default function App() {
     categoryLabels,
     renameCategory,
     restoreDefaultCategories,
-    resetAllData,
   } = useSurveyData(accounts, account, isAdmin);
 
   const [activePage, setActivePage] = useState<PageKey>(() => getPageKeyFromPathname(window.location.pathname, ROUTE_BASE_PATH));
@@ -573,11 +572,6 @@ export default function App() {
     document.body.classList.toggle('dark', darkMode);
     return () => document.body.classList.remove('dark');
   }, [darkMode]);
-
-  const handleResetAllData = () => {
-    logAdminActivity('Cleared local frontend cache');
-    resetAllData();
-  };
 
   // A survey's own "Department / Role Access" checkboxes (set via Survey Forms > Modify)
   // are the source of truth for who can see & answer that specific form. If a survey has
@@ -1257,7 +1251,6 @@ export default function App() {
         department={profile.department}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode((value) => !value)}
-        onResetSystemData={handleResetAllData}
         onLogout={handleLogout}
         accountsCount={accounts.length}
         activePartnerCompaniesCount={partnerCompanies.filter((c) => !c.isArchived).length}
@@ -1446,7 +1439,7 @@ export default function App() {
         navigationLabel={isAdmin ? 'Administrator workspace' : undefined}
         employeeMode={!isAdmin}
         action={
-          <div className={`flex min-w-0 items-center ${isAdmin ? 'divide-x divide-slate-200 dark:divide-slate-800' : 'employee-actions'}`}>
+          <div className={`flex min-w-0 items-center ${isAdmin ? '' : 'employee-actions'}`}>
             {isAdmin ? (
               <div className="pr-1 sm:pr-3">
                 <NotificationBell
@@ -1476,18 +1469,6 @@ export default function App() {
                 />
               </div>
             )}
-            {isAdmin && <div className="px-1 sm:px-3">
-              <button
-                className={`inline-flex h-10 w-10 items-center justify-center rounded-lg transition cursor-pointer ${
-                  'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
-                }`}
-                type="button"
-                onClick={() => setDarkMode((value) => !value)}
-                title="Toggle dark mode"
-              >
-                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-              </button>
-            </div>}
             <div className="pl-1 sm:pl-3">
               <AccountMenu
                 email={account}
@@ -1690,37 +1671,27 @@ export default function App() {
 
       {isSettingsModalOpen && profile && (
         <div
-          className={isAdmin
-            ? 'fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm sm:p-4'
-            : 'employee-profile-dialog-backdrop fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-5'}
+          className="employee-profile-dialog-backdrop fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/45 p-3 backdrop-blur-sm sm:p-5"
           role="dialog"
           aria-modal="true"
           aria-labelledby="settings-modal-title"
         >
-          <div className={isAdmin
-            ? 'flex max-h-[95vh] w-[96vw] max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950'
-            : 'employee-profile-dialog flex max-h-[88vh] w-[min(94vw,680px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950'}>
-            <div className={isAdmin
-              ? 'flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900'
-              : 'employee-profile-dialog-header flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-900'}>
+          <div className={`employee-profile-dialog ${isAdmin ? 'admin-settings-modal ' : ''}flex max-h-[88vh] w-[min(94vw,680px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950`}>
+            <div className="employee-profile-dialog-header flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8 py-4 dark:border-slate-800 dark:bg-slate-900">
               <div>
-                <h2 id="settings-modal-title" className={isAdmin
-                  ? 'text-xl font-bold text-slate-900 dark:text-white'
-                  : 'text-lg font-bold text-slate-900 dark:text-white'}>
+                <h2 id="settings-modal-title" className="text-lg font-bold text-slate-900 dark:text-white">
                   {isAdmin ? 'Settings' : 'Profile & Settings'}
                 </h2>
-                <p className={isAdmin ? 'text-xs text-slate-500 dark:text-slate-400' : 'mt-1 text-sm text-slate-500 dark:text-slate-400'}>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   {isAdmin
-                    ? 'Manage your account, appearance, session, and available system tools.'
+                    ? 'Manage your account, appearance, and session.'
                     : 'Account details and preferences.'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsSettingsModalOpen(false)}
-                className={isAdmin
-                  ? 'inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
-                  : 'employee-profile-dialog-close inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}
+                className="employee-profile-dialog-close inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                 aria-label="Close settings"
               >
                 <X size={20} />
@@ -1737,18 +1708,16 @@ export default function App() {
                 </div>
               )}
             >
-              <div className={isAdmin
-                ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6'
-                : 'employee-profile-dialog-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5'}>
+              <div className="employee-profile-dialog-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 py-7">
                 {isAdmin ? (
                   <SettingsPage
+                    modalLayout
                     email={account || ''}
                     role={profile.role}
                     designation={profile.designation}
                     department={profile.department}
                     darkMode={darkMode}
                     onToggleDarkMode={() => setDarkMode((value) => !value)}
-                    onResetSystemData={handleResetAllData}
                     onLogout={handleLogout}
                     accountsCount={accounts.length}
                     activePartnerCompaniesCount={partnerCompanies.filter((company) => !company.isArchived).length}

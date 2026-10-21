@@ -5,10 +5,11 @@ interface PaginationProps {
   pageSize: number;
   totalItems: number;
   onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
   ariaLabel: string;
   pageSizeOptions?: number[];
   showPageControls?: boolean;
+  showPageSizeSelector?: boolean;
   verticalPadding?: 'compact' | 'comfortable';
   className?: string;
 }
@@ -24,6 +25,7 @@ export function Pagination({
   ariaLabel,
   pageSizeOptions = DEFAULT_PAGE_SIZES,
   showPageControls = true,
+  showPageSizeSelector = true,
   verticalPadding = 'compact',
   className = '',
 }: PaginationProps) {
@@ -79,17 +81,23 @@ export function Pagination({
         </div>
       ) : <div />}
 
-      <label className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 sm:justify-self-end">
-        <select
-          className="h-8 w-16 min-w-16 shrink-0 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-[#0063a9] outline-none transition focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-blue-300"
-          value={pageSize}
-          onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          aria-label="Items per page"
-        >
-          {options.map((option) => <option key={option} value={option}>{option}</option>)}
-        </select>
-        <span>Items per page</span>
-      </label>
+      {showPageSizeSelector ? (
+        <label className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 sm:justify-self-end">
+          <select
+            className="h-8 w-16 min-w-16 shrink-0 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-[#0063a9] outline-none transition focus:border-[#0063a9] focus:ring-2 focus:ring-[#0063a9]/15 dark:border-slate-700 dark:bg-slate-950 dark:text-blue-300"
+            value={pageSize}
+            onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
+            aria-label="Items per page"
+          >
+            {options.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+          <span>Items per page</span>
+        </label>
+      ) : (
+        <span className="whitespace-nowrap text-center text-xs text-slate-500 dark:text-slate-400 sm:justify-self-end">
+          {pageSize} items per page
+        </span>
+      )}
     </nav>
   );
 }
