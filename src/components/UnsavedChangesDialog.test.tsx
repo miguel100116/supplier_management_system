@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import { useModalEscape } from '../hooks/useModalEscape';
+import { SendFormConfirmation } from '../features/evaluations/components/SendFormConfirmation';
 import { UnsavedChangesDialog } from './UnsavedChangesDialog';
 import { CategoriesManagerPage } from '../pages/CategoriesManagerPage';
 import { DEFAULT_CATEGORIES } from '../data/questionCategories';
@@ -210,4 +212,76 @@ test('category save-and-leave preserves validation and requires impact confirmat
   find(view.render(), (element) => element.type === 'button' && String(element.props.children).includes('Yes, Apply Changes')).props.onClick();
   assert.equal(saves, 1);
   assert.throws(() => find(view.render(), (element) => element.props.id === 'category-editor-title'));
+});
+
+test('Send Form confirmation only sends on explicit approval and prevents repeated approval while pending', async () => {
+  let saves = 0;
+  let closed = 0;
+  let complete!: () => void;
+  const props = { title: 'Supplier evaluation', surveyType: 'Supplier', companyCount: 12, recipientCount: 8, busy: false, error: 'Save failed', onClose: () => { closed++; }, onConfirm: () => { saves++; return new Promise<void>((resolve) => { complete = resolve; }); } };
+  const view = renderHooks(SendFormConfirmation, props);
+  let tree = view.render();
+  assert.equal(saves, 0);
+  assert.equal(find(tree, (element) => element.props.role === 'alert').props.children, 'Save failed');
+  button(tree, 'Go back').props.onClick();
+  assert.equal(closed, 1);
+  assert.equal(saves, 0);
+  button(tree, 'Yes, proceed').props.onClick();
+  button(tree, 'Yes, proceed').props.onClick();
+  button(tree, 'Go back').props.onClick();
+  assert.equal(saves, 1);
+  assert.equal(closed, 1);
+  props.busy = true;
+  tree = view.render();
+  assert.equal(button(tree, 'Sending…').props.disabled, true);
+  assert.equal(button(tree, 'Go back').props.disabled, true);
+  complete();
+  await new Promise((resolve) => setImmediate(resolve));
+  props.busy = false;
+  button(view.render(), 'Go back').props.onClick();
+  assert.equal(closed, 2);
+});
+
+test('Send Form Escape and backdrop dismiss only approval, with priority over the underlying review', () => {
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const listeners = new Map<string, (event: any) => void>();
+  Object.assign(globalThis, {
+    window: { scrollX: 0, scrollY: 0, innerWidth: 1000, getComputedStyle: () => ({ paddingRight: '0' }), scrollTo() {}, addEventListener: (name: string, callback: (event: any) => void) => listeners.set(name, callback), removeEventListener: (name: string) => listeners.delete(name) },
+    document: { activeElement: null, body: { style: {} }, documentElement: { style: {}, clientWidth: 1000 } },
+  });
+  let closed = 0;
+  let saved = 0;
+  let reviewClosed = 0;
+  // Register the underlying review at its real priority using the shared hook.
+  const underlying = renderHooks(() => { useModalEscape(true, () => { reviewClosed++; }, 80); return <div />; }, {});
+  const props = { title: 'Courier evaluation', surveyType: 'Courier', companyCount: 20, recipientCount: 5, busy: false, onClose: () => { closed++; }, onConfirm: async () => { saved++; } };
+  const view = renderHooks(SendFormConfirmation, props);
+  let cleanups: unknown[] = [];
+  try {
+    underlying.render();
+    cleanups.push(...underlying.effects.map((effect) => effect()));
+    view.render();
+    cleanups.push(...view.effects.map((effect) => effect()));
+    const escape = () => listeners.get('keydown')!({ key: 'Escape', defaultPrevented: false, preventDefault() {}, stopImmediatePropagation() {} });
+    escape();
+    assert.equal(closed, 1);
+    const backdrop = { parentElement: null, classList: { contains: (name: string) => ['fixed', 'inset-0'].includes(name) } };
+    const panel = { parentElement: backdrop, classList: { contains: () => false } };
+    const pointer = (target: unknown) => listeners.get('pointerdown')!({ target, preventDefault() {}, stopImmediatePropagation() {} });
+    pointer(panel);
+    assert.equal(closed, 1);
+    pointer(backdrop);
+    assert.equal(closed, 2);
+    props.busy = true;
+    view.render();
+    escape();
+    pointer(backdrop);
+    assert.equal(closed, 2);
+    assert.equal(saved, 0);
+    assert.equal(reviewClosed, 0);
+  } finally {
+    cleanups.reverse().forEach((cleanup) => { if (typeof cleanup === 'function') cleanup(); });
+    Object.assign(globalThis, { window: priorWindow, document: priorDocument });
+  }
 });

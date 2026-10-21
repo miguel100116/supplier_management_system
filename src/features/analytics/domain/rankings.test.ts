@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { formatNumber } from './analytics';
 import { getBand } from '../../../data/questionWeights';
 import { SurveyResponse } from '../../../types/survey';
 import { getLeaderboard } from '../../evaluations/domain/scoring';
-import { getAnalyticsCompanyRankings, getCompanyPerformanceRanking, paginateAnalyticsItems, paginateCompanyRankings, rankCompanySummaries } from './rankings';
+import { formatAnalyticsScore, getAnalyticsScore, getAnalyticsBand, formatAnalyticsRatingRange, getAnalyticsCompanyRankings, getCompanyPerformanceRanking, paginateAnalyticsItems, paginateCompanyRankings, rankCompanySummaries } from './rankings';
 
 function courierResponse(company: string, responseId: string, rating: number): SurveyResponse {
   return {
@@ -113,7 +114,7 @@ test('leaderboard ranks normalized rubric scores across categories and applies t
   assert.equal(getBand('Subcontractor', 85.5).label, 'Satisfactory');
   assert.equal(getBand('Subcontractor', 78).label, 'Unsatisfactory');
   assert.equal(getBand('Subcontractor', 72).label, 'Unsatisfactory');
-  assert.equal(getBand('Supplier', 79.96).label, 'Satisfactory');
+  assert.equal(getBand('Supplier', 79.96).label, 'Unsatisfactory');
 });
 
 test('leaderboard score ties use evaluation count and then company name', () => {
@@ -181,4 +182,35 @@ test('question performance pagination returns no more than 20 ranked questions',
   assert.equal(secondPage.items[0], 'Question 21');
   assert.equal(secondPage.startIndex, 20);
   assert.equal(secondPage.totalPages, 3);
+});
+
+test('Analytics keeps score precision and never rounds a score into a higher rating', () => {
+  for (const type of ['Courier', 'Supplier'] as const) {
+    assert.equal(getAnalyticsScore(type, 94.9996), 94.9996);
+    assert.equal(formatAnalyticsScore(type, 94.9996), '94.99 / 100');
+    assert.equal(getAnalyticsBand(type, 94.9996).label, 'Good');
+    assert.equal(getAnalyticsBand(type, 95).label, 'Excellent');
+    assert.equal(getAnalyticsBand(type, 88.9996).label, 'Satisfactory');
+    assert.equal(getAnalyticsBand(type, 79.9996).label, 'Unsatisfactory');
+  }
+  assert.equal(getAnalyticsScore('Subcontractor', 74.999), 74.999 / 50);
+  assert.equal(formatAnalyticsScore('Subcontractor', 78), '1.56 / 2.0');
+  assert.equal(getAnalyticsBand('Subcontractor', 74.999).label, 'Good Performer');
+  assert.equal(getAnalyticsBand('Subcontractor', 75).label, 'Top Performer');
+  assert.equal(getAnalyticsBand('Subcontractor', 49.999).label, 'Marginal Performer');
+  assert.equal(getAnalyticsBand('Subcontractor', 24.999).label, 'Poor Performer');
+  assert.equal(formatAnalyticsRatingRange('Subcontractor', 1), '1 to <1.5');
+  assert.equal(formatAnalyticsRatingRange('Supplier', 1), '89 to <95');
+});
+
+test('scores show exactly two decimal places without rounding up, including binary and exponent edge cases', () => {
+  for (const [value, expected] of [
+    [89.999, '89.99'], [94.9996, '94.99'], [1.5699, '1.56'],
+    [1.15, '1.15'], [0.29, '0.29'], [100, '100.00'], [0, '0.00'],
+    [1e-7, '0.00'], [1.23456e21, '1234560000000000000000.00'],
+    [-1.159, '-1.15'], [-0.0001, '0.00'], [Number.NaN, '0.00'],
+    [Number.POSITIVE_INFINITY, '0.00'],
+  ] as const) assert.equal(formatNumber(value), expected);
+  assert.equal(formatNumber(89.999, 1), '89.9');
+  assert.equal(formatNumber(89.999, 0), '89');
 });

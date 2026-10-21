@@ -1,3 +1,4 @@
+import { formatUnroundedNumber } from '../../../utils/formatUnroundedNumber';
 import { ArchiveSeries, CustomForm, FilterState, KpiSummary, PartnerCompany, Rating, SurveyResponse, SurveyType } from '../../../types/survey';
 import { getQuestionMaxPoints, isScoredQuestion } from '../../../data/questionWeights';
 
@@ -164,8 +165,8 @@ export function getCompletionStyle(completed: number, total: number): Completion
   return { status: 'in-progress', percentage, barColorClass: 'bg-emerald-700 dark:bg-emerald-600', textColorClass: 'text-emerald-700 dark:text-emerald-400' };
 }
 
-export function formatNumber(value: number, digits = 1) {
-  return Number.isFinite(value) ? value.toFixed(digits) : '0.0';
+export function formatNumber(value: number, digits = 2) {
+  return formatUnroundedNumber(value, digits);
 }
 
 /**
@@ -429,7 +430,7 @@ export function ratingDistribution(responses: SurveyResponse[]) {
 export function averageBySurveyType(responses: SurveyResponse[], types: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor']) {
   return types.map((surveyType) => ({
     surveyType,
-    average: Number(formatNumber(averageRating(responses.filter((response) => response.surveyType === surveyType)))),
+    average: averageRating(responses.filter((response) => response.surveyType === surveyType)),
     responses: submissionCount(responses.filter((response) => response.surveyType === surveyType)),
   }));
 }
@@ -444,7 +445,7 @@ export function monthlyTrend(responses: SurveyResponse[]) {
       return {
         month,
         average: scoredSubmissions.length
-          ? Number(formatNumber(scoredSubmissions.reduce((sum, item) => sum + item.score, 0) / scoredSubmissions.length))
+          ? scoredSubmissions.reduce((sum, item) => sum + item.score, 0) / scoredSubmissions.length
           : null,
         responses: submissionCount(monthResponses),
       };
@@ -461,7 +462,7 @@ export function yearlyTrend(responses: SurveyResponse[]) {
       return {
         year,
         average: scoredSubmissions.length
-          ? Number(formatNumber(scoredSubmissions.reduce((sum, item) => sum + item.score, 0) / scoredSubmissions.length))
+          ? scoredSubmissions.reduce((sum, item) => sum + item.score, 0) / scoredSubmissions.length
           : null,
         responses: submissionCount(yearResponses),
       };
@@ -490,7 +491,7 @@ export function seriesTrend(responses: SurveyResponse[], seriesList: ArchiveSeri
         seriesId,
         label: seriesById.get(seriesId)?.label ?? 'Unknown',
         createdAt: seriesById.get(seriesId)?.createdAt ?? '',
-        average: scores.length ? Number(formatNumber(scores.reduce((sum, item) => sum + item.score, 0) / scores.length)) : null,
+        average: scores.length ? scores.reduce((sum, item) => sum + item.score, 0) / scores.length : null,
         responses: submissionCount(seriesResponses),
       };
     })
@@ -506,7 +507,7 @@ export function questionPerformance(responses: SurveyResponse[]) {
     .sort((left, right) => right.average - left.average)
     .map((item) => ({
       question: item.question.replace('How satisfied are you with ', '').replace('How would you rate ', ''),
-      average: Number(formatNumber(item.average)),
+      average: item.average,
       responses: item.responses,
     }));
 }
@@ -527,7 +528,7 @@ export function categoryPerformance(responses: SurveyResponse[]) {
   return [...groups.entries()]
     .map(([category, categoryResponses]) => ({
       category,
-      average: Number(formatNumber(averageByQuestion(categoryResponses).reduce((sum, item) => sum + item.average, 0) / Math.max(averageByQuestion(categoryResponses).length, 1))),
+      average: averageByQuestion(categoryResponses).reduce((sum, item) => sum + item.average, 0) / Math.max(averageByQuestion(categoryResponses).length, 1),
       responses: categoryResponses.length,
       naCount: scoredResponses(categoryResponses).filter((response) => response.rating === 'N/A').length,
     }))

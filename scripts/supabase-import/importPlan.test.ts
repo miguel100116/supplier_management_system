@@ -5,8 +5,56 @@ import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildImportPlan, IMPORT_TABLE_ROWS, loadCompanyAliases, stableUuid } from './importPlan';
+import { previewRawEvaluationImport, commitRawEvaluationImport } from '../../src/features/evaluation-imports/services/rawEvaluationImport';
+import { createImportedResponseFilter } from '../../src/features/evaluation-imports/services/importedResponseIdentity';
+import { buildAnalyticsSnapshot } from '../../src/features/analytics/domain/analyticsSnapshot';
+import { submissionCount } from '../../src/features/analytics/domain/analytics';
+import type { SurveyResponse } from '../../src/types/survey';
+import { createCompanyReportData, getReportAverageText } from '../../src/features/feedback-hub/reporting/companyReportData';
+import { formatAnalyticsScore, getAnalyticsBand } from '../../src/features/analytics/domain/rankings';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+for (const [type, sourceCount, countableCount] of [['Courier', 30, 30], ['Supplier', 185, 178], ['Subcontractor', 65, 65]] as const) {
+  test(`${type} reference CSV retains its counts and scores when UUID and UI import copies coexist`, async () => {
+    const name = `Microgenesis ${type} Evaluation Form.csv`;
+    const preview = await previewRawEvaluationImport(new File([readFileSync(resolve(projectRoot, 'reference-materials/source-data', name))], name), type, []);
+    assert.equal(preview.rows.length, sourceCount);
+    assert.equal(new Set(preview.rows.map((row) => row.responseId)).size, sourceCount);
+    const imported = commitRawEvaluationImport(preview, Object.fromEntries(preview.companyMatches.map((match) => [match.normalizedName, 'add-as-partner'])));
+    const legacy = imported.responses.map((response) => ({ ...response,
+      responseId: stableUuid(`evaluation-submission:evaluation-form-${type.toLowerCase()}:${response.responseId.split('-').at(-1)}`),
+      surveyId: `default-${type.toLowerCase()}`,
+    }));
+    const combined = [...legacy, ...imported.responses];
+    assert.equal(submissionCount(combined), countableCount * 2);
+    const unique = combined.filter(await createImportedResponseFilter(combined));
+    assert.equal(submissionCount(unique), countableCount);
+    assert.deepEqual(buildAnalyticsSnapshot(unique, [type], imported.newPartnerCompanies, []),
+      buildAnalyticsSnapshot(imported.responses, [type], imported.newPartnerCompanies, []));
+    for (const ranking of buildAnalyticsSnapshot(unique, [type], imported.newPartnerCompanies, []).companies) {
+      const partner = imported.newPartnerCompanies.find((company) => company.name === ranking.name)!;
+      const report = createCompanyReportData({ survey: { id: `default-${type.toLowerCase()}`, title: 'Reference CSV', surveyType: type },
+        companyId: partner.id, partnerCompanies: imported.newPartnerCompanies, responses: unique, scopeToSurveyId: false, includeArchived: true });
+      assert.equal(report.volumeWeightedScore, ranking.rankScore);
+      assert.equal(report.composite?.evaluationCount, ranking.count);
+      assert.equal(getReportAverageText(report), formatAnalyticsScore(type, ranking.rankScore));
+      assert.deepEqual(report.volumeWeightedBand, getAnalyticsBand(type, ranking.rankScore));
+    }
+
+    // Client submissions and distinct periods/source IDs must remain countable.
+    const reference = imported.responses[0];
+    const newRows: SurveyResponse[] = [
+      { ...reference, responseId: 'RESP-client-added', dataSource: 'production_submission' },
+      { ...legacy[0], responseId: stableUuid('unrelated-submission') },
+      { ...legacy[0], archived: true, seriesId: 'previous-period' },
+      { ...legacy[0], submissionDate: '2026-10-20T12:00:00Z' },
+      { ...legacy[0], respondentEmail: 'another@mgenesis.com' },
+      { ...legacy[0], dataSource: 'test_submission' },
+    ];
+    assert.deepEqual(newRows.filter(await createImportedResponseFilter([...combined, ...newRows])), newRows);
+  });
+}
 
 test('builds the normalized plan from the four inspected production CSV files', () => {
   const plan = buildImportPlan(projectRoot);

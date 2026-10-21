@@ -33,13 +33,17 @@ import {
   YAxis,
 } from 'recharts';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { surveyTypeDisplayLabel, formatCompositeScore, getBand, ratingBands } from '../data/questionWeights';
+import { surveyTypeDisplayLabel } from '../data/questionWeights';
+import { formatAnalyticsRatingRange, analyticsBands, formatAnalyticsScore, getAnalyticsBand } from '../features/analytics/domain/rankings';
 import { formatNumber, getScoreAxisDomain, questionPerformance } from '../features/analytics/domain/analytics';
-import { computeCompanyComposite, getCompanyTrend, getLeaderboard, getSectionPeerAverages } from '../features/evaluations/domain/scoring';
+import { getCompanyTrend, getLeaderboard, getSectionPeerAverages } from '../features/evaluations/domain/scoring';
 import { captureChartImage, exportCompanyReportAsDocx, exportCompanyReportAsPDF } from '../features/reports/services/companyReportExport';
 import { radarPointLabel } from '../features/analytics/components/radarChartLabels';
 import {
   createCompanyReportData,
+  computeReportComposite,
+  filterResponsesForReport,
+  normalizeReportResponsesForCompany,
   getCompanyReportCommentId,
   getCompanyReportCommentResponses,
   getOverallFeedbackQuestionId,
@@ -100,6 +104,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
       partnerCompanies,
       responses,
       scopeToSurveyId: false,
+      includeArchived: true,
       commentScope: 'all',
     });
   }, [responses, selectedCompanyRecord, partnerCompanies, category]);
@@ -160,31 +165,31 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category, companyOptions.join('|')]);
 
+  const companyResponses = useMemo(() => selectedCompanyRecord
+    ? normalizeReportResponsesForCompany(selectedCompany, filterResponsesForReport(
+        { id: `company-report-${category.toLowerCase()}`, surveyType: category },
+        selectedCompanyRecord, partnerCompanies, responses, false, true,
+      )) : [], [selectedCompanyRecord, selectedCompany, category, partnerCompanies, responses]);
   const composite = useMemo(
-    () => (selectedCompany ? computeCompanyComposite(selectedCompany, category, responses) : null),
-    [selectedCompany, category, responses],
+    () => (selectedCompany ? computeReportComposite(selectedCompany, category, companyResponses) : null),
+    [selectedCompany, category, companyResponses],
   );
   const volumeWeightedSummary = useMemo(() => {
     if (!composite) return null;
-    const rankedCompany = leaderboard.find(
-      (candidate) => selectedCompanyRecord?.id && candidate.companyId === selectedCompanyRecord.id,
-    ) ?? leaderboard.find((candidate) => candidate.company === selectedCompany);
-    const score = composite.hasScore
-      ? rankedCompany?.rankScore ?? composite.compositeScore
-      : null;
+    const score = composite.hasScore ? composite.compositeScore : null;
     return {
       score,
-      band: score === null ? composite.band : getBand(category, score),
+      band: score === null ? composite.band : getAnalyticsBand(category, score),
     };
-  }, [category, composite, leaderboard, selectedCompany, selectedCompanyRecord]);
+  }, [category, composite]);
   const peerAverages = useMemo(() => getSectionPeerAverages(responses, category), [responses, category]);
   const trend = useMemo(
-    () => (selectedCompany ? getCompanyTrend(responses, selectedCompany, category) : []),
-    [selectedCompany, category, responses],
+    () => (selectedCompany ? getCompanyTrend(companyResponses, selectedCompany, category) : []),
+    [selectedCompany, category, companyResponses],
   );
   const questionRows = useMemo(
-    () => (selectedCompany ? questionPerformance(responses.filter((r) => r.company === selectedCompany)) : []),
-    [selectedCompany, responses],
+    () => questionPerformance(companyResponses),
+    [companyResponses],
   );
 
   const sectionChartData = useMemo<SectionChartRow[]>(() => {
@@ -248,13 +253,14 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
       const data = createCompanyReportData({
         survey: {
           id: `company-report-${category.toLowerCase()}`,
-          title: `Current ${category} responses`,
+          title: `Selected scope: ${category} responses`,
           surveyType: category,
         },
         companyId: selectedCompanyRecord.id,
         partnerCompanies,
         responses,
         scopeToSurveyId: false,
+        includeArchived: true,
         graphs,
         includeComments,
         commentScope: 'all',
@@ -273,10 +279,10 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
     const row = sectionChartData.find((r) => r.section === value);
     if (!row) return value;
     const companyVal = row[composite.company];
-    const companyStr = typeof companyVal === 'number' ? companyVal.toFixed(1) : '0.0';
+    const companyStr = typeof companyVal === 'number' ? formatNumber(companyVal) : '0.00';
     if (reportAudience === 'external') return `${value} (${companyStr})`;
     const peerVal = row[PEER_LABEL];
-    const peerStr = typeof peerVal === 'number' ? peerVal.toFixed(1) : '0.0';
+    const peerStr = typeof peerVal === 'number' ? formatNumber(peerVal) : '0.00';
     return `${value} (${companyStr} / ${peerStr})`;
   };
 
@@ -461,7 +467,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                   <ReportPageHeader company={composite.company} />
                   <h2 className="mt-6 text-xl font-bold text-slate-800 dark:text-slate-100">Executive Summary</h2>
                   <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-                    <SummaryStat label="Volume-Weighted score" value={volumeWeightedSummary?.score === null || volumeWeightedSummary?.score === undefined ? 'N/A' : formatCompositeScore(composite.surveyType, volumeWeightedSummary.score).text} accent />
+                    <SummaryStat label="Leaderboard score" value={volumeWeightedSummary?.score === null || volumeWeightedSummary?.score === undefined ? 'N/A' : formatAnalyticsScore(composite.surveyType, volumeWeightedSummary.score)} accent />
                     <SummaryStat label="Rating band" value={volumeWeightedSummary?.band.label ?? composite.band.label} />
                     <SummaryStat label="Evaluations" value={String(composite.evaluationCount)} />
                   </div>
@@ -498,16 +504,16 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                               <CartesianGrid strokeDasharray="3 3" vertical={false} />
                               <XAxis dataKey="section" tick={{ fontSize: 9.5 }} interval={0} height={24} />
                               <YAxis domain={sectionAxisDomain} tick={{ fontSize: 10 }} />
-                              <Tooltip />
+                              <Tooltip formatter={(value) => typeof value === 'number' ? formatNumber(value) : value} />
                               <Bar dataKey={composite.company} fill={PRIMARY_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false}>
                                 {reportAudience === 'external' && sectionChartData.map((row, index) => (
                                   <Cell key={row.section} fill={EXTERNAL_BAR_COLORS[index % EXTERNAL_BAR_COLORS.length]} />
                                 ))}
-                                <LabelList dataKey={composite.company} position="top" formatter={(val) => typeof val === 'number' ? val.toFixed(1) : String(val ?? '')} style={{ fontSize: 13, fill: PRIMARY_COLOR, fontWeight: 'bold' }} />
+                                <LabelList dataKey={composite.company} position="top" formatter={(val) => typeof val === 'number' ? formatNumber(val) : String(val ?? '')} style={{ fontSize: 13, fill: PRIMARY_COLOR, fontWeight: 'bold' }} />
                               </Bar>
                               {reportAudience === 'internal' && (
                                 <Bar dataKey={PEER_LABEL} fill={PEER_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                                  <LabelList dataKey={PEER_LABEL} position="top" formatter={(val) => typeof val === 'number' ? val.toFixed(1) : String(val ?? '')} style={{ fontSize: 13, fill: PEER_COLOR, fontWeight: 'bold' }} />
+                                  <LabelList dataKey={PEER_LABEL} position="top" formatter={(val) => typeof val === 'number' ? formatNumber(val) : String(val ?? '')} style={{ fontSize: 13, fill: PEER_COLOR, fontWeight: 'bold' }} />
                                 </Bar>
                               )}
                             </BarChart>
@@ -555,7 +561,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                               </Radar>
                             )}
                             <Legend verticalAlign="top" align="left" layout="vertical" iconSize={10} wrapperStyle={{ fontSize: 10, paddingBottom: 12, left: 0 }} />
-                            <Tooltip />
+                            <Tooltip formatter={(value) => typeof value === 'number' ? formatNumber(value) : value} />
                           </RadarChart>
                         </ResponsiveContainer>
                       </div>
@@ -574,10 +580,10 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="label" tick={{ fontSize: 9 }} tickLine={false} />
                             <YAxis domain={[0, 100]} tick={{ fontSize: 9 }} tickLine={false} width={30} />
-                            <Tooltip />
+                            <Tooltip formatter={(value) => typeof value === 'number' ? formatNumber(value) : value} />
                             <Legend verticalAlign="top" align="left" layout="horizontal" iconSize={10} wrapperStyle={{ fontSize: 10, paddingBottom: 10, left: 0 }} />
                             <Line type="monotone" dataKey="score" name={composite.company} stroke={PRIMARY_COLOR} strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false}>
-                              <LabelList dataKey="score" position="top" formatter={(val) => typeof val === 'number' ? val.toFixed(1) : String(val ?? '')} style={{ fontSize: 13, fill: PRIMARY_COLOR, fontWeight: 'bold' }} />
+                              <LabelList dataKey="score" position="top" formatter={(val) => typeof val === 'number' ? formatNumber(val) : String(val ?? '')} style={{ fontSize: 13, fill: PRIMARY_COLOR, fontWeight: 'bold' }} />
                             </Line>
                           </LineChart>
                         </ResponsiveContainer>
@@ -825,12 +831,11 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
 }
 
 function ReportRatingScale({ category }: { category: SurveyType }) {
-  const bands = ratingBands[category];
+  const bands = analyticsBands[category];
   const scales = bands.map((band, index) => {
-    const upper = index === 0 ? 100 : (bands[index - 1]?.min ?? 1) - 1;
     return {
       color: band.hex,
-      range: band.min === 0 ? `${upper} and below` : `${upper} - ${band.min}`,
+      range: formatAnalyticsRatingRange(category, index),
       label: band.label,
     };
   });

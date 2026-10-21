@@ -6,6 +6,70 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { QuestionPerformanceRow } from './QuestionPerformanceRow';
 import { AnalyticsDateRangeControls } from './AnalyticsDateRangeControls';
 import { AnalyticsPage } from '../../../pages/AnalyticsPage';
+import { applyFilters, initialFilters } from '../domain/analytics';
+import type { SurveyResponse, SurveyType } from '../../../types/survey';
+import { ExecutiveSummaryReportBuilderPage } from '../../../pages/ExecutiveSummaryReportBuilderPage';
+import { QuestionReportBuilderPage } from '../../../pages/QuestionReportBuilderPage';
+import { CompanyReportBuilderPage } from '../../../pages/CompanyReportBuilderPage';
+import { questionWeights } from '../../../data/questionWeights';
+import { ReportsPage } from '../../../pages/ReportsPage';
+
+function renderReport(element: React.ReactElement) {
+  const previousReact = (globalThis as { React?: typeof React }).React;
+  const previousStorage = globalThis.localStorage;
+  const previousWindow = globalThis.window;
+  Object.assign(globalThis, { React, localStorage: { getItem: () => null }, window: { location: { pathname: '/reports', search: '' } } });
+  try { return renderToStaticMarkup(element); }
+  finally { Object.assign(globalThis, { React: previousReact, localStorage: previousStorage, window: previousWindow }); }
+}
+
+test('empty executive reports do not invent findings or declining performance', () => {
+  const markup = renderReport(<ExecutiveSummaryReportBuilderPage responses={[]} partnerCompanies={[]} onBack={() => {}} />);
+  assert.doesNotMatch(markup, /Courier lines lead|documentation bottlenecks|Core Performance Advisory|Focus Required on|has dropped/);
+});
+
+test('question reports do not list registry-only partners as evaluated companies', () => {
+  const markup = renderReport(<QuestionReportBuilderPage responses={[]} partnerCompanies={[{
+    id: 'unevaluated', name: 'Registry Only Partner', type: 'Courier', createdAt: '2026-01-01',
+  }]} onBack={() => {}} />);
+  assert.doesNotMatch(markup, /Registry Only Partner/);
+});
+
+test('company report preview includes historical names by stable company ID', () => {
+  const weight = questionWeights.Courier[0];
+  const base: SurveyResponse = { responseId: 'current', companyId: 'partner', company: 'Current Partner', surveyType: 'Courier',
+    submissionDate: '2026-10-01', respondentType: 'Employee', questionId: weight.questionId, questionNumber: 1,
+    question: 'Criterion', questionCategory: weight.section, rating: weight.maxPoints, comment: '' };
+  const markup = renderReport(<CompanyReportBuilderPage responses={[base, {
+    ...base, responseId: 'old-name', company: 'Old Partner Name', submissionDate: '2026-09-01', rating: weight.maxPoints / 2,
+  }]} partnerCompanies={[{ id: 'partner', name: 'Current Partner', type: 'Courier', createdAt: '2026-01-01' }]}
+    initialSettings={{ category: 'Courier', selectedCompany: 'Current Partner' }} onBack={() => {}} />);
+  assert.match(markup, /Leaderboard score<\/p><p[^>]*>75\.00 \/ 100<\/p>/);
+});
+
+test('generated report summaries and question content use the same official cohort as their rankings', () => {
+  const weight = questionWeights.Courier[0];
+  const official: SurveyResponse = { responseId: 'official', company: 'Official Partner', surveyType: 'Courier',
+    respondentType: 'Employee', submissionDate: '2026-10-01', questionId: weight.questionId, questionNumber: 1,
+    question: 'Official Criterion', questionCategory: weight.section, rating: weight.maxPoints, comment: '' };
+  const raw = { ...official, responseId: 'test', company: 'Test Partner', question: 'Test-only Criterion', rating: 0 };
+  const markup = renderReport(<ReportsPage responses={[official, raw]} rankingResponses={[official]} partnerCompanies={[]}
+    initialRecipe={{ kind: 'summary', parameters: {} }} />);
+  assert.match(markup, /Official Partner/);
+  assert.doesNotMatch(markup, /Test-only Criterion|Test Partner/);
+  assert.match(markup, /Average System-wide Score:<\/span> 100\.00%/);
+});
+
+test('executive notes entered by the client are retained and unscored categories do not create warnings', () => {
+  const weight = questionWeights.Courier[0];
+  const response: SurveyResponse = { responseId: 'one', company: 'Partner', surveyType: 'Courier', respondentType: 'Employee',
+    submissionDate: '2026-10-01', questionId: weight.questionId, questionNumber: 1, question: 'Criterion',
+    questionCategory: weight.section, rating: weight.maxPoints, comment: '' };
+  const markup = renderReport(<ExecutiveSummaryReportBuilderPage responses={[response]} partnerCompanies={[]}
+    initialSettings={{ customNotesText: 'Client reviewed this reporting period.' }} onBack={() => {}} />);
+  assert.match(markup, /Client reviewed this reporting period\./);
+  assert.doesNotMatch(markup, /Focus Required on Supplier|Focus Required on Subcontractor/);
+});
 
 const COMPANY_ANALYSIS_SOURCE = readFileSync(
   new URL('./CompanyAnalysisPanel.tsx', import.meta.url),
@@ -59,6 +123,62 @@ test('custom calendars and period selection remain available when no analytics m
     assert.match(custom, /No analytics available/);
     const current = renderToStaticMarkup(<AnalyticsPage {...props} dataScope="current" />);
     assert.doesNotMatch(current, /id="analytics-date-from"/);
+  } finally {
+    if (previous === undefined) Reflect.deleteProperty(globals, 'React');
+    else globals.React = previous;
+  }
+});
+
+test('local category views render their supplied response scope and keep every permitted tab available', () => {
+  const globals = globalThis as typeof globalThis & { React?: typeof React };
+  const previous = globals.React;
+  globals.React = React;
+  try {
+    const types: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
+    const responses: SurveyResponse[] = types.map((type, index) => ({
+      responseId: `synthetic-${index}`, surveyType: type, respondentType: 'Employee', submissionDate: '2026-10-01T00:00:00Z',
+      company: `Example ${type}`, questionId: ['Q01', 'Q-SUP-04', 'Q-SUB-04-a'][index], questionNumber: 1,
+      question: `Synthetic ${type} question`, questionCategory: 'Delivery', rating: 1, comment: '',
+    }));
+    for (const type of [undefined, ...types, undefined]) {
+      const selected = type ? [type] : [];
+      const markup = renderToStaticMarkup(<AnalyticsPage responses={applyFilters(responses, { ...initialFilters, surveyType: selected })} activeSurveyTypes={type ? [type] : types} permittedSurveyTypes={types} filters={{ surveyType: selected, questionId: '', rating: 'All', company: '', search: '' }} setFilters={() => undefined} />);
+      assert.match(markup, /Analytics summary/);
+      assert.doesNotMatch(markup, /Loading Analytics|Analytics unavailable/);
+      for (const category of types) assert.match(markup, new RegExp(`>${category}</button>`));
+      for (const category of types) {
+        assert.equal(markup.includes(`title="Example ${category}"`), !type || category === type);
+      }
+    }
+  } finally {
+    if (previous === undefined) Reflect.deleteProperty(globals, 'React');
+    else globals.React = previous;
+  }
+});
+
+test('Analytics renders loaded responses without calling an aggregate API', (t) => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Analytics must use loaded responses'); });
+  const globals = globalThis as typeof globalThis & { React?: typeof React };
+  const previous = globals.React;
+  globals.React = React;
+  try {
+    const responses: SurveyResponse[] = [{
+      responseId: 'retained', company: 'Retained Partner', surveyType: 'Courier', respondentType: 'Employee',
+      submissionDate: '2026-10-01T00:00:00Z', questionId: 'Q01', questionNumber: 1, question: 'Criterion',
+      questionCategory: 'Delivery', rating: 15, comment: '',
+    }];
+    const markup = renderToStaticMarkup(<AnalyticsPage responses={responses}
+      activeSurveyTypes={['Courier']} permittedSurveyTypes={['Courier']}
+      filters={{ surveyType: [], questionId: '', rating: 'All', company: '', search: '' }} setFilters={() => undefined} />);
+    assert.match(markup, /Retained Partner/);
+    assert.equal(fetchMock.mock.callCount(), 0);
+    assert.match(markup, /Analytics summary/);
+    assert.match(markup, /1 scored submissions in this view/);
+    assert.equal((markup.match(/id="analytics-detail-heading"/g) ?? []).length, 1);
+    assert.equal((markup.match(/>Rating trend<\/h3>/g) ?? []).length, 1);
+    assert.match(markup, />Courier<\/button>/);
+    assert.doesNotMatch(markup, />(Supplier|Subcontractor)<\/button>/);
+    assert.doesNotMatch(markup, /Loading Analytics/);
   } finally {
     if (previous === undefined) Reflect.deleteProperty(globals, 'React');
     else globals.React = previous;

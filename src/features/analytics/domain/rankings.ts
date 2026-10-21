@@ -1,6 +1,6 @@
 import { formatCompositeScore, getBand, ratingBands, type ScoreBand } from '../../../data/questionWeights';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
-import { computeRankScore } from './analytics';
+import { formatNumber, computeRankScore } from './analytics';
 import { computeCompanyComposite, getLeaderboard } from '../../evaluations/domain/scoring';
 
 export interface CompanyRankingCandidate {
@@ -31,14 +31,27 @@ export const analyticsBands: Record<SurveyType, ScoreBand[]> = {
 
 export function getAnalyticsScore(surveyType: SurveyType, percentScore: number): number {
   return surveyType === 'Subcontractor'
-    ? Math.round(percentScore / 5 + Number.EPSILON) / 10
-    : formatCompositeScore(surveyType, percentScore).value;
+    ? percentScore / 50
+    : percentScore;
 }
 
 export function getAnalyticsBand(surveyType: SurveyType, percentScore: number): ScoreBand {
   if (surveyType !== 'Subcontractor') return getBand(surveyType, percentScore);
   const score = getAnalyticsScore(surveyType, percentScore);
   return subcontractorBands.find((band) => score >= band.min) ?? subcontractorBands[3];
+}
+
+/** Rating intervals include all fractional scores without rounding gaps. */
+export function formatAnalyticsRatingRange(surveyType: SurveyType, index: number): string {
+  const bands = analyticsBands[surveyType];
+  const band = bands[index];
+  return index === 0
+    ? `${band.min} to ${surveyType === 'Subcontractor' ? 2 : 100}`
+    : `${band.min} to <${bands[index - 1].min}`;
+}
+
+export function formatAnalyticsScore(surveyType: SurveyType, percentScore: number): string {
+  return `${formatNumber(getAnalyticsScore(surveyType, percentScore))} / ${surveyType === 'Subcontractor' ? '2.0' : '100'}`;
 }
 
 /**
@@ -179,7 +192,7 @@ export function getCompanyPerformanceRanking(
 
     if (composites.length === 0) return [];
 
-    const rawScore = Number((composites.reduce((sum, composite) => sum + composite.compositeScore, 0) / composites.length).toFixed(1));
+    const rawScore = composites.reduce((sum, composite) => sum + composite.compositeScore, 0) / composites.length;
     return [{
       company,
       rawScore,

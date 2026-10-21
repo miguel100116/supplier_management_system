@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { formatNumber } from '../domain/analytics';
 
 const RADIAN = Math.PI / 180;
 
@@ -43,7 +44,7 @@ export function radarPointLabel({
   fill,
   fontSize = 11,
   fontWeight = 'bold',
-  formatter = (value) => value.toFixed(1),
+  formatter = formatNumber,
   radialInset = 14,
   lane = 0,
 }: RadarLabelOptions) {

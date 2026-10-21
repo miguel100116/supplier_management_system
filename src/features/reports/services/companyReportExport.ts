@@ -1,3 +1,4 @@
+import { formatAnalyticsRatingRange } from '../../analytics/domain/rankings';
 import { jsPDF } from 'jspdf';
 import autoTableModule from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
@@ -182,14 +183,7 @@ function drawCoverPage(
 }
 
 function getRatingRangeLabel(data: CompanyReportData, index: number): string {
-  const band = data.ratingScale[index];
-  const previous = data.ratingScale[index - 1];
-  const upper = index === 0
-    ? 100
-    : (previous?.displayMinimum ?? 1) - 1;
-  return band.displayMinimum <= 0
-    ? `${upper} and below`
-    : `${band.displayMinimum} - ${upper}`;
+  return formatAnalyticsRatingRange(data.surveyType, index);
 }
 
 function drawRatingScale(doc: jsPDF, data: CompanyReportData, x: number, y: number, width: number) {
@@ -318,7 +312,7 @@ function drawExecutiveSummaryPage(
   doc.setLineWidth(0.7);
   doc.roundedRect(marginLeft, stripY, contentWidth, 54, 5, 5, 'S');
   const metrics = [
-    { label: 'VOLUME-WEIGHTED SCORE', value: getReportAverageText(data), color: data.volumeWeightedBand?.hex ?? '#94A3B8' },
+    { label: 'LEADERBOARD SCORE', value: getReportAverageText(data), color: data.volumeWeightedBand?.hex ?? '#94A3B8' },
     { label: 'RATING', value: data.volumeWeightedBand?.label ?? 'No Score Yet', color: data.volumeWeightedBand?.hex ?? '#94A3B8' },
     { label: 'RESPONDENTS', value: String(data.composite?.evaluationCount ?? 0), color: '#1E293B' },
   ];
@@ -668,7 +662,7 @@ export async function exportCompanyReportAsDocx(data: CompanyReportData, recipe?
             children: [
               new Paragraph({
                 spacing: { after: 80 },
-                children: [new TextRun({ text: 'VOLUME-WEIGHTED SCORE', bold: true, size: 18, color: MUTED_HEX })],
+                children: [new TextRun({ text: 'LEADERBOARD SCORE', bold: true, size: 18, color: MUTED_HEX })],
               }),
               new Paragraph({
                 children: [new TextRun({ text: getReportAverageText(data), bold: true, size: 56, color: BRAND_HEX })],
@@ -754,7 +748,7 @@ export async function exportCompanyReportAsDocx(data: CompanyReportData, recipe?
             new TableCell({
               shading: { fill: idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF' },
               margins: { top: 50, bottom: 50, left: 100, right: 100 },
-              children: [new Paragraph({ children: [new TextRun({ text: row.average.toFixed(1), size: 18 })] })],
+              children: [new Paragraph({ children: [new TextRun({ text: formatReportNumber(row.average), size: 18 })] })],
             }),
             new TableCell({
               shading: { fill: idx % 2 === 0 ? 'F8FAFC' : 'FFFFFF' },

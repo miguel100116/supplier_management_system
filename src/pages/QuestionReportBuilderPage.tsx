@@ -18,7 +18,8 @@ import Papa from 'papaparse';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { getQuestionMaxPoints, surveyTypeDisplayLabel } from '../data/questionWeights';
 import { isOverallCategory } from '../data/questionCategories';
-import { formatNumber, hasAnsweredItem, numericRating, averageRating } from '../features/analytics/domain/analytics';
+import { formatNumber, numericRating, averageRating } from '../features/analytics/domain/analytics';
+import { getEvaluatedCompanyNames } from '../features/reports/domain/reportContent';
 
 interface QuestionReportBuilderPageProps {
   responses: SurveyResponse[];
@@ -90,13 +91,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
     };
 
     ALL_SURVEY_TYPES.forEach((type) => {
-      const companiesForType = partnerCompanies
-        .filter((c) => c.type === type && !c.isArchived)
-        .map((c) => c.name);
-      const evaluatedFromResponses = Array.from(
-        new Set(responses.filter((r) => r.surveyType === type && hasAnsweredItem(r)).map((r) => r.company))
-      );
-      map[type] = Array.from(new Set([...companiesForType, ...evaluatedFromResponses])).sort();
+      map[type] = getEvaluatedCompanyNames(responses, partnerCompanies, type);
     });
 
     return map;

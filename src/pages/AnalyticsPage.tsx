@@ -5,19 +5,20 @@ import { CompanyAnalysisPanel } from '../features/analytics/components/CompanyAn
 import { PageDescription } from '../components/PageDescription';
 import { StateMessage } from '../components/StateMessage';
 import { ArchiveSeries, FilterState, PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
-import { formatNumber, hasAnsweredItem, monthlyTrend, questionPerformance, responseVolume, seriesTrend, submissionCount, submissionScores, yearlyTrend } from '../features/analytics/domain/analytics';
-import { computeCompanyComposite } from '../features/evaluations/domain/scoring';
-import { analyticsBands, getAnalyticsBand, getAnalyticsCompanyRankings, getAnalyticsScore, paginateAnalyticsItems, paginateCompanyRankings } from '../features/analytics/domain/rankings';
+import { formatNumber } from '../features/analytics/domain/analytics';
+import { formatAnalyticsRatingRange, analyticsBands, getAnalyticsBand, getAnalyticsScore, paginateAnalyticsItems, paginateCompanyRankings } from '../features/analytics/domain/rankings';
 import { QuestionPerformanceRow } from '../features/analytics/components/QuestionPerformanceRow';
 import { getValueColorBand } from '../features/analytics/domain/valueColorBand';
 import { AnalyticsDateRangeControls } from '../features/analytics/components/AnalyticsDateRangeControls';
 import type { AnalyticsDateRange } from '../features/analytics/domain/dateRange';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { Pagination } from '../components/Pagination';
+import { buildAnalyticsSnapshot } from '../features/analytics/domain/analyticsSnapshot';
 
 interface AnalyticsPageProps {
   responses: SurveyResponse[];
   activeSurveyTypes: SurveyType[];
+  permittedSurveyTypes?: SurveyType[];
   filters: FilterState;
   setFilters: (filters: FilterState) => void;
   dataScope?: 'current' | 'all-time' | 'custom';
@@ -40,7 +41,6 @@ type CompanySummary = {
   rankScore: number;
 };
 
-const surveyTypes: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
 const panelClass = 'rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950';
 const typeStyles: Record<SurveyType, { soft: string; bar: string }> = {
   Courier: { soft: 'bg-sky-50 text-sky-700 dark:bg-sky-950 dark:text-sky-300', bar: 'bg-sky-600' },
@@ -70,38 +70,29 @@ function AnalyticsTooltip({ text }: { text: string }) {
   );
 }
 
-export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilters, dataScope = 'current', onChangeDataScope, archiveSeries = [], selectedSeriesIds = [], onChangeSelectedSeriesIds, dateRange = { from: '', to: '' }, onChangeDateRange, partnerCompanies = [], archivedResponses = [] }: AnalyticsPageProps) {
-  const [selectedCompany, setSelectedCompany] = useState<CompanySummary | null>(null);
+export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTypes = ['Courier', 'Supplier', 'Subcontractor'], filters, setFilters, dataScope = 'current', onChangeDataScope, archiveSeries = [], selectedSeriesIds = [], onChangeSelectedSeriesIds, dateRange = { from: '', to: '' }, onChangeDateRange, partnerCompanies = [], archivedResponses = [] }: AnalyticsPageProps) {
+  const [companySelection, setSelectedCompany] = useState<Pick<CompanySummary, 'name' | 'type'> | null>(null);
   const [trendGranularity, setTrendGranularity] = useState<'monthly' | 'yearly' | 'series'>('monthly');
   const [leaderboardPage, setLeaderboardPage] = useState(0);
   const [questionPerformancePage, setQuestionPerformancePage] = useState(0);
   const [leaderboardPageSize, setLeaderboardPageSize] = useState(20);
   const [questionPerformancePageSize, setQuestionPerformancePageSize] = useState(20);
   const closeSelectedCompany = () => setSelectedCompany(null);
-  useModalEscape(Boolean(selectedCompany), closeSelectedCompany);
 
   const selectedType = filters.surveyType.length === 1 ? filters.surveyType[0] : 'All';
   const ratingScaleType: SurveyType = selectedType === 'All' ? 'Courier' : selectedType;
   const ratingScale = analyticsBands[ratingScaleType];
   const formatRatingScale = (type: SurveyType) => analyticsBands[type]
-    .map((band, index, bands) => {
-      if (type === 'Subcontractor') {
-        const maximum = index === 0 ? 2 : bands[index - 1].min - 0.1;
-        return `${band.label} ${band.min === 0 ? `≤${maximum.toFixed(1)}` : `${band.min.toFixed(1)}–${maximum.toFixed(1)}`}`;
-      }
-      return `${band.label} ${band.min === 0 ? `≤${bands[index - 1].min - 1}` : `${band.min}–${index === 0 ? 100 : bands[index - 1].min - 1}`}`;
-    })
+    .map((band, index) => `${band.label} ${formatAnalyticsRatingRange(type, index)}`)
     .join(' · ');
   const ratingScaleText = selectedType === 'All'
     ? formatRatingScale('Courier')
     : formatRatingScale(selectedType);
-  const totalSubmissions = useMemo(() => submissionCount(responses), [responses]);
-  const scoredSubmissions = useMemo(() => submissionScores(responses), [responses]);
-  const averageScore = scoredSubmissions.length ? scoredSubmissions.reduce((sum, submission) => sum + submission.score, 0) / scoredSubmissions.length : 0;
-
-  const companySummaries = useMemo(() => {
-    return getAnalyticsCompanyRankings(responses, activeSurveyTypes) as CompanySummary[];
-  }, [responses, activeSurveyTypes]);
+  const summary = useMemo(() => buildAnalyticsSnapshot(responses, activeSurveyTypes, partnerCompanies, archiveSeries), [responses, activeSurveyTypes, partnerCompanies, archiveSeries]);
+  const { totalSubmissions, scoredSubmissionCount, averageScore, evaluatedPartnerCount, partnerDenominator } = summary;
+  const companySummaries = summary.companies;
+  const selectedCompany = companySummaries.find((company) => company.name === companySelection?.name && company.type === companySelection.type) ?? null;
+  useModalEscape(Boolean(selectedCompany), closeSelectedCompany);
 
   const visibleCompanies = useMemo(() => selectedType === 'All' ? companySummaries : companySummaries.filter((company) => company.type === selectedType), [companySummaries, selectedType]);
   const paginatedCompanies = useMemo(
@@ -119,29 +110,33 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
       startIndex: paginatedCompanies.startIndex + leaderboardSplitIndex,
     },
   ].filter((column) => column.items.length > 0);
-  const evaluatedNames = useMemo(() => new Set(responses.filter(hasAnsweredItem).map((response) => response.companyId || `${response.surveyType}:${response.company}`)), [responses]);
-  const eligiblePartners = useMemo(() => partnerCompanies.filter((company) => !company.isArchived && company.type !== 'Uncategorized' && activeSurveyTypes.includes(company.type)), [partnerCompanies, activeSurveyTypes]);
-  const evaluatedPartnerCount = eligiblePartners.length ? eligiblePartners.filter((company) => evaluatedNames.has(company.id) || evaluatedNames.has(`${company.type}:${company.name}`)).length : visibleCompanies.length;
-  const partnerDenominator = eligiblePartners.length || visibleCompanies.length;
-  const volumeData = useMemo(() => responseVolume(responses, activeSurveyTypes), [responses, activeSurveyTypes]);
-  const questionData = useMemo(() => questionPerformance(responses), [responses]);
+  const volumeData = summary.volume;
+  const questionData = summary.questions;
   const paginatedQuestionData = useMemo(
     () => paginateAnalyticsItems(questionData, questionPerformancePage, questionPerformancePageSize),
     [questionData, questionPerformancePage, questionPerformancePageSize],
   );
   const trendData = useMemo<Array<{ key: string; average: number | null; responses: number }>>(() => {
-    if (trendGranularity === 'yearly') return yearlyTrend(responses).map((item) => ({ key: item.year, ...item }));
-    if (trendGranularity === 'series') return seriesTrend(responses, archiveSeries).map((item) => ({ key: item.label, ...item }));
-    return monthlyTrend(responses).map((item) => ({ key: item.month, ...item }));
-  }, [responses, archiveSeries, trendGranularity]);
-  const selectedComposite = useMemo(() => selectedCompany ? computeCompanyComposite(selectedCompany.name, selectedCompany.type, responses) : null, [selectedCompany, responses]);
-  const selectedLowestQuestions = useMemo(() => selectedCompany ? questionPerformance(responses.filter((response) => response.company === selectedCompany.name && response.surveyType === selectedCompany.type)).sort((left, right) => left.average - right.average).slice(0, 3) : [], [selectedCompany, responses]);
+    if (trendGranularity === 'yearly') return summary.yearly.map((item) => ({ key: item.year, ...item }));
+    if (trendGranularity === 'series') return summary.series.map((item) => ({ key: item.label, ...item }));
+    return summary.monthly.map((item) => ({ key: item.month, ...item }));
+  }, [summary, trendGranularity]);
+  const selectedComposite = selectedCompany ? summary.analysis.find((a) => a.type === selectedCompany.type)?.companies.find((c) => c.company === selectedCompany.name) : null;
+  const selectedLowestQuestions = selectedComposite?.lowestQuestions ?? [];
 
   const selectType = (type: SurveyType | 'All') => {
     setLeaderboardPage(0);
     setFilters({ ...filters, surveyType: type === 'All' ? [] : [type] });
   };
   const toggleSeries = (id: string) => onChangeSelectedSeriesIds?.(selectedSeriesIds.includes(id) ? selectedSeriesIds.filter((seriesId) => seriesId !== id) : [...selectedSeriesIds, id]);
+
+  const categoryTabs = (
+    <div role="group" aria-label="Analytics categories" className="mt-4 flex flex-wrap gap-1 border-b border-slate-100 pb-3 dark:border-slate-800">
+      {(['All', ...permittedSurveyTypes] as const).map((type) => (
+        <button type="button" key={type} onClick={() => selectType(type)} aria-pressed={selectedType === type} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedType === type ? 'bg-[#eef7fc] text-[#176FAE] dark:bg-sky-950/30 dark:text-sky-300' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'}`}>{type === 'All' ? 'All categories' : type}</button>
+      ))}
+    </div>
+  );
 
   const analyticsHeader = (
     <>
@@ -166,10 +161,11 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
     </>
   );
 
-  if (!responses.length && !archivedResponses.length) {
+  if (!summary.hasResponses && !archivedResponses.length) {
     return (
       <div className="space-y-5">
         {analyticsHeader}
+        {categoryTabs}
         <StateMessage title="No analytics available" message={dataScope === 'custom' ? 'No official evaluation responses match the selected dates and periods.' : 'No official evaluation responses match the current scope.'} />
       </div>
     );
@@ -180,7 +176,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
       {analyticsHeader}
 
       <section aria-label="Analytics summary" className="grid overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:grid-cols-3 md:divide-x md:divide-slate-100 dark:md:divide-slate-800">
-        <KpiCard label="Overall average score" value={`${formatNumber(averageScore, 0)}/100`} detail={`${scoredSubmissions.length} scored submissions in this view`} tooltip="The simple average of normalized submission scores in the selected reporting scope." />
+        <KpiCard label="Overall average score" value={`${formatNumber(averageScore)}/100`} detail={`${scoredSubmissionCount} scored submissions in this view`} tooltip="The simple average of normalized submission scores in the selected reporting scope." />
         <KpiCard label="Evaluations" value={String(totalSubmissions)} detail="Distinct answered evaluation forms" tooltip="A unique response ID counts when at least one item has a nonblank answer other than N/A." />
         <KpiCard label="Partners evaluated" value={`${evaluatedPartnerCount}/${partnerDenominator}`} detail={partnerDenominator ? `${Math.round((evaluatedPartnerCount / partnerDenominator) * 100)}% coverage` : 'No eligible partners'} tooltip="Active eligible partners with at least one visible evaluation, compared with the active eligible partner registry." />
       </section>
@@ -192,7 +188,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
         <div className="grid gap-4 xl:grid-cols-2">
           <article className={`${panelClass} p-4 sm:p-5`}>
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-bold">Rating trend</h3><p className="mt-1 text-xs text-slate-500">Average score and evaluation volume over time</p></div><select aria-label="Rating trend period" value={trendGranularity} onChange={(event) => setTrendGranularity(event.target.value as typeof trendGranularity)} className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-900"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="series">Survey period</option></select></div>
-            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="key" tick={{ fontSize: 10 }} /><YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 10 }} /><YAxis yAxisId="forms" orientation="right" allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip /><Line yAxisId="score" type="monotone" dataKey="average" name="Average Score" stroke="#2187CD" strokeWidth={2} dot={{ r: 3 }} /><Line yAxisId="forms" type="monotone" dataKey="responses" name="Counted Forms" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} /></LineChart></ResponsiveContainer></div>
+            <div className="h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ top: 8, right: 12, left: -20, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" /><XAxis dataKey="key" tick={{ fontSize: 10 }} /><YAxis yAxisId="score" domain={[0, 100]} tick={{ fontSize: 10 }} /><YAxis yAxisId="forms" orientation="right" allowDecimals={false} tick={{ fontSize: 10 }} /><Tooltip formatter={(value, name) => [name === 'Average Score' && typeof value === 'number' ? formatNumber(value) : value, name]} /><Line yAxisId="score" type="monotone" dataKey="average" name="Average Score" stroke="#2187CD" strokeWidth={2} dot={{ r: 3 }} /><Line yAxisId="forms" type="monotone" dataKey="responses" name="Counted Forms" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} /></LineChart></ResponsiveContainer></div>
           </article>
           <article className={`${panelClass} p-4 sm:p-5`}>
             <div className="mb-4">
@@ -232,11 +228,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
                 </div>
               </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-1 border-b border-slate-100 pb-3 dark:border-slate-800">
-            {(['All', ...surveyTypes] as const).map((type) => (
-              <button type="button" key={type} onClick={() => selectType(type)} aria-pressed={selectedType === type} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedType === type ? 'bg-[#eef7fc] text-[#176FAE] dark:bg-sky-950/30 dark:text-sky-300' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'}`}>{type === 'All' ? 'All categories' : type}</button>
-            ))}
-          </div>
+          {categoryTabs}
         </div>
 
         <div className="px-4 py-3 sm:px-6">
@@ -253,7 +245,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
                       <button type="button" onClick={() => setSelectedCompany(company)} className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-center px-2 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900/70 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]">
                         <span className="flex h-7 w-8 items-center justify-center rounded-md bg-slate-200 text-xs font-extrabold text-slate-800 dark:bg-slate-700 dark:text-slate-100">{rank}</span>
                         <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: scoreBand.hex }} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · <span style={{ color: scoreBand.hex }}>{scoreBand.label}</span></span></span>
-                        <span className="flex items-center justify-end gap-1 text-xs font-bold tabular-nums" style={{ color: scoreBand.hex }}>{getAnalyticsScore(company.type, company.rankScore).toFixed(1)}<ChevronRight size={13} /></span>
+                        <span className="flex items-center justify-end gap-1 text-xs font-bold tabular-nums" style={{ color: scoreBand.hex }}>{formatNumber(getAnalyticsScore(company.type, company.rankScore))}<ChevronRight size={13} /></span>
                         <span className="hidden text-right text-[11px] font-medium tabular-nums text-slate-400 sm:block">{company.count}</span>
                       </button>
                     </li>
@@ -273,7 +265,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
           )}
         </div>
       </section>
-        <CompanyAnalysisPanel responses={responses} archiveSeries={archiveSeries} />
+        <CompanyAnalysisPanel analysis={summary.analysis} surveyTypes={permittedSurveyTypes} archiveSeries={archiveSeries} />
         <article className={`${panelClass} overflow-hidden`}>
           <div className="border-b border-slate-100 px-4 py-4 dark:border-slate-800 sm:px-6">
             <h3 className="text-sm font-bold">Question performance</h3>
@@ -309,9 +301,9 @@ export function AnalyticsPage({ responses, activeSurveyTypes, filters, setFilter
           <aside role="dialog" aria-modal="true" aria-labelledby="company-detail-title" className="h-full w-full max-w-md overflow-y-auto bg-white shadow-2xl dark:bg-slate-950">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"><span className="text-xs font-semibold text-slate-400">Company performance</span><button type="button" onClick={closeSelectedCompany} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close company details"><X size={18} /></button></div>
             <div className="space-y-6 p-5 sm:p-7">
-              <div><h2 id="company-detail-title" className="text-xl font-bold text-slate-900 dark:text-white">{selectedCompany.name}</h2><div className="mt-3 flex items-end gap-2"><span className="text-4xl font-bold tracking-tight text-[#2187CD]">{getAnalyticsScore(selectedCompany.type, selectedCompany.scorePercentage).toFixed(1)}</span><span className="pb-1 text-sm text-slate-400">/ {selectedCompany.type === 'Subcontractor' ? '2.0' : '100'}</span></div><div className="mt-3 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${typeStyles[selectedCompany.type].soft}`}>{selectedCompany.type}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{getAnalyticsBand(selectedCompany.type, selectedCompany.scorePercentage).label}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{selectedCompany.count} forms</span></div></div>
-              <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Category results</h3><div className="mt-4 space-y-3">{selectedComposite?.sections.map((section) => (<div key={section.section}><div className="mb-1 flex justify-between gap-3 text-xs"><span className="truncate text-slate-600 dark:text-slate-300">{section.section}</span><span className="font-semibold tabular-nums">{section.percent.toFixed(0)}</span></div><div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800"><div className={`h-full rounded-full ${typeStyles[selectedCompany.type].bar}`} style={{ width: `${section.percent}%` }} /></div></div>))}</div></div>
-              <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Lowest performance questions</h3><div className="mt-3 space-y-3">{selectedLowestQuestions.length ? selectedLowestQuestions.map((question) => (<div key={question.question} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800"><div className="flex items-start justify-between gap-3"><p className="text-xs leading-5 text-slate-700 dark:text-slate-200">{question.question}</p><span className="shrink-0 text-xs font-bold text-rose-600">{question.average.toFixed(1)}</span></div><p className="mt-1 text-[10px] text-slate-400">{question.responses} response{question.responses === 1 ? '' : 's'}</p></div>)) : <p className="text-xs text-slate-400">No scoreable question data is available.</p>}</div></div>
+              <div><h2 id="company-detail-title" className="text-xl font-bold text-slate-900 dark:text-white">{selectedCompany.name}</h2><div className="mt-3 flex items-end gap-2"><span className="text-4xl font-bold tracking-tight text-[#2187CD]">{formatNumber(getAnalyticsScore(selectedCompany.type, selectedCompany.scorePercentage))}</span><span className="pb-1 text-sm text-slate-400">/ {selectedCompany.type === 'Subcontractor' ? '2.0' : '100'}</span></div><div className="mt-3 flex flex-wrap gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${typeStyles[selectedCompany.type].soft}`}>{selectedCompany.type}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{getAnalyticsBand(selectedCompany.type, selectedCompany.scorePercentage).label}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{selectedCompany.count} forms</span></div></div>
+              <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Category results</h3><div className="mt-4 space-y-3">{selectedComposite?.sections.map((section) => (<div key={section.section}><div className="mb-1 flex justify-between gap-3 text-xs"><span className="truncate text-slate-600 dark:text-slate-300">{section.section}</span><span className="font-semibold tabular-nums">{formatNumber(section.percent)}</span></div><div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800"><div className={`h-full rounded-full ${typeStyles[selectedCompany.type].bar}`} style={{ width: `${section.percent}%` }} /></div></div>))}</div></div>
+              <div className="border-t border-slate-100 pt-5 dark:border-slate-800"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Lowest performance questions</h3><div className="mt-3 space-y-3">{selectedLowestQuestions.length ? selectedLowestQuestions.map((question) => (<div key={question.question} className="rounded-lg border border-slate-100 p-3 dark:border-slate-800"><div className="flex items-start justify-between gap-3"><p className="text-xs leading-5 text-slate-700 dark:text-slate-200">{question.question}</p><span className="shrink-0 text-xs font-bold text-rose-600">{formatNumber(question.average)}</span></div><p className="mt-1 text-[10px] text-slate-400">{question.responses} response{question.responses === 1 ? '' : 's'}</p></div>)) : <p className="text-xs text-slate-400">No scoreable question data is available.</p>}</div></div>
               <PlaceholderButton title="Open the full company report"><BarChart3 size={14} /> Open full company report</PlaceholderButton>
             </div>
           </aside>
@@ -329,7 +321,7 @@ function AnalyticsHeader({ dataScope, onChangeDataScope }: { dataScope: 'current
           <PageDescription>Review evaluation results, identify performance gaps, and compare partner companies.</PageDescription>
         </div>
       </div>
-      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800"><div role="group" aria-label="Analytics date scope" className="inline-flex w-fit gap-1 rounded-lg bg-slate-50 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-[11px] text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-Weighted Based</span></div></div>
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800"><div role="group" aria-label="Analytics date scope" className="inline-flex w-fit gap-1 rounded-lg bg-slate-50 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-[11px] text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-weighted</span></div></div>
     </header>
   );
 }

@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Database, Download, FileBarChart, FileSpreadsheet, FileText, Table2, Handshake, Search } from 'lucide-react';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { formatNumber, getKpiSummary, questionPerformance, averageBySurveyType } from '../features/analytics/domain/analytics';
-import { formatCompositeScore } from '../data/questionWeights';
-import { getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
+import { formatAnalyticsScore, getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
 import { ExportTable, exportTablesAsCSV, exportTablesAsExcel, exportTablesAsPDF } from '../features/reports/services/exporters';
 import { CompanyReportBuilderPage } from './CompanyReportBuilderPage';
 import { QuestionReportBuilderPage } from './QuestionReportBuilderPage';
@@ -63,7 +62,8 @@ export function ReportsPage(props: ReportsPageProps) {
   </div>;
 }
 
-function ReportGenerator({ initialRecipe, responses, rankingResponses = responses, companyReportResponses, partnerCompanies = [], canExport = false }: ReportsPageProps) {
+function ReportGenerator({ initialRecipe, responses: rawResponses, rankingResponses = rawResponses, companyReportResponses, partnerCompanies = [], canExport = false }: ReportsPageProps) {
+  const responses = rankingResponses;
   const [showSummaryBuilder, setShowSummaryBuilder] = useState(initialRecipe?.kind === 'summary');
   const [showCompanyBuilder, setShowCompanyBuilder] = useState(initialRecipe?.kind === 'company');
   const [showQuestionBuilder, setShowQuestionBuilder] = useState(initialRecipe?.kind === 'question');
@@ -82,7 +82,7 @@ function ReportGenerator({ initialRecipe, responses, rankingResponses = response
     evaluations: ranking.count,
   }));
   
-  const splitCount = Math.min(10, Math.floor(companyPerformance.length / 2));
+  const splitCount = Math.min(10, Math.floor(companyPerformance.length / 2) || 1);
   const topCompanies = companyPerformance.slice(0, splitCount);
   const leastRatedCompanies = companyPerformance.slice().reverse().slice(0, splitCount);
 
@@ -109,14 +109,14 @@ function ReportGenerator({ initialRecipe, responses, rankingResponses = response
 
   const topCompaniesTable: ExportTable = {
     title: `Top Performing Companies (Top ${splitCount})`,
-    columns: ['Company', 'Survey Type', 'Volume-Weighted Score', 'Evaluations'],
-    rows: topCompanies.map((row) => [row.company, row.surveyType, formatCompositeScore(row.surveyType, row.score).text, row.evaluations]),
+    columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Evaluations'],
+    rows: topCompanies.map((row) => [row.company, row.surveyType, formatAnalyticsScore(row.surveyType, row.score), row.evaluations]),
   };
 
   const leastRatedCompaniesTable: ExportTable = {
     title: `Least Rated Companies (Bottom ${splitCount})`,
-    columns: ['Company', 'Survey Type', 'Volume-Weighted Score', 'Evaluations'],
-    rows: leastRatedCompanies.map((row) => [row.company, row.surveyType, formatCompositeScore(row.surveyType, row.score).text, row.evaluations]),
+    columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Evaluations'],
+    rows: leastRatedCompanies.map((row) => [row.company, row.surveyType, formatAnalyticsScore(row.surveyType, row.score), row.evaluations]),
   };
 
   const questionHighlightsTable: ExportTable = {
@@ -196,7 +196,7 @@ function ReportGenerator({ initialRecipe, responses, rankingResponses = response
     return (
       <RawDataExportPage
         initialCategory={initialRecipe?.parameters.category}
-        responses={responses}
+        responses={rawResponses}
         canExport={canExport}
         onBack={() => setShowRawDataExport(false)}
       />

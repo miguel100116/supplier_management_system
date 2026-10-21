@@ -15,6 +15,53 @@
 //   authorized by Postgres RLS. See supabase/seed_admins.sql for role setup.
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import type { PersistedProfile } from '../features/account-management/domain/accountProfile';
+
+export type LoginRole = PersistedProfile['role'];
+export interface MicrosoftAuth {
+  idToken: string;
+  nonce: string;
+}
+export interface LoginIdentity {
+  email: string;
+  auth?: MicrosoftAuth;
+}
+export type LoginAttempt = () => Promise<LoginIdentity | null>;
+
+export async function signInForRole(role: LoginRole, authenticate: LoginAttempt): Promise<string | null> {
+  try {
+    const identity = await authenticate();
+    if (!identity) return null;
+    if (identity.auth) {
+      const result = await signIntoSupabaseWithMicrosoft(identity.auth.idToken, identity.auth.nonce);
+      if (!result.ok) throw new Error(result.error || 'Unable to establish the required Supabase session.');
+    }
+    const { data, error } = await supabase.auth.getUser();
+    const user = data.user;
+    const email = user?.email?.trim().toLowerCase();
+    if (error || !user?.email_confirmed_at || !email?.endsWith('@mgenesis.com')
+      || email !== identity.email.trim().toLowerCase()) {
+      throw new Error('Unable to verify this account. Please sign in again.');
+    }
+    const profile = await supabase.from('app_profiles').select('email,user_id,role').eq('email', email).maybeSingle();
+    // Legacy Employee profiles may have a null link: the schema permits it,
+    // and profile RLS identifies the owner by the verified JWT email. Never
+    // infer a role, accept a conflicting link, or use this exception for Admins.
+    const legacyEmployee = profile.data?.role === 'Employee' && profile.data.user_id === null;
+    if (profile.error || !profile.data || profile.data.email !== email || (!legacyEmployee && profile.data.user_id !== user.id)
+      || (profile.data.role !== 'Admin' && profile.data.role !== 'Employee')) {
+      throw new Error('Unable to verify your account type. Please contact your administrator.');
+    }
+    if (profile.data.role !== role) {
+      throw new Error(`This is an ${profile.data.role} account. Select ${profile.data.role} Account to sign in.`);
+    }
+    return email;
+  } catch (error) {
+    const result = await supabase.auth.signOut({ scope: 'local' });
+    if (result.error) throw new Error('Sign-in was blocked, but the session could not be cleared. Please try again.');
+    throw error;
+  }
+}
 
 export interface SupabaseBridgeResult {
   ok: boolean;

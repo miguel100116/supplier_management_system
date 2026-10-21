@@ -10,6 +10,7 @@ Status: repository procedure as of 2026-09-24. Hosted configuration and producti
 - Microsoft sign-in is never considered complete unless the Microsoft ID token is successfully exchanged for a Supabase session. When Microsoft public configuration is absent, the option remains disabled.
 - Logout clears the application identity and signs out the active Supabase and Microsoft providers. A 30-minute inactivity boundary is synchronized across browser tabs.
 - Database RLS and the confirmed profile are the authorization boundary; navigation visibility is not authorization.
+- Explicit login checks the selected account type against the existing persisted role. A matching verified, confirmed company email may use a legacy Employee profile with `user_id = null`, consistent with the nullable schema and email-based profile RLS. A non-null ID must match the authenticated identity; Admin profiles always require that match. Missing/malformed profiles and failed lookups remain blocked. Login never creates profiles, assigns roles, or repairs remote links.
 
 ## Account lifecycle
 
