@@ -402,17 +402,18 @@ export function PartnersFeedbackHubPage({
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn pb-12">
+    <div className="space-y-5 animate-fadeIn pb-12">
       <PageDescription>Review feedback collected from partners and employees in one place.</PageDescription>
-      {/* Tabs Navigation & Bulk Sending Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-1 sm:pb-0 gap-4">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto">
+      {/* The three tabs follow the feedback lifecycle; dispatch stays alongside the active work. */}
+      <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 dark:border-slate-800 xl:flex-row xl:items-center xl:justify-between">
+        <nav aria-label="Feedback Hub workflow" className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-lg bg-slate-50 p-1 dark:bg-slate-900">
           <button
+            aria-pressed={activeTab === 'current-forms'}
             onClick={() => setActiveTab('current-forms')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition whitespace-nowrap ${
+            className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition whitespace-nowrap ${
               activeTab === 'current-forms'
-                ? 'border-[#0063a9] text-[#0063a9] dark:border-blue-400 dark:text-blue-300'
-                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400'
+                ? 'bg-[#eaf5fc] text-[#2187CD] dark:bg-slate-800 dark:text-sky-300'
+                : 'text-slate-500 hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <FileText size={16} />
@@ -423,11 +424,12 @@ export function PartnersFeedbackHubPage({
           </button>
 
           <button
+            aria-pressed={activeTab === 'past-results'}
             onClick={() => setActiveTab('past-results')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition whitespace-nowrap ${
+            className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition whitespace-nowrap ${
               activeTab === 'past-results'
-                ? 'border-[#0063a9] text-[#0063a9] dark:border-blue-400 dark:text-blue-300'
-                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400'
+                ? 'bg-[#eaf5fc] text-[#2187CD] dark:bg-slate-800 dark:text-sky-300'
+                : 'text-slate-500 hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Archive size={16} />
@@ -435,11 +437,12 @@ export function PartnersFeedbackHubPage({
           </button>
 
           <button
+            aria-pressed={activeTab === 'sent-reports'}
             onClick={() => setActiveTab('sent-reports')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition whitespace-nowrap ${
+            className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold transition whitespace-nowrap ${
               activeTab === 'sent-reports'
-                ? 'border-[#0063a9] text-[#0063a9] dark:border-blue-400 dark:text-blue-300'
-                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400'
+                ? 'bg-[#eaf5fc] text-[#2187CD] dark:bg-slate-800 dark:text-sky-300'
+                : 'text-slate-500 hover:bg-white hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <Send size={16} />
@@ -457,7 +460,8 @@ export function PartnersFeedbackHubPage({
         </nav>
 
         {/* Relocated Bulk Sending Button - Rightmost position */}
-        <div className="flex items-center gap-2.5 pb-2 sm:pb-0 shrink-0 self-end sm:self-auto">
+        <div aria-label="Report delivery actions" className="flex flex-wrap items-center gap-2.5 shrink-0 xl:border-l xl:border-slate-200 xl:pl-4 xl:dark:border-slate-800 xl:justify-end">
+          <span className="hidden text-[9px] font-bold uppercase tracking-wider text-slate-400 xl:inline">Report delivery</span>
           {queuedCount > 0 && (
             <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2.5 py-1 text-[10px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-200 border border-amber-200 dark:border-amber-800 animate-pulse">
               <Clock size={11} />
@@ -472,7 +476,7 @@ export function PartnersFeedbackHubPage({
             disabled={!areAllSurveysCompleted}
             className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all shrink-0 ${
               areAllSurveysCompleted
-                ? 'bg-[#0063a9] hover:bg-blue-800 text-white shadow-sm'
+                ? 'bg-[#2187CD] hover:bg-[#2187CD]/90 text-white shadow-sm'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
             }`}
             title={

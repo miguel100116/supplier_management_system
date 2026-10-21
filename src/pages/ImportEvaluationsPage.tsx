@@ -553,12 +553,12 @@ export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, ar
   useModalEscape(Boolean(activeDuplicate), cancelDuplicateUpload, 0, true);
 
   return (
-    <div className="space-y-6">
+    <div className="admin-import-page space-y-6">
       <PageDescription>
         Upload several CSV or Excel response exports at once. Files can contain Supplier, Subcontractor, or Courier evaluations, including multiple files for the same category.
       </PageDescription>
 
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-label="Evaluation response file upload">
+      <section className="admin-import-panel space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-label="Evaluation response file upload">
         <input
           ref={fileInput}
           type="file"
@@ -627,12 +627,12 @@ export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, ar
 
         {error && <p role="alert" className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/20 dark:text-rose-400"><AlertTriangle size={15} className="mt-0.5 shrink-0" />{error}</p>}
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div className="admin-import-categories grid grid-cols-1 gap-3 lg:grid-cols-3">
           {FORM_CARDS.map(({ surveyType, title, formLabel, icon: Icon }) => {
             const categoryPreviews = readyPreviews.filter((preview) => preview.surveyType === surveyType);
             const categorySummaries = summaries?.filter((item) => item.surveyType === surveyType) ?? [];
             return (
-              <div key={surveyType} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+              <div key={surveyType} className="admin-import-category rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                 <div className="flex items-start gap-3">
                   <span className="rounded-lg bg-blue-50 p-2 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-400"><Icon size={19} /></span>
                   <div className="min-w-0 flex-1">

@@ -111,7 +111,11 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
         dropdown.
       </PageDescription>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <section className="panel overflow-hidden p-0" aria-labelledby="category-labels-heading">
+        <header className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div><h2 id="category-labels-heading" className="text-sm font-semibold text-slate-800 dark:text-slate-100">Partner type labels</h2><p className="mt-1 text-xs text-slate-400">Choose a type to edit the five scoring categories it uses.</p></div>
+          <span className="shrink-0 text-xs text-slate-400">3 types</span>
+        </header>
         {(['Courier', 'Supplier', 'Subcontractor'] as const).map((type) => {
           const Icon = TYPE_META[type].icon;
           return (
@@ -119,32 +123,30 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
               key={type}
               type="button"
               onClick={() => openEditor(type)}
-              className="panel text-left p-5 space-y-3 hover:border-blue-200 dark:hover:border-blue-900 transition cursor-pointer group"
+              className="group flex w-full flex-col gap-3 border-b border-slate-100 px-5 py-4 text-left transition last:border-b-0 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2187CD] dark:border-slate-800 dark:hover:bg-slate-900/50 sm:flex-row sm:items-center sm:gap-5"
             >
-              <div className="flex items-center justify-between">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#0063a9] dark:bg-blue-950/40 dark:text-blue-300">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sky-50 text-[#2187CD] dark:bg-sky-950/40 dark:text-sky-300">
                   <Icon size={18} />
-                </span>
-                <ChevronRight size={16} className="text-slate-300 group-hover:text-[#0063a9] dark:group-hover:text-blue-300 transition" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800 dark:text-white">{type}</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">{TYPE_META[type].description}</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5 pt-1">
+              </span>
+              <span className="min-w-[155px] sm:w-[190px]">
+                <span className="block text-[13px] font-semibold text-slate-800 dark:text-white">{type}</span>
+                <span className="mt-1 block text-[11px] leading-4 text-slate-400">{TYPE_META[type].description}</span>
+              </span>
+              <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">
                 {categoryLabels[type].map((cat) => (
                   <span
                     key={cat}
-                    className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                    className="inline-flex items-center rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                   >
                     {cat}
                   </span>
                 ))}
-              </div>
+              </span>
+              <span className="flex shrink-0 items-center gap-1 text-[11px] text-slate-400">Edit labels <ChevronRight size={14} className="text-slate-300 transition group-hover:text-[#2187CD] dark:group-hover:text-sky-300" /></span>
             </button>
           );
         })}
-      </div>
+      </section>
 
       {openType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
@@ -200,7 +202,7 @@ export function CategoriesManagerPage({ categoryLabels, onRenameCategory, onRest
                   type="button"
                   onClick={requestSave}
                   disabled={!isDirty}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0063a9] px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#00528c] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 dark:disabled:bg-slate-700"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2187CD] px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#1976B5] disabled:cursor-not-allowed disabled:bg-slate-300 disabled:hover:bg-slate-300 dark:disabled:bg-slate-700"
                 >
                   <Save size={13} /> Save Changes
                 </button>

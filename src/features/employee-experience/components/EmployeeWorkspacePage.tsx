@@ -5,6 +5,7 @@ import { useModalEscape } from '../../../hooks/useModalEscape';
 import { filterPendingEvaluations, getPendingEmployeeEvaluations, type EmployeeEvaluationFilter } from '../domain/pendingEvaluations';
 import { EmployeeCompanyIcon } from './EmployeeCompanyIcon';
 import { Pagination } from '../../../components/Pagination';
+import { WorkspaceWelcomeBanner } from '../../../components/WorkspaceWelcomeBanner';
 
 type WorkspaceView = 'Home' | 'Evaluations' | 'My submissions';
 type SubmissionItem = { id: string; company: string; type: SurveyType; date: string; answers: { question: string; answer: string }[] };
@@ -147,20 +148,13 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
       </div>
 
       {view === 'Home' && (
-        <div className="welcome-banner">
-          <div className="welcome-content">
-            <span className="banner-eyebrow"><span /> YOUR EXPERIENCE MATTERS</span>
-            <h2>Better partners.<br />Better work, together.</h2>
-            <p>Your feedback helps us understand the partners<br className="desktop-break" /> we work with. Start with an evaluation below.</p>
-            <button className="banner-link" type="button" onClick={() => onNavigate('Evaluations')}>Explore your evaluations <ArrowRight size={17} /></button>
-          </div>
-          <div className="hero-art" aria-hidden="true">
-            <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="art-dot dot-one" /><div className="art-dot dot-two" />
-            <div className="art-sheet sheet-back" /><div className="art-sheet sheet-front"><span className="art-sheet-heading" /><span className="art-sheet-sub" />
-              {[0, 1, 2].map((item) => <div className="art-line" key={item}><span className="art-check"><Check size={12} /></span><span /></div>)}
-            </div><div className="art-seal"><Check size={24} /></div>
-          </div>
-        </div>
+        <WorkspaceWelcomeBanner
+          eyebrow="YOUR EXPERIENCE MATTERS"
+          title={<>Better partners.<br />Better work, together.</>}
+          description={<>Your feedback helps us understand the partners<br className="desktop-break" /> we work with. Start with an evaluation below.</>}
+          actionLabel="Explore your evaluations"
+          onAction={() => onNavigate('Evaluations')}
+        />
       )}
 
       {view !== 'My submissions' && (

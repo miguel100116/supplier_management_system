@@ -139,6 +139,175 @@ export function Shell<T extends string>({
     });
   };
 
+  if (adminMode) {
+    const selectPage = (page: T) => {
+      onPageChange(page);
+      setIsMobileNavOpen(false);
+    };
+    const dashboardPage = flatPages.find((page) => page.key === ('dashboard' as T))?.key ?? flatPages[0]?.key;
+
+    return (
+      <div className={`admin-workspace${isSidebarCollapsed ? ' is-collapsed' : ''}`}>
+        <aside className="admin-sidebar">
+          <button
+            type="button"
+            className="admin-brand"
+            onClick={() => selectPage(dashboardPage ?? activePage)}
+            title="Go to Dashboard"
+            aria-label="Microgenesis — go to Dashboard"
+          >
+            <img src="/microgenesis_logo.png" alt="Microgenesis" />
+          </button>
+
+          <div className="admin-workspace-label">{navigationLabel || 'ADMIN WORKSPACE'}</div>
+          <button
+            type="button"
+            className="admin-sidebar-toggle"
+            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+            aria-label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+
+          <nav className="admin-navigation" aria-label="Administrator workspace">
+            {pages.map((page) => {
+              if (page.type === 'group') {
+                const GroupIcon = page.icon;
+                const expanded = expandedGroups.has(page.id);
+                const activeChild = page.children.some((child) => child.key === activePage);
+                return (
+                  <div className="admin-navigation-group" key={page.id}>
+                    <button
+                      type="button"
+                      className={`admin-nav-item admin-nav-group-button${activeChild ? ' is-active-group' : ''}`}
+                      onClick={() => {
+                        if (isSidebarCollapsed) setIsSidebarCollapsed(false);
+                        toggleGroup(page.id);
+                      }}
+                      aria-expanded={expanded}
+                      title={isSidebarCollapsed ? page.label : undefined}
+                    >
+                      <GroupIcon size={17} />
+                      <span>{page.label}</span>
+                      <ChevronDown className={expanded ? 'is-expanded' : ''} size={14} />
+                    </button>
+                    {expanded && !isSidebarCollapsed && (
+                      <div className="admin-navigation-children">
+                        {page.children.map((child) => {
+                          const active = child.key === activePage;
+                          return (
+                            <button
+                              type="button"
+                              key={child.key}
+                              className={`admin-nav-child${active ? ' is-active' : ''}`}
+                              disabled={child.disabled}
+                              onClick={() => selectPage(child.key)}
+                              aria-current={active ? 'page' : undefined}
+                              title={child.disabled ? 'Access restricted by an administrator' : undefined}
+                            >
+                              <span>{child.label}</span>
+                              {child.badgeCount !== undefined && child.badgeCount > 0 && <span className="admin-nav-badge">{child.badgeCount}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              const Icon = page.icon;
+              const active = page.key === activePage;
+              return (
+                <button
+                  type="button"
+                  key={page.key}
+                  className={`admin-nav-item${active ? ' active' : ''}`}
+                  disabled={page.disabled}
+                  onClick={() => selectPage(page.key)}
+                  aria-current={active ? 'page' : undefined}
+                  title={page.disabled ? 'Access restricted by an administrator' : isSidebarCollapsed ? page.label : undefined}
+                >
+                  <Icon size={17} />
+                  <span>{page.label}</span>
+                  {page.badgeCount !== undefined && page.badgeCount > 0 && <span className="admin-nav-badge">{page.badgeCount}</span>}
+                </button>
+              );
+            })}
+          </nav>
+
+          {sidebarExtra && <div className="admin-sidebar-extra">{sidebarExtra(isSidebarCollapsed)}</div>}
+        </aside>
+
+        <div className="admin-main-shell">
+          <header className="admin-topbar">
+            <div className="admin-topbar-title">
+              <button
+                type="button"
+                className="admin-mobile-menu-button"
+                onClick={() => setIsMobileNavOpen((open) => !open)}
+                aria-expanded={isMobileNavOpen}
+                aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              >
+                {isMobileNavOpen ? <ChevronLeft size={17} /> : <Menu size={17} />}
+              </button>
+              <button
+                type="button"
+                className="admin-breadcrumb-home"
+                onClick={() => dashboardPage && selectPage(dashboardPage)}
+                aria-label="Go to Dashboard"
+                aria-current={activePage === dashboardPage ? 'page' : undefined}
+              >
+                Dashboard
+              </button>
+              {activePage !== dashboardPage && (
+                <>
+                  <ChevronRight size={14} aria-hidden="true" />
+                  <span aria-current="page">{moduleLabel}</span>
+                </>
+              )}
+            </div>
+            <div className="admin-topbar-actions">{action}</div>
+          </header>
+
+          {isMobileNavOpen && <button type="button" className="admin-mobile-nav-backdrop" aria-label="Close navigation menu" onClick={() => setIsMobileNavOpen(false)} />}
+          {isMobileNavOpen && (
+            <div className="admin-mobile-navigation">
+              {pages.map((page) => page.type === 'group' ? (
+                <div className="admin-mobile-group" key={page.id}>
+                  <div className="admin-mobile-group-title">{page.label}</div>
+                  {page.children.map((child) => (
+                    <button type="button" key={child.key} disabled={child.disabled} className={activePage === child.key ? 'is-active' : ''} aria-current={activePage === child.key ? 'page' : undefined} onClick={() => selectPage(child.key)}>
+                      {child.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <button type="button" key={page.key} disabled={page.disabled} className={activePage === page.key ? 'is-active' : ''} aria-current={activePage === page.key ? 'page' : undefined} onClick={() => selectPage(page.key)}>
+                  <page.icon size={16} />{page.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <main className="admin-main">
+            <div className="admin-content">
+              {!hidePageHeading && (
+                <div className={`admin-page-heading${compactPageHeader ? ' is-compact' : ''}`}>
+                  <h1>{contentHeading}</h1>
+                  <div id="shell-header-action" />
+                </div>
+              )}
+              {hidePageHeading && <div id="shell-header-action" className={`admin-header-action-anchor${activePage === dashboardPage ? ' is-dashboard' : ''}`} />}
+              {children}
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-cloud text-ink dark:bg-slate-950 dark:text-slate-100 flex flex-col">
       {/* Top Header Layer */}

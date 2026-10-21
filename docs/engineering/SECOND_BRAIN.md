@@ -727,7 +727,6 @@ Decision: `src/darkTheme.css` is the semantic token layer for dark mode. It load
 
 Evidence: `src/darkTheme.css`, `src/main.tsx`, and the `darkMode: 'class'` wrapper in `src/App.tsx`. Browser review on 2026-10-15 covered employee Home, Evaluations, setup, and questions views in both themes at desktop size, plus responsive Home at mobile size. Review used temporary local fixture data because the browser session was not authenticated.
 
-
 ### 2026-10-19 - SMS-14 unified Reports and retained exports
 
 Implemented locally; hosted staging and cross-device operation not verified. Reports uses `/reports` with Generate/History tabs. `/generate-report` remains an alias; `/export-history` resolves to Reports and replaces the URL with `?tab=history`. Present remains separate. Existing report layouts and export permissions are retained.
@@ -757,6 +756,18 @@ App derives module titles from the existing visible sidebar leaves instead of ov
 EvaluationWorkspace uses one grouped tab container for Forms, Responses, Coverage, and Category Labels. Coverage no longer renders a separate outlined-button layout. Buttons share padding, font weight, and colors across views, with a distinct active state and wrapping for narrow screens. Evidence: `src/App.tsx`, `src/layouts/Shell.tsx`, `src/features/evaluations/components/EvaluationWorkspace.tsx`, and focused layout/navigation tests. Browser visual comparison was unavailable because no browser was connected; no deployment or remote data change was performed beyond the authorized ticket statuses.
 
 Local verification: 16 focused tests and the full 270-test suite passed, along with all four TypeScript projects, the production build, and Git diff whitespace checks. The existing large-bundle warning remains.
+
+### 2026-10-19 - Employee UI as Admin visual reference
+
+Decision: The existing Employee workspace implementation is the visual authority for the Admin redesign. Admin reuses its font pair, palette, neutral surfaces, borders, selected-state colors, spacing, and responsive shell proportions while adapting navigation and page layouts to Admin workflows. Existing Admin routes, permissions, data, and interactions remain the behavior source of truth. `src/layouts/Shell.tsx` adapts the shared shell to Admin route groups; `src/adminWorkspace.css` applies the Employee tokens and Admin-specific layouts. No Employee UI redesign is part of this decision.
+
+Evidence: `src/features/employee-experience/components/EmployeeExperienceShell.tsx`, `src/features/employee-experience/components/employeeExperience.css`, `src/adminWorkspace.css`, `src/layouts/Shell.tsx`, and the Admin pages. Browser comparison of authenticated Admin routes was unavailable in the local environment.
+
+### 2026-10-19 - Admin Dashboard reference composition
+
+Decision: Admin Dashboard uses the shared `WorkspaceWelcomeBanner` rendered on Employee Home, the Employee heading and navigation sizing, and shared workspace color/font tokens. Its operational content is ordered as Document Follow-up, Forms in Progress, Evaluation Snapshot, and Recent Submissions. It maps live records through `computeCompanyDocumentSummary`, existing survey status and response selectors, and the canonical 0–100 submission scoring helper. Current / All-Time applies to the snapshot; open forms and recent submissions stay current. Optional dashboard widgets remain collapsed below the main sections. Extracting the banner preserves the Employee's existing copy, action, illustration, and styling.
+
+Evidence: `src/components/WorkspaceWelcomeBanner.tsx`, `src/features/employee-experience/components/EmployeeWorkspacePage.tsx`, `src/features/employee-experience/components/employeeExperience.css`, `src/pages/DashboardPage.tsx`, `src/adminWorkspace.css`, and `src/layouts/Shell.tsx`. Dashboard presentation and navigation tests are in `src/pages/DashboardPage.test.tsx`; browser screenshot comparison was unavailable.
 
 
 ### 2026-10-20 - Company-wide Analytics aggregate boundary (reverted 2026-10-21)

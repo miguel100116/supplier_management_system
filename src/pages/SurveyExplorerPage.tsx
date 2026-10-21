@@ -115,29 +115,39 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section aria-label="Available evaluation forms" className="panel overflow-hidden p-0">
+        <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+          <div><h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Choose an evaluation form</h2><p className="mt-1 text-xs text-slate-400">Select a form to review its submissions and answers.</p></div>
+          <span className="shrink-0 text-xs text-slate-400">{orderedSurveys.length} forms</span>
+        </header>
         {orderedSurveys.map((survey) => {
           const status = getSurveyStatus(survey);
           const selected = survey.id === selectedSurvey?.id;
           const dotColor = status === 'Paused' ? 'bg-amber-500' : status === 'Completed' || status === 'Archived' ? 'bg-slate-400' : 'bg-emerald-500';
           const typeColor = survey.surveyType === 'Courier' ? 'border-sky-200 bg-sky-50 text-sky-700' : survey.surveyType === 'Supplier' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-orange-200 bg-orange-50 text-orange-700';
-          return <button key={survey.id} type="button" aria-pressed={selected} onClick={() => openSurvey(survey.id)} className={`min-h-[229px] w-full rounded-2xl border px-6 py-5 text-left transition ${selected ? 'border-[#0063a9] bg-[#0063a9] text-white shadow-md' : 'border-slate-200 bg-white text-slate-900 shadow-sm hover:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100'}`}>
-            <div className="flex items-start justify-between gap-3"><h3 className="max-w-[215px] text-lg font-semibold leading-6">{survey.title}</h3><span className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-sm ${selected ? 'border-white/20 bg-white/10 text-white' : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}><i className={`h-2 w-2 rounded-full ${dotColor}`}/>{status === 'Running' ? 'Running' : status === 'Completed' ? 'Completed' : status}</span></div>
-            <p className={`mt-3 min-h-[52px] text-sm leading-[22px] ${selected ? 'text-blue-100' : 'text-slate-600 dark:text-slate-300'}`}>{survey.description}</p>
-            <div className={`mt-4 flex items-center gap-3 border-t pt-3 text-sm ${selected ? 'border-white/20 text-blue-50' : 'border-slate-100 text-slate-500 dark:border-slate-800'}`}><span className={`rounded-md border px-3 py-1 text-xs font-semibold ${selected ? 'border-white/25 bg-white/10 text-white' : typeColor}`}>{survey.surveyType}</span>{survey.deadlineDate && <span className="flex items-center gap-2"><CalendarClock size={14}/>{survey.deadlineDate}</span>}</div>
+          return <button key={survey.id} type="button" aria-pressed={selected} onClick={() => openSurvey(survey.id)} className={`grid w-full gap-1 border-b border-l-2 px-4 py-3 text-left transition last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2187CD] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4 ${selected ? 'border-l-[#2187CD] bg-sky-50/70 dark:bg-sky-950/20' : 'border-l-transparent hover:bg-slate-50/70 dark:hover:bg-slate-900/50'}`}>
+            <span className="min-w-0">
+              <span className={`block truncate text-[13px] font-semibold ${selected ? 'text-[#2187CD] dark:text-sky-300' : 'text-slate-800 dark:text-slate-100'}`}>{survey.title}</span>
+              <span className="mt-1 block truncate text-xs text-slate-500 dark:text-slate-400" title={survey.description}>{survey.description || 'No description provided.'}</span>
+            </span>
+            <span className="flex flex-wrap items-center gap-2 pl-0.5 text-[11px] text-slate-500 dark:text-slate-400 sm:justify-end">
+              <span className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${typeColor}`}>{survey.surveyType}</span>
+              <span className="inline-flex items-center gap-1.5"><i className={`h-1.5 w-1.5 rounded-full ${dotColor}`}/>{status}</span>
+              {survey.deadlineDate && <span className="inline-flex items-center gap-1"><CalendarClock size={12}/>{survey.deadlineDate}</span>}
+            </span>
           </button>;
         })}
-      </div>
+      </section>
       {!selectedSurvey && <section className="panel py-10 text-center text-sm text-slate-500">No evaluation forms are available yet.</section>}
       {selectedSurvey && <>
-      <section className="panel space-y-4">
-        <header className="-mx-6 -mt-6 border-b border-slate-100 px-6 py-5 dark:border-slate-800"><h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{selectedSurvey.title}</h2><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{selectedSurvey.description}</p></header>
+      <section className="panel space-y-4" aria-label={`Responses for ${selectedSurvey.title}`}>
+        <header className="-mx-6 -mt-6 flex flex-col gap-1 border-b border-slate-100 px-6 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Response explorer · {selectedSurvey.surveyType}</p><h2 className="mt-1 text-[15px] font-semibold text-slate-900 dark:text-slate-100">{selectedSurvey.title}</h2></div><p className="text-xs text-slate-500 dark:text-slate-400">{submissions.length} submissions</p></header>
         {selectedSubmission ? (
           <>
             <button className="secondary-button inline-flex items-center gap-2" type="button" onClick={() => setSelectedResponseId(null)}>
               <ChevronLeft size={16} /> Back to Responses
             </button>
-            <div className="flex flex-wrap gap-6 border-b border-slate-100 pb-4 dark:border-slate-800">
+            <div className="grid gap-3 rounded-lg bg-slate-50/70 p-3 sm:grid-cols-2 xl:grid-cols-4 dark:bg-slate-900/50">
               <div><p className="text-xs font-medium text-slate-500">Respondent Email</p><p className="font-semibold">{selectedSubmission.first.respondentEmail || 'N/A'}</p></div>
               <div><p className="text-xs font-medium text-slate-500">Submission Date</p><p className="font-semibold">{new Date(selectedSubmission.first.submissionDate).toLocaleString()}{selectedSubmission.first.submissionDateInferredFrom && ' (inferred)'}</p></div>
               <div><p className="text-xs font-medium text-slate-500">Company</p><p className="font-semibold">{selectedSubmission.first.company}</p></div>
@@ -145,12 +155,12 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
             </div>
             <div className="space-y-6">
               {selectedSubmission.answers.map((answer) => (
-                <div key={answer.questionId} className="border-l-2 border-[#0063a9] pl-4 dark:border-blue-500">
-                  <p className="mb-1 text-sm text-slate-500 dark:text-slate-400">{answer.questionCategory} - Q{answer.questionNumber}</p>
-                  <p className="mb-2 font-medium text-slate-900 dark:text-slate-100">{answer.question}</p>
-                  <div className="flex items-center gap-2 rounded-lg bg-slate-50 p-3 dark:bg-slate-900/50">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Answer:</span>
-                    <span className="font-bold text-[#0063a9] dark:text-blue-400">{answerValue(answer)}</span>
+                <div key={answer.questionId} className="grid gap-3 border-b border-slate-100 pb-4 last:border-0 dark:border-slate-800 sm:grid-cols-[minmax(0,1fr)_minmax(220px,.45fr)]">
+                  <div><p className="mb-1 text-[11px] text-slate-500 dark:text-slate-400">{answer.questionCategory} · Q{answer.questionNumber}</p>
+                    <p className="text-[13px] font-medium leading-5 text-slate-900 dark:text-slate-100">{answer.question}</p></div>
+                  <div className="flex items-start gap-2 rounded-md bg-slate-50 p-3 dark:bg-slate-900/50">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Answer</span>
+                    <span className="text-[13px] font-semibold text-[#2187CD] dark:text-sky-300">{answerValue(answer)}</span>
                   </div>
                 </div>
               ))}
@@ -163,7 +173,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                 <label htmlFor="response-email-search" className="mb-1.5 block text-xs font-semibold">Search respondent email</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                  <input id="response-email-search" type="search" placeholder="Filter by email..." className="h-9 w-full min-w-0 rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#0063a9] dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-600" value={emailSearch} onChange={(event) => { setEmailSearch(event.target.value); setPage(1); }} />
+                  <input id="response-email-search" type="search" placeholder="Filter by email..." className="h-9 w-full min-w-0 rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#2187CD] dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-600" value={emailSearch} onChange={(event) => { setEmailSearch(event.target.value); setPage(1); }} />
                 </div>
               </div>
               <button type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"><SlidersHorizontal size={14}/> Filters</button>
@@ -174,7 +184,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                   <option value="filtered">Filtered responses</option>
                 </select>
               </div>
-              <button type="button" onClick={exportExcel} disabled={!exportSubmissions.length || isExporting} className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#0063a9] px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-600">
+              <button type="button" onClick={exportExcel} disabled={!exportSubmissions.length || isExporting} className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-[#2187CD] px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-600">
                 <Download size={14} /> {isExporting ? 'Preparing Excel...' : 'Export to Excel'}
               </button>
             </div>
@@ -204,7 +214,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
                           <td className="px-4 py-3">{submission.first.company}</td>
                           <td className="px-4 py-3">{new Date(submission.first.submissionDate).toLocaleString()}{submission.first.submissionDateInferredFrom && ' (inferred)'}</td>
                           <td className="px-4 py-3">{submission.score === null ? 'N/A' : (Math.round(submission.score * 10) / 10) + '%'}</td>
-                          <td className="px-4 py-3"><button type="button" className="font-semibold text-[#0063a9] underline dark:text-blue-400" onClick={() => setSelectedResponseId(submission.id)}>View answers</button></td>
+                          <td className="px-4 py-3"><button type="button" className="font-semibold text-[#2187CD] underline dark:text-blue-400" onClick={() => setSelectedResponseId(submission.id)}>View answers</button></td>
                         </tr>
                       ))}
                     </tbody>

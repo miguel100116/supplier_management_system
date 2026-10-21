@@ -1236,7 +1236,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageDescription>Monitor partner compliance documents, track expiring or expired items, and send notifications to partners.</PageDescription>
       {mutationError && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-300">
@@ -1255,14 +1255,15 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         headerPortalTarget
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex flex-nowrap overflow-x-auto rounded-lg border border-slate-200 bg-white p-1 dark:border-transparent dark:bg-slate-950 w-full sm:w-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <div role="group" aria-label="Filter document register by category" className="flex min-w-0 flex-nowrap overflow-x-auto rounded-lg bg-slate-50 p-1 dark:bg-slate-900 w-full sm:w-auto" style={{ scrollbarWidth: 'none' }}>
           <button
+            aria-pressed={isAllView}
             onClick={() => selectCategory(ALL_KEY)}
             className={`shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md py-2 px-4 text-xs font-bold transition-all duration-150 cursor-pointer ${
               isAllView
-                ? 'bg-[#0063a9] text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                ? 'bg-[#eaf5fc] text-[#2187CD] dark:bg-slate-800 dark:text-sky-300'
+                : 'text-slate-500 hover:bg-white hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200'
             }`}
           >
             <LayoutGrid size={12} />
@@ -1273,11 +1274,12 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             return (
               <button
                 key={cat.key}
+                aria-pressed={categoryKey === cat.key}
                 onClick={() => selectCategory(cat.key)}
                 className={`shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md py-2 px-4 text-xs font-bold transition-all duration-150 cursor-pointer ${
                   categoryKey === cat.key
-                    ? 'bg-[#0063a9] text-white shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    ? 'bg-[#eaf5fc] text-[#2187CD] dark:bg-slate-800 dark:text-sky-300'
+                    : 'text-slate-500 hover:bg-white hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                 }`}
               >
                 <Icon size={12} />
@@ -1295,7 +1297,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         const chartsGridClass = chartsToShow.length === 2 ? 'grid grid-cols-1 lg:grid-cols-5 gap-4' : 'grid grid-cols-1 gap-4';
 
         return (
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-5 dark:border-slate-800/60 dark:bg-slate-900/20 space-y-5">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Compliance Overview</h3>
@@ -1369,10 +1371,16 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               </div>
             </div>
 
+            <details open={isAllView} className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-600 marker:hidden hover:text-[#2187CD] dark:border-slate-800 dark:text-slate-300 dark:hover:text-sky-300 [&::-webkit-details-marker]:hidden">
+                <span>Overview metrics and compliance analysis</span>
+                <ChevronDown size={14} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+              </summary>
+              <div className="space-y-5 pt-4">
             {(isWidgetVisible('kpi-total') || isWidgetVisible('kpi-accreditation') || isWidgetVisible('kpi-expiring') || isWidgetVisible('kpi-expired') || isWidgetVisible('kpi-rate')) && (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                {isWidgetVisible('kpi-total') && <KpiCard icon={Users} label="Total Partners" value={overview.total} caption={viewLabel} accent="text-[#0063a9]" />}
-                {isWidgetVisible('kpi-accreditation') && <KpiCard icon={ShieldCheck} label="Active Accreditation" value={overview.activeAccreditation} caption="Accredited status" accent="text-[#0063a9]" />}
+                {isWidgetVisible('kpi-total') && <KpiCard icon={Users} label="Total Partners" value={overview.total} caption={viewLabel} accent="text-[#2187CD]" />}
+                {isWidgetVisible('kpi-accreditation') && <KpiCard icon={ShieldCheck} label="Active Accreditation" value={overview.activeAccreditation} caption="Accredited status" accent="text-[#2187CD]" />}
                 {isWidgetVisible('kpi-expiring') && <KpiCard icon={Clock} label="Expiring ≤ 30 Days" value={overview.expiringSoonDocs} caption="Documents" accent="text-[#a16207]" />}
                 {isWidgetVisible('kpi-expired') && <KpiCard icon={XCircle} label="Expired / For Update" value={overview.expiredDocs} caption="Documents" accent="text-[#f43f5e]" />}
                 {isWidgetVisible('kpi-rate') && (
@@ -1506,8 +1514,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                       <ComposedChart data={history} margin={{ top: 20, right: isMobile ? 4 : 16, left: isMobile ? -12 : 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#0063a9" stopOpacity={0.16} />
-                            <stop offset="100%" stopColor="#0063a9" stopOpacity={0} />
+                            <stop offset="0%" stopColor="#2187CD" stopOpacity={0.16} />
+                            <stop offset="100%" stopColor="#2187CD" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-100 dark:stroke-slate-800" />
@@ -1515,7 +1523,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                         <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: isMobile ? 9 : 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={isMobile ? 34 : 40} />
                         <Tooltip contentStyle={{ fontSize: '11px', borderRadius: 10, border: '1px solid #e2e8f0' }} labelFormatter={(d) => formatDate(String(d ?? ''))} formatter={(v) => [`${typeof v === 'number' ? v : 0}%`, 'Compliance Rate']} />
                         <Area type="monotone" dataKey="rate" stroke="none" fill="url(#trendFill)" isAnimationActive={false} />
-                        <Line type="monotone" dataKey="rate" stroke="#0063a9" strokeWidth={2} dot={{ r: 4, fill: '#0063a9', strokeWidth: 0 }} activeDot={{ r: 6 }} isAnimationActive={false}>
+                        <Line type="monotone" dataKey="rate" stroke="#2187CD" strokeWidth={2} dot={{ r: 4, fill: '#2187CD', strokeWidth: 0 }} activeDot={{ r: 6 }} isAnimationActive={false}>
                           <LabelList dataKey="rate" position="top" formatter={(v) => `${typeof v === 'number' ? v : 0}%`} style={{ fontSize: 11, fontWeight: 700, fill: CHART_INK }} />
                         </Line>
                       </ComposedChart>
@@ -1644,12 +1652,23 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                 )}
               </div>
             )}
+              </div>
+            </details>
           </div>
         );
       })()}
 
+      <section className="space-y-4" aria-label="Document compliance workbench">
+      {!isAllView && (
+        <header className="flex flex-col gap-1 border-b border-slate-200 pb-3 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold tracking-tight text-[#1c2f4b] dark:text-slate-100">{category.label} documents</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Review compliance and update document status for each partner.</p>
+          </div>
+        </header>
+      )}
       {!isAllView && categoryCompanies.length > 0 && (
-        <div className="space-y-0">
+        <div className="space-y-3">
           {/* Search and document filters; advanced filters remain Admin-only */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="grid w-full flex-1 grid-cols-1 gap-2 sm:grid-cols-[minmax(220px,1fr)_minmax(170px,0.55fr)_minmax(180px,0.55fr)]">
@@ -1716,16 +1735,16 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                 onClick={() => (isFilterPanelOpen ? cancelFilters() : openFilterPanel())}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
                   isFilterPanelOpen
-                    ? 'border-[#0063a9] bg-[#0063a9]/5 text-[#0063a9] dark:bg-[#0063a9]/20 dark:text-sky-400'
+                    ? 'border-[#2187CD] bg-[#2187CD]/5 text-[#2187CD] dark:bg-[#2187CD]/20 dark:text-sky-400'
                     : customFilterRows.length > 0
-                    ? 'border-[#0063a9]/40 bg-[#0063a9]/5 text-[#0063a9] dark:bg-[#0063a9]/10 dark:border-sky-700 dark:text-sky-400'
+                    ? 'border-[#2187CD]/40 bg-[#2187CD]/5 text-[#2187CD] dark:bg-[#2187CD]/10 dark:border-sky-700 dark:text-sky-400'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-white'
                 }`}
               >
                 <SlidersHorizontal size={12} />
                 <span>Customize Filters</span>
                 {customFilterRows.length > 0 && !isFilterPanelOpen && (
-                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#0063a9] text-white text-[10px] font-bold leading-none px-1">
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#2187CD] text-white text-[10px] font-bold leading-none px-1">
                     {customFilterRows.length}
                   </span>
                 )}
@@ -1753,7 +1772,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                 <button
                   type="button"
                   onClick={() => setDocumentStatusFilter('all')}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#0063a9] hover:border-blue-300 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#2187CD] hover:border-blue-300 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
                   title="Remove document status filter"
                 >
                   <span className="truncate">
@@ -1790,7 +1809,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               {/* Panel header */}
               <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
-                  <Filter size={14} className="text-[#0063a9]" />
+                  <Filter size={14} className="text-[#2187CD]" />
                   <div>
                     <p className="text-sm font-bold text-slate-900 dark:text-white leading-none">Customize Filters</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">Advanced partner and document conditions use AND logic</p>
@@ -1902,7 +1921,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                 <button
                   type="button"
                   onClick={addDraftRow}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 hover:border-[#0063a9]/50 hover:bg-[#0063a9]/5 hover:text-[#0063a9] dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-sky-700 dark:hover:text-sky-400 transition cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 hover:border-[#2187CD]/50 hover:bg-[#2187CD]/5 hover:text-[#2187CD] dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-sky-700 dark:hover:text-sky-400 transition cursor-pointer"
                 >
                   <Plus size={13} />
                   Add Filter
@@ -1965,7 +1984,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             Focus the table and use ← / → arrow keys to scroll sideways.
           </div>
           <div
-            className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0063a9]"
+            className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2187CD]"
             ref={tableScrollRef}
             role="region"
             aria-label="Partner compliance document matrix. Focus this region and use left and right arrow keys to scroll horizontally."
@@ -2123,6 +2142,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           </div>
         </div>
       )}
+      </section>
 
       {/* Frozen header overlay - see updateStickyHeader/renderHeaderCells above for why
           this can't just be position:sticky on the real thead. Fully interactive (sort
@@ -2236,7 +2256,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               <button
                 onClick={() => setFlagFlow((prev) => (prev ? { ...prev, step: 'confirm' } : prev))}
                 disabled={flagFlow.selectedProvided === flagFlow.currentProvided}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0063a9] hover:bg-[#00548c] disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold text-white transition cursor-pointer"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2187CD] hover:bg-[#2187CD]/90 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-xs font-bold text-white transition cursor-pointer"
                 type="button"
               >
                 <span>Confirm</span>
@@ -2489,7 +2509,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-start justify-between gap-3 px-6 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-[#0063a9]/10 text-[#0063a9] shrink-0">
+                <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-[#2187CD]/10 text-[#2187CD] shrink-0">
                   <BellPlus size={16} />
                 </span>
                 <div>

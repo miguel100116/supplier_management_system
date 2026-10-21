@@ -19,7 +19,8 @@ import {
   BarChart3,
   ListCollapse,
   Layers,
-  ChevronDown
+  ChevronDown,
+  ArrowRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
@@ -35,6 +36,9 @@ import {
 import { computeCategoryRankSummary } from '../features/partner-companies/domain/categorySummary';
 import { formatCompositeScore } from '../data/questionWeights';
 import { selectSurveyResponses } from '../features/evaluations/domain/surveyResponses';
+import { getSurveyStatus } from '../features/evaluations/domain/surveyStatus';
+import { computeCompanyDocumentSummary } from '../features/document-tracker/domain/compliance';
+import { WorkspaceWelcomeBanner } from '../components/WorkspaceWelcomeBanner';
 
 // ----------------------------------------------------
 // TYPES & WIDGET DEFINITIONS
@@ -54,6 +58,8 @@ export interface DashboardWidget {
   title: string;
   gridSpan: 1 | 2 | 3; // 1 = 1 column, 2 = 2 columns, 3 = full width
 }
+
+type AdminDashboardDestination = 'document-register' | 'survey-forms' | 'analytics' | 'partner-companies' | 'import-evaluations' | 'archive' | 'reports' | 'account-management';
 
 interface DashboardPageProps {
   responses: SurveyResponse[];
@@ -75,6 +81,39 @@ interface DashboardPageProps {
   isAdmin?: boolean;
   userEmail?: string;
   onOpenSurveyResponses?: (surveyId: string) => void;
+  onNavigate?: (page: AdminDashboardDestination) => void;
+}
+
+export function DashboardDataScopeToggle({ scope, onChange }: { scope: 'current' | 'all-time'; onChange: (scope: 'current' | 'all-time') => void }) {
+  return (
+    <div className="admin-dashboard-scope" role="group" aria-label="Choose performance reporting period" title="Choose whether performance reflects only the current period or every archived period combined">
+      {(['current', 'all-time'] as const).map((value) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onChange(value)}
+          aria-pressed={scope === value}
+          className={`admin-dashboard-scope-button${scope === value ? ' is-selected' : ''}`}
+        >
+          {value === 'current' ? 'Current Period' : 'All-Time'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function AdminDashboardControlBanner({ onNavigate }: { onNavigate?: (page: AdminDashboardDestination) => void }) {
+  return (
+    <div className="employee-experience admin-dashboard-banner-scope">
+      <WorkspaceWelcomeBanner
+        eyebrow="ADMINISTRATIVE CONTROL"
+        title={<>Clear oversight.<br />Better partnerships.</>}
+        description="Keep evaluations, partner records, and compliance work moving from one focused workspace."
+        actionLabel="Manage evaluations"
+        onAction={onNavigate ? () => onNavigate('survey-forms') : undefined}
+      />
+    </div>
+  );
 }
 
 const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defaultSpan: 1 | 2 | 3; category: 'Analytics' | 'Surveys' | 'Submissions' }[] = [
@@ -101,8 +140,8 @@ const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defau
   },
   { 
     type: 'active-forms', 
-    title: 'Published Survey Forms', 
-    desc: 'Overview of live questionnaires, response counters, and close dates.', 
+    title: 'Evaluation Forms',
+    desc: 'Status, response activity, and close dates for available evaluation forms.',
     defaultSpan: 1,
     category: 'Surveys'
   },
@@ -123,6 +162,14 @@ const ALL_WIDGET_CATALOG: { type: WidgetType; title: string; desc: string; defau
 ];
 
 const DEFAULT_LAYOUT: DashboardWidget[] = [
+  // Put live evaluation work first; historical ranking and comparison widgets
+  // remain available in the catalog for admins who need deeper analysis.
+  { id: 'widget-active-forms', type: 'active-forms', title: 'Evaluation Forms', gridSpan: 3 },
+  { id: 'widget-recent', type: 'recent-submissions', title: 'Recent Evaluations Log', gridSpan: 2 },
+  { id: 'widget-volume', type: 'volume-tracker', title: 'Response Statistics Feed', gridSpan: 1 }
+];
+
+const PREVIOUS_DEFAULT_LAYOUT: DashboardWidget[] = [
   { id: 'widget-satisfaction', type: 'satisfaction-gauge', title: 'Top Performing Partner', gridSpan: 2 },
   { id: 'widget-volume', type: 'volume-tracker', title: 'Response Statistics Feed', gridSpan: 1 },
   { id: 'widget-comparison', type: 'group-comparison', title: 'Stakeholder Group Comparison', gridSpan: 1 },
@@ -135,12 +182,6 @@ const categoryColors: Record<string, string> = {
   Courier: 'bg-blue-500',
   Supplier: 'bg-emerald-500',
   Subcontractor: 'bg-orange-500'
-};
-
-const badgeColors: Record<string, string> = {
-  Courier: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200 border border-blue-200 dark:border-blue-800',
-  Supplier: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800',
-  Subcontractor: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-200 border border-orange-200 dark:border-orange-800'
 };
 
 import { createPortal } from 'react-dom';
@@ -159,7 +200,8 @@ export function DashboardPage({
   surveys = [],
   isAdmin = false,
   userEmail = '',
-  onOpenSurveyResponses
+  onOpenSurveyResponses,
+  onNavigate
 }: DashboardPageProps) {
   const effectiveHistoryResponses = historyResponses ?? allResponses;
   
@@ -171,6 +213,7 @@ export function DashboardPage({
   const [catalogTab, setCatalogTab] = useState<'All' | 'Analytics' | 'Surveys' | 'Submissions'>('All');
   const [showConfigMenu, setShowConfigMenu] = useState<string | null>(null);
   const [headerPortalTarget, setHeaderPortalTarget] = useState<Element | null>(null);
+  const [widgetsOpen, setWidgetsOpen] = useState(false);
   useModalEscape(isAddOpen, () => setIsAddOpen(false));
 
   useEffect(() => {
@@ -182,7 +225,23 @@ export function DashboardPage({
     const saved = localStorage.getItem('survey_dashboard_widgets_v1');
     if (saved) {
       try {
-        setWidgets(JSON.parse(saved));
+        const savedLayout = JSON.parse(saved) as DashboardWidget[];
+        const matchesPreviousDefault = Array.isArray(savedLayout)
+          && savedLayout.length === PREVIOUS_DEFAULT_LAYOUT.length
+          && PREVIOUS_DEFAULT_LAYOUT.every((widget, index) => {
+            const savedWidget = savedLayout[index];
+            return savedWidget?.id === widget.id
+              && savedWidget.type === widget.type
+              && savedWidget.title === widget.title
+              && savedWidget.gridSpan === widget.gridSpan;
+          });
+
+        if (matchesPreviousDefault) {
+          setWidgets(DEFAULT_LAYOUT);
+          localStorage.setItem('survey_dashboard_widgets_v1', JSON.stringify(DEFAULT_LAYOUT));
+        } else {
+          setWidgets(savedLayout);
+        }
       } catch (e) {
         setWidgets(DEFAULT_LAYOUT);
       }
@@ -441,9 +500,10 @@ export function DashboardPage({
 
   // 4. Submissions Feed
   const recentSubmissions = useMemo(() => {
-    const scoresByResponseId = new Map(submissionScores(allResponses).map((submission) => [submission.responseId, submission.score]));
+    const scopedResponses = allResponses.filter((response) => !surveyTypeFilter.length || surveyTypeFilter.includes(response.surveyType));
+    const scoresByResponseId = new Map(submissionScores(scopedResponses).map((submission) => [submission.responseId, submission.score]));
     const submissionsByResponseId = new Map<string, SurveyResponse>();
-    allResponses.forEach((response) => {
+    scopedResponses.forEach((response) => {
       if (hasAnsweredItem(response) && !submissionsByResponseId.has(response.responseId)) {
         submissionsByResponseId.set(response.responseId, response);
       }
@@ -452,7 +512,44 @@ export function DashboardPage({
       .map((response) => ({ ...response, score: scoresByResponseId.get(response.responseId) ?? null }))
       .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
       .slice(0, 5);
-  }, [allResponses]);
+  }, [allResponses, surveyTypeFilter]);
+
+  const documentReferenceDate = new Date();
+  const documentFollowups = partnerCompanies
+    .filter((company) => !company.isArchived && (!surveyTypeFilter.length || surveyTypeFilter.includes(company.type as SurveyType)))
+    .map((company) => ({ company, summary: computeCompanyDocumentSummary(company, documentReferenceDate) }))
+    .filter(({ summary }) => summary.expiredCount + summary.forUpdateCount + summary.missingCount + summary.expiringSoonCount > 0)
+    .sort((a, b) => {
+      const severity = (entry: typeof a) => entry.summary.expiredCount + entry.summary.forUpdateCount;
+      return severity(b) - severity(a)
+        || b.summary.missingCount - a.summary.missingCount
+        || b.summary.expiringSoonCount - a.summary.expiringSoonCount
+        || a.company.name.localeCompare(b.company.name);
+    });
+
+  const evaluationCycle = useMemo(() => surveys
+    .map((survey: any) => ({
+      survey,
+      status: getSurveyStatus(survey),
+      responses: submissionCount(selectSurveyResponses(survey, surveys, allResponses)),
+    }))
+    .filter(({ survey, status }) => (status === 'Running' || status === 'Paused')
+      && (!surveyTypeFilter.length || surveyTypeFilter.includes(survey.surveyType)))
+    .sort((a, b) => {
+      const order = (status: string) => status === 'Running' ? 0 : status === 'Paused' ? 1 : 2;
+      return order(a.status) - order(b.status)
+        || String(a.survey.deadlineDate || '9999-12-31').localeCompare(String(b.survey.deadlineDate || '9999-12-31'));
+    }), [surveys, allResponses, surveyTypeFilter]);
+
+  const performanceByType = useMemo(() => {
+    const types: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
+    return types
+      .filter((type) => !surveyTypeFilter.length || surveyTypeFilter.includes(type))
+      .map((type) => {
+        const typeResponses = effectiveHistoryResponses.filter((response) => response.surveyType === type);
+        return { type, count: submissionCount(typeResponses), average: averageRating(typeResponses) };
+      });
+  }, [effectiveHistoryResponses, surveyTypeFilter]);
 
   // Catalog filtered widgets
   const filteredCatalog = useMemo(() => {
@@ -461,30 +558,22 @@ export function DashboardPage({
   }, [catalogTab]);
 
   return (
-    <div className="space-y-6">
+    <div className={`dashboard-page${isAdmin ? ' is-admin-dashboard' : ''}`} aria-busy={isLoading}>
       
       {/* ----------------------------------------------------
           DASHBOARD HEADER & CONTROL BAR
           ---------------------------------------------------- */}
-      {headerPortalTarget && createPortal(
+      {!isAdmin && headerPortalTarget && createPortal(
         <div className="flex flex-wrap items-center gap-2.5 shrink-0 justify-end w-full sm:w-auto">
-          {onChangeDataScope && (
-            <div className="flex rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-1" title="Choose whether stats reflect only the current period or every archived period combined">
-              {(['current', 'all-time'] as const).map((scope) => (
-                <button
-                  key={scope}
-                  type="button"
-                  onClick={() => onChangeDataScope(scope)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                    dataScope === scope
-                      ? 'bg-[#0063a9] text-white shadow-xs'
-                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  {scope === 'current' ? 'Current Period' : 'All-Time'}
-                </button>
-              ))}
-            </div>
+          {onChangeDataScope && <DashboardDataScopeToggle scope={dataScope} onChange={onChangeDataScope} />}
+          {!isCustomizing && (
+            <button
+              type="button"
+              onClick={() => { setDraftWidgets([...widgets]); setWidgetsOpen(true); setIsCustomizing(true); }}
+              className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+            >
+              Customize widgets
+            </button>
           )}
           {isCustomizing ? (
             <>
@@ -524,6 +613,155 @@ export function DashboardPage({
           ) : null}
         </div>,
         headerPortalTarget
+      )}
+
+      {error && <p role="alert" className="dashboard-error">Dashboard data could not be loaded: {error}</p>}
+      {isLoading && <p role="status" className="dashboard-refresh-status">Loading dashboard data…</p>}
+
+      {isAdmin && (
+        <>
+          <div className="employee-experience admin-dashboard-heading-scope">
+            <header className="page-heading admin-dashboard-greeting">
+              <div>
+                <div className="eyebrow">ADMINISTRATOR WORKSPACE</div>
+                <h1>Good to see you, Admin.</h1>
+                <p>Manage evaluations, partner records, and the work that needs your attention.</p>
+              </div>
+            </header>
+          </div>
+
+          <AdminDashboardControlBanner onNavigate={onNavigate} />
+
+          <div className="admin-dashboard-grid">
+            <div className="admin-dashboard-column">
+            <section className="admin-dashboard-panel admin-dashboard-attention admin-dashboard-followup" aria-labelledby="admin-dashboard-attention-title">
+              <div className="admin-dashboard-panel-heading">
+                <div>
+                  <h2 id="admin-dashboard-attention-title">Document follow-up</h2>
+                  <p>{isLoading || error ? 'Partner document status is temporarily unavailable.' : `${documentFollowups.length} partner${documentFollowups.length === 1 ? '' : 's'} with document items to review`}</p>
+                </div>
+                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('document-register')}>Open Document Tracker <ArrowRight size={14} /></button>}
+              </div>
+
+              {!isLoading && !error && (
+                <div className="admin-dashboard-issue-summary" aria-label="Document follow-up counts">
+                  <span className="is-expired"><strong>{documentFollowups.reduce((sum, item) => sum + item.summary.expiredCount + item.summary.forUpdateCount, 0)}</strong><small>expired / for update</small></span>
+                  <span className="is-missing"><strong>{documentFollowups.reduce((sum, item) => sum + item.summary.missingCount, 0)}</strong><small>missing</small></span>
+                  <span className="is-expiring"><strong>{documentFollowups.reduce((sum, item) => sum + item.summary.expiringSoonCount, 0)}</strong><small>expiring soon</small></span>
+                </div>
+              )}
+
+              {isLoading || error ? (
+                <p className="admin-dashboard-empty">Follow-up items will appear when partner data is available.</p>
+              ) : documentFollowups.length === 0 ? (
+                <p className="admin-dashboard-empty">No missing, expired, or soon-to-expire partner documents need review.</p>
+              ) : (
+                <div className="admin-dashboard-followups">
+                  {documentFollowups.slice(0, 5).map(({ company, summary }) => (
+                    <button type="button" className="admin-dashboard-followup-row" key={company.id} onClick={() => onNavigate?.('document-register')}>
+                      <span className="admin-dashboard-followup-copy">
+                        <span className="admin-dashboard-company-line">
+                          <strong>{company.name}</strong>
+                          <small className="admin-dashboard-partner-type">{company.type}</small>
+                        </span>
+                        <small className="admin-dashboard-followup-detail">
+                          {summary.expiredCount + summary.forUpdateCount > 0 && <span className="is-expired">{summary.expiredCount + summary.forUpdateCount} expired / for update</span>}
+                          {summary.missingCount > 0 && <span>{summary.missingCount} missing</span>}
+                          {summary.expiringSoonCount > 0 && <span>{summary.expiringSoonCount} expiring soon</span>}
+                        </small>
+                      </span>
+                      <ArrowRight size={15} aria-hidden="true" />
+                    </button>
+                  ))}
+                  {documentFollowups.length > 5 && <p className="admin-dashboard-list-footnote">Showing 5 of {documentFollowups.length} partners requiring follow-up.</p>}
+                </div>
+              )}
+            </section>
+
+            <section className="admin-dashboard-panel admin-dashboard-cycles" aria-labelledby="admin-dashboard-cycles-title">
+              <div className="admin-dashboard-panel-heading">
+                <div>
+                  <h2 id="admin-dashboard-cycles-title">Forms in progress</h2>
+                  <p>{evaluationCycle.filter(({ status }) => status === 'Running').length} running · {evaluationCycle.filter(({ status }) => status === 'Paused').length} paused</p>
+                </div>
+                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('survey-forms')}>Manage forms <ArrowRight size={14} /></button>}
+              </div>
+              {isLoading || error ? (
+                <p className="admin-dashboard-empty">Evaluation form status is temporarily unavailable.</p>
+              ) : evaluationCycle.length === 0 ? (
+                <p className="admin-dashboard-empty">No evaluation forms are currently running or paused.</p>
+              ) : (
+                <div className="admin-dashboard-cycle-list">
+                  {evaluationCycle.slice(0, 4).map(({ survey, status, responses: responseCount }) => (
+                    <div className="admin-dashboard-cycle-row" key={survey.id}>
+                      <div className="admin-dashboard-cycle-copy">
+                        <strong title={survey.title}>{survey.title}</strong>
+                        <small>{survey.surveyType}{survey.deadlineDate ? ` · Closes ${survey.deadlineDate}` : ' · No close date'}</small>
+                      </div>
+                      <span className={`admin-dashboard-cycle-status ${status.toLowerCase()}`}>{status}</span>
+                      {onOpenSurveyResponses ? (
+                        <button type="button" className="admin-dashboard-response-link" disabled={responseCount === 0} onClick={() => onOpenSurveyResponses(survey.id)}>{responseCount} responses</button>
+                      ) : <span className="admin-dashboard-response-count">{responseCount} responses</span>}
+                    </div>
+                  ))}
+                  {evaluationCycle.length > 4 && <p className="admin-dashboard-list-footnote">Showing 4 of {evaluationCycle.length} forms. Open Evaluation Workspace to see all.</p>}
+                </div>
+              )}
+            </section>
+
+            </div>
+            <div className="admin-dashboard-column">
+            <section className="admin-dashboard-panel admin-dashboard-snapshot" aria-labelledby="admin-dashboard-performance-title">
+              <div className="admin-dashboard-panel-heading">
+                <div>
+                  <h2 id="admin-dashboard-performance-title">Evaluation snapshot</h2>
+                  <p>{dataScope === 'all-time' ? 'All-time records' : 'Current period'}{surveyTypeFilter.length ? ` · ${surveyTypeFilter.join(', ')}` : ' · All partner types'}</p>
+                </div>
+                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>View analytics <ArrowRight size={14} /></button>}
+              </div>
+              {onChangeDataScope && <div className="admin-dashboard-performance-toolbar"><span>Reporting period</span><DashboardDataScopeToggle scope={dataScope} onChange={onChangeDataScope} /></div>}
+              <table className="admin-dashboard-performance-table" aria-label="Average partner evaluation score by type">
+                <thead><tr><th scope="col">Partner type</th><th scope="col">Average score</th><th scope="col">Evaluations</th></tr></thead>
+                <tbody>
+                  {performanceByType.map(({ type, count, average }) => (
+                    <tr key={type}>
+                      <th scope="row" className="admin-dashboard-performance-type">{type}</th>
+                      <td><span className="admin-dashboard-performance-score"><strong>{count > 0 ? average.toFixed(1) : String.fromCharCode(8212)}</strong><small>/ 100</small><i aria-hidden="true"><b style={{ width: `${Math.max(0, Math.min(100, average))}%` }} /></i></span></td>
+                      <td className="admin-dashboard-performance-count">{count} evaluations</td>
+                    </tr>
+                  ))}
+                  {performanceByType.every(({ count }) => count === 0) && <tr><td colSpan={3} className="admin-dashboard-performance-empty">No evaluations are available for this scope.</td></tr>}
+                </tbody>
+              </table>
+            </section>
+
+            <section className="admin-dashboard-panel admin-dashboard-activity" aria-labelledby="admin-dashboard-activity-title">
+              <div className="admin-dashboard-panel-heading">
+                <div>
+                  <h2 id="admin-dashboard-activity-title">Recent submissions</h2>
+                  <p>Latest completed evaluations in the current period</p>
+                </div>
+                {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>Explore results <ArrowRight size={14} /></button>}
+              </div>
+              {isLoading || error ? (
+                <p className="admin-dashboard-empty">Recent submissions are temporarily unavailable.</p>
+              ) : recentSubmissions.length === 0 ? (
+                <p className="admin-dashboard-empty">No evaluations have been submitted in the current period.</p>
+              ) : (
+                <div className="admin-dashboard-recent-list">
+                  {recentSubmissions.slice(0, 4).map((response) => (
+                    <div className="admin-dashboard-recent-row" key={response.responseId}>
+                      <span><strong>{response.company}</strong><small>{response.surveyType} · {response.submissionDateInferredFrom ? 'Inferred date · ' : ''}{response.submissionDate}</small></span>
+                      <span className="admin-dashboard-recent-score">{typeof response.score === 'number' ? formatCompositeScore(response.surveyType, response.score).text : 'Unscored'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            </div>
+          </div>
+        </>
       )}
 
       {/* ----------------------------------------------------
@@ -630,6 +868,30 @@ export function DashboardPage({
       {/* ----------------------------------------------------
           ACTIVE WIDGETS GRID
           ---------------------------------------------------- */}
+      {!isAdmin && <details
+        className="admin-dashboard-optional-widgets"
+        open={widgetsOpen}
+        onToggle={(event) => setWidgetsOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <span><strong>Additional dashboard widgets</strong><small>Optional charts and saved dashboard blocks</small></span>
+          <ChevronDown size={16} aria-hidden="true" />
+        </summary>
+        <div className="admin-dashboard-optional-content">
+      {isAdmin && (
+        <div className="admin-dashboard-widget-controls">
+          {!isCustomizing ? (
+            <button type="button" className="admin-dashboard-text-link" onClick={() => { setDraftWidgets([...widgets]); setIsCustomizing(true); }}>Customize widgets <ArrowRight size={14} /></button>
+          ) : (
+            <div className="admin-dashboard-widget-edit-actions">
+              <button type="button" className="admin-dashboard-widget-secondary" onClick={handleResetLayout}><RotateCcw size={14} />Reset</button>
+              <button type="button" className="admin-dashboard-widget-secondary" onClick={cancelCustomize}>Cancel</button>
+              <button type="button" className="admin-dashboard-widget-secondary" onClick={() => setIsAddOpen(true)}><Plus size={14} />Add</button>
+              <button type="button" className="admin-dashboard-widget-save" onClick={saveCustomize}><CheckCircle2 size={14} />Save changes</button>
+            </div>
+          )}
+        </div>
+      )}
       {activeWidgets.length === 0 ? (
         <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white p-5 text-center dark:border-slate-800 dark:bg-slate-900 sm:p-8">
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-950/20 rounded-full flex items-center justify-center mb-4 text-blue-500">
@@ -648,7 +910,7 @@ export function DashboardPage({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="dashboard-widget-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <AnimatePresence mode="popLayout">
             {activeWidgets.map((widget, index) => {
               // Determine grid span class
@@ -660,8 +922,9 @@ export function DashboardPage({
                     : 'col-span-1';
 
               return (
-                <motion.div
+                <motion.section
                   key={widget.id}
+                  aria-labelledby={`dashboard-widget-${widget.id}`}
                   layout
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -671,16 +934,15 @@ export function DashboardPage({
                   onDragStartCapture={(e: React.DragEvent) => handleDragStart(e, widget.id)}
                   onDragOver={handleDragOver}
                   onDrop={(e: React.DragEvent) => handleDrop(e, widget.id)}
-                  className={`${spanClass} flex flex-col bg-white dark:bg-slate-950 rounded-2xl border ${isCustomizing ? 'border-blue-300 dark:border-blue-700/50 cursor-grab hover:border-blue-400 dark:hover:border-blue-500 shadow-md ring-2 ring-blue-500/20' : 'border-slate-200/90 dark:border-slate-800 shadow-sm'} relative group overflow-visible transition-all`}
+                  className={`dashboard-widget-section ${spanClass} flex min-w-0 flex-col ${isCustomizing ? 'dashboard-widget-section-editing cursor-grab' : ''} relative group transition-all`}
                 >
                   
                   {/* Widget Card Header */}
-                  <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-900/30 rounded-t-2xl">
+                  <div className="dashboard-widget-heading flex items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-800">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-100 truncate" title={widget.title}>
+                      <h2 id={`dashboard-widget-${widget.id}`} className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate" title={widget.title}>
                         {widget.title}
-                      </h4>
+                      </h2>
                     </div>
 
                     {/* Widget Operations Toolbar */}
@@ -732,11 +994,11 @@ export function DashboardPage({
                   </div>
 
                   {/* Widget Card Body */}
-                  <div className="flex min-h-[160px] flex-1 flex-col justify-center p-4 sm:p-5">
+                  <div className="dashboard-widget-body flex min-w-0 flex-1 flex-col pt-3">
                     {widget.type === 'satisfaction-gauge' && (
                       <div className="space-y-4">
                         {topPartner ? (
-                          <div className="flex flex-col sm:flex-row items-center gap-5 justify-between">
+                          <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
                             {/* Dial */}
                             <div className="relative flex items-center justify-center w-24 h-24 shrink-0">
                               <svg className="w-full h-full transform -rotate-90">
@@ -773,8 +1035,8 @@ export function DashboardPage({
                               <h5 className="mt-1.5 max-w-full truncate text-lg font-bold text-slate-800 dark:text-slate-100 sm:text-xl">
                                 {topPartner.name}
                               </h5>
-                              <p className="text-xs text-slate-400 mt-1 leading-snug">
-                                Acclaimed leader across {topPartner.count} employee feedback surveys.
+                              <p className="text-xs text-slate-500 mt-1 leading-snug">
+                                Highest volume-weighted score in the selected period.
                               </p>
                               <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-500 sm:justify-start">
                                 <span>Rating: {formatCompositeScore(topPartner.type as SurveyType, topPartner.scorePercentage).text}</span>
@@ -792,21 +1054,21 @@ export function DashboardPage({
                     )}
 
                     {widget.type === 'volume-tracker' && (
-                      <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 sm:gap-4">
-                        <div className="bg-slate-50/50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <div className="dashboard-metrics grid grid-cols-1 min-[380px]:grid-cols-2">
+                        <div className="dashboard-metric">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Total Feedback</span>
-                          <span className="mt-1 block break-words text-2xl font-light tabular-nums text-slate-800 dark:text-white">
+                          <span className="mt-2 block break-words text-3xl font-semibold tabular-nums text-slate-800 dark:text-white">
                             {submissionCount(effectiveHistoryResponses)}
                           </span>
-                          <span className="text-[10px] text-blue-500 mt-1 block font-medium">Submissions log</span>
+                          <span className="text-xs text-slate-500 mt-1 block">Responses included in this view</span>
                         </div>
 
-                        <div className="bg-slate-50/50 dark:bg-slate-900/40 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                        <div className="dashboard-metric">
                           <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Active Partners</span>
-                          <span className="mt-1 block break-words text-2xl font-light tabular-nums text-slate-800 dark:text-white">
+                          <span className="mt-2 block break-words text-3xl font-semibold tabular-nums text-slate-800 dark:text-white">
                             {accreditedBranchTotal}
                           </span>
-                          <span className="text-[10px] text-emerald-500 mt-1 block font-medium">Accredited BP Codes</span>
+                          <span className="text-xs text-slate-500 mt-1 block">Accredited BP codes</span>
                         </div>
                       </div>
                     )}
@@ -879,7 +1141,7 @@ export function DashboardPage({
                     })()}
 
                     {widget.type === 'active-forms' && (
-                      <div className="space-y-4">
+                      <div className="dashboard-active-form-list">
                         {surveys.length === 0 ? (
                           <div className="text-center text-slate-400 text-xs py-4">
                             No published survey questionnaires are available.
@@ -889,25 +1151,27 @@ export function DashboardPage({
                             // Use the Explorer's form-specific selector, then count unique
                             // respondent submissions rather than raw per-question answer rows.
                             const count = submissionCount(selectSurveyResponses(survey, surveys, allResponses));
+                            const status = getSurveyStatus(survey);
                             return (
-                              <div key={survey.id} className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50/50 dark:bg-slate-900/20 border border-slate-100 dark:border-slate-800 text-sm">
-                                <div className="min-w-0 flex-1 pr-2">
-                                  <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{survey.title}</p>
-                                  <p className="text-xs text-slate-400 mt-1">Due: {survey.deadlineDate || 'No close date'}</p>
+                              <div key={survey.id} className="dashboard-form-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-slate-200 py-3 dark:border-slate-800">
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium text-slate-800 dark:text-slate-200" title={survey.title}>{survey.title}</p>
+                                  <p className="mt-1 text-xs text-slate-500">{survey.surveyType}{survey.deadlineDate ? ` · Closes ${survey.deadlineDate}` : ' · No close date'}</p>
                                 </div>
+                                <span className={`dashboard-form-status ${status.toLowerCase()}`}>{status}</span>
                                 {isAdmin && onOpenSurveyResponses ? (
                                   <button
                                     type="button"
                                     onClick={() => onOpenSurveyResponses(survey.id)}
                                     disabled={count === 0}
                                     aria-label={`View ${count} responses for ${survey.title}`}
-                                    className="shrink-0 rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-1.5 text-xs font-bold text-blue-600 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-default disabled:opacity-60 dark:border-blue-900/30 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-950/50"
+                                    className="dashboard-response-action shrink-0"
                                   >
-                                    {count} respondents
+                                    {count > 0 ? `View ${count} responses` : '0 responses'}
                                   </button>
                                 ) : (
-                                  <span className="shrink-0 px-3 py-1.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 font-bold text-blue-600 dark:text-blue-400 text-xs">
-                                    {count} respondents
+                                  <span className="dashboard-response-count shrink-0">
+                                    {count} responses
                                   </span>
                                 )}
                               </div>
@@ -923,7 +1187,7 @@ export function DashboardPage({
                     )}
 
                     {widget.type === 'recent-submissions' && (
-                      <div className="space-y-2">
+                      <div className="dashboard-recent-list">
                         {recentSubmissions.length === 0 ? (
                           <div className="text-center text-slate-400 text-xs py-4">
                             No survey responses are available.
@@ -931,16 +1195,14 @@ export function DashboardPage({
                         ) : (
                           recentSubmissions.map((resp, sIdx) => {
                             return (
-                              <div key={sIdx} className="flex items-center justify-between text-xs py-1.5 border-b border-dashed border-slate-100 dark:border-slate-800/60 last:border-0">
+                              <div key={sIdx} className="dashboard-submission-row grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 border-b border-slate-200 py-3 text-xs last:border-0 dark:border-slate-800">
                                 <div className="min-w-0 flex-1 pr-2">
-                                  <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${badgeColors[resp.surveyType] || 'bg-slate-100 text-slate-800'}`}>
-                                    {resp.surveyType}
-                                  </span>
                                   <p className="font-semibold text-slate-700 dark:text-slate-300 truncate mt-1">
                                     {resp.company}
                                   </p>
+                                  <p className="text-[11px] text-slate-500">{resp.surveyType} · {resp.submissionDate}</p>
                                 </div>
-                                <span className="shrink-0 font-bold text-slate-900 dark:text-white">
+                                <span className="shrink-0 font-semibold text-slate-800 dark:text-slate-200">
                                   {typeof resp.score === 'number' ? formatCompositeScore(resp.surveyType, resp.score).text : 'N/A'}
                                 </span>
                               </div>
@@ -984,12 +1246,14 @@ export function DashboardPage({
                       </div>
                     )}
                   </div>
-                </motion.div>
+                </motion.section>
               );
             })}
           </AnimatePresence>
         </div>
       )}
+        </div>
+      </details>}
 
       {/* ----------------------------------------------------
           ADD WIDGET MODAL DIALOG
