@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "functions": {
+    "api/analytics.mjs": {
+      "includeFiles": "server-build/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/((?!api(?:/|$)).*)",

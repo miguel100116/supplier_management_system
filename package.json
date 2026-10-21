@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && npm run build:analytics-api",
+    "build:analytics-api": "node scripts/buildAnalyticsApi.mjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "lint": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.scripts.json && tsc --noEmit -p tsconfig.server.json",
