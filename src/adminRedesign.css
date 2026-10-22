@@ -125,6 +125,18 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 }
 
 /* Documents: keep summary controls and the register aligned to the same grid. */
+.admin-workspace .document-category-filter {
+  top: 79px;
+}
+
+@media (max-width: 800px) {
+  .admin-workspace .document-category-filter { top: 70px; }
+}
+
+@media (max-width: 560px) {
+  .admin-workspace .document-category-filter { top: 66px; }
+}
+
 .admin-documents-page > .flex:has([aria-label="Filter document register by category"]) {
   justify-content: flex-start;
   min-height: 48px;

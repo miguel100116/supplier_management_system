@@ -438,6 +438,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   // panel spans the navbar, with its own horizontal scroll mirrored from the
   // real table so columns stay aligned - see updateStickyHeader below.
   const matrixPanelRef = useRef<HTMLDivElement>(null);
+  const categoryFilterRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const realTheadRef = useRef<HTMLTableSectionElement>(null);
   const overlayScrollRef = useRef<HTMLDivElement>(null);
@@ -454,7 +455,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     }
   }, []);
   const isHeaderStuckRef = useRef(false);
-  const [stickyHeader, setStickyHeader] = useState<{ left: number; width: number; colWidths: number[] } | null>(null);
+  const [stickyHeader, setStickyHeader] = useState<{ top: number; left: number; width: number; colWidths: number[] } | null>(null);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   useModalEscape(isNotificationSettingsOpen, () => setIsNotificationSettingsOpen(false), 50);
   useModalEscape(Boolean(renewalTarget), () => setRenewalTarget(null), 50);
@@ -1131,7 +1132,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   // widths/position are only re-measured on a stuck-state transition (or
   // when forced) - not on every scroll tick, since they only actually change
   // on resize or when the matrix's shape changes, not on ordinary scrolling.
-  const NAV_HEIGHT = 80; // matches Shell's h-20 top header
   const updateStickyHeader = useCallback((forceMeasure = false) => {
     const panel = matrixPanelRef.current;
     const wrapper = tableScrollRef.current;
@@ -1140,7 +1140,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
 
     const panelRect = panel.getBoundingClientRect();
     const theadHeight = thead.getBoundingClientRect().height;
-    const shouldStick = panelRect.top <= NAV_HEIGHT && panelRect.bottom > NAV_HEIGHT + theadHeight;
+    const headerTop = categoryFilterRef.current?.getBoundingClientRect().bottom ?? 80;
+    const shouldStick = panelRect.top <= headerTop && panelRect.bottom > headerTop + theadHeight;
 
     if (!shouldStick) {
       if (isHeaderStuckRef.current) {
@@ -1154,7 +1155,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       isHeaderStuckRef.current = true;
       const wrapperRect = wrapper.getBoundingClientRect();
       const colWidths = Array.from(thead.querySelectorAll('th')).map((th) => th.getBoundingClientRect().width);
-      setStickyHeader({ left: wrapperRect.left, width: wrapperRect.width, colWidths });
+      setStickyHeader({ top: headerTop, left: wrapperRect.left, width: wrapperRect.width, colWidths });
       if (overlayScrollRef.current) overlayScrollRef.current.scrollLeft = wrapper.scrollLeft;
     }
   }, []);
@@ -1255,7 +1256,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         headerPortalTarget
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div ref={categoryFilterRef} className="document-category-filter sticky top-20 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <div role="group" aria-label="Filter document register by category" className="flex min-w-0 flex-nowrap overflow-x-auto rounded-lg bg-slate-50 p-1 dark:bg-slate-900 w-full sm:w-auto" style={{ scrollbarWidth: 'none' }}>
           <button
             aria-pressed={isAllView}
@@ -2150,7 +2151,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           re-sort while scrolled into the middle of the table. */}
       {stickyHeader && createPortal(
         <div
-          style={{ position: 'fixed', top: NAV_HEIGHT, left: stickyHeader.left, width: stickyHeader.width, zIndex: 45 }}
+          style={{ position: 'fixed', top: stickyHeader.top, left: stickyHeader.left, width: stickyHeader.width, zIndex: 21 }}
           className="shadow-md"
         >
           <div ref={overlayScrollRef} className="overflow-hidden" onKeyDown={handleMatrixKeyDown}>

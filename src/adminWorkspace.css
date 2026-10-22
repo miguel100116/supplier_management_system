@@ -8,6 +8,8 @@
   --canvas: var(--background);
   --selected: var(--workspace-selected);
   --selected-surface: var(--workspace-selected-surface);
+  --nav-selected: #125b91;
+  --nav-selected-surface: #dceffa;
   --focus: var(--focus-ring);
   --radius: 12px;
   --interface-font: var(--workspace-interface-font);
@@ -86,9 +88,9 @@
 .admin-workspace .admin-nav-item > svg { width: 20px; height: 20px; flex: 0 0 20px; }
 .admin-workspace .admin-nav-item > span:first-of-type { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-workspace .admin-nav-item:hover { background: #f5f7fb; }
-.admin-workspace .admin-nav-item.active { color: #2187cd; background: #edf3fe; font-weight: 650; }
-.admin-workspace .admin-nav-item.active > svg { color: #2187cd; }
-.admin-workspace .admin-nav-item.is-active-group { color: #2187cd; font-weight: 650; }
+.admin-workspace .admin-nav-item.active { color: var(--nav-selected); background: var(--nav-selected-surface); font-weight: 650; }
+.admin-workspace .admin-nav-item.active > svg { color: var(--nav-selected); }
+.admin-workspace .admin-nav-item.is-active-group { color: var(--nav-selected); font-weight: 650; }
 .admin-workspace .admin-nav-item:disabled,
 .admin-workspace .admin-nav-child:disabled { color: #aeb9c9; cursor: not-allowed; }
 .admin-nav-group-button > svg:last-child { width: 14px; height: 14px; flex: 0 0 14px; margin-left: auto; transition: transform .18s; }
@@ -112,7 +114,7 @@
 }
 .admin-workspace .admin-nav-child > span:first-child { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-workspace .admin-nav-child:hover { background: #f5f7fb; }
-.admin-workspace .admin-nav-child.is-active { color: #2187cd; background: #edf3fe; font-weight: 650; }
+.admin-workspace .admin-nav-child.is-active { color: var(--nav-selected); background: var(--nav-selected-surface); font-weight: 650; }
 .admin-nav-indicator { width: 5px; height: 5px; flex: 0 0 5px; margin-left: auto; border-radius: 50%; background: var(--workspace-selection-dot); }
 .admin-nav-badge { display: inline-flex; min-width: 17px; height: 17px; flex: 0 0 auto; align-items: center; justify-content: center; padding: 0 4px; border-radius: 9px; color: #fff; background: #e35b6d; font-size: 9px; font-weight: 700; }
 .admin-sidebar-extra { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); }
@@ -232,7 +234,7 @@
 .admin-import-category h3 { font-family: var(--interface-font); }
 .admin-import-category :is(button, input, select) { border-radius: 7px; }
 
-.dark .admin-workspace { --selected: var(--accent); --selected-surface: var(--surface-selected); --workspace-selected: var(--accent); --workspace-selected-surface: var(--surface-selected); color: var(--foreground); background: var(--background); }
+.dark .admin-workspace { --selected: var(--accent); --selected-surface: var(--surface-selected); --nav-selected: var(--accent); --nav-selected-surface: var(--surface-selected); --workspace-selected: var(--accent); --workspace-selected-surface: var(--surface-selected); color: var(--foreground); background: var(--background); }
 .dark .admin-sidebar,
 .dark .admin-topbar { border-color: #283447; background: #121c2b; }
 .dark .admin-workspace-label { color: #9aa6b8; }
@@ -307,7 +309,7 @@
   .admin-mobile-group-title { padding: 4px 10px 7px; color: #97a1af; font-size: 9px; font-weight: 650; letter-spacing: 1.7px; text-transform: uppercase; }
   .admin-mobile-navigation button { display: flex; width: 100%; min-height: 47px; align-items: center; gap: 13px; padding: 0 15px; border: 0; border-radius: 7px; color: #68758a; background: transparent; font-size: 13px; font-weight: 500; text-align: left; transition: background .18s, color .18s, box-shadow .18s, transform .18s; }
   .admin-mobile-navigation button:hover { background: #f5f7fb; }
-  .admin-mobile-navigation button.is-active { color: var(--selected); background: var(--selected-surface); font-weight: 650; }
+  .admin-mobile-navigation button.is-active { color: var(--nav-selected); background: var(--nav-selected-surface); font-weight: 650; }
   .admin-mobile-navigation button:disabled { color: #aeb9c9; }
   .admin-main { padding: 30px 26px 30px; }
   .admin-page-heading h1 { font-size: 27px; }

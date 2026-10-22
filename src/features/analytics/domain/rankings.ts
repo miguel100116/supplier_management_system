@@ -13,6 +13,7 @@ export interface CompanyRankingCandidate {
 export type RankedCompany<T extends CompanyRankingCandidate> = T & { rankScore: number };
 
 export interface AnalyticsCompanySummary extends CompanyRankingCandidate {
+  companyId?: string;
   average: number;
   rankScore: number;
 }
@@ -69,6 +70,7 @@ export function getAnalyticsCompanyRankings(
     return companies
       .filter((company) => company.hasScore)
       .map((company) => ({
+        companyId: company.companyId,
         name: company.company,
         type: company.surveyType,
         average: company.compositeScore,
@@ -78,11 +80,11 @@ export function getAnalyticsCompanyRankings(
       }));
   });
 
-  return summaries.sort((left, right) => {
-    if (right.rankScore !== left.rankScore) return right.rankScore - left.rankScore;
-    if (right.count !== left.count) return right.count - left.count;
-    return left.name.localeCompare(right.name);
-  });
+  return summaries.sort(compareAnalyticsCompanies);
+}
+
+export function compareAnalyticsCompanies(left: AnalyticsCompanySummary, right: AnalyticsCompanySummary): number {
+  return right.rankScore - left.rankScore || right.count - left.count || left.name.localeCompare(right.name);
 }
 
 export const ANALYTICS_PAGE_SIZE = 20;

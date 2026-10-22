@@ -32,6 +32,7 @@ import {
   getSurveyEvaluationCompanies,
   hasAnsweredItem,
   computeRankScore,
+  formatNumber,
 } from '../features/analytics/domain/analytics';
 import { computeCategoryRankSummary } from '../features/partner-companies/domain/categorySummary';
 import { formatCompositeScore } from '../data/questionWeights';
@@ -64,14 +65,13 @@ type AdminDashboardDestination = 'document-register' | 'survey-forms' | 'analyti
 interface DashboardPageProps {
   responses: SurveyResponse[];
   allResponses: SurveyResponse[];
-  // Same shape as allResponses, but reflecting whichever data scope is
-  // active (current period only, or every archived period combined too).
-  // Used only for the historical-style stats (Top Performing Partner,
-  // Stakeholder Group Comparison) - completion tracking always uses
+  // Official responses with the same scope and filters as Analytics/Reports.
+  // Used for evaluation summaries and historical-style widgets;
+  // completion tracking always uses
   // allResponses regardless, since "who still needs to answer this round"
   // must never be affected by viewing All-Time history.
   historyResponses?: SurveyResponse[];
-  dataScope?: 'current' | 'all-time';
+  dataScope?: 'current' | 'all-time' | 'custom';
   onChangeDataScope?: (scope: 'current' | 'all-time') => void;
   partnerCompanies: PartnerCompany[];
   isLoading: boolean;
@@ -96,7 +96,7 @@ export function DashboardDataScopeFilter({ scope, onChange }: { scope: 'current'
   );
 }
 
-export function DashboardDataScopeToggle({ scope, onChange, currentLabel = 'Current Period', className = 'admin-dashboard-scope' }: { scope: 'current' | 'all-time'; onChange: (scope: 'current' | 'all-time') => void; currentLabel?: string; className?: string }) {
+export function DashboardDataScopeToggle({ scope, onChange, className = 'admin-dashboard-scope' }: { scope: 'current' | 'all-time' | 'custom'; onChange: (scope: 'current' | 'all-time') => void; className?: string }) {
   return (
     <div className={className} role="group" aria-label="Choose performance reporting period" title="Choose whether performance reflects only the current period or every archived period combined">
       {(['current', 'all-time'] as const).map((value) => (
@@ -107,7 +107,7 @@ export function DashboardDataScopeToggle({ scope, onChange, currentLabel = 'Curr
           aria-pressed={scope === value}
           className={`admin-dashboard-scope-button${scope === value ? ' is-selected' : ''}`}
         >
-          {value === 'current' ? currentLabel : 'All-Time'}
+          {value === 'current' ? 'Current Period' : 'All-Time'}
         </button>
       ))}
     </div>
@@ -712,16 +712,16 @@ export function DashboardPage({
 
             <section className="admin-dashboard-ledger-section" aria-labelledby="admin-dashboard-performance-title">
               <div className="admin-dashboard-ledger-heading">
-                <div><h2 id="admin-dashboard-performance-title">Evaluation results</h2><p>{dataScope === 'all-time' ? 'All-time records' : 'Current period'}{surveyTypeFilter.length ? ` · ${surveyTypeFilter.join(', ')}` : ' · All partner types'}</p></div>
+                <div><h2 id="admin-dashboard-performance-title">Evaluation results</h2><p>{dataScope === 'all-time' ? 'All-time records' : dataScope === 'custom' ? 'Custom date range' : 'Current period'}{surveyTypeFilter.length ? ` · ${surveyTypeFilter.join(', ')}` : ' · All partner types'}</p></div>
                 <div className="admin-dashboard-heading-actions">
                   {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>View analytics <ArrowRight size={13} /></button>}
                 </div>
               </div>
-              {onChangeDataScope && <DashboardDataScopeToggle scope={dataScope} onChange={onChangeDataScope} currentLabel="Custom" className="admin-dashboard-document-filters" />}
+              {onChangeDataScope && <DashboardDataScopeToggle scope={dataScope} onChange={onChangeDataScope} className="admin-dashboard-document-filters" />}
               <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-performance-table" aria-label="Average partner evaluation score by type">
                 <thead><tr><th scope="col">Partner type</th><th scope="col">Average rubric score</th><th scope="col">Evaluations</th></tr></thead>
                 <tbody>{performanceByType.map(({ type, count, average }) => <tr key={type}>
-                  <th scope="row" className="admin-dashboard-performance-type">{type}</th><td><span className="admin-dashboard-performance-score"><strong>{count > 0 ? average.toFixed(1) : String.fromCharCode(8212)}</strong><small>/ 100</small><i aria-hidden="true"><b style={{ width: `${Math.max(0, Math.min(100, average))}%` }} /></i></span></td><td className="admin-dashboard-performance-count">{count} evaluations</td>
+                  <th scope="row" className="admin-dashboard-performance-type">{type}</th><td><span className="admin-dashboard-performance-score"><strong>{count > 0 ? formatNumber(average) : String.fromCharCode(8212)}</strong><small>/ 100</small><i aria-hidden="true"><b style={{ width: `${Math.max(0, Math.min(100, average))}%` }} /></i></span></td><td className="admin-dashboard-performance-count">{count} evaluations</td>
                 </tr>)}{performanceByType.every(({ count }) => count === 0) && <tr><td colSpan={3} className="admin-dashboard-performance-empty">No evaluations are available for this scope.</td></tr>}</tbody>
               </table></div>
             </section>

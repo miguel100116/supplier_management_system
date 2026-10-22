@@ -1,11 +1,10 @@
 import type { ArchiveSeries, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { averageRating, hasAnsweredItem, monthlyTrend, questionPerformance, responseVolume, seriesTrend, submissionCount, submissionScores, yearlyTrend } from './analytics';
-import { getAnalyticsCompanyRankings } from './rankings';
+import { getAnalyticsCompanyRankings, type AnalyticsCompanySummary } from './rankings';
 import { getCompanyTrend, getCompanyTrendBySeries, getLeaderboard, getPeerAverageTrend, getPeerAverageTrendBySeries, getSectionPeerAverages } from '../../evaluations/domain/scoring';
 
 // Prepare the local Analytics view from the caller's authorized response scope.
-function buildAnalyticsSummary(responses: SurveyResponse[], types: SurveyType[], partners: PartnerCompany[], series: ArchiveSeries[]) {
-  const companies = getAnalyticsCompanyRankings(responses, types);
+function buildAnalyticsSummary(responses: SurveyResponse[], types: SurveyType[], partners: PartnerCompany[], series: ArchiveSeries[], companies = getAnalyticsCompanyRankings(responses, types)) {
   const evaluated = new Set(responses.filter(hasAnsweredItem).map((r) => r.companyId || `${r.surveyType}:${r.company}`));
   const eligible = partners.filter((p) => !p.isArchived && p.type !== 'Uncategorized' && types.includes(p.type));
   return {
@@ -44,8 +43,8 @@ function buildCompanyAnalysis(responses: SurveyResponse[], types: SurveyType[], 
 }
 
 // Category views reuse the same company calculations; no scoring rules change.
-export function buildAnalyticsSnapshot(responses: SurveyResponse[], types: SurveyType[], partners: PartnerCompany[], series: ArchiveSeries[]) {
-  return { ...buildAnalyticsSummary(responses, types, partners, series), analysis: buildCompanyAnalysis(responses, types, series) };
+export function buildAnalyticsSnapshot(responses: SurveyResponse[], types: SurveyType[], partners: PartnerCompany[], series: ArchiveSeries[], companies?: AnalyticsCompanySummary[]) {
+  return { ...buildAnalyticsSummary(responses, types, partners, series, companies), analysis: buildCompanyAnalysis(responses, types, series) };
 }
 
 export type AnalyticsSnapshot = ReturnType<typeof buildAnalyticsSnapshot>;

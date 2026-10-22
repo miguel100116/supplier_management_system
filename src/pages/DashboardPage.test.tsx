@@ -1,11 +1,82 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import React, { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { EmployeeWorkspacePage } from '../features/employee-experience/components/EmployeeWorkspacePage';
 import { AdminDashboardControlBanner, DashboardDataScopeFilter, DashboardDataScopeToggle, DashboardPage } from './DashboardPage';
+import { applyFilters, formatNumber, getKpiSummary } from '../features/analytics/domain/analytics';
+import { buildAnalyticsSnapshot } from '../features/analytics/domain/analyticsSnapshot';
+import { isOfficialAnalyticsResponse } from '../features/analytics/domain/responseProvenance';
+import { filterCustomAnalyticsResponses } from '../features/analytics/domain/dateRange';
+import type { FilterState, SurveyResponse, SurveyType } from '../types/survey';
 
 Object.assign(globalThis, { React });
+
+test('App supplies the same filtered official cohort and exact scope to Dashboard, Analytics, and generated reports', () => {
+  const source = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+  const dashboard = source.match(/<DashboardPage\s[\s\S]*?\/>/)?.[0] ?? '';
+  const analytics = source.match(/<AnalyticsPage\s[\s\S]*?\/>/)?.[0] ?? '';
+  const reports = source.match(/<ReportsPage\s[\s\S]*?\/>/)?.[0] ?? '';
+  for (const component of [dashboard, analytics]) {
+    assert.match(component, /responses=\{analyticsFilteredResponses\}/);
+    assert.match(component, /dataScope=\{dataScope\}/);
+  }
+  assert.match(dashboard, /historyResponses=\{analyticsFilteredResponses\}/);
+  assert.match(dashboard, /allResponses=\{userAccessibleAllResponses\}/, 'Operational completion retains current-round submissions');
+  assert.match(reports, /rankingResponses=\{analyticsFilteredResponses\}/);
+  assert.match(reports, /companyReportResponses=\{analyticsFilteredResponses\}/);
+});
+
+test('Dashboard evaluation summary agrees with Analytics and report KPIs for filtered current, all-time, custom, and empty cohorts', () => {
+  const row = (responseId: string, surveyType: SurveyType, rating: SurveyResponse['rating'], overrides: Partial<SurveyResponse> = {}): SurveyResponse => ({
+    responseId, surveyType, company: `${surveyType} Partner`, companyId: surveyType,
+    respondentType: 'Employee', submissionDate: '2026-10-10T12:00:00+08:00',
+    questionId: surveyType === 'Courier' ? 'Q01' : surveyType === 'Supplier' ? 'Q39' : 'Q03',
+    questionNumber: 1, question: 'Scored criterion', questionCategory: 'Quality', rating, comment: '',
+    dataSource: 'client_csv', ...overrides,
+  });
+  const rows = [row('courier-zero', 'Courier', 0), row('supplier', 'Supplier', 3.55556), row('subcontractor', 'Subcontractor', 1.5),
+    row('archived', 'Supplier', 4, { archived: true, seriesId: 'prior', submissionDate: '2026-08-01T12:00:00+08:00' }),
+    row('blank', 'Supplier', 'N/A'), row('test', 'Supplier', 0, { dataSource: 'test_submission' })];
+  const scenarios: { scope: 'current' | 'all-time' | 'custom'; input: SurveyResponse[]; company: string; expected: number; filters?: Partial<FilterState> }[] = [
+    { scope: 'current' as const, input: rows.filter(r => !r.archived), company: '', expected: 3 },
+    { scope: 'all-time' as const, input: rows, company: '', expected: 4 },
+    { scope: 'custom' as const, input: filterCustomAnalyticsResponses(rows, { from: '2026-08-01', to: '2026-08-01' }, ['prior']), company: '', expected: 1 },
+    { scope: 'current' as const, input: rows.filter(r => !r.archived), company: 'Supplier Partner', expected: 1 },
+    { scope: 'custom' as const, input: filterCustomAnalyticsResponses(rows, { from: '2099-01-01', to: '' }), company: '', expected: 0 },
+    { scope: 'current', input: rows.filter(r => !r.archived), company: '', expected: 1, filters: { surveyType: ['Supplier'] } },
+    { scope: 'current', input: rows.filter(r => !r.archived), company: '', expected: 1, filters: { questionId: 'Q39' } },
+    { scope: 'current', input: rows.filter(r => !r.archived), company: '', expected: 1, filters: { rating: 0 } },
+    { scope: 'all-time', input: rows, company: '', expected: 1, filters: { search: 'Subcontractor Partner' } },
+  ];
+  const types: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
+  for (const scenario of scenarios) {
+    const cohort = applyFilters(scenario.input.filter(isOfficialAnalyticsResponse), {
+      surveyType: [], search: '', questionId: '', rating: 'All', company: scenario.company, ...scenario.filters,
+    });
+    const summary = buildAnalyticsSnapshot(cohort, types, [], []);
+    const report = getKpiSummary(cohort);
+    assert.equal(summary.totalSubmissions, scenario.expected);
+    assert.equal(report.totalResponses, summary.totalSubmissions);
+    assert.equal(report.averageRating, summary.averageScore);
+    const html = renderToStaticMarkup(createElement(DashboardPage, {
+      responses: cohort, historyResponses: cohort, allResponses: rows.filter(r => !r.archived),
+      partnerCompanies: [], isLoading: false, error: null, surveyTypeFilter: [], isAdmin: true, dataScope: scenario.scope,
+    }));
+    const table = html.match(/<table class="admin-dashboard-performance-table"[\s\S]*?<\/table>/)?.[0] ?? '';
+    let dashboardCount = 0;
+    for (const type of types) {
+      const metrics = getKpiSummary(cohort.filter(r => r.surveyType === type));
+      const categoryRow = table.match(new RegExp(`<tr><th[^>]*>${type}</th>[\\s\\S]*?</tr>`))?.[0] ?? '';
+      assert.match(categoryRow, new RegExp(`>${metrics.totalResponses} evaluations<`));
+      if (metrics.totalResponses) assert.ok(categoryRow.includes(`<strong>${formatNumber(metrics.averageRating)}</strong>`));
+      dashboardCount += metrics.totalResponses;
+    }
+    assert.equal(dashboardCount, report.totalResponses);
+    if (scenario.scope === 'custom') assert.match(html, /Custom date range/);
+  }
+});
 
 test('Employee dashboard period toggle preserves its existing selection behavior', () => {
   const changes: Array<'current' | 'all-time'> = [];
@@ -93,7 +164,7 @@ test('Admin dashboard keeps the protected banner and presents its work in an act
   assert.match(html, /Evaluation forms in progress/);
   assert.match(html, /Recent submissions/);
   assert.match(html, /role="group" aria-label="Choose performance reporting period"/);
-  assert.match(html, /aria-pressed="true" class="admin-dashboard-scope-button is-selected">Custom<\/button>/);
+  assert.match(html, /aria-pressed="true" class="admin-dashboard-scope-button is-selected">Current Period<\/button>/);
   assert.match(html, /aria-pressed="false" class="admin-dashboard-scope-button">All-Time<\/button>/);
   assert.match(html, /class="admin-dashboard-category-badge courier"/);
   assert.match(html, /class="admin-dashboard-category-badge supplier"/);

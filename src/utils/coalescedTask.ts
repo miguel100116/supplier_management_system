@@ -1,3 +1,15 @@
+// A refresh may publish only while the state it started from is still current.
+export function createRefreshGuard() {
+  let revision = 0;
+  return {
+    invalidate() { revision += 1; },
+    start() {
+      const startedAt = revision;
+      return () => revision === startedAt;
+    },
+  };
+}
+
 /**
  * Runs at most one async task per key. Calls received while a task is running
  * mark that key dirty and cause one follow-up run after the active task ends.

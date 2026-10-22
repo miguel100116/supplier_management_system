@@ -51,7 +51,7 @@ interface SurveyFillerPageProps {
     address: string | undefined,
     answers: { questionId: string; questionNumber: number; question: string; questionCategory: string; rating: Rating; comment: string }[],
     startTime?: string
-  ) => string | null;
+  ) => string | null | Promise<string | null>;
   onCancel?: () => void;
 }
 
@@ -124,6 +124,8 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   const [ratings, setRatings] = useState<Record<string, any>>({});
   const [comments, setComments] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [copyPreviousAnswers, setCopyPreviousAnswers] = useState(true);
 
@@ -240,6 +242,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
   useImperativeHandle(ref, () => ({
     attemptExit: (onAllowed: () => void, onCancelled?: () => void) => {
+      if (submittingRef.current) { onCancelled?.(); return; }
       if (step === 2) {
         // Mid-survey: don't let external navigation (Home, sidebar, etc.)
         // silently wipe in-progress answers - surface the same draft warning.
@@ -448,9 +451,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     setComments((prev) => ({ ...prev, [qId]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeSurvey) return;
+    if (!activeSurvey || submittingRef.current) return;
     if (!hasOrganizationalProfile) {
       setError('Your Department and Designation are not assigned. Please contact an administrator before submitting an evaluation.');
       return;
@@ -592,26 +595,35 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       }];
     });
 
-    const responseId = onSubmitted(
-      selectedSurveyId,
-      company.trim(),
-      department,
-      respondentType,
-      address.trim(),
-      formattedAnswers,
-      startTimeRef.current ?? undefined
-    );
-    if (!responseId) {
-      setError('Your evaluation could not be submitted. Please try again.');
-      return;
-    }
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const responseId = await onSubmitted(
+        selectedSurveyId,
+        company.trim(),
+        department,
+        respondentType,
+        address.trim(),
+        formattedAnswers,
+        startTimeRef.current ?? undefined
+      );
+      if (!responseId) {
+        setError('Your evaluation could not be submitted. Please try again.');
+        return;
+      }
 
-    if (selectedSurveyId && company) {
-      const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company.trim()}`;
-      localStorage.removeItem(draftKey);
-    }
+      if (selectedSurveyId && company) {
+        const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company.trim()}`;
+        localStorage.removeItem(draftKey);
+      }
 
-    setStep(3);
+      setStep(3);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Your evaluation could not be saved. Please try again.');
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   const handleReset = () => {
@@ -1157,6 +1169,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             <div className="flex items-center gap-3">
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={() => employeeExperience && showReview ? setShowReview(false) : setStep(1)}
                 className="secondary-button flex items-center gap-1.5"
               >
@@ -1169,9 +1182,11 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
               type="submit"
               className={employeeExperience ? 'primary-button' : 'primary-button w-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 min-[420px]:w-auto'}
               id="btn-filler-submit"
+              disabled={isSubmitting}
+              aria-busy={isSubmitting}
             >
               {employeeExperience && showReview ? <Send size={14} /> : employeeExperience ? <ArrowRight size={14} /> : <Send size={14} />}
-              <span>{employeeExperience ? showReview ? 'Submit evaluation' : 'Review answers' : 'Submit Evaluation'}</span>
+              <span>{isSubmitting ? 'Saving evaluation...' : employeeExperience ? showReview ? 'Submit evaluation' : 'Review answers' : 'Submit Evaluation'}</span>
             </button>
           </div>
         </form>
