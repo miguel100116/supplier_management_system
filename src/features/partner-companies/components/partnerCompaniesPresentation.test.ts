@@ -47,13 +47,15 @@ test('branch category and rank analysis remains separate and before directory co
   const breakdownPosition = PARTNER_COMPANIES_SOURCE.indexOf('<PartnerCategoryRankBreakdown');
   const toolbarPosition = PARTNER_COMPANIES_SOURCE.indexOf('<PartnerCompaniesFilterToolbar');
   const paginationPosition = PARTNER_COMPANIES_SOURCE.indexOf('admin-directory-pagination panel');
-  assert.ok(overviewPosition >= 0 && breakdownPosition > overviewPosition && breakdownPosition < toolbarPosition, 'analysis stays before directory controls');
+  assert.ok(overviewPosition >= 0 && breakdownPosition > overviewPosition && breakdownPosition < PARTNER_COMPANIES_SOURCE.indexOf('</PartnerRegistryOverview>', overviewPosition), 'analysis remains inside the directory overview composition');
   assert.ok(paginationPosition > toolbarPosition, 'pagination stays beneath directory results');
 
   const overviewWithBreakdown = renderToStaticMarkup(createElement(PartnerRegistryOverview, {
     category: 'All', onCategoryChange: () => {}, onOpenActiveCompanies: () => {}, onOpenRegister: () => {},
+    directoryControls: createElement('div', { 'data-testid': 'directory-controls' }),
   }, createElement(PartnerCategoryRankBreakdown, props)));
-  assert.ok(overviewWithBreakdown.indexOf('Category &amp; Supplier Rank Breakdown') < overviewWithBreakdown.indexOf('aria-label="Partner categories"'));
+  assert.ok(overviewWithBreakdown.indexOf('Category &amp; Supplier Rank Breakdown') < overviewWithBreakdown.indexOf('aria-label="Partner categories"'), 'analysis renders before category tabs');
+  assert.ok(overviewWithBreakdown.indexOf('aria-label="Partner categories"') < overviewWithBreakdown.indexOf('data-testid="directory-controls"'), 'category tabs render before directory controls');
 });
 
 test('directory filters open from icons and reset independently inside their popovers', () => {

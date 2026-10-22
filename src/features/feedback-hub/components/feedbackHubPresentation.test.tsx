@@ -99,7 +99,7 @@ test('Past Results explains type-wide response counts and retains the existing c
   assert.match(markup, /Partner type/);
   assert.match(markup, /Scope/);
   assert.match(markup, /Export PDF/);
-  assert.match(markup, /Send to partner/);
+  assert.match(markup, /Send report to partner/);
 });
 
 test('Sent Reports exposes compact partner-type filtering and counts its filtered results', () => {
