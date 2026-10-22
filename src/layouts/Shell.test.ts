@@ -19,14 +19,27 @@ test('module navigation resets the shared page scroll position', () => {
   assert.deepEqual(receivedOptions, { top: 0, left: 0, behavior: 'auto' });
 });
 
-test('global header keeps the logo and renders no title text or separator', () => {
+test('Admin shell places the logo in the navigation rail and route context in the content header', () => {
   const source = readFileSync(new URL('./Shell.tsx', import.meta.url), 'utf8');
-  const headerSource = source.match(/<header\b[\s\S]*?<\/header>/)?.[0];
+  const brandSource = source.match(/className="admin-brand"[\s\S]*?<\/button>/)?.[0];
+  const headerSource = source.match(/<header className="admin-topbar">[\s\S]*?<\/header>/)?.[0];
 
-  assert.ok(headerSource?.includes('src="/microgenesis_logo.png"'));
-  assert.ok(!headerSource?.includes('Supplier Management System'));
-  assert.doesNotMatch(headerSource ?? '', /\{title\}/);
-  assert.doesNotMatch(headerSource ?? '', />\s*\/\s*</);
+  assert.ok(brandSource?.includes('src="/microgenesis_logo.png"'));
+  assert.ok(headerSource?.includes('{moduleLabel}'));
+  assert.ok(headerSource?.includes('{action}'));
+  assert.doesNotMatch(headerSource ?? '', /src="\/microgenesis_logo\.png"/);
+});
+
+test('Admin desktop navigation stays expanded and preserves grouped destinations', () => {
+  const source = readFileSync(new URL('./Shell.tsx', import.meta.url), 'utf8');
+  const adminBranch = source.slice(source.indexOf('if (adminMode) {'), source.indexOf('/* Top Header Layer */'));
+
+  assert.match(adminBranch, /className="admin-workspace"/);
+  assert.match(adminBranch, /<nav className="admin-navigation"/);
+  assert.match(adminBranch, /aria-expanded=\{expanded \|\| isMobileNavOpen\}/);
+  assert.match(adminBranch, /onClick=\{\(\) => toggleGroup\(page\.id\)\}/);
+  assert.doesNotMatch(adminBranch, /admin-sidebar-toggle|isSidebarCollapsed/);
+  assert.match(adminBranch, /sidebarExtra\(false\)/);
 });
 
 test('login audience switch shares responsive headings and validates the selected type before entering the app', () => {

@@ -57,10 +57,9 @@ export function PartnerRegistryOverview({
 
   return (
     <>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div className="admin-directory-header flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-[30px]">Directory</h1>
-          <p className="mt-1 text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">Manage accredited partner companies, compliance documentation, and branch accreditation company-wide.</p>
+          <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">Manage accredited companies, branches, and compliance status across the partner registry.</p>
         </div>
         {isAdmin && (
           <div className="flex flex-wrap gap-2 xl:shrink-0">

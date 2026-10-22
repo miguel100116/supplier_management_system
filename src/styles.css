@@ -10,7 +10,7 @@
 
 @theme {
   --default-ring-width: 3px;
-  --default-ring-color: #3b82f6;
+  --default-ring-color: #2187cd;
 }
 
 /* Preserve the v3 defaults and invisible accessibility outline. */

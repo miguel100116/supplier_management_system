@@ -173,6 +173,11 @@ test('Analytics renders loaded responses without calling an aggregate API', (t) 
     assert.match(markup, /Retained Partner/);
     assert.equal(fetchMock.mock.callCount(), 0);
     assert.match(markup, /Analytics summary/);
+    assert.match(markup, /1 scored submissions in this view/);
+    assert.equal((markup.match(/id="analytics-detail-heading"/g) ?? []).length, 1);
+    assert.equal((markup.match(/>Rating trend<\/h3>/g) ?? []).length, 1);
+    assert.match(markup, />Courier<\/button>/);
+    assert.doesNotMatch(markup, />(Supplier|Subcontractor)<\/button>/);
     assert.doesNotMatch(markup, /Loading Analytics/);
   } finally {
     if (previous === undefined) Reflect.deleteProperty(globals, 'React');

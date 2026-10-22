@@ -440,7 +440,7 @@ export function ArchivePage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="admin-archive-page space-y-6">
       <PageDescription>Manage archived partner companies, restore archived surveys, and review preserved responses.</PageDescription>
       {successMessage && (
         <div className="bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/50 rounded-xl p-4 flex items-center gap-3 text-emerald-800 dark:text-emerald-300 text-sm animate-fade-in">
@@ -454,99 +454,33 @@ export function ArchivePage({
         </div>
       )}
 
-      {/* Archive section selectors */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {/* Block 1: Archived Survey */}
-        <button
-          onClick={() => {
-            setActiveTab('surveys');
-            setSearchQuery('');
-          }}
-          className={`panel min-h-[120px] p-5 flex items-center gap-4 text-left transition relative overflow-hidden cursor-pointer ${
-            activeTab === 'surveys'
-              ? '!border-[#0063a9] !bg-[#0063a9] text-white shadow-sm'
-              : 'bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:bg-slate-900'
-          }`}
-          id="btn-archive-surveys"
-        >
-          <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'surveys' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-          }`}>
-            <ClipboardList size={24} />
-          </div>
-          <div className="space-y-1 flex-1 pr-12">
-            <h3 className={`text-sm font-bold ${activeTab === 'surveys' ? 'text-white' : 'text-slate-900 dark:text-white'}`}>Archived Surveys</h3>
-            <p className={`text-xs line-clamp-2 ${activeTab === 'surveys' ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              Form templates removed from active rotation. Can be restored back to the active registry.
-            </p>
-          </div>
-          <span className={`absolute top-5 right-5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black ${activeTab === 'surveys' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
-            {archivedSurveys.length}
-          </span>
-        </button>
-
-        {/* Block 2: Archived Responses */}
-        <button
-          onClick={() => {
-            setActiveTab('responses');
-            setSearchQuery('');
-          }}
-          className={`panel min-h-[120px] p-5 flex items-center gap-4 text-left transition relative overflow-hidden cursor-pointer ${
-            activeTab === 'responses'
-              ? '!border-[#0063a9] !bg-[#0063a9] text-white shadow-sm'
-              : 'bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:bg-slate-900'
-          }`}
-          id="btn-archive-responses"
-        >
-          <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'responses' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-          }`}>
-            <FileText size={24} />
-          </div>
-          <div className="space-y-1 flex-1 pr-12">
-            <h3 className={`text-sm font-bold ${activeTab === 'responses' ? 'text-white' : 'text-slate-900 dark:text-white'}`}>Archived Responses</h3>
-            <p className={`text-xs line-clamp-2 ${activeTab === 'responses' ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              Submissions preserved from completed or reset evaluations. Keeps your live dashboards neat.
-            </p>
-          </div>
-          <span className={`absolute top-5 right-5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black ${activeTab === 'responses' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
-            {groupedArchivedResponses.length}
-          </span>
-        </button>
-
-        {/* Block 3: Archived Companies */}
-        <button
-          onClick={() => {
-            setActiveTab('companies');
-            setSearchQuery('');
-            setCompanyTypeFilter('All');
-          }}
-          className={`panel min-h-[120px] p-5 flex items-center gap-4 text-left transition relative overflow-hidden cursor-pointer ${
-            activeTab === 'companies'
-              ? '!border-[#0063a9] !bg-[#0063a9] text-white shadow-sm'
-              : 'bg-white hover:border-slate-300 hover:bg-slate-50/50 dark:bg-slate-900'
-          }`}
-          id="btn-archive-companies"
-        >
-          <div className={`p-3 rounded-xl shrink-0 ${
-            activeTab === 'companies' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-          }`}>
-            <Building2 size={24} />
-          </div>
-          <div className="space-y-1 flex-1 pr-12">
-            <h3 className={`text-sm font-bold ${activeTab === 'companies' ? 'text-white' : 'text-slate-900 dark:text-white'}`}>Archived Companies</h3>
-            <p className={`text-xs line-clamp-2 ${activeTab === 'companies' ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
-              View archived partner records and restore companies to the active registry.
-            </p>
-          </div>
-          <span className={`absolute top-5 right-5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-black ${activeTab === 'companies' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
-            {archivedCompanies.length}
-          </span>
-        </button>
+      <div className="archive-section-tabs" role="group" aria-label="Choose archived record type">
+        {([
+          { key: 'surveys', label: 'Surveys', count: archivedSurveys.length, Icon: ClipboardList },
+          { key: 'responses', label: 'Responses', count: groupedArchivedResponses.length, Icon: FileText },
+          { key: 'companies', label: 'Companies', count: archivedCompanies.length, Icon: Building2 },
+        ] as const).map(({ key, label, count, Icon }) => (
+          <button
+            key={key}
+            type="button"
+            id={`btn-archive-${key}`}
+            onClick={() => {
+              setActiveTab(key);
+              setSearchQuery('');
+              if (key === 'companies') setCompanyTypeFilter('All');
+            }}
+            aria-pressed={activeTab === key}
+            className={`archive-section-tab${activeTab === key ? ' is-active' : ''}`}
+          >
+            <Icon size={15} aria-hidden="true" />
+            <span>Archived {label}</span>
+            <span className="archive-section-count">{count}</span>
+          </button>
+        ))}
       </div>
 
       {/* List Container with Search */}
-      <div className="panel p-5 space-y-4">
+      <div className="archive-list-panel panel p-5 space-y-4">
         <div role="toolbar" aria-label="Archive filters" className="flex flex-wrap items-center gap-2">
           <label className="relative min-w-0 flex-1 basis-24 sm:min-w-[160px]">
             <span className="sr-only">Search archived {activeTab}</span>

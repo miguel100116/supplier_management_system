@@ -123,6 +123,68 @@
 .dark [class~="dark:text-blue-300"],
 .dark [class~="dark:text-blue-400"] { color: var(--accent); }
 
+/* Legacy brand-color utilities now resolve to the shared Microgenesis blue. */
+[class~="bg-[#0063a9]"],
+[class~="hover:bg-[#0063a9]"]:hover { background-color: var(--primary); }
+[class~="bg-[#0063a9]/5"] { background-color: color-mix(in srgb, var(--primary) 5%, transparent); }
+[class~="bg-[#0063a9]/10"],
+[class~="hover:bg-[#0063a9]/10"]:hover,
+.group:hover [class~="group-hover:bg-[#0063a9]/10"] { background-color: color-mix(in srgb, var(--primary) 10%, transparent); }
+[class~="bg-[#0063a9]/20"],
+[class~="hover:bg-[#0063a9]/20"]:hover { background-color: color-mix(in srgb, var(--primary) 20%, transparent); }
+[class~="bg-[#00528c]/40"] { background-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+[class~="hover:bg-[#00528c]/60"]:hover { background-color: color-mix(in srgb, var(--primary) 60%, transparent); }
+[class~="bg-[#0063a9]/[0.04]"] { background-color: color-mix(in srgb, var(--primary) 4%, transparent); }
+[class~="bg-[#0063a9]/[0.05]"] { background-color: color-mix(in srgb, var(--primary) 5%, transparent); }
+[class~="bg-[#0063a9]/[0.08]"] { background-color: color-mix(in srgb, var(--primary) 8%, transparent); }
+[class~="text-[#0063a9]"],
+[class~="text-[#0078a8]"],
+[class~="hover:text-[#0063a9]"]:hover { color: var(--primary); }
+.group:hover [class~="group-hover:text-[#0063a9]"],
+.group:hover [class~="group-hover:text-[#0078a8]"] { color: var(--primary); }
+[class~="border-[#0063a9]"],
+[class~="hover:border-[#0063a9]"]:hover { border-color: var(--primary); }
+[class~="border-[#0063a9]/10"] { border-color: color-mix(in srgb, var(--primary) 10%, transparent); }
+[class~="border-[#0063a9]/15"] { border-color: color-mix(in srgb, var(--primary) 15%, transparent); }
+[class~="border-[#0063a9]/20"] { border-color: color-mix(in srgb, var(--primary) 20%, transparent); }
+[class~="border-[#0063a9]/30"] { border-color: color-mix(in srgb, var(--primary) 30%, transparent); }
+[class~="hover:border-[#0063a9]/50"]:hover { border-color: color-mix(in srgb, var(--primary) 50%, transparent); }
+[class~="hover:border-[#0063a9]/60"]:hover { border-color: color-mix(in srgb, var(--primary) 60%, transparent); }
+[class~="accent-[#0063a9]"] { accent-color: var(--primary); }
+[class~="stroke-[#0063a9]"] { stroke: var(--primary); }
+[class~="focus:border-[#0063a9]"]:focus { border-color: var(--focus-ring); }
+[class~="focus:ring-[#0063a9]"]:focus,
+[class~="focus-visible:ring-[#0063a9]"]:focus-visible,
+[class~="focus-within:ring-[#0063a9]"]:focus-within { --tw-ring-color: var(--focus-ring); }
+[class~="focus:ring-[#0063a9]/15"]:focus { --tw-ring-color: color-mix(in srgb, var(--focus-ring) 15%, transparent); }
+
+[class~="hover:bg-[#00528c]"]:hover,
+[class~="hover:bg-[#00558f]"]:hover { background-color: var(--primary-hover); }
+[class~="hover:text-[#004f87]"]:hover { color: var(--primary-hover); }
+[class~="hover:border-[#0078a8]"]:hover { border-color: var(--primary); }
+
+.dark [class~="bg-[#0063a9]"],
+.dark [class~="hover:bg-[#0063a9]"]:hover { background-color: var(--primary); }
+.dark [class~="text-[#0063a9]"],
+.dark [class~="text-[#0078a8]"],
+.dark [class~="hover:text-[#0063a9]"]:hover { color: var(--accent); }
+.dark .group:hover [class~="group-hover:text-[#0063a9]"],
+.dark .group:hover [class~="group-hover:text-[#0078a8]"] { color: var(--accent); }
+.dark [class~="border-[#0063a9]"],
+.dark [class~="hover:border-[#0063a9]"]:hover { border-color: var(--accent-border); }
+.dark [class~="focus:border-[#0063a9]"]:focus { border-color: var(--focus-ring); }
+.dark [class~="focus:ring-[#0063a9]"]:focus,
+.dark [class~="focus-visible:ring-[#0063a9]"]:focus-visible,
+.dark [class~="focus-within:ring-[#0063a9]"]:focus-within { --tw-ring-color: var(--focus-ring); }
+.dark [class~="focus:ring-[#0063a9]/15"]:focus { --tw-ring-color: color-mix(in srgb, var(--focus-ring) 15%, transparent); }
+.dark [class~="hover:bg-[#00528c]"]:hover,
+.dark [class~="hover:bg-[#00558f]"]:hover { background-color: var(--primary-hover); }
+.dark [class~="bg-[#00528c]/40"] { background-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.dark [class~="hover:bg-[#00528c]/60"]:hover { background-color: color-mix(in srgb, var(--primary) 60%, transparent); }
+.dark [class~="hover:text-[#004f87]"]:hover,
+.dark [class~="hover:text-[#0078a8]"]:hover { color: var(--accent); }
+.dark [class~="hover:border-[#0078a8]"]:hover { border-color: var(--accent-border); }
+
 /* Preserve status meaning across the existing utility based components while
    replacing their bright, palette specific dark fills with semantic colors. */
 .dark [class*="dark:bg-emerald-"],
@@ -171,12 +233,6 @@
 .dark [class*="dark:text-purple-"] { color: var(--muted-foreground); }
 .dark [class*="dark:border-violet-"],
 .dark [class*="dark:border-purple-"] { border-color: var(--border); }
-
-.dark [class~="bg-[#0063a9]"] { background-color: var(--primary); }
-.dark [class~="hover:bg-[#00528c]"]:hover { background-color: var(--primary-hover); }
-.dark [class~="text-[#0063a9]"] { color: var(--accent); }
-.dark [class~="border-[#0063a9]"] { border-color: var(--accent-border); }
-.dark [class~="focus:ring-[#0063a9]"]:focus-visible { --tw-ring-color: var(--focus-ring); }
 
 .dark .recharts-cartesian-axis-tick-value,
 .dark .recharts-legend-item-text { fill: var(--muted-foreground); color: var(--muted-foreground) !important; }

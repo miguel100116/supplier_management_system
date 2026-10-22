@@ -37,25 +37,26 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
     .slice(0, 2) || 'AD';
 
   return (
-    <div className={`relative ${appearance === 'employee' ? 'account-wrap' : ''}`} ref={menuRef} id="account-menu-container">
+    <div className={`relative ${appearance === 'employee' ? 'account-wrap' : appearance === 'neutral' ? 'admin-account-wrap' : ''}`} ref={menuRef} id="account-menu-container">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={appearance === 'employee' ? 'account-button' : `flex items-center gap-1 rounded-lg px-1.5 py-1.5 text-sm font-medium outline-none transition min-[380px]:gap-2 min-[380px]:px-2 sm:px-3 cursor-pointer animate-fade-in ${appearance === 'neutral' ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800' : 'border border-blue-400/25 bg-[#00528c]/40 text-white hover:bg-[#00528c]/60'}`}
+        className={appearance === 'employee' ? 'account-button' : appearance === 'neutral' ? 'admin-account-button' : `flex items-center gap-1 rounded-lg px-1.5 py-1.5 text-sm font-medium outline-none transition min-[380px]:gap-2 min-[380px]:px-2 sm:px-3 cursor-pointer animate-fade-in border border-blue-400/25 bg-[#00528c]/40 text-white hover:bg-[#00528c]/60`}
         type="button"
         id="account-menu-trigger"
       >
-        <div className={appearance === 'employee' ? 'avatar' : 'flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[#0063a9] font-bold text-xs shadow-sm shrink-0'}>
+        <div className={appearance === 'employee' ? 'avatar' : appearance === 'neutral' ? 'admin-account-avatar' : 'flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-[#0063a9] font-bold text-xs shadow-sm shrink-0'}>
           {initials}
         </div>
-        <span className={appearance === 'employee' ? 'account-name' : `hidden md:inline truncate max-w-28 ${appearance === 'neutral' ? 'text-slate-600 dark:text-slate-300' : 'text-blue-100 group-hover:text-white'}`}>
-          {email}{appearance === 'employee' && <span>{designation || role || 'Employee'}</span>}
+        <span className={appearance === 'employee' ? 'account-name' : appearance === 'neutral' ? 'admin-account-name' : 'hidden md:inline truncate max-w-28 text-blue-100 group-hover:text-white'}>
+          {appearance === 'neutral' ? <span className="admin-account-email">{email}</span> : email}
+          {(appearance === 'employee' || appearance === 'neutral') && <span className={appearance === 'neutral' ? 'admin-account-designation' : undefined}>{appearance === 'neutral' && role === 'Admin' ? 'Administrator' : designation || role || 'Employee'}</span>}
         </span>
-        <ChevronDown size={14} className={`transition-transform duration-200 ${appearance === 'neutral' ? 'text-slate-400 dark:text-slate-500' : appearance === 'employee' ? 'text-slate-400' : 'text-blue-200'} ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`transition-transform duration-200 ${appearance === 'neutral' || appearance === 'employee' ? 'text-slate-400' : 'text-blue-200'} ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
         <div
-          className={appearance === 'employee' ? 'account-menu' : 'absolute right-0 z-50 mt-2 w-[calc(100vw-1rem)] max-w-64 origin-top-right rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5 focus:outline-none dark:border-slate-800 dark:bg-slate-950 animate-in fade-in slide-in-from-top-1 duration-150'}
+          className={`${appearance === 'employee' ? 'employee-account-menu ' : appearance === 'neutral' ? 'admin-account-menu ' : ''}absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-1rem))] origin-top-right rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl ring-1 ring-black/5 focus:outline-none dark:border-slate-800 dark:bg-slate-950 animate-in fade-in slide-in-from-top-1 duration-150`}
           id="account-menu-dropdown"
         >
           <div className="px-3 py-2.5 border-b border-slate-100 dark:border-slate-800">
@@ -65,8 +66,8 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
             </p>
           </div>
           
-          <div className="mt-1 divide-y divide-slate-100 dark:divide-slate-800">
-            <div className="flex flex-col gap-2 px-3 py-2.5 text-xs text-slate-600 dark:text-slate-400">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+            <div className="flex flex-col gap-2.5 px-3 py-3 text-xs leading-5 text-slate-600 dark:text-slate-400">
               <div className="flex items-center gap-2">
                 <User size={13} className={appearance === 'employee' ? 'text-[#2187CD]' : 'text-[#0063a9] dark:text-blue-400'} />
                 <span className="font-bold text-slate-700 dark:text-slate-300">
@@ -74,30 +75,30 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
                 </span>
               </div>
               {designation && (
-                <div className="flex items-center gap-2 pl-5">
-                  <Award size={12} className="text-slate-400" />
+                <div className="flex items-start gap-2 pl-5">
+                  <Award size={13} className="mt-0.5 shrink-0 text-slate-400" />
                   <span>Designation: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{designation}</strong></span>
                 </div>
               )}
               {department && (
-                <div className="flex items-center gap-2 pl-5">
-                  <MapPin size={12} className="text-slate-400" />
+                <div className="flex items-start gap-2 pl-5">
+                  <MapPin size={13} className="mt-0.5 shrink-0 text-slate-400" />
                   <span>Department: <strong className="text-slate-700 dark:text-slate-300 font-semibold">{department}</strong></span>
                 </div>
               )}
             </div>
             
-            <div className="pt-1.5 pb-0.5">
+            <div className="space-y-0.5 py-1.5">
               <button
                 onClick={() => {
                   setIsOpen(false);
                   onOpenSettings();
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900 cursor-pointer"
+                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900 cursor-pointer"
                 type="button"
                 id="settings-button"
               >
-                <Settings size={15} />
+                <Settings size={18} className="shrink-0" />
                 <span>Settings</span>
               </button>
               <button
@@ -105,11 +106,11 @@ export function AccountMenu({ email, designation, department, role, onOpenSettin
                   setIsOpen(false);
                   onLogout();
                 }}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition cursor-pointer"
+                className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition cursor-pointer"
                 type="button"
                 id="logout-button"
               >
-                <LogOut size={15} />
+                <LogOut size={16} className="shrink-0" />
                 <span>Sign out</span>
               </button>
             </div>

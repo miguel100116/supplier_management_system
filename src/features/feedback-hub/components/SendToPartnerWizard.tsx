@@ -62,7 +62,7 @@ import { formatNumber, getScoreAxisDomain, questionPerformance, submissionScores
 import { radarPointLabel } from '../../analytics/components/radarChartLabels';
 import { BulkHiddenChartCapturer, BulkReportCaptureItem } from './BulkHiddenChartCapturer';
 
-const PRIMARY_COLOR = '#0063a9';
+const PRIMARY_COLOR = '#2187cd';
 const PEER_COLOR = '#b91c1c';
 const PEER_LABEL = 'Peer average';
 

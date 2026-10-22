@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { configureMsal } from './services/msalAuth';
 import './styles.css';
 import './features/employee-experience/components/employeeExperience.css';
+import './adminWorkspace.css';
+import './adminRedesign.css';
 import './darkTheme.css';
 
 async function startApp() {

@@ -5,9 +5,11 @@ import { useModalEscape } from '../../../hooks/useModalEscape';
 import { filterPendingEvaluations, getPendingEmployeeEvaluations, type EmployeeEvaluationFilter } from '../domain/pendingEvaluations';
 import { EmployeeCompanyIcon } from './EmployeeCompanyIcon';
 import { Pagination } from '../../../components/Pagination';
+import { WorkspaceWelcomeBanner } from '../../../components/WorkspaceWelcomeBanner';
 
 type WorkspaceView = 'Home' | 'Evaluations' | 'My submissions';
 type SubmissionItem = { id: string; company: string; type: SurveyType; date: string; answers: { question: string; answer: string }[] };
+const EMPLOYEE_ROWS_PER_PAGE = 10;
 
 interface EmployeeWorkspacePageProps {
   view: WorkspaceView;
@@ -48,8 +50,6 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
   const [detail, setDetail] = useState<SubmissionItem | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [evaluationPage, setEvaluationPage] = useState(1);
-  const [evaluationPageSize, setEvaluationPageSize] = useState(10);
-  const [historyPageSize, setHistoryPageSize] = useState(10);
   useModalEscape(Boolean(detail), () => setDetail(null));
 
   const evaluations = useMemo(() => getPendingEmployeeEvaluations(surveys, partnerCompanies, responses, userEmail), [partnerCompanies, responses, surveys, userEmail]);
@@ -60,11 +60,11 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
     return counts;
   }, [evaluations]);
   const visibleEvaluations = useMemo(() => filterPendingEvaluations(evaluations, evaluationFilter, search), [evaluations, evaluationFilter, search]);
-  const evaluationPageCount = Math.max(1, Math.ceil(visibleEvaluations.length / evaluationPageSize));
+  const evaluationPageCount = Math.max(1, Math.ceil(visibleEvaluations.length / EMPLOYEE_ROWS_PER_PAGE));
   const activeEvaluationPage = Math.min(evaluationPage, evaluationPageCount);
   const pagedEvaluations = visibleEvaluations.slice(
-    (activeEvaluationPage - 1) * evaluationPageSize,
-    activeEvaluationPage * evaluationPageSize,
+    (activeEvaluationPage - 1) * EMPLOYEE_ROWS_PER_PAGE,
+    activeEvaluationPage * EMPLOYEE_ROWS_PER_PAGE,
   );
   const groupedSubmissions = useMemo(() => {
     const byResponseId = new Map<string, SurveyResponse[]>();
@@ -93,8 +93,7 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
     (filter === 'All evaluations' || item.type === filter) &&
     `${item.company} ${item.type}`.toLowerCase().includes(search.trim().toLowerCase()),
   );
-  const pageSize = historyPageSize;
-  const pageCount = Math.max(1, Math.ceil(visibleSubmissions.length / pageSize));
+  const pageSize = EMPLOYEE_ROWS_PER_PAGE;
   const pagedSubmissions = visibleSubmissions.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const visibleEvaluationRows = view === 'Home' ? categoryEvaluations.slice(0, 3) : pagedEvaluations;
@@ -147,20 +146,13 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
       </div>
 
       {view === 'Home' && (
-        <div className="welcome-banner">
-          <div className="welcome-content">
-            <span className="banner-eyebrow"><span /> YOUR EXPERIENCE MATTERS</span>
-            <h2>Better partners.<br />Better work, together.</h2>
-            <p>Your feedback helps us understand the partners<br className="desktop-break" /> we work with. Start with an evaluation below.</p>
-            <button className="banner-link" type="button" onClick={() => onNavigate('Evaluations')}>Explore your evaluations <ArrowRight size={17} /></button>
-          </div>
-          <div className="hero-art" aria-hidden="true">
-            <div className="art-orbit orbit-one" /><div className="art-orbit orbit-two" /><div className="art-dot dot-one" /><div className="art-dot dot-two" />
-            <div className="art-sheet sheet-back" /><div className="art-sheet sheet-front"><span className="art-sheet-heading" /><span className="art-sheet-sub" />
-              {[0, 1, 2].map((item) => <div className="art-line" key={item}><span className="art-check"><Check size={12} /></span><span /></div>)}
-            </div><div className="art-seal"><Check size={24} /></div>
-          </div>
-        </div>
+        <WorkspaceWelcomeBanner
+          eyebrow="YOUR EXPERIENCE MATTERS"
+          title={<>Better partners.<br />Better work, together.</>}
+          description={<>Your feedback helps us understand the partners<br className="desktop-break" /> we work with. Start with an evaluation below.</>}
+          actionLabel="Explore your evaluations"
+          onAction={() => onNavigate('Evaluations')}
+        />
       )}
 
       {view !== 'My submissions' && (
@@ -187,7 +179,7 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
                     </div>)}
                     {visibleEvaluationRows.length === 0 && <div className="empty-state" role="status"><ClipboardList size={30} /><h3>{emptyTitle}</h3><p>{emptyDescription}</p>{(evaluationFilter !== 'All evaluations' || search.trim()) && <button className="text-button" type="button" onClick={() => { updateEvaluationFilter('All evaluations'); setSearch(''); setEvaluationPage(1); }}>{view === 'Home' && evaluationFilter !== 'All evaluations' ? 'View all categories' : 'Clear filters'}</button>}</div>}
                   </div>}
-              {!isLoading && !error && view === 'Evaluations' && visibleEvaluations.length > 0 && <Pagination page={activeEvaluationPage} pageSize={evaluationPageSize} totalItems={visibleEvaluations.length} onPageChange={setEvaluationPage} onPageSizeChange={(size) => { setEvaluationPageSize(size); setEvaluationPage(1); }} ariaLabel="Evaluation pages" showPageControls={evaluationPageCount > 1 || evaluationPageSize !== 10} verticalPadding="comfortable" className="mt-6 px-[17px] min-[561px]:px-5" />}
+              {!isLoading && !error && view === 'Evaluations' && visibleEvaluations.length > 0 && <Pagination page={activeEvaluationPage} pageSize={EMPLOYEE_ROWS_PER_PAGE} totalItems={visibleEvaluations.length} onPageChange={setEvaluationPage} ariaLabel="Evaluation pages" showPageControls showPageSizeSelector={false} verticalPadding="comfortable" className="mt-6 px-[17px] min-[561px]:px-5" />}
               {view === 'Home' && <div className="panel-footnote"><LockKeyhole size={14} /> Only evaluations available to you appear here.</div>}
             </section>
             {view === 'Home' && <section className="panel recent-panel">
@@ -216,16 +208,18 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
           : error ? <div className="empty-state" role="alert"><History size={30} /><h3>Submissions are unavailable</h3><p>We couldn’t load your submission history.</p></div>
             : <HistoryRows items={pagedSubmissions} onSelect={setDetail} />}
         {!isLoading && !error && !visibleSubmissions.length && <div className="empty-state"><History size={30} /><h3>{groupedSubmissions.length ? 'No submissions found' : 'No submissions yet'}</h3><p>{groupedSubmissions.length ? 'Try another search or clear your filters.' : 'Your completed evaluations will appear here.'}</p>{groupedSubmissions.length > 0 && <button className="text-button" type="button" onClick={() => { setSearch(''); setFilter('All evaluations'); }}>Clear filters</button>}</div>}
-        {!isLoading && !error && visibleSubmissions.length > 0 && <Pagination page={currentPage} pageSize={pageSize} totalItems={visibleSubmissions.length} onPageChange={setCurrentPage} onPageSizeChange={(size) => { setHistoryPageSize(size); setCurrentPage(1); }} ariaLabel="Submission history pagination" showPageControls={pageCount > 1 || pageSize !== 10} />}
+        {!isLoading && !error && visibleSubmissions.length > 0 && <Pagination page={currentPage} pageSize={pageSize} totalItems={visibleSubmissions.length} onPageChange={setCurrentPage} ariaLabel="Submission history pagination" showPageControls showPageSizeSelector={false} />}
       </section>}
 
       {detail && <div className="fixed inset-0 modal-backdrop">
-        <section className="modal" role="dialog" aria-modal="true" aria-label="Submission details">
+        <section className="modal submission-details-modal" role="dialog" aria-modal="true" aria-label="Submission details">
           <button className="modal-close icon-button" type="button" aria-label="Close dialog" autoFocus onClick={() => setDetail(null)}><span aria-hidden="true">×</span></button>
-          <span className="submitted-tag"><Check size={13} /> Submitted</span><h2>{detail.company}</h2><p className="modal-subtitle">{detail.type} evaluation · {formatDateTime(detail.date)}</p>
-          <div className="modal-note">Submitted evaluation · Read-only</div>
-          {detail.answers.map((answer, index) => <div className="answer-row" key={`${answer.question}-${index}`}><div><span>{answer.question}</span><p>{answer.answer}</p></div></div>)}
-          <button className="secondary-button" type="button" onClick={() => { setDetail(null); onNavigate('My submissions'); }}>Back to my submissions</button>
+          <div className="submission-details-content">
+            <span className="submitted-tag"><Check size={13} /> Submitted</span><h2>{detail.company}</h2><p className="modal-subtitle">{detail.type} evaluation · {formatDateTime(detail.date)}</p>
+            <div className="modal-note">Submitted evaluation · Read-only</div>
+            {detail.answers.map((answer, index) => <div className="answer-row" key={`${answer.question}-${index}`}><div><span>{answer.question}</span><p>{answer.answer}</p></div></div>)}
+            <button className="secondary-button" type="button" onClick={() => { setDetail(null); onNavigate('My submissions'); }}>Back to my submissions</button>
+          </div>
         </section>
       </div>}
     </>
