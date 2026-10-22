@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { QueuedReportEmail } from '../types';
-import { Clock, CheckCircle2, Send, Users, ChevronRight, AlertCircle, Sparkles, Filter, Search } from 'lucide-react';
+import { Clock, CheckCircle2, Send, Users, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
 import { SurveyProgressModal } from './SurveyProgressModal';
 import { SurveyDetailModal } from './SurveyDetailModal';
+import { FeedbackHubFilterBar } from './FeedbackHubFilterBar';
 import { getSurveyCompletionSummary } from '../../evaluations/domain/surveyCompletion';
 import { SurveyAccount } from '../../../hooks/useSurveyData';
 
@@ -46,34 +47,25 @@ export function CurrentFormsTab({
   });
 
   return (
-    <div className="space-y-6">
-      {/* Search & Category Filter Bar */}
-      <div className="flex flex-col sm:flex-row-reverse sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950">
-        <div className="relative flex-1 max-w-md w-full">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search forms by form title or survey type..."
-            className="field text-xs !mt-0"
-            style={{ paddingLeft: '2.75rem' }}
-          />
-        </div>
-
-        <div className="segmented-control shrink-0">
-          {(['All', 'Courier', 'Supplier', 'Subcontractor'] as const).map((type) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => setTypeFilter(type)}
-              className={typeFilter === type ? 'segmented-active' : ''}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="feedback-hub-tab feedback-current-tab space-y-4">
+      <FeedbackHubFilterBar
+        searchValue={searchQuery}
+        searchPlaceholder="Search current forms"
+        searchLabel="Search forms by title or partner type"
+        onSearchChange={setSearchQuery}
+        resultCount={filteredSurveys.length}
+        resultLabel={filteredSurveys.length === 1 ? 'form' : 'forms'}
+        categoryValue={typeFilter}
+        categoryLabel="Partner type"
+        categoryOptions={[
+          { value: 'All', label: 'All partner types' },
+          { value: 'Courier', label: 'Courier' },
+          { value: 'Supplier', label: 'Supplier' },
+          { value: 'Subcontractor', label: 'Subcontractor' },
+        ]}
+        onCategoryChange={(value) => setTypeFilter(value as SurveyType | 'All')}
+        onReset={() => { setSearchQuery(''); setTypeFilter('All'); }}
+      />
 
       {/* Forms Grid */}
       {filteredSurveys.length === 0 ? (
@@ -83,7 +75,7 @@ export function CurrentFormsTab({
           <p className="text-xs">Adjust search filters or create new survey forms under Survey Forms tab.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="feedback-current-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredSurveys.map((survey) => {
             // Companies this survey actually evaluates right now (respects
             // the admin's "Modify Companies to Evaluate" selection) and each
@@ -112,11 +104,21 @@ export function CurrentFormsTab({
             return (
               <div
                 key={survey.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`${survey.title}, ${survey.surveyType}, ${isOngoing ? 'Ongoing' : 'Completed'}. View details`}
                 onClick={() => {
                   if (isOngoing) {
                     setSelectedSurveyForProgress(survey);
                   } else {
                     setSelectedSurveyForDetail(survey);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    if (isOngoing) setSelectedSurveyForProgress(survey);
+                    else setSelectedSurveyForDetail(survey);
                   }
                 }}
                 className={`group relative rounded-xl border p-5 transition duration-200 cursor-pointer shadow-sm hover:shadow-md flex flex-col justify-between ${
@@ -128,7 +130,7 @@ export function CurrentFormsTab({
                 <div>
                   {/* Top Header Row */}
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <span className={`feedback-category-badge ${survey.surveyType.toLowerCase()} inline-flex items-center rounded-md px-2.5 py-1 text-[11px] font-bold`}>
                       {survey.surveyType}
                     </span>
 

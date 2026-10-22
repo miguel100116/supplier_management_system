@@ -49,7 +49,10 @@ import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
 import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';
 import { PartnerCompaniesFilterToolbar } from '../features/partner-companies/components/PartnerCompaniesFilterToolbar';
+import { PartnerCompanyDirectoryCard } from '../features/partner-companies/components/PartnerCompanyDirectoryCard';
 import { PartnerRegistryOverview } from '../features/partner-companies/components/PartnerRegistryOverview';
+import { PartnerCategoryRankBreakdown } from '../features/partner-companies/components/PartnerCategoryRankBreakdown';
+import { PartnerDirectoryArchiveButton } from '../features/partner-companies/components/PartnerDirectoryArchiveButton';
 
 const MISSING_FIELD_ICONS: Record<MissingProfileField, typeof MapPin> = {
   address: MapPin,
@@ -69,6 +72,11 @@ export function typeBadgeClasses(type: PartnerCompanyType): string {
     default:
       return 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700';
   }
+}
+
+export function directoryCategoryBadgeClasses(type: PartnerCompanyType, origin?: SupplierOrigin): string {
+  if (type === 'Supplier' && origin === 'Foreign') return 'bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-900/60';
+  return typeBadgeClasses(type);
 }
 
 // Toggle options for a branch's Status field - mirrors the Master List's own
@@ -126,14 +134,7 @@ const DOCUMENT_STATUS_STYLES: Record<DocumentStatus, string> = {
   'Expiring Soon': 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40',
   Expired: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/40',
   'For Update': 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/40',
-  Missing: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700',
-};
-
-const STATUS_TAB_LABELS: Record<'Active' | 'Expired' | 'Incomplete' | 'Archived', string> = {
-  Active: 'Total',
-  Expired: 'Expired',
-  Incomplete: 'Incomplete Profile',
-  Archived: 'Archived',
+  Missing: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50',
 };
 
 interface PartnerCompaniesPageProps {
@@ -190,10 +191,7 @@ export function PartnerCompaniesPage({
   currentUserEmail = '',
 }: PartnerCompaniesPageProps) {
   const canRenew = isAdmin || canRenewDocuments;
-  // Tabs: Active, Expired, Archived
-  const [statusTab, setStatusTab] = useState<'Active' | 'Expired' | 'Incomplete' | 'Archived'>('Active');
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(COMPANIES_PAGE_SIZE);
   // Affiliation filter
   const [activeTab, setActiveTab] = useState<PartnerCompanyType | 'All'>('All');
   // Local/Foreign sub-filter, only meaningful while activeTab === 'Supplier'
@@ -207,7 +205,6 @@ export function PartnerCompaniesPage({
   const [registeredFrom, setRegisteredFrom] = useState('');
   const [registeredTo, setRegisteredTo] = useState('');
   const [documentFilter, setDocumentFilter] = useState<'all' | 'current' | 'expiring' | 'expired' | 'missing'>('all');
-  const [isCategorySummaryOpen, setIsCategorySummaryOpen] = useState(true);
   const [importReplace, setImportReplace] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [registerModalTab, setRegisterModalTab] = useState<'manual' | 'upload'>('manual');
@@ -215,6 +212,7 @@ export function PartnerCompaniesPage({
 
   // Detail Modal State
   const [selectedCompany, setSelectedCompany] = useState<PartnerCompany | null>(null);
+  const [selectedCompanyView, setSelectedCompanyView] = useState<'overview' | 'branches' | 'performance'>('overview');
   
   // Document Renewal Date Picker State - which branch/document is being
   // renewed (null = closed), defaulting to today.
@@ -402,14 +400,6 @@ export function PartnerCompaniesPage({
   // (document status) and Incomplete (profile) at once, so this pulls from
   // every non-archived company rather than being mutually exclusive with
   // Active/Expired the way those two are with each other.
-  const incompleteCompanies = useMemo(
-    () =>
-      [...classifiedCompanies.active, ...classifiedCompanies.expired].filter(
-        (c) => findMissingProfileFields(c).length > 0
-      ),
-    [classifiedCompanies]
-  );
-
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
@@ -584,18 +574,9 @@ export function PartnerCompaniesPage({
     if (didArchive) setCompanyToArchive(null);
   };
 
-  // Filter and sort companies based on tabs
+  // Filter and sort companies by category and directory controls.
   const filteredCompanies = useMemo(() => {
-    let baseList: PartnerCompany[] = [];
-    if (statusTab === 'Active') {
-      baseList = classifiedCompanies.active;
-    } else if (statusTab === 'Expired') {
-      baseList = classifiedCompanies.expired;
-    } else if (statusTab === 'Incomplete') {
-      baseList = incompleteCompanies;
-    } else {
-      baseList = classifiedCompanies.archived;
-    }
+    let baseList: PartnerCompany[] = [...classifiedCompanies.active, ...classifiedCompanies.archived];
 
     if (activeTab !== 'All') {
       baseList = baseList.filter((c) => c.type === activeTab);
@@ -655,25 +636,27 @@ export function PartnerCompaniesPage({
       });
     }
     return baseList;
-  }, [classifiedCompanies, incompleteCompanies, statusTab, activeTab, originFilter, debouncedSearchQuery, sortConfig, effectiveNow, registeredFrom, registeredTo, documentFilter]);
+  }, [classifiedCompanies, activeTab, originFilter, debouncedSearchQuery, sortConfig, effectiveNow, registeredFrom, registeredTo, documentFilter]);
 
   // Jump back to page 1 whenever a filter/search/sort narrows or reshuffles
   // the result set - otherwise the user can land on a now-empty page.
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusTab, activeTab, originFilter, debouncedSearchQuery, sortConfig, registeredFrom, registeredTo, documentFilter]);
+  }, [activeTab, originFilter, debouncedSearchQuery, sortConfig, registeredFrom, registeredTo, documentFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / COMPANIES_PAGE_SIZE));
   // Clamp defensively (e.g. the list shrinks from a delete while on a later
   // page) so pagination stays correct without waiting for the effect above.
   const safePage = Math.min(currentPage, totalPages);
   const paginatedCompanies = useMemo(
-    () => filteredCompanies.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [filteredCompanies, safePage, pageSize]
+    () => filteredCompanies.slice((safePage - 1) * COMPANIES_PAGE_SIZE, safePage * COMPANIES_PAGE_SIZE),
+    [filteredCompanies, safePage]
   );
+  const hasArchivedCompanies = filteredCompanies.some((company) => company.isArchived);
 
   // Click handler to open company details modal
-  const handleCompanyClick = (company: PartnerCompany) => {
+  const handleCompanyClick = (company: PartnerCompany, view: 'overview' | 'branches' | 'performance' = 'overview') => {
+    setSelectedCompanyView(view);
     setSelectedCompany(company);
   };
 
@@ -826,32 +809,13 @@ export function PartnerCompaniesPage({
       )}
 
       <PartnerRegistryOverview
-        categorySummary={categoryRankSummary}
-        branchCount={partnerCompanies.reduce((total, company) => total + (company.branches?.length ?? 0), 0)}
-        activeCount={classifiedCompanies.active.length}
-        incompleteCount={incompleteCompanies.length}
-        expiredCount={classifiedCompanies.expired.length}
-        archivedCount={classifiedCompanies.archived.length}
-        expanded={isCategorySummaryOpen}
-        onToggleExpanded={() => setIsCategorySummaryOpen((value) => !value)}
-        onStatusChange={setStatusTab}
-        status={statusTab}
+        category={activeTab}
+        onCategoryChange={(value) => { setActiveTab(value); if (value !== 'Supplier') setOriginFilter('All'); }}
         isAdmin={isAdmin}
         onOpenActiveCompanies={() => setIsActiveCompaniesOpen(true)}
         onOpenRegister={() => { setErrorMessage(''); setRegisterModalTab('manual'); setIsRegisterOpen(true); }}
-      />
-      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleImportFileSelected} />
-      <section className="space-y-3" aria-label="Partner directory workspace">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-base font-semibold tracking-tight text-[#1c2f4b] dark:text-slate-100">Partner directory</h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Find a company, review its registration, and check document standing.</p>
-          </div>
-        </div>
+        directoryControls={(
       <PartnerCompaniesFilterToolbar
-        statusTab={statusTab}
-        statusLabels={STATUS_TAB_LABELS}
-        onStatusChange={setStatusTab}
         categoryTab={activeTab}
         onCategoryChange={(value) => { setActiveTab(value); if (value !== 'Supplier') setOriginFilter('All'); }}
         originFilter={originFilter}
@@ -859,7 +823,6 @@ export function PartnerCompaniesPage({
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onSearchClear={() => { setSearchQuery(''); setDebouncedSearchQuery(''); }}
-        resultCount={filteredCompanies.length}
         sortOptions={[
           { value: 'default', label: 'Default order' },
           { value: 'name-asc', label: 'Company: A–Z' },
@@ -868,8 +831,8 @@ export function PartnerCompaniesPage({
           { value: 'type-desc', label: 'Category: Z-A' },
           { value: 'registeredAt-desc', label: 'Registered: newest first' },
           { value: 'registeredAt-asc', label: 'Registered: oldest first' },
-          { value: 'docStatus-desc', label: 'Documents: most urgent first' },
-          { value: 'docStatus-asc', label: 'Documents: least urgent first' },
+          { value: 'docStatus-desc', label: 'Branch status: needs attention first' },
+          { value: 'docStatus-asc', label: 'Branch status: lowest priority first' },
         ]}
         sortValue={sortConfig ? `${sortConfig.key}-${sortConfig.direction}` : 'default'}
         onSortChange={(value) => {
@@ -890,7 +853,6 @@ export function PartnerCompaniesPage({
         documentFilter={documentFilter}
         onDocumentFilterChange={setDocumentFilter}
         onReset={() => {
-          setStatusTab('Active');
           setSearchQuery('');
           setDebouncedSearchQuery('');
           setActiveTab('All');
@@ -901,6 +863,15 @@ export function PartnerCompaniesPage({
           setSortConfig(null);
         }}
       />
+        )}
+      >
+        <PartnerCategoryRankBreakdown
+          categorySummary={categoryRankSummary}
+          branchCount={partnerCompanies.reduce((total, company) => total + (company.branches?.length ?? 0), 0)}
+        />
+      </PartnerRegistryOverview>
+      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleImportFileSelected} />
+      <section className="space-y-3" aria-label="Partner directory workspace">
 
       {importError && (
         <div className="rounded-lg bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 text-xs font-semibold flex items-center gap-2 dark:bg-rose-950/20 dark:border-rose-900">
@@ -926,7 +897,6 @@ export function PartnerCompaniesPage({
             direction: value.slice(separator + 1) as 'asc' | 'desc',
           });
         }}
-        resultCount={filteredCompanies.length}
         dateFrom={registeredFrom}
         dateTo={registeredTo}
         onDateFromChange={setRegisteredFrom}
@@ -960,140 +930,109 @@ export function PartnerCompaniesPage({
       */}
 
       {filteredCompanies.length === 0 ? (
-        <div className="panel py-20 text-center text-slate-400">
-          <Building size={48} className="mx-auto mb-3 opacity-30 text-slate-300" />
-          <p className="text-sm font-semibold">No companies found under this tab selection.</p>
-          <p className="text-xs mt-1 text-slate-400">
-            {statusTab === 'Active' && 'There are no active partners.'}
-            {statusTab === 'Expired' && 'No companies currently have an expired document.'}
-            {statusTab === 'Incomplete' && 'Every partner profile is fully filled in.'}
-            {statusTab === 'Archived' && 'The archive is currently empty.'}
-          </p>
+        <div className="admin-directory-empty panel py-14 text-center text-slate-400">
+          <Building size={30} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" aria-hidden="true" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">No partners match these filters.</p>
+          <p className="mt-1 text-xs text-slate-400">Try changing or resetting the filters.</p>
         </div>
       ) : (
-        <section className="panel overflow-hidden !p-0" aria-label="Partner company directory">
+        <section className="admin-directory-table-shell panel overflow-hidden !p-0" aria-label="Partner company directory">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-[13px]">
+            <table className={`admin-directory-table w-full min-w-[980px] border-collapse text-[13px] ${hasArchivedCompanies ? 'is-archived' : ''}`}>
+              <colgroup>
+                <col className="admin-directory-col-partner" />
+                <col className="admin-directory-col-category" />
+                <col className="admin-directory-col-registered" />
+                {hasArchivedCompanies && <col className="admin-directory-col-archived" />}
+                <col className="admin-directory-col-branch" />
+                <col className="admin-directory-col-health" />
+                <col className="admin-directory-col-actions" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-950/60">
-                  <th 
-                    className="px-5 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
-                    onClick={() => handleSort('name')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Company Name &amp; Identifier
-                      {sortConfig?.key === 'name' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-                      )}
-                    </div>
+                  <th className="px-5 py-3" aria-sort={sortConfig?.key === 'name' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" className="admin-directory-sort-button" onClick={() => handleSort('name')}>Partner{sortConfig?.key === 'name' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
                   </th>
-                  <th 
-                    className="px-5 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
-                    onClick={() => handleSort('type')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Category
-                      {sortConfig?.key === 'type' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-                      )}
-                    </div>
+                  <th className="px-5 py-3" aria-sort={sortConfig?.key === 'type' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" className="admin-directory-sort-button" onClick={() => handleSort('type')}>Category{sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
                   </th>
-                  <th className="px-5 py-3">Registration Date</th>
-                  {statusTab === 'Archived' && <th className="px-5 py-3">Archived Date &amp; Time</th>}
-                  <th
-                    className="px-5 py-3 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
-                    onClick={() => handleSort('docStatus')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Document Status
-                      {sortConfig?.key === 'docStatus' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-                      )}
-                    </div>
+                  <th className="px-5 py-3">Registered</th>
+                  {hasArchivedCompanies && <th className="px-5 py-3">Archived</th>}
+                  <th className="px-5 py-3" aria-sort={sortConfig?.key === 'docStatus' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button type="button" className="admin-directory-sort-button" onClick={() => handleSort('docStatus')}>Branch status{sortConfig?.key === 'docStatus' && (sortConfig.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />)}</button>
                   </th>
-                  <th className="px-5 py-3 text-right">Actions</th>
+                  <th className="px-5 py-3">Document health</th>
+                  <th className="px-5 py-3 text-right" aria-label="Partner actions" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {paginatedCompanies.map((c) => {
                   const docSummary = computeCompanyDocumentSummary(c, effectiveNow);
                   const missingProfileFields = findMissingProfileFields(c);
+                  const branch = primaryBranch(c);
+                  const attentionCount = docSummary.expiredCount + docSummary.forUpdateCount + docSummary.expiringSoonCount + docSummary.missingCount;
 
                   return (
                     <tr
                       key={c.id}
-                      onClick={() => handleCompanyClick(c)}
-                      className="hover:bg-slate-50/80 dark:hover:bg-slate-900/20 cursor-pointer group transition-colors"
+                      className="admin-directory-row transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-900/30"
                     >
-                      <td className="px-5 py-3.5 align-top font-semibold text-slate-800 dark:text-slate-100 group-hover:text-[#2187CD] dark:group-hover:text-blue-400 max-w-[280px]">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <Building size={14} className="shrink-0 text-slate-400 group-hover:text-[#2187CD]" />
-                          <span className="truncate text-[10px] font-bold uppercase tracking-wide" title={c.name}>{c.name}</span>
-                        </div>
-                        {primaryBranch(c)?.bpCode && <p className="ml-6 mt-1 text-[9px] font-medium text-slate-400">BP Code: {primaryBranch(c)?.bpCode}</p>}
-                        {missingProfileFields.length > 0 && (
-                          <span
-                            title={`Missing ${missingProfileFields.map((f) => MISSING_FIELD_LABELS[f]).join(', ')}`}
-                            className="mt-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 px-1.5 py-0.5 text-[9px] font-bold"
-                          >
-                            {missingProfileFields.length} missing
-                          </span>
-                        )}
+                      <td className="px-5 py-3.5 align-middle">
+                        <button type="button" onClick={() => handleCompanyClick(c)} className="admin-directory-company-link" aria-label={`Open ${c.name} partner record`}>
+                          <span className="admin-directory-company-name">{c.name}</span>
+                          {branch?.bpCode && <span className="admin-directory-company-code">BP Code {branch.bpCode}</span>}
+                          {(c.branches?.length ?? 0) > 1 && <span className="admin-directory-company-code">{c.branches?.length} branches</span>}
+                        </button>
+                        {missingProfileFields.length > 0 && <span className="admin-directory-missing-profile" title={`Missing ${missingProfileFields.map((f) => MISSING_FIELD_LABELS[f]).join(', ')}`}>{missingProfileFields.length} profile fields missing</span>}
                       </td>
-                      <td className="px-5 py-3.5 align-top">
+                      <td className="px-5 py-3.5 align-middle">
                         <div className="flex flex-wrap items-center gap-1">
-                          <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${typeBadgeClasses(c.type)}`}>
-                            {c.type}
+                          <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold border ${directoryCategoryBadgeClasses(c.type, c.supplierOrigin)}`}>
+                            {c.type === 'Supplier' && c.supplierOrigin ? `Supplier ${c.supplierOrigin}` : c.type}
                           </span>
-                          {c.type === 'Supplier' && c.supplierOrigin && (
-                            <span className="inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider border bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700">
-                              {c.supplierOrigin}
-                            </span>
-                          )}
                         </div>
                       </td>
-                      <td className="px-5 py-3.5 align-top whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs">
+                      <td className="px-5 py-3.5 align-middle whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs">
                         {formatDate(c.registeredAt || c.createdAt)}
                       </td>
-                      {statusTab === 'Archived' && (
+                      {hasArchivedCompanies && (
                         <td
-                          className="px-5 py-3.5 align-top whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs"
+                          className="px-5 py-3.5 align-middle whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs"
                           title={c.archivedAt ?? undefined}
                         >
-                          {formatDateTime(c.archivedAt)}
+                          {c.isArchived ? formatDateTime(c.archivedAt) : '—'}
                         </td>
                       )}
-                      <td className="px-5 py-3.5 align-top whitespace-nowrap text-xs font-medium">
-                        {c.isArchived ? (
-                          <span className="text-slate-400 italic">Archived</span>
-                        ) : primaryBranch(c)?.status ? (
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${branchStatusBadgeClasses(primaryBranch(c)!.status!)}`}>
-                            {primaryBranch(c)!.status}
+                      <td className="px-5 py-3.5 align-middle whitespace-nowrap text-xs font-medium">
+                        {branch?.status ? (
+                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold border ${branchStatusBadgeClasses(branch.status)}`}>
+                            {branch.status}
                           </span>
                         ) : (
-                          <span className="text-slate-300 dark:text-slate-600">—</span>
+                          <span className="text-slate-400">Not set</span>
                         )}
                       </td>
-                      <td className="px-5 py-3.5 align-top text-right">
-                        <div className="flex flex-wrap justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-5 py-3.5 align-middle">
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold ${c.isArchived ? 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' : DOCUMENT_STATUS_STYLES[docSummary.status]}`}>
+                            {c.isArchived ? 'Archived' : docSummary.status}
+                          </span>
+                          {!c.isArchived && attentionCount > 0 && <span className="text-[10px] text-slate-400">{attentionCount} follow-up item{attentionCount === 1 ? '' : 's'}</span>}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 align-middle text-right">
+                        <div className="admin-directory-actions" onClick={(e) => e.stopPropagation()}>
                           {(docSummary.status === 'Expired' || docSummary.status === 'Missing') && canRenew && (
                             <button
-                              onClick={() => handleCompanyClick(c)}
-                              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1 px-2.5 text-xs cursor-pointer transition"
+                              onClick={() => handleCompanyClick(c, 'branches')}
+                              className="admin-directory-review-link"
                             >
-                              <RefreshCw size={12} />
-                              <span>Review</span>
+                              <FileText size={15} aria-hidden="true" />
+                              <span className="sr-only">Review documents</span>
                             </button>
                           )}
                           {isAdmin && (
-                            <button
-                              onClick={(e) => toggleArchive(c, e)}
-                              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold py-1 px-2.5 text-xs cursor-pointer transition"
-                              title={c.isArchived ? "Restore to registry" : "Archive Partner"}
-                            >
-                              <Archive size={12} />
-                              <span>{c.isArchived ? "Restore" : "Archive"}</span>
-                            </button>
+                            <PartnerDirectoryArchiveButton companyName={c.name} isArchived={Boolean(c.isArchived)} onArchiveOrRestore={() => toggleArchive(c)} />
                           )}
                         </div>
                       </td>
@@ -1103,47 +1042,59 @@ export function PartnerCompaniesPage({
               </tbody>
             </table>
           </div>
+          <div className="admin-directory-mobile-list" aria-label="Partner company directory">
+            {paginatedCompanies.map((company) => {
+              const summary = computeCompanyDocumentSummary(company, effectiveNow);
+              const branch = primaryBranch(company);
+              const missingProfileCount = findMissingProfileFields(company).length;
+              const attentionCount = summary.expiredCount + summary.forUpdateCount + summary.expiringSoonCount + summary.missingCount;
+              return <PartnerCompanyDirectoryCard
+                key={company.id}
+                company={company}
+                categoryClassName={directoryCategoryBadgeClasses(company.type, company.supplierOrigin)}
+                documentStatus={summary.status}
+                documentStatusClassName={DOCUMENT_STATUS_STYLES[summary.status]}
+                branchStatusClassName={branch?.status ? branchStatusBadgeClasses(branch.status) : undefined}
+                primaryBranchCode={branch?.bpCode}
+                primaryBranchStatus={branch?.status}
+                registeredDate={formatDate(company.registeredAt || company.createdAt)}
+                archivedDate={company.isArchived && company.archivedAt ? formatDateTime(company.archivedAt) : undefined}
+                attentionCount={attentionCount}
+                missingProfileCount={missingProfileCount}
+                canReviewDocuments={Boolean(canRenew && (summary.status === 'Expired' || summary.status === 'Missing'))}
+                isAdmin={Boolean(isAdmin)}
+                onOpen={() => handleCompanyClick(company)}
+                onReviewDocuments={() => handleCompanyClick(company, 'branches')}
+                onArchiveOrRestore={() => toggleArchive(company)}
+              />;
+            })}
+          </div>
         </section>
       )}
 
-      {filteredCompanies.length > 0 && <Pagination page={safePage} pageSize={pageSize} totalItems={filteredCompanies.length}
-        onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }} ariaLabel="Partner companies pagination"
-        showPageControls={totalPages > 1 || pageSize !== COMPANIES_PAGE_SIZE} className="panel px-5" />}
+      {filteredCompanies.length > 0 && <Pagination page={safePage} pageSize={COMPANIES_PAGE_SIZE} totalItems={filteredCompanies.length}
+        onPageChange={setCurrentPage} ariaLabel="Partner companies pagination" showPageSizeSelector={false}
+        showPageControls={totalPages > 1} className="admin-directory-pagination panel px-5" />}
       </section>
 
       {/* PARTNER DETAILS & CONTRACT CONFIGURATION DRAWER/MODAL */}
       {selectedCompany && createPortal(
         <div className="admin-dialog-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
           <div className="admin-partner-details-dialog w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-transparent dark:bg-slate-950 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-            {/* Close Button */}
-            <button
-              onClick={() => setSelectedCompany(null)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer"
-              title="Close panel"
-              type="button"
-            >
-              <X size={18} />
-            </button>
-
-            {/* Modal Header */}
-            <div className="admin-partner-details-header flex items-start gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="rounded-xl bg-[#2187CD]/10 p-3 text-[#2187CD] dark:bg-blue-950/40 dark:text-blue-400 shrink-0 mt-1">
-                <Building size={24} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white truncate">{selectedCompany.name}</h3>
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${typeBadgeClasses(selectedCompany.type)}`}>
-                    {selectedCompany.type}
+            <div className="admin-partner-dialog-topbar">
+              {/* Modal Header */}
+              <div className="admin-partner-details-header flex min-w-0 flex-col gap-2">
+                <h3 className="min-w-0 break-words text-lg font-semibold leading-6 text-slate-900 dark:text-white">{selectedCompany.name}</h3>
+                <p className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs leading-4 text-slate-500 dark:text-slate-400">
+                  <span className="break-all">ID: {selectedCompany.id}</span>
+                  <span className="min-w-0 break-words">Scope: {selectedCompany.affiliation || 'General partnership'}</span>
+                </p>
+                <div className="flex w-full flex-wrap items-center gap-1.5">
+                  <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold ${directoryCategoryBadgeClasses(selectedCompany.type, selectedCompany.supplierOrigin)}`}>
+                    {selectedCompany.type === 'Supplier' && selectedCompany.supplierOrigin ? `Supplier ${selectedCompany.supplierOrigin}` : selectedCompany.type}
                   </span>
-                  {selectedCompany.type === 'Supplier' && selectedCompany.supplierOrigin && (
-                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700">
-                      {selectedCompany.supplierOrigin === 'Foreign' ? <Globe size={10} /> : <MapPin size={10} />}
-                      {selectedCompany.supplierOrigin}
-                    </span>
-                  )}
                   {selectedCompany.accreditationStatus && (
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${
+                    <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold ${
                       selectedCompany.accreditationStatus === 'Accredited'
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400'
                         : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400'
@@ -1152,10 +1103,29 @@ export function PartnerCompaniesPage({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-1">ID: {selectedCompany.id} &bull; Scope: {selectedCompany.affiliation || 'General partnership'}</p>
+              </div>
+
+              <button
+                onClick={() => setSelectedCompany(null)}
+                className="admin-partner-details-close"
+                title="Close panel"
+                aria-label="Close partner record"
+                type="button"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="admin-partner-dialog-tabs" role="group" aria-label="Partner record sections">
+                <button type="button" aria-pressed={selectedCompanyView === 'overview'} onClick={() => setSelectedCompanyView('overview')}>Overview</button>
+                <button type="button" aria-pressed={selectedCompanyView === 'branches'} onClick={() => setSelectedCompanyView('branches')}>
+                  Branches &amp; documents <span>{(selectedCompany.branches ?? []).length}</span>
+                </button>
+                <button type="button" aria-pressed={selectedCompanyView === 'performance'} onClick={() => setSelectedCompanyView('performance')}>Performance</button>
               </div>
             </div>
 
+            <div className="admin-partner-dialog-content">
+            {selectedCompanyView === 'overview' && <div className="space-y-5">
             {/* Partner Classification - which document set applies (Courier/Supplier-Local/
                 Supplier-Foreign/Subcontractor) is driven entirely by this, so it's editable
                 by the same role that can renew documents. Master-List rows that imported with
@@ -1216,13 +1186,13 @@ export function PartnerCompaniesPage({
             <div className="admin-partner-core-details grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               
               {/* Left Column: Contact + Registration */}
-              <div className="space-y-4">
+              <div className="admin-partner-core-column space-y-4">
                 <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                   <Calendar size={14} />
                   <span>Contact &amp; Registration</span>
                 </h4>
 
-                <div className="space-y-3 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div className="admin-partner-core-panel space-y-3 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
                   <div>
                     <label className="field-label text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
                       Target Company Primary Email
@@ -1278,13 +1248,13 @@ export function PartnerCompaniesPage({
               </div>
 
               {/* Right Column: Document Compliance Summary */}
-              <div className="space-y-4">
+              <div className="admin-partner-core-column space-y-4">
                 <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                   <ClipboardList size={14} />
                   <span>Document Compliance Summary</span>
                 </h4>
 
-                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
+                <div className="admin-partner-core-panel bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 space-y-3">
                   <div className="grid grid-cols-1 gap-3 text-xs min-[420px]:grid-cols-2">
                     <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
                       <span className="text-slate-400 font-medium block">Required Documents</span>
@@ -1314,7 +1284,10 @@ export function PartnerCompaniesPage({
               </div>
             </div>
 
+            </div>}
+
             {/* Audit Index & Performance Section */}
+            {selectedCompanyView === 'performance' && <div className="admin-partner-performance">
             <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-slate-50 dark:bg-slate-900/30 p-3 rounded-lg text-xs space-y-1">
                 <span className="text-slate-400 font-medium">Evaluation Audit volume:</span>
@@ -1329,9 +1302,10 @@ export function PartnerCompaniesPage({
                 </p>
               </div>
             </div>
+            </div>}
 
             {/* Branches & Compliance Documents (from Master List import) */}
-            {(selectedCompany.branches ?? []).length > 0 && (
+            {selectedCompanyView === 'branches' && (selectedCompany.branches ?? []).length > 0 && (
               <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
                 <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mb-3">
                   <ClipboardList size={14} />
@@ -1485,30 +1459,26 @@ export function PartnerCompaniesPage({
                 </div>
               </div>
             )}
+            {selectedCompanyView === 'branches' && (selectedCompany.branches ?? []).length === 0 && (
+              <p className="admin-directory-no-branches">No branches are recorded for this partner.</p>
+            )}
+            </div>
 
             {/* Administrative Action Footer */}
             {isAdmin && (
-              <div className="admin-partner-dialog-actions flex flex-col sm:flex-row items-center justify-between gap-3 mt-8 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => toggleArchive(selectedCompany)}
-                  className="secondary-button text-xs py-2 w-full sm:w-auto flex items-center justify-center gap-1.5"
-                >
-                  <Archive size={14} />
-                  <span>{selectedCompany.isArchived ? "Restore to Active Registry" : "Archive Partner Company"}</span>
-                </button>
-
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="admin-partner-dialog-actions flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setSelectedCompany(null)}
-                    className="secondary-button text-xs py-2 flex-1 sm:flex-none"
                     type="button"
+                    onClick={() => toggleArchive(selectedCompany)}
+                    className="secondary-button text-xs py-2 px-3 flex items-center justify-center gap-1.5"
                   >
-                    Close Dialog
+                    <Archive size={14} />
+                    <span>{selectedCompany.isArchived ? "Restore" : "Archive"}</span>
                   </button>
                   <button
                     onClick={() => startDelete(selectedCompany)}
-                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2 px-4 rounded-lg flex items-center justify-center gap-1.5 flex-1 sm:flex-none transition duration-150 cursor-pointer"
+                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs py-2 px-3 rounded-md flex items-center justify-center gap-1.5 transition duration-150 cursor-pointer"
                     type="button"
                   >
                     <Trash size={14} />

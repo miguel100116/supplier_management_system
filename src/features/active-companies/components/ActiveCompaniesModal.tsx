@@ -8,7 +8,6 @@ import {
   type ActiveCompanySnapshot,
 } from '../domain/activeCompanySnapshots';
 import { loadActiveCompanySnapshots } from '../services/activeCompanySnapshotService';
-import { getActiveCompanyCellColors } from './companyCellStyles';
 import { APPLICATION_RECORD_CHANGED_EVENT, type ApplicationRecordType } from '../../../services/applicationRepository';
 
 interface ActiveCompaniesModalProps {
@@ -43,6 +42,8 @@ const TYPE_CONFIGS: TypeConfig[] = [
     badge: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
   },
 ];
+
+const ALL_UPLOADS_OPTION = '__all_uploads__';
 
 function formatSnapshotDate(value: string): string {
   return new Date(value).toLocaleString(undefined, {
@@ -113,10 +114,10 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
       aria-modal="true"
       aria-labelledby="active-companies-title"
     >
-      <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+      <div className="admin-active-companies-dialog flex max-h-[min(880px,calc(100dvh-32px))] w-full max-w-[980px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
         <header className="flex shrink-0 items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">
           <div>
-            <h2 id="active-companies-title" className="text-lg font-bold text-slate-900 dark:text-white">
+            <h2 id="active-companies-title" className="text-base font-bold text-slate-900 dark:text-white">
               Active Companies by Type
             </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
@@ -128,7 +129,7 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+        <div className="admin-active-companies-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6 sm:py-4">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
               <Loader2 size={18} className="animate-spin" /> Loading active companies...
@@ -138,31 +139,41 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
               {loadError}
             </div>
           ) : (
-            <div className="mt-5 divide-y divide-slate-200 rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+            <div className="admin-active-companies-sections divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
               {TYPE_CONFIGS.map(({ type, label, accent, badge }) => {
                 const history = histories[type];
-                const selected = history.find((snapshot) => snapshot.id === selectedIds[type]) ?? history[0];
-                const columnBreak = selected ? Math.ceil(selected.companies.length / 2) : 0;
-                const companyColumns = selected
-                  ? [selected.companies.slice(0, columnBreak), selected.companies.slice(columnBreak)]
-                  : [];
+                const requestedId = selectedIds[type] ?? history[0]?.id;
+                const selected = history.find((snapshot) => snapshot.id === requestedId) ?? history[0];
+                const showAllUploads = requestedId === ALL_UPLOADS_OPTION;
+                const companies = showAllUploads
+                  ? [...new Set(history.flatMap((snapshot) => snapshot.companies))]
+                  : selected?.companies ?? [];
+                const selectedOption = showAllUploads ? ALL_UPLOADS_OPTION : selected?.id ?? '';
                 return (
-                  <section key={type} className="p-4 sm:p-5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className={`text-sm font-extrabold tracking-wide ${accent}`}>{label.toLocaleUpperCase()}</h3>
-                        <span className={`inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-xs font-bold ${badge}`}>
-                          {selected?.companies.length ?? 0}
-                        </span>
+                  <section key={type} className="py-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <h3 className={`text-sm font-semibold ${accent}`}>{label}</h3>
+                          <span className={`inline-flex min-w-7 items-center justify-center rounded-md px-2 py-0.5 text-xs font-semibold ${badge}`}>
+                            {companies.length}
+                          </span>
+                        </div>
+                        {selected && (
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Source: {showAllUploads ? `All ${history.length} saved upload${history.length === 1 ? '' : 's'}` : selected.sourceFileName}
+                          </p>
+                        )}
                       </div>
                       {history.length > 0 && (
-                        <label className="flex min-w-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                          <span className="shrink-0">Upload date</span>
+                        <label className="flex min-w-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400 sm:shrink-0">
+                          <span className="shrink-0">Upload view</span>
                           <select
-                            value={selected?.id}
+                            value={selectedOption}
                             onChange={(event) => setSelectedIds((current) => ({ ...current, [type]: event.target.value }))}
-                            className="min-w-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-[#0063a9] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            className="min-w-0 max-w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-[#2187CD] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                           >
+                            <option value={ALL_UPLOADS_OPTION}>All uploads</option>
                             {history.map((snapshot, index) => (
                               <option key={snapshot.id} value={snapshot.id}>
                                 {index === 0 ? 'Latest — ' : ''}{formatSnapshotDate(snapshot.uploadedAt)}
@@ -172,25 +183,14 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
                         </label>
                       )}
                     </div>
-                    {selected ? (
-                      <>
-                        <p className="mt-1 text-[11px] text-slate-400">Source: {selected.sourceFileName}</p>
-                        <div className="mt-3 grid gap-2 md:grid-cols-2">
-                          {companyColumns.map((companies, columnIndex) => (
-                            <ul key={`${type}-column-${columnIndex}`} className="space-y-2">
-                              {companies.map((company, rowIndex) => (
-                                <li
-                                  key={company}
-                                  className="rounded-lg border px-3 py-2.5 text-sm font-medium shadow-sm transition-transform hover:-translate-y-0.5"
-                                  style={getActiveCompanyCellColors(rowIndex)}
-                                >
-                                  {company}
-                                </li>
-                              ))}
-                            </ul>
-                          ))}
-                        </div>
-                      </>
+                    {companies.length > 0 ? (
+                      <ul className="admin-active-companies-list mt-3 grid grid-cols-1 gap-x-8 md:grid-cols-2">
+                        {companies.map((company) => (
+                          <li key={company} className="min-w-0 border-b border-slate-100 py-2 text-sm leading-5 text-slate-800 dark:border-slate-800 dark:text-slate-200">
+                            <span className="block break-words">{company}</span>
+                          </li>
+                        ))}
+                      </ul>
                     ) : (
                       <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No active-company upload is available yet.</p>
                     )}
