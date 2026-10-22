@@ -402,7 +402,7 @@ export function PartnersFeedbackHubPage({
   }
 
   return (
-    <div className="space-y-5 animate-fadeIn pb-12">
+    <div className="admin-feedback-page space-y-5 animate-fadeIn pb-12">
       <PageDescription>Review feedback collected from partners and employees in one place.</PageDescription>
       {/* The three tabs follow the feedback lifecycle; dispatch stays alongside the active work. */}
       <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 dark:border-slate-800 xl:flex-row xl:items-center xl:justify-between">

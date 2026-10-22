@@ -686,7 +686,7 @@ export function SurveyFormsPage({
     : selectedAccessCategories.length > 1 ? 'Multiple Categories' : 'No Category';
 
   return (
-    <div className="space-y-5">
+    <div className="admin-survey-forms-page space-y-5">
       {/* Cards Row */}
       {!isAdmin && (
         <section className="grid gap-4">

@@ -1,6 +1,7 @@
 import { LucideIcon, Menu, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { EmployeeExperienceShell } from '../features/employee-experience/components/EmployeeExperienceShell';
+import { AdminQuickGuide } from './AdminQuickGuide';
 
 interface NavChild<T extends string> {
   key: T;
@@ -89,6 +90,9 @@ export function Shell<T extends string>({
 
   const flatPages = flattenPages(pages);
   const activePageItem = flatPages.find((p) => p.key === activePage);
+  const activeGroup = pages.find(
+    (page): page is NavGroup<T> => page.type === 'group' && page.children.some((child) => child.key === activePage)
+  );
   const ActiveIcon = activePageItem?.icon ?? Menu;
   const moduleLabel = activePageItem?.label ?? title;
   const contentHeading = pageHeading || title;
@@ -131,6 +135,11 @@ export function Shell<T extends string>({
   }
 
   const toggleGroup = (id: string) => {
+    if (window.matchMedia('(max-width: 800px)').matches) {
+      setIsMobileNavOpen(true);
+      return;
+    }
+
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -147,7 +156,7 @@ export function Shell<T extends string>({
     const dashboardPage = flatPages.find((page) => page.key === ('dashboard' as T))?.key ?? flatPages[0]?.key;
 
     return (
-      <div className={`admin-workspace${isSidebarCollapsed ? ' is-collapsed' : ''}`}>
+      <div className="admin-workspace">
         <aside className="admin-sidebar">
           <button
             type="button"
@@ -160,16 +169,6 @@ export function Shell<T extends string>({
           </button>
 
           <div className="admin-workspace-label">{navigationLabel || 'ADMIN WORKSPACE'}</div>
-          <button
-            type="button"
-            className="admin-sidebar-toggle"
-            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
-            aria-label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-            title={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-          >
-            {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
-
           <nav className="admin-navigation" aria-label="Administrator workspace">
             {pages.map((page) => {
               if (page.type === 'group') {
@@ -181,18 +180,15 @@ export function Shell<T extends string>({
                     <button
                       type="button"
                       className={`admin-nav-item admin-nav-group-button${activeChild ? ' is-active-group' : ''}`}
-                      onClick={() => {
-                        if (isSidebarCollapsed) setIsSidebarCollapsed(false);
-                        toggleGroup(page.id);
-                      }}
-                      aria-expanded={expanded}
-                      title={isSidebarCollapsed ? page.label : undefined}
+                      onClick={() => toggleGroup(page.id)}
+                      aria-expanded={expanded || isMobileNavOpen}
+                      aria-label={page.label}
                     >
-                      <GroupIcon size={17} />
+                      <GroupIcon size={20} strokeWidth={1.65} />
                       <span>{page.label}</span>
                       <ChevronDown className={expanded ? 'is-expanded' : ''} size={14} />
                     </button>
-                    {expanded && !isSidebarCollapsed && (
+                    {expanded && (
                       <div className="admin-navigation-children">
                         {page.children.map((child) => {
                           const active = child.key === activePage;
@@ -207,6 +203,7 @@ export function Shell<T extends string>({
                               title={child.disabled ? 'Access restricted by an administrator' : undefined}
                             >
                               <span>{child.label}</span>
+                              {active && <span className="admin-nav-indicator" aria-hidden="true" />}
                               {child.badgeCount !== undefined && child.badgeCount > 0 && <span className="admin-nav-badge">{child.badgeCount}</span>}
                             </button>
                           );
@@ -227,17 +224,19 @@ export function Shell<T extends string>({
                   disabled={page.disabled}
                   onClick={() => selectPage(page.key)}
                   aria-current={active ? 'page' : undefined}
-                  title={page.disabled ? 'Access restricted by an administrator' : isSidebarCollapsed ? page.label : undefined}
+                  aria-label={page.label}
+                  title={page.disabled ? 'Access restricted by an administrator' : undefined}
                 >
-                  <Icon size={17} />
+                  <Icon size={20} strokeWidth={1.65} />
                   <span>{page.label}</span>
+                  {active && <span className="admin-nav-indicator" aria-hidden="true" />}
                   {page.badgeCount !== undefined && page.badgeCount > 0 && <span className="admin-nav-badge">{page.badgeCount}</span>}
                 </button>
               );
             })}
           </nav>
 
-          {sidebarExtra && <div className="admin-sidebar-extra">{sidebarExtra(isSidebarCollapsed)}</div>}
+          {sidebarExtra && <div className="admin-sidebar-extra">{sidebarExtra(false)}</div>}
         </aside>
 
         <div className="admin-main-shell">
@@ -264,11 +263,15 @@ export function Shell<T extends string>({
               {activePage !== dashboardPage && (
                 <>
                   <ChevronRight size={14} aria-hidden="true" />
+                  {activeGroup && <>
+                    <span className="admin-breadcrumb-section">{activeGroup.label}</span>
+                    <ChevronRight size={14} aria-hidden="true" />
+                  </>}
                   <span aria-current="page">{moduleLabel}</span>
                 </>
               )}
             </div>
-            <div className="admin-topbar-actions">{action}</div>
+            <div className="admin-topbar-actions"><AdminQuickGuide />{action}</div>
           </header>
 
           {isMobileNavOpen && <button type="button" className="admin-mobile-nav-backdrop" aria-label="Close navigation menu" onClick={() => setIsMobileNavOpen(false)} />}

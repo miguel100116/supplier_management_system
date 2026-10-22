@@ -163,7 +163,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTyp
 
   if (!summary.hasResponses && !archivedResponses.length) {
     return (
-      <div className="space-y-5">
+      <div className="admin-analytics-page space-y-5">
         {analyticsHeader}
         {categoryTabs}
         <StateMessage title="No analytics available" message={dataScope === 'custom' ? 'No official evaluation responses match the selected dates and periods.' : 'No official evaluation responses match the current scope.'} />
@@ -172,7 +172,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTyp
   }
 
   return (
-    <div className="min-w-0 space-y-5 pb-10">
+    <div className="admin-analytics-page min-w-0 space-y-5 pb-10">
       {analyticsHeader}
 
       <section aria-label="Analytics summary" className="grid overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:grid-cols-3 md:divide-x md:divide-slate-100 dark:md:divide-slate-800">

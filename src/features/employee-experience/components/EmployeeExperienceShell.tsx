@@ -110,23 +110,25 @@ export function EmployeeExperienceShell<T extends string>({ pages, activePage, o
             {action}
           </div>
         </header>
-        <main>{children}<footer className="main-footer"><span>Microgenesis · Employee experience</span><span>Partner evaluations</span></footer></main>
+        <main>{children}<footer className="main-footer"><span>Microgenesis · Employee workspace</span><span>Partner evaluations</span></footer></main>
       </div>
 
       {isHelpOpen && (
         <div className="fixed inset-0 modal-backdrop">
           <section className="modal quick-guide-modal" role="dialog" aria-modal="true" aria-labelledby="quick-guide-title">
             <button className="modal-close icon-button" type="button" aria-label="Close dialog" autoFocus onClick={() => setIsHelpOpen(false)}><Icon name="close" /></button>
-            <span className="eyebrow">A QUICK GUIDE</span>
-            <h2 id="quick-guide-title">Your experience. Your feedback.</h2>
-            <p className="modal-subtitle">Three simple steps to complete an evaluation.</p>
-            <ol className="quick-guide-steps">
-              <li><span>1</span><div><h3>Choose the right partner</h3><p>Open Evaluations and select the company and survey you want to answer.</p></div></li>
-              <li><span>2</span><div><h3>Answer thoughtfully</h3><p>Use your own experience. Required questions are marked with an asterisk. Unfinished answers are not saved when you leave.</p></div></li>
-              <li><span>3</span><div><h3>Review, then submit</h3><p>Check the company and your answers. After submission, find your record in My submissions.</p></div></li>
-            </ol>
-            <p className="quick-guide-note">Your evaluations use the partner information and survey questions assigned to your employee account.</p>
-            <button className="primary-button" type="button" onClick={() => setIsHelpOpen(false)}>Got it</button>
+            <div className="quick-guide-modal-content">
+              <span className="eyebrow">A QUICK GUIDE</span>
+              <h2 id="quick-guide-title">Your experience. Your feedback.</h2>
+              <p className="modal-subtitle">Three simple steps to complete an evaluation.</p>
+              <ol className="quick-guide-steps">
+                <li><span>1</span><div><h3>Choose the right partner</h3><p>Open Evaluations and select the company and survey you want to answer.</p></div></li>
+                <li><span>2</span><div><h3>Answer thoughtfully</h3><p>Use your own experience. Required questions are marked with an asterisk. Unfinished answers are not saved when you leave.</p></div></li>
+                <li><span>3</span><div><h3>Review, then submit</h3><p>Check the company and your answers. After submission, find your record in My submissions.</p></div></li>
+              </ol>
+              <p className="quick-guide-note">Your evaluations use the partner information and survey questions assigned to your employee account.</p>
+              <button className="primary-button" type="button" onClick={() => setIsHelpOpen(false)}>Got it</button>
+            </div>
           </section>
         </div>
       )}

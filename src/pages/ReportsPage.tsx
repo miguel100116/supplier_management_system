@@ -46,7 +46,7 @@ export function ReportsPage(props: ReportsPageProps) {
     else url.searchParams.delete('tab');
     window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
   };
-  return <div className="space-y-5">
+  return <div className="admin-reports-page space-y-5">
     <div role="tablist" aria-label="Reports" className="flex gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
       {['generate', 'history'].map(value => <button key={value} type="button" role="tab" tabIndex={tab === value ? 0 : -1} onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;

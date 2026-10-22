@@ -480,7 +480,7 @@ export function ArchivePage({
       </div>
 
       {/* List Container with Search */}
-      <div className="archive-list-panel panel p-0 space-y-0">
+      <div className="archive-list-panel panel p-5 space-y-4">
         <div role="toolbar" aria-label="Archive filters" className="flex flex-wrap items-center gap-2">
           <label className="relative min-w-0 flex-1 basis-24 sm:min-w-[160px]">
             <span className="sr-only">Search archived {activeTab}</span>

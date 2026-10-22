@@ -114,7 +114,7 @@ export function SurveyExplorerPage({ responses, surveys = [] }: SurveyExplorerPa
   }
 
   return (
-    <div className="space-y-5">
+    <div className="admin-response-explorer-page space-y-5">
       <section aria-label="Available evaluation forms" className="panel overflow-hidden p-0">
         <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
           <div><h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Choose an evaluation form</h2><p className="mt-1 text-xs text-slate-400">Select a form to review its submissions and answers.</p></div>

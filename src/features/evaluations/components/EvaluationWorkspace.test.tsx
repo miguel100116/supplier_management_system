@@ -33,11 +33,10 @@ test('every view shares the same responsive tab layout and each button navigates
   for (const current of EVALUATION_WORKSPACE_TABS) {
     const navigated: string[] = [];
     const tree = EvaluationWorkspace({ activePage: current.key, onNavigate: page => navigated.push(page), children: null });
-    const section = Children.toArray(tree.props.children).find(child => isValidElement(child) && child.type === 'section');
-    assert.ok(isValidElement<{ className: string; children: any }>(section));
-    const nav = section.props.children;
-    layouts.add(`${section.props.className}|${nav.props.className}`);
-    assert.match(nav.props.className, /max-w-full flex-wrap/);
+    const nav = Children.toArray(tree.props.children).find(child => isValidElement(child) && child.type === 'nav');
+    assert.ok(isValidElement<{ className: string; children: any }>(nav));
+    layouts.add(nav.props.className);
+    assert.match(nav.props.className, /admin-evaluation-tabs.*max-w-full flex-wrap/);
     nav.props.children.forEach((button: any, index: number) => {
       assert.equal(button.props.children, EVALUATION_WORKSPACE_TABS[index].label);
       const active = EVALUATION_WORKSPACE_TABS[index].key === current.key;

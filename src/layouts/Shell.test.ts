@@ -30,6 +30,18 @@ test('Admin shell places the logo in the navigation rail and route context in th
   assert.doesNotMatch(headerSource ?? '', /src="\/microgenesis_logo\.png"/);
 });
 
+test('Admin desktop navigation stays expanded and preserves grouped destinations', () => {
+  const source = readFileSync(new URL('./Shell.tsx', import.meta.url), 'utf8');
+  const adminBranch = source.slice(source.indexOf('if (adminMode) {'), source.indexOf('/* Top Header Layer */'));
+
+  assert.match(adminBranch, /className="admin-workspace"/);
+  assert.match(adminBranch, /<nav className="admin-navigation"/);
+  assert.match(adminBranch, /aria-expanded=\{expanded \|\| isMobileNavOpen\}/);
+  assert.match(adminBranch, /onClick=\{\(\) => toggleGroup\(page\.id\)\}/);
+  assert.doesNotMatch(adminBranch, /admin-sidebar-toggle|isSidebarCollapsed/);
+  assert.match(adminBranch, /sidebarExtra\(false\)/);
+});
+
 test('login audience switch shares responsive headings and validates the selected type before entering the app', () => {
   const source = readFileSync(new URL('../pages/LoginPage.tsx', import.meta.url), 'utf8');
   assert.match(source, /useState<LoginRole>\('Employee'\)/);

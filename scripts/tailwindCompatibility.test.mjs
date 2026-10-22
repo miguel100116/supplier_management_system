@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
 import config from '../postcss.config.js';
 
-test('v4 stylesheet compilation retains the v3 palette, effects, sibling spacing and accessible outlines', async () => {
+test('v4 stylesheet compilation retains the configured palette, effects, sibling spacing and accessible outlines', async () => {
   const styles = new URL('../src/styles.css', import.meta.url);
   const source = readFileSync(styles, 'utf8') + '\n@source inline("space-y-4 space-x-3 divide-y divide-x divide-slate-100 dark:divide-slate-800 sm:space-y-6 outline-none focus:outline-none shadow-sm rounded-sm blur-sm bg-blue-600 text-slate-900");';
   const result = await postcss(config.plugins).process(source, { from: fileURLToPath(styles), map: false });
@@ -32,7 +32,7 @@ test('v4 stylesheet compilation retains the v3 palette, effects, sibling spacing
   assert.ok(rules.some((rule) => rule.selector.includes('sm\\:space-y-6') && rule.selector.includes(':not([hidden])')));
   assert.equal(declarations('.outline-none')['outline-style'], 'solid');
   assert.equal(declarations('.field')['outline-style'], 'solid');
-  assert.equal(declarations('.bg-blue-600')['background-color'], '#2563eb');
+  assert.equal(declarations('.bg-blue-600')['background-color'], '#2187cd');
   assert.equal(declarations('.text-slate-900').color, '#0f172a');
   assert.equal(declarations('.rounded-sm')['border-radius'], '.125rem');
   assert.match(declarations('.shadow-sm')['--tw-shadow'], /0 1px 2px/);

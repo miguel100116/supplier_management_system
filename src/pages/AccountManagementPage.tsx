@@ -369,7 +369,7 @@ export function AccountManagementPage({
             className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200"
             type="button"
           >
-            <Shield size={16} className="text-indigo-600 dark:text-indigo-400" />
+            <Shield size={16} className="text-blue-600 dark:text-blue-400" />
             Department Access
           </button>
           <button
@@ -386,7 +386,7 @@ export function AccountManagementPage({
       {/* Main Content */}
       <div className="admin-accounts-list panel">
         <div className="admin-accounts-filters mb-4">
-          <div className="mb-3 inline-flex flex-wrap items-center gap-1 rounded-lg bg-[#eef3ff] p-1 dark:bg-slate-800" role="group" aria-label="Filter accounts by system role">
+          <div className="mb-3 inline-flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800" role="group" aria-label="Filter accounts by system role">
               {(['All', 'Admin', 'Employee'] as const).map((tab) => (
                 <button
                   key={tab}
@@ -395,12 +395,12 @@ export function AccountManagementPage({
                   aria-pressed={roleFilter === tab}
                   className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
                     roleFilter === tab
-                      ? 'bg-[#0063a9] text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                      ? 'bg-white text-[#2187cd] shadow-sm'
+                      : 'bg-transparent text-slate-600 hover:bg-slate-200 dark:bg-transparent dark:text-slate-300 dark:hover:bg-slate-700'
                   }`}
                 >
                   <span>{tab}</span>
-                  <span className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] leading-none tabular-nums ${roleFilter === tab ? 'bg-white/20' : 'bg-white text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                  <span className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] leading-none tabular-nums ${roleFilter === tab ? 'bg-[#edf3fe] text-[#2187cd]' : 'bg-white text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                     {roleCounts[tab]}
                   </span>
                 </button>
@@ -413,7 +413,7 @@ export function AccountManagementPage({
               <input
                 type="text"
                 placeholder="Search by email, department, or designation..."
-                className="w-full rounded-lg border border-transparent bg-[#eef3ff] py-2.5 pl-9 pr-11 text-sm outline-none transition placeholder:text-slate-500 focus:border-blue-300 focus:ring-2 focus:ring-blue-500/15 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-11 text-sm text-slate-700 outline-none transition placeholder:text-slate-500 focus:border-[#2187cd] focus:ring-2 focus:ring-[#2187cd]/15 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -421,7 +421,7 @@ export function AccountManagementPage({
             </div>
             <label className="relative flex min-w-0 flex-1 items-center md:flex-none">
               <ArrowDownAZ className="pointer-events-none absolute left-3 text-slate-600 dark:text-slate-300" size={16} />
-              <select value={tableSort} onChange={(event) => setTableSort(event.target.value as AccountSort)} aria-label="Sort accounts" className="w-full appearance-none rounded-lg border border-transparent bg-[#eef3ff] py-2.5 pl-9 pr-9 text-xs font-semibold text-slate-800 outline-none focus:border-blue-300 dark:bg-slate-800 dark:text-slate-100 md:min-w-[185px]">
+              <select value={tableSort} onChange={(event) => setTableSort(event.target.value as AccountSort)} aria-label="Sort accounts" className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-xs font-semibold text-slate-700 outline-none focus:border-[#2187cd] focus:ring-2 focus:ring-[#2187cd]/15 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 md:min-w-[185px]">
                 <option value="email-asc">Sort by: Email (A–Z)</option>
                 <option value="email-desc">Sort by: Email (Z–A)</option>
                 <option value="department-asc">Sort by: Department (A–Z)</option>
@@ -431,13 +431,13 @@ export function AccountManagementPage({
             </label>
             <label className="relative flex min-w-0 flex-1 items-center md:flex-none">
               <Building2 className="pointer-events-none absolute left-3 text-slate-600 dark:text-slate-300" size={16} />
-              <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value as AccountDepartmentFilter)} aria-label="Filter accounts by department" className="w-full appearance-none rounded-lg border border-transparent bg-[#eef3ff] py-2.5 pl-9 pr-9 text-xs font-semibold text-slate-800 outline-none focus:border-blue-300 dark:bg-slate-800 dark:text-slate-100 md:min-w-[190px]">
+              <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value as AccountDepartmentFilter)} aria-label="Filter accounts by department" className="w-full appearance-none rounded-lg border border-slate-200 bg-white py-2.5 pl-9 pr-9 text-xs font-semibold text-slate-700 outline-none focus:border-[#2187cd] focus:ring-2 focus:ring-[#2187cd]/15 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 md:min-w-[190px]">
                 <option value="All Departments">All Departments</option>
                 {DEPARTMENT_OPTIONS.map((departmentOption) => <option key={departmentOption} value={departmentOption}>{departmentOption}</option>)}
               </select>
               <ChevronDown className="select-chevron pointer-events-none absolute text-slate-500" size={14} />
             </label>
-            <button type="button" onClick={() => { setSearchTerm(''); setTableSort('email-asc'); setRoleFilter('All'); setDepartmentFilter('All Departments'); }} aria-label="Reset account filters" title="Reset filters" className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-lg bg-[#eef3ff] text-slate-700 transition hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 md:self-auto">
+            <button type="button" onClick={() => { setSearchTerm(''); setTableSort('email-asc'); setRoleFilter('All'); setDepartmentFilter('All Departments'); }} aria-label="Reset account filters" title="Reset filters" className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187cd]/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 md:self-auto">
               <RotateCcw size={16} aria-hidden="true" />
             </button>
           </div>
@@ -500,7 +500,7 @@ export function AccountManagementPage({
                       {acc.permissions && (
                         <button
                           onClick={() => handleResetAccess(acc)}
-                          className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5 mr-2"
+                          className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-0.5 mr-2"
                           title="Reset Access back to defaults"
                         >
                           <RotateCcw size={12} />
@@ -784,7 +784,7 @@ export function AccountManagementPage({
             {/* Header */}
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
               <div className="flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
+                <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
                   <Shield size={20} />
                 </span>
                 <div>
@@ -817,7 +817,7 @@ export function AccountManagementPage({
                       onClick={() => setSelectedDept(dept)}
                       className={`w-full flex items-center justify-between text-left px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
                         isSelected
-                          ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 shadow-sm border border-indigo-100 dark:border-indigo-900/30'
+                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 shadow-sm border border-blue-100 dark:border-blue-900/30'
                           : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50 border border-transparent'
                       }`}
                       type="button"
@@ -836,7 +836,7 @@ export function AccountManagementPage({
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Access Settings for:</span>
-                    <span className="inline-flex items-center rounded-md bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/50 px-2.5 py-0.5 text-xs font-bold">
+                    <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50 px-2.5 py-0.5 text-xs font-bold">
                       {selectedDept}
                     </span>
                   </div>
@@ -860,13 +860,13 @@ export function AccountManagementPage({
                           onClick={() => toggleDeptSurveyTypeSelection(type.key)}
                           className={`flex items-start gap-3 w-full p-2.5 rounded-xl border text-left transition-all ${
                             isChecked 
-                              ? 'border-indigo-500 bg-indigo-50/10 dark:bg-indigo-950/10' 
+                              ? 'border-blue-500 bg-blue-50/10 dark:bg-blue-950/10'
                               : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                           }`}
                         >
                           <div className="pt-0.5">
                             {isChecked ? (
-                              <div className="h-4.5 w-4.5 rounded flex items-center justify-center bg-indigo-600 text-white">
+                              <div className="h-4.5 w-4.5 rounded flex items-center justify-center bg-blue-600 text-white">
                                 <Check size={12} strokeWidth={3} />
                               </div>
                             ) : (
@@ -898,13 +898,13 @@ export function AccountManagementPage({
                           onClick={() => toggleDeptPageSelection(module.key)}
                           className={`flex items-start gap-3 p-2.5 rounded-xl border text-left transition-all ${
                             isChecked 
-                              ? 'border-indigo-500 bg-indigo-50/10 dark:bg-indigo-950/10' 
+                              ? 'border-blue-500 bg-blue-50/10 dark:bg-blue-950/10'
                               : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                           }`}
                         >
                           <div className="pt-0.5">
                             {isChecked ? (
-                              <div className="h-4.5 w-4.5 rounded flex items-center justify-center bg-indigo-600 text-white">
+                              <div className="h-4.5 w-4.5 rounded flex items-center justify-center bg-blue-600 text-white">
                                 <Check size={12} strokeWidth={3} />
                               </div>
                             ) : (
@@ -935,7 +935,7 @@ export function AccountManagementPage({
               <button
                 type="button"
                 onClick={handleSaveDeptAccess}
-                className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition cursor-pointer shadow-md"
+                className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition cursor-pointer shadow-md"
               >
                 Save Department Access
               </button>
