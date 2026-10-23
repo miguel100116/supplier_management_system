@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import { PageDescription, PageDescriptionTarget } from '../../../components/PageDescription';
 
 export const EVALUATION_WORKSPACE_TABS = [
   { key: 'survey-forms', label: 'Forms', description: 'Create and manage evaluation forms, assigned companies, deadlines, and access.' },
@@ -20,7 +21,7 @@ export function EvaluationWorkspace({ activePage, onNavigate, children }: {
 }) {
   return (
     <div className="admin-evaluation-workspace space-y-6">
-      <p className="-mt-3 text-base text-slate-500 dark:text-slate-400">{activePage === 'categories-manager' ? 'Change the displayed scoring category names for each survey type.' : 'Create and manage evaluation forms, assigned companies, deadlines, and access.'}</p>
+      <PageDescription>{activePage === 'categories-manager' ? 'Change the displayed scoring category names for each survey type.' : 'Create and manage evaluation forms, assigned companies, deadlines, and access.'}</PageDescription>
       <nav aria-label="Evaluation workspace views" className="admin-evaluation-tabs flex max-w-full flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
           {EVALUATION_WORKSPACE_TABS.map((tab) => (
             <button
@@ -36,7 +37,7 @@ export function EvaluationWorkspace({ activePage, onNavigate, children }: {
             </button>
           ))}
       </nav>
-      {children}
+      <PageDescriptionTarget.Provider value={null}>{children}</PageDescriptionTarget.Provider>
     </div>
   );
 }

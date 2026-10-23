@@ -308,11 +308,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTyp
 function AnalyticsHeader({ dataScope, onChangeDataScope }: { dataScope: 'current' | 'all-time' | 'custom'; onChangeDataScope?: (scope: 'current' | 'all-time' | 'custom') => void }) {
   return (
     <header className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="min-w-0 flex-1">
-          <PageDescription>Review evaluation results, identify performance gaps, and compare partner companies.</PageDescription>
-        </div>
-      </div>
+      <PageDescription>Review evaluation results, identify performance gaps, and compare partner companies.</PageDescription>
       <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800"><div role="group" aria-label="Analytics date scope" className="inline-flex w-fit gap-1 rounded-lg bg-slate-50 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-[11px] text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-weighted</span></div></div>
     </header>
   );

@@ -75,6 +75,112 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
+function headerFormat(element: Element) {
+  const title = element.querySelector('h1')!;
+  const subtitle = element.querySelector('p');
+  const typography = (target: Element) => {
+    const css = getComputedStyle(target);
+    return [css.fontFamily, css.fontSize, css.fontWeight, css.lineHeight, css.letterSpacing, css.color];
+  };
+  return { title: typography(title), subtitle: subtitle && typography(subtitle),
+    gap: subtitle && subtitle.getBoundingClientRect().top - title.getBoundingClientRect().bottom };
+}
+
+test('Admin module headings match the compact Directory title and subtitle format', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const service = await backend(page);
+  await page.goto('/login');
+  await signIn(page);
+  await page.goto('/partners');
+  const reference = await page.locator('.admin-directory-header').evaluate(headerFormat);
+  const modules = [
+    ['document-tracker', 'Documents', true], ['feedback-hub', 'Feedback', true],
+    ['evaluation-workspace', 'Workspace', true], ['analytics', 'Analytics', true],
+    ['reports', 'Reports', true], ['archive-center', 'Archive', true],
+    ['import-evaluation-responses', 'Import Responses', true], ['employees-users', 'Users', false],
+    ['present-mode', 'Present', false],
+  ] as const;
+  for (const [route, title, hasSubtitle] of modules) {
+    await page.goto(`/${route}`);
+    const header = page.locator('.admin-page-heading');
+    await expect(header.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
+    if (hasSubtitle) await expect(header.locator('p')).toHaveCount(1);
+    if (route === 'employees-users') await expect(page.locator('.admin-accounts-page')).toBeVisible();
+    if (route === 'present-mode') await expect(page.locator('.admin-presentation-page')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath(`heading-${route}.png`), animations: 'disabled' });
+    const actual = await header.evaluate(headerFormat);
+    expect(actual.title, title).toEqual(reference.title);
+    if (hasSubtitle) {
+      expect(actual.subtitle, title).toEqual(reference.subtitle);
+      expect(actual.gap, title).toBeCloseTo(reference.gap!, 0);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), title).toBe(false);
+    if (route === 'document-tracker') {
+      const action = header.getByRole('button', { name: 'Add Notification', exact: true });
+      await action.focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('heading', { name: 'Document Expiry Notifications', exact: true })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(action).toBeFocused();
+      if (!testInfo.project.use.isMobile) {
+        for (const width of [1920, 1024]) {
+          await page.setViewportSize({ width, height: 900 });
+          await page.screenshot({ path: testInfo.outputPath(`heading-documents-${width}.png`), animations: 'disabled' });
+          const layout = await header.evaluate(element => {
+            const copy = element.querySelector('.admin-page-heading-copy')!.getBoundingClientRect();
+            const button = element.querySelector('button')!.getBoundingClientRect();
+            return { gap: button.left - copy.right, right: button.right, viewport: innerWidth };
+          });
+          expect(layout.gap).toBeGreaterThanOrEqual(12);
+          expect(layout.right).toBeLessThanOrEqual(layout.viewport);
+        }
+        await page.setViewportSize({ width: 1280, height: 720 });
+      }
+    }
+    if (route === 'evaluation-workspace') {
+      const tabs = page.getByRole('navigation', { name: 'Evaluation workspace views' });
+      await tabs.getByRole('button', { name: 'Category Labels', exact: true }).click();
+      await expect(header.locator('p')).toHaveText('Change the displayed scoring category names for each survey type.');
+      await expect(header.locator('p')).toHaveCount(1);
+      await expect(page.getByText(/Each partner type is evaluated across 5 categories/)).toBeVisible();
+      await tabs.getByRole('button', { name: 'Forms', exact: true }).click();
+      await expect(header.locator('p')).toHaveText('Create and manage evaluation forms, assigned companies, deadlines, and access.');
+    }
+  }
+  const navigate = async (label: string) => {
+    if (testInfo.project.use.isMobile) {
+      await page.getByRole('button', { name: 'Open navigation menu', exact: true }).click();
+      await page.locator('.admin-mobile-navigation').getByRole('button', { name: label, exact: true }).click();
+    } else {
+      await page.getByRole('navigation', { name: 'Administrator workspace', exact: true })
+        .getByRole('button', { name: label, exact: true }).click();
+    }
+  };
+  // Exercise portal cleanup while the Shell stays mounted, including a hidden heading.
+  await page.goto('/document-tracker');
+  await expect(page.locator('.admin-page-heading p')).toContainText('Monitor partner compliance documents');
+  await navigate('Directory');
+  await expect(page.locator('.admin-directory-header h1')).toHaveText('Partner directory');
+  await expect(page.locator('.admin-page-heading')).toHaveCount(0);
+  await navigate('Analytics');
+  await expect(page.locator('.admin-page-heading p')).toHaveText('Review evaluation results, identify performance gaps, and compare partner companies.');
+  await navigate('Users');
+  await expect(page.locator('.admin-page-heading h1')).toHaveText('Users');
+  await expect(page.locator('.admin-page-heading p')).toHaveCount(0);
+  await expect(page.getByText('Review evaluation results, identify performance gaps, and compare partner companies.', { exact: true })).toHaveCount(0);
+  await navigate('Directory');
+  await page.evaluate(() => document.body.classList.add('dark'));
+  const darkReference = await page.locator('.admin-directory-header').evaluate(headerFormat);
+  await expect(page.locator('.admin-directory-header h1')).toHaveCSS('color', 'rgb(230, 237, 245)');
+  await navigate('Documents');
+  await expect(page.locator('.admin-page-heading p')).toHaveCount(1);
+  const darkActual = await page.locator('.admin-page-heading').evaluate(headerFormat);
+  expect(darkActual).toEqual(darkReference);
+  await page.screenshot({ path: testInfo.outputPath('heading-documents-dark.png'), animations: 'disabled' });
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
 test('Admin desktop uses the compact workspace scale while mobile retains its normal scale', async ({ page }, testInfo) => {
   const service = await backend(page);
   const survey = { id: 'synthetic-survey', title: 'Courier Satisfaction Survey', surveyType: 'Courier',

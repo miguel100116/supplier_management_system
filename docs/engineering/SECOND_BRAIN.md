@@ -2,6 +2,14 @@
 
 Last verified: 2026-10-23
 
+### 2026-10-23 - Consistent Admin module headers
+
+The Admin Shell matches the Partner directory's 22px/600 heading and 14px subtitle, with a 4px title-to-subtitle gap. `PageDescription` uses a Shell-provided portal target to place existing introductory copy below the title; outside that context it stays inline. Evaluation Workspace supplies its own header copy and keeps nested category explanations local. Header actions retain their existing handlers and wrap below the text on narrow screens. Dashboard and Employee layouts retain their existing presentation. Dark headings/subtitles use the shared theme tokens.
+
+Evidence: `src/layouts/Shell.tsx`, `src/components/PageDescription.tsx`, `src/adminRedesign.css`, Evaluation Workspace, and the module-header browser journey in `tests/e2e/application.spec.ts`. Rollback is a revert of these presentation changes; no persistence or migration is involved.
+
+Local verification: all 376 Node tests, TypeScript checks, production build, twenty desktop/mobile browser journeys, and Git diff whitespace checks passed. The header regression reproduced the previous Documents typography mismatch. Screenshots were inspected at desktop, small-laptop, and mobile widths with synthetic records, including dark mode. Hosted rendering was not checked; the existing bundle-size warning remains. No deployment or remote data changes were performed.
+
 ### 2026-10-23 - Notification and Feedback release review
 
 Integrated `origin/regoris` at `53fd9db` into local `second-branch` by fast-forward, preserving the notification fixes, Feedback progress dialog and UI/UX agent rules. Both documentation additions were retained during stash restoration; the browser journeys merged without conflicts. The combined tree passed 376 Node tests, all four TypeScript projects, production build and 18 desktop/mobile browser journeys, including the Feedback dialog under the new desktop scale. The dependency audit reported zero vulnerabilities. The owner authorized committing and pushing this reviewed work to `second-branch`; the local pre-push hook reruns verification against the commit. No migration or deployment is included. Hosted delivery timing and dark-mode visual review remain unverified; the existing bundle-size warning remains.
