@@ -75,6 +75,45 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
+test('Workspace category and status badges use consistent typography and geometry', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  for (const [surveyType, status] of [['Courier', 'Running'], ['Supplier', 'Paused'], ['Subcontractor', 'Completed']] as const) {
+    const form = { id: `badge-${surveyType}`, title: `${surveyType} evaluation`, surveyType, status,
+      description: 'Synthetic form for badge presentation checks.', createdAt, questions: [] };
+    service.records.push({ record_type: 'survey', record_id: form.id, payload: form, created_at: createdAt });
+  }
+  await page.goto('/login');
+  await signIn(page);
+  await page.goto('/evaluation-workspace');
+  const rows = page.locator('.admin-survey-forms-page table tbody tr');
+  await expect(rows).toHaveCount(3);
+  for (const dark of [false, true]) {
+    await page.evaluate(enabled => document.body.classList.toggle('dark', enabled), dark);
+    await page.screenshot({ path: testInfo.outputPath(`workspace-badges-${dark ? 'dark' : 'light'}.png`), animations: 'disabled' });
+    for (const row of await rows.all()) {
+      const badges = await row.evaluate(element => {
+        const geometry = (cell: Element) => {
+          const badge = cell.firstElementChild!;
+          const css = getComputedStyle(badge);
+          return { font: css.fontFamily, size: css.fontSize, weight: css.fontWeight,
+            lineHeight: css.lineHeight, tracking: css.letterSpacing, casing: css.textTransform,
+            padding: css.padding, radius: css.borderRadius, border: css.borderWidth,
+            height: badge.getBoundingClientRect().height };
+        };
+        return { category: geometry(element.children[1]), status: geometry(element.children[2]) };
+      });
+      expect(badges.category).toEqual(badges.status);
+      expect(badges.category.size).toBe('12px');
+      const box = await row.getByRole('cell').nth(1).locator('span').boundingBox();
+      const cell = await row.getByRole('cell').nth(1).boundingBox();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(cell!.x + cell!.width);
+    }
+  }
+  for (const label of ['ACTIVE', 'PAUSED', 'ENDED']) await expect(rows.getByText(label, { exact: true })).toBeVisible();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
 function headerFormat(element: Element) {
   const title = element.querySelector('h1')!;
   const subtitle = element.querySelector('p');
