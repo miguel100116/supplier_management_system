@@ -215,7 +215,7 @@ A condensed cheat-sheet of who gets what, by default:
 | Step | Actor | Action |
 |---|---|---|
 | 1 | Admin | Creates a Survey Form: title, type (Courier / Supplier / Subcontractor), questions, deadline, and which departments/ranks/companies can see it. |
-| 2 | Admin | Publishes the form (status: Running). |
+| 2 | Admin | Makes the form available (status: Running). An explicit successful Send/Resend records a distribution revision and renews in-app unread reminders for eligible employees with unfinished work. |
 | 3 | Employee / Partner | Fills out the form if their department/rank/company is in scope. |
 | 4 | System | Records one response row per answered question and updates the Notification Bell and Notification Logs. |
 | 5 | All eligible users | See the new data reflected in Dashboard, Analytics, Survey Explorer, and Reports within their authorized response scope. |

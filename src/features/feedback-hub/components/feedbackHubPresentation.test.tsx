@@ -143,6 +143,7 @@ test('Progress modal formats raw submission timestamps and separates footer acti
   const submittedAt = '2026-05-03T10:24:00.000Z';
   const markup = renderToStaticMarkup(createElement(SurveyProgressModal, {
     survey,
+    surveys: [survey],
     responses: [response(1)],
     partnerCompanies: [],
     accounts: [],
@@ -157,8 +158,34 @@ test('Progress modal formats raw submission timestamps and separates footer acti
   assert.ok(markup.indexOf('>Ongoing<') < markup.indexOf('>Supplier<'));
   assert.match(markup, /feedback-progress-header-main/);
   assert.match(markup, /aria-label="Close survey progress"/);
-  assert.ok(markup.indexOf('Close Progress View') < markup.indexOf('Mark Survey as Complete Now'));
+  assert.ok(markup.indexOf('feedback-progress-close"') < markup.indexOf('Complete survey'));
   assert.match(markup, /primary-button feedback-progress-complete/);
   assert.doesNotMatch(markup, /feedback-progress-footer-help|Completes automatically once/);
   assert.doesNotMatch(markup, new RegExp(`>${submittedAt}<`));
+});
+
+test('progress overview separates submissions from per-employee completion and keeps records accessible', () => {
+  const running = { ...survey, status: 'Running' as const, deadlineDate: '31/12/2099' };
+  const markup = renderToStaticMarkup(createElement(SurveyProgressModal, {
+    survey: running, surveys: [running], responses: [response(1)],
+    partnerCompanies: [1, 2].map(index => ({ id: `company-${index}`, name: `Company ${index}`, type: 'Supplier' as const, createdAt: '2026-01-01' })),
+    accounts: [1, 2].map(index => ({ email: `person${index}@mgenesis.com`, role: 'Employee', designation: 'Rank & File', department: 'Logistics' })),
+    onClose: noop, isAdmin: false,
+  }));
+  assert.match(markup, /<dt>Submitted evaluations<\/dt><dd>1<\/dd>/);
+  assert.match(markup, /0 of 2 employees complete/);
+  assert.match(markup, /<progress value="1" max="2" aria-label="Evaluations completed by person1@mgenesis.com"/);
+  assert.match(markup, /<caption class="sr-only">Employee evaluation completion<\/caption>/);
+  assert.match(markup, /<caption class="sr-only">Recorded respondents<\/caption>/);
+  assert.doesNotMatch(markup, /Complete survey|Export PDF|\/ 2 target/);
+});
+
+test('empty progress is explicit and does not imply a company target or score', () => {
+  const markup = renderToStaticMarkup(createElement(SurveyProgressModal, {
+    survey, surveys: [survey], responses: [], partnerCompanies: [], accounts: [], onClose: noop,
+  }));
+  assert.match(markup, /No employees currently have access/);
+  assert.match(markup, /No employees have submitted responses yet/);
+  assert.match(markup, /<dd>N\/A<\/dd>/);
+  assert.doesNotMatch(markup, /<progress|Complete survey/);
 });

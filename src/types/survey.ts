@@ -192,6 +192,9 @@ export interface CustomForm {
   surveyType: SurveyType;
   description: string;
   createdAt: string;
+  /** Explicit successful send/resend; absent on legacy forms. */
+  distributionId?: string;
+  lastDistributedAt?: string;
   archivedAt?: string;
   /** Timestamp when an Admin explicitly ended this survey, independent of its deadline. */
   manuallyEndedAt?: string;

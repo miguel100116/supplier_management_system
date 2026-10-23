@@ -80,7 +80,7 @@ export function CurrentFormsTab({
             // Companies this survey actually evaluates right now (respects
             // the admin's "Modify Companies to Evaluate" selection) and each
             // eligible employee's progress against that same list.
-            const completion = getSurveyCompletionSummary(survey, accounts, partnerCompanies, responses);
+            const completion = getSurveyCompletionSummary(survey, accounts, partnerCompanies, responses, surveys);
             const targetResponses = Math.max(completion.companiesTotal, 1);
             const employeesAt100 = completion.eligibleEmployees.filter((e) => e.completed >= e.total && e.total > 0).length;
             const responseCount = completion.eligibleEmployees.length
@@ -216,6 +216,7 @@ export function CurrentFormsTab({
       {/* Ongoing Survey Read-only Progress Modal */}
       {selectedSurveyForProgress && (
         <SurveyProgressModal
+          surveys={surveys}
           survey={selectedSurveyForProgress}
           responses={responses}
           partnerCompanies={partnerCompanies}

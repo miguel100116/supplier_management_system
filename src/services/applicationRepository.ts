@@ -519,6 +519,9 @@ export function subscribeToApplicationChanges(client = supabase): () => void {
         window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
           detail: { recordType: 'survey_response', reason: hasSubscribed ? 'reconnect' : 'subscribed' },
         }));
+        window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
+          detail: { recordType: 'survey', reason: hasSubscribed ? 'reconnect' : 'subscribed' },
+        }));
         hasSubscribed = true;
         window.dispatchEvent(new CustomEvent(APPLICATION_REALTIME_STATUS_EVENT, {
           detail: { status, consecutiveFailures: 0, warningVisible: false },

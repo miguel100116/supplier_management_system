@@ -143,6 +143,15 @@ Treat the existing Supplier Management System as the design authority. UI work m
 - After a UI change, review desktop and mobile states when visual tooling is available. Check brand colors, typography, spacing, hierarchy, alignment, control states, accessibility, and unintended changes. If visual comparison is unavailable, state that limitation in the handoff.
 - When comparable patterns conflict, prefer the one used in the same module or workflow. If the choice would materially change the interface and remains ambiguous, ask before inventing a new pattern.
 
+### Automatic UI/UX quality pass (unslop)
+
+- Automatically review and improve UI/UX quality whenever creating or intentionally changing an interface; do not wait for a separate cleanup request. Apply this pass to the affected screen or interaction within the authorized scope.
+- Remove unnecessary visual noise: redundant headings, repeated instructions, decorative icons, excessive badges, nested cards, oversized spacing, competing primary actions, and effects that do not help users understand or complete their task. Preserve useful information and controls.
+- Fix concrete usability defects in the touched interface: unclear labels, misleading success or empty states, weak hierarchy, inconsistent controls, clipped content, viewport overflow, inaccessible focus states, and avoidable interaction steps. Reuse the closest established Microgenesis pattern instead of inventing a new design.
+- Preserve validation, permissions, data, confirmation safeguards, keyboard navigation, focus handling, and error recovery. Simplifying appearance must never remove required functionality or hide operational failures.
+- Check the result at desktop and mobile sizes, including relevant loading, empty, error, disabled, selected, and open-dialog states. Add behavioral or viewport regression coverage for defects found; report any visual checks that could not be performed.
+- Keep this pass small and reviewable. Do not expand it into adjacent screens, a redesign, dependency additions, or a formatting sweep. During a behavior-preserving refactor, retain the existing UI and report pre-existing design issues separately; this rule does not override the refactoring contract or require approval for routine improvements already within an authorized UI task.
+
 ### Modal and dialog contract
 
 - Every modal or dialog must register with the shared `useModalEscape` lifecycle in `src/hooks/useModalEscape.ts`. This provides Escape handling, backdrop dismissal, scroll locking, nested-modal priority, and focus restoration.

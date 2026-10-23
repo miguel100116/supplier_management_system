@@ -963,19 +963,20 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 .admin-directory-breakdown .admin-directory-breakdown-content { padding-block: 12px; }
 .admin-directory-breakdown .rounded-xl { border-radius: 8px; }
 .admin-directory-page [role="tablist"] button { min-width: 0; }
-.admin-directory-page .admin-directory-table .admin-directory-col-partner { width: 30%; }
+.admin-directory-page .admin-directory-table .admin-directory-col-partner { width: auto; }
 .admin-directory-page .admin-directory-table .admin-directory-col-category { width: 14%; }
 .admin-directory-page .admin-directory-table .admin-directory-col-registered { width: 13%; }
 .admin-directory-page .admin-directory-table .admin-directory-col-branch { width: 13%; }
-.admin-directory-page .admin-directory-table .admin-directory-col-health { width: 17%; }
-.admin-directory-page .admin-directory-table .admin-directory-col-actions { width: 13%; }
-.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-partner { width: 25%; }
+/* Keep document health beside its actions; partner names absorb spare width. */
+.admin-directory-page .admin-directory-table .admin-directory-col-health { width: 132px; }
+.admin-directory-page .admin-directory-table .admin-directory-col-actions { width: 104px; }
+.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-partner { width: auto; }
 .admin-directory-page .admin-directory-table.is-archived .admin-directory-col-category { width: 13%; }
 .admin-directory-page .admin-directory-table.is-archived .admin-directory-col-registered { width: 11%; }
-.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-archived { width: 11%; }
+.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-archived { width: 176px; }
 .admin-directory-page .admin-directory-table.is-archived .admin-directory-col-branch { width: 12%; }
-.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-health { width: 15%; }
-.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-actions { width: 13%; }
+.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-health { width: 132px; }
+.admin-directory-page .admin-directory-table.is-archived .admin-directory-col-actions { width: 104px; }
 .admin-directory-page .admin-directory-table tbody td { padding-top: 9px; padding-bottom: 9px; }
 .admin-directory-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .admin-directory-mobile-actions { justify-content: space-between; }

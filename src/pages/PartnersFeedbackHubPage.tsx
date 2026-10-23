@@ -375,7 +375,7 @@ export function PartnersFeedbackHubPage({
   // to Evaluate" selection).
   const activeSurveys = surveys.filter((s) => s.status !== 'Archived');
   const hasOngoingSurveys = activeSurveys.some(
-    (s) => !getSurveyCompletionSummary(s, accounts, partnerCompanies, responses).isComplete
+    (s) => !getSurveyCompletionSummary(s, accounts, partnerCompanies, responses, surveys).isComplete
   );
   const areAllSurveysCompleted = !hasOngoingSurveys;
 

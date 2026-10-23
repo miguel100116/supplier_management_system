@@ -5,11 +5,12 @@ import { CustomForm, SurveyType, PartnerCompany, SurveyAccessRole } from '../typ
 import { StateMessage } from '../components/StateMessage';
 import { CompletionStatusBar } from '../features/evaluations/components/CompletionStatusBar';
 import { Pagination } from '../components/Pagination';
-import { getAllCompaniesOfType, getSurveyEvaluationCompanies, hasAnsweredItem } from '../features/analytics/domain/analytics';
+import { getAllCompaniesOfType, getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
 import { getReminderFrequency, saveReminderFrequency } from '../features/notifications/services/reminderSettings';
 import { TableFilterBar } from '../components/TableFilterBar';
 import { SurveyFormsToolbar } from '../features/evaluations/components/SurveyFormsToolbar';
 import { compareDate, compareText, isWithinDateRange } from '../utils/tableFilters';
+import { getPendingEvaluationCompanies } from '../features/evaluations/domain/evaluationProgress';
 import { getSurveyStatus } from '../features/evaluations/domain/surveyStatus';
 import { SurveyAccessStatus } from '../features/evaluations/components/SurveyAccessStatus';
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog';
@@ -25,6 +26,7 @@ import { getAdminActivity, logAdminActivity, type AdminActivityEntry } from '../
 
 interface SurveyFormsPageProps {
   surveys: CustomForm[];
+  knownSurveys?: CustomForm[];
   responses: any[];
   partnerCompanies?: PartnerCompany[];
   userEmail?: string;
@@ -100,6 +102,7 @@ function yyyymmddToDdmm(yyyymmdd: string): string {
 
 export function SurveyFormsPage({
   surveys,
+  knownSurveys = surveys,
   responses,
   partnerCompanies = [],
   userEmail = '',
@@ -252,16 +255,10 @@ export function SurveyFormsPage({
       setDistributionFeedback({ kind: 'error', text: 'This evaluation deadline has passed. Update the deadline before sending this form.' });
       return;
     }
-    if (getSurveyStatus(sendConfirmationSurvey) === 'Running' && !sendCompanySelectionRequired && sendCompanyIds === null) {
-      setIsSendApprovalOpen(false);
-      setSendConfirmationSurveyId(null);
-      setDistributionFeedback({ kind: 'success', text: 'This form is already available to eligible employees. Existing survey reminders will direct them to it.' });
-      return;
-    }
 
     setIsSendingForm(true);
     try {
-      await onUpdateSurvey({ ...applyDistributionCompanySelection(sendConfirmationSurvey, sendCompanyIds, partnerCompanies), status: 'Running', manuallyEndedAt: undefined, archivedAt: undefined });
+      await onUpdateSurvey({ ...applyDistributionCompanySelection(sendConfirmationSurvey, sendCompanyIds, partnerCompanies), status: 'Running', manuallyEndedAt: undefined, archivedAt: undefined, distributionId: crypto.randomUUID(), lastDistributedAt: new Date().toISOString() });
       logAdminActivity(
         'Made evaluation form available',
         `${sendConfirmationSurvey.title} (${sendConfirmationSurvey.surveyType}) · ${eligibleRecipients.length} eligible employees · by ${userEmail || 'Admin'}`,
@@ -285,19 +282,6 @@ export function SurveyFormsPage({
     return getReminderFrequency();
   });
 
-  // Identify unique set of evaluated companies for this user
-  const userEvaluations = useMemo(() => {
-    if (!userEmail) return new Set<string>();
-    const set = new Set<string>();
-    const normalizedUserEmail = userEmail.trim().toLowerCase();
-    responses.forEach((resp) => {
-      if (hasAnsweredItem(resp) && resp.respondentEmail && resp.respondentEmail.trim().toLowerCase() === normalizedUserEmail) {
-        set.add(`${resp.surveyType}:${resp.company.trim().toLowerCase()}`);
-      }
-    });
-    return set;
-  }, [responses, userEmail]);
-
   // A category only "counts" toward this user's evaluation progress if they actually
   // have a real, non-archived survey form assigned/accessible to them for it. Having
   // broad access to a survey type (e.g. via an Account Management checkmark) isn't
@@ -319,7 +303,7 @@ export function SurveyFormsPage({
   const evaluableCompanies = useMemo(() => {
     const map = new Map<string, PartnerCompany>();
     surveys.forEach((survey) => {
-      if (survey.status === 'Archived') return;
+      if (getSurveyStatus(survey) !== 'Running') return;
       if (!assignedSurveyTypes.has(survey.surveyType)) return;
       getSurveyEvaluationCompanies(survey, partnerCompanies).forEach((c) => map.set(c.id, c));
     });
@@ -334,17 +318,14 @@ export function SurveyFormsPage({
       Subcontractor: [],
     };
 
+    const pendingIds = new Set(surveys.filter((survey) => getSurveyStatus(survey) === 'Running')
+      .flatMap((survey) => getPendingEvaluationCompanies(survey, knownSurveys, partnerCompanies, responses, userEmail ?? '').map((company) => company.id)));
     evaluableCompanies.forEach((company) => {
-      const isEvaluated = userEvaluations.has(`${company.type}:${company.name.trim().toLowerCase()}`);
-      if (!isEvaluated && company.type !== 'Uncategorized') {
-        if (pending[company.type]) {
-          pending[company.type].push(company);
-        }
-      }
+      if (pendingIds.has(company.id) && company.type !== 'Uncategorized') pending[company.type].push(company);
     });
 
     return pending;
-  }, [evaluableCompanies, userEvaluations]);
+  }, [evaluableCompanies, surveys, knownSurveys, partnerCompanies, responses, userEmail]);
 
   const totalCompanies = evaluableCompanies.length;
   const pendingCount =
@@ -371,10 +352,10 @@ export function SurveyFormsPage({
     const completed: Record<string, number> = {};
     surveys.forEach((survey) => {
       const companies = getSurveyEvaluationCompanies(survey, partnerCompanies);
-      completed[survey.id] = companies.filter((c) => userEvaluations.has(`${survey.surveyType}:${c.name.trim().toLowerCase()}`)).length;
+      completed[survey.id] = companies.length - getPendingEvaluationCompanies(survey, knownSurveys, partnerCompanies, responses, userEmail ?? '').length;
     });
     return completed;
-  }, [surveys, partnerCompanies, userEvaluations]);
+  }, [surveys, knownSurveys, partnerCompanies, responses, userEmail]);
 
   const formatDeadline = (deadlineDate?: string) => {
     if (!deadlineDate) return 'No deadline set';
@@ -1114,7 +1095,7 @@ export function SurveyFormsPage({
       {sendConfirmationSurvey && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="send-form-title">
           <div aria-hidden="true" className="absolute inset-0 bg-slate-950/50" />
-            <section className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><header className="mb-3"><h2 id="send-form-title" className="text-lg font-bold">Confirm form distribution</h2><p className="text-sm text-slate-500">{sendConfirmationSurvey.title} · {sendConfirmationSurvey.surveyType}</p><p className="mt-2 text-sm"><b>{eligibleRecipients.length}</b> eligible employee{eligibleRecipients.length === 1 ? '' : 's'} based on category permissions and this form’s access settings.</p></header><SendFormCompanySelection surveyType={sendConfirmationSurvey.surveyType} companies={sendTopCompanies} selectedIds={sendCompanyIds} busy={isSendingForm || !onUpdateSurvey} onSelect={setSendCompanyIds} />{distributionFeedback?.kind === 'error' && <p role="alert" className="mb-3 text-sm text-rose-600">{distributionFeedback.text}</p>}<div className="max-h-[45vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2">Employee</th><th className="p-2">Department</th><th className="p-2">Designation</th></tr></thead><tbody>{eligibleRecipients.map((recipient) => <tr key={recipient.email} className="border-t border-slate-100 dark:border-slate-800"><td className="p-2">{recipient.email}</td><td className="p-2">{recipient.department}</td><td className="p-2">{recipient.designation}</td></tr>)}</tbody></table>{eligibleRecipients.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No eligible employees match the current access settings.</p>}</div>{sendDeadlineExpired && <p className="mt-3 text-sm text-rose-600">The deadline has passed. Update it in Manage Access before sending.</p>}<footer className="mt-4 flex justify-end gap-2"><button onClick={requestCloseSendConfirmation} disabled={isSendingForm} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button><button onClick={() => { setDistributionFeedback(null); setIsSendApprovalOpen(true); }} disabled={isSendingForm || !onUpdateSurvey || !eligibleRecipients.length || sendDeadlineExpired || (sendCompanySelectionRequired && !sendCompanyIds?.length)} className="rounded-lg bg-[#2187CD] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSendingForm ? 'Sending…' : (sendCompanyIds !== null || sendCompanySelectionRequired) ? 'Confirm & Save Selection' : getSurveyStatus(sendConfirmationSurvey) === 'Running' ? 'Already Available' : 'Confirm & Make Available'}</button></footer></section>
+            <section className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><header className="mb-3"><h2 id="send-form-title" className="text-lg font-bold">Confirm form distribution</h2><p className="text-sm text-slate-500">{sendConfirmationSurvey.title} · {sendConfirmationSurvey.surveyType}</p><p className="mt-2 text-sm"><b>{eligibleRecipients.length}</b> eligible employee{eligibleRecipients.length === 1 ? '' : 's'} based on category permissions and this form’s access settings.</p></header><SendFormCompanySelection surveyType={sendConfirmationSurvey.surveyType} companies={sendTopCompanies} selectedIds={sendCompanyIds} busy={isSendingForm || !onUpdateSurvey} onSelect={setSendCompanyIds} />{distributionFeedback?.kind === 'error' && <p role="alert" className="mb-3 text-sm text-rose-600">{distributionFeedback.text}</p>}<div className="max-h-[45vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2">Employee</th><th className="p-2">Department</th><th className="p-2">Designation</th></tr></thead><tbody>{eligibleRecipients.map((recipient) => <tr key={recipient.email} className="border-t border-slate-100 dark:border-slate-800"><td className="p-2">{recipient.email}</td><td className="p-2">{recipient.department}</td><td className="p-2">{recipient.designation}</td></tr>)}</tbody></table>{eligibleRecipients.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No eligible employees match the current access settings.</p>}</div>{sendDeadlineExpired && <p className="mt-3 text-sm text-rose-600">The deadline has passed. Update it in Manage Access before sending.</p>}<footer className="mt-4 flex justify-end gap-2"><button onClick={requestCloseSendConfirmation} disabled={isSendingForm} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button><button onClick={() => { setDistributionFeedback(null); setIsSendApprovalOpen(true); }} disabled={isSendingForm || !onUpdateSurvey || !eligibleRecipients.length || sendDeadlineExpired || (sendCompanySelectionRequired && !sendCompanyIds?.length)} className="rounded-lg bg-[#2187CD] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSendingForm ? 'Sending…' : (sendCompanyIds !== null || sendCompanySelectionRequired) ? 'Confirm & Save Selection' : getSurveyStatus(sendConfirmationSurvey) === 'Running' ? 'Confirm & Resend' : 'Confirm & Make Available'}</button></footer></section>
         </div>
       )}
 
@@ -1538,7 +1519,7 @@ export function SurveyFormsPage({
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <label className="block text-xs font-bold uppercase text-slate-900 dark:text-slate-100">SET NOTIFICATION</label>
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400">Choose automated reminder frequency for respondents</span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">Saved preference only; scheduled delivery is not enabled.</span>
                         </div>
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {[

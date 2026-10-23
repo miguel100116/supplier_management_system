@@ -8,6 +8,7 @@ import { SurveyDateRangeQuestion } from '../features/evaluations/components/Surv
 import { RatingScale } from '../features/evaluations/components/RatingScale';
 import { resolveSelectableSurveyId } from '../features/evaluations/domain/surveySelection';
 import { getQuestionMaxPoints } from '../data/questionWeights';
+import { getPendingEvaluationCompanies } from '../features/evaluations/domain/evaluationProgress';
 import { getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
 import { EmployeeCompanyIcon } from '../features/employee-experience/components/EmployeeCompanyIcon';
 
@@ -35,6 +36,7 @@ interface PendingExit {
 
 interface SurveyFillerPageProps {
   surveys: CustomForm[];
+  knownSurveys?: CustomForm[];
   partnerCompanies: PartnerCompany[];
   initialSurveyId?: string | null;
   initialCompanyName?: string;
@@ -56,7 +58,7 @@ interface SurveyFillerPageProps {
 }
 
 export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageProps>(function SurveyFillerPage(
-  { surveys, partnerCompanies = [], initialSurveyId, initialCompanyName = '', employeeExperience = false, userEmail, defaultDepartment, defaultRespondentType, responses, onSubmitted, onCancel },
+  { surveys, knownSurveys = surveys, partnerCompanies = [], initialSurveyId, initialCompanyName = '', employeeExperience = false, userEmail, defaultDepartment, defaultRespondentType, responses, onSubmitted, onCancel },
   ref
 ) {
   const shouldReduceMotion = useReducedMotion() ?? false;
@@ -150,17 +152,8 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   const matchingCompanies = useMemo(() => {
     if (!activeSurvey) return [];
     
-    // Find all company names already evaluated by this user for this survey type
-    const evaluatedCompanies = new Set(
-      responses
-        .filter((r) => r.respondentEmail === userEmail && r.surveyType === activeSurvey.surveyType)
-        .map((r) => r.company)
-    );
-
-    return getSurveyEvaluationCompanies(activeSurvey, partnerCompanies).filter(
-      (c) => !evaluatedCompanies.has(c.name)
-    );
-  }, [partnerCompanies, activeSurvey, responses, userEmail]);
+    return getPendingEvaluationCompanies(activeSurvey, knownSurveys, partnerCompanies, responses, userEmail);
+  }, [partnerCompanies, activeSurvey, knownSurveys, responses, userEmail]);
 
   // All companies assigned to this survey (even if already evaluated)
   const allCompaniesOfThisType = useMemo(() => {

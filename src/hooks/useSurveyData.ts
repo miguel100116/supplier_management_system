@@ -1,3 +1,4 @@
+import { toNotification, groupResponsesToNotifications } from '../features/notifications/domain/responseNotifications';
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
 import { surveyQuestions } from '../data/questions';
@@ -199,68 +200,6 @@ function normalizeSurveyResponse(response: SurveyResponse): SurveyResponse {
     surveyType: normalizeSurveyType(response.surveyType),
     questionCategory: response.questionCategory === LEGACY_OVERALL_CATEGORY ? OVERALL_CATEGORY : response.questionCategory,
   };
-}
-
-function toNotification(rows: SurveyResponse[]): ResponseNotification | null {
-  const first = rows[0];
-  if (!first) return null;
-
-  // Determine email
-  let email = first.respondentEmail;
-  if (!email) {
-    const cleanType = first.respondentType.toLowerCase();
-    if (cleanType.includes('rank') || cleanType.includes('file')) {
-      email = 'miguel.santos@mgenesis.com';
-    } else if (cleanType.includes('super')) {
-      email = 'denise.aquino@mgenesis.com';
-    } else if (cleanType.includes('manag')) {
-      email = 'angela.reyes@mgenesis.com';
-    } else if (cleanType.includes('direct')) {
-      email = 'patricia.navarro@mgenesis.com';
-    } else if (cleanType.includes('exec')) {
-      email = 'rafael.concepcion@mgenesis.com';
-    } else {
-      email = 'miguel.santos@mgenesis.com';
-    }
-  }
-
-  // Determine designation
-  let designation = first.respondentType;
-  const normalized = email.trim().toLowerCase();
-  if (normalized === 'admin@mgenesis.com') designation = 'Executive';
-  else if (normalized === 'miguel.santos@mgenesis.com') designation = 'Rank & File';
-  else if (normalized === 'denise.aquino@mgenesis.com') designation = 'Supervisory';
-  else if (normalized === 'angela.reyes@mgenesis.com') designation = 'Managerial';
-  else if (normalized === 'patricia.navarro@mgenesis.com') designation = 'Director';
-  else if (normalized === 'rafael.concepcion@mgenesis.com') designation = 'Executive';
-
-  return {
-    id: first.responseId,
-    company: first.company,
-    surveyType: first.surveyType,
-    respondentType: first.respondentType,
-    submissionDate: first.submissionDate,
-    questionCount: rows.length,
-    respondentEmail: email,
-    department: first.department || 'Logistics',
-    designation: designation,
-  };
-}
-
-// Group responses by responseId to create proper individual notifications
-function groupResponsesToNotifications(allResponses: SurveyResponse[]): ResponseNotification[] {
-  const grouped: Record<string, SurveyResponse[]> = {};
-  allResponses.forEach((r) => {
-    if (!grouped[r.responseId]) {
-      grouped[r.responseId] = [];
-    }
-    grouped[r.responseId].push(r);
-  });
-
-  return Object.values(grouped)
-    .map((rows) => toNotification(rows))
-    .filter((item): item is ResponseNotification => item !== null)
-    .sort((a, b) => b.submissionDate.localeCompare(a.submissionDate));
 }
 
 // Minimal shape needed from an account record — kept structural (not imported
@@ -1715,10 +1654,12 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // Update an existing survey form
   const updateSurvey = async (updatedForm: CustomForm) => {
     const normalizedForm = normalizeCustomForm(updatedForm);
-    const updated = surveys.map((survey) => survey.id === normalizedForm.id ? normalizedForm : survey);
-    setSurveys(updated);
-    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
-    await persistRemoteAsync(replaceApplicationRecords('survey', updated, (survey) => survey.id));
+    await persistRemoteAsync(upsertApplicationRecords('survey', [normalizedForm], (survey) => survey.id));
+    setSurveys((current) => {
+      const updated = current.map((survey) => survey.id === normalizedForm.id ? normalizedForm : survey);
+      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+      return updated;
+    });
     return normalizedForm;
   };
 
@@ -2493,7 +2434,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   }, [documentNotifications, earlyMilestoneNotifications]);
 
   const combinedUnreadNotificationIds = useMemo(
-    () => new Set(combinedNotifications.filter((notification) => unreadNotificationIds.has(notification.id)).map((notification) => notification.id)),
+    () => new Set(combinedNotifications.filter((notification) => !readNotificationIdsRef.current.has(notification.id)).map((notification) => notification.id)),
     [combinedNotifications, unreadNotificationIds],
   );
 

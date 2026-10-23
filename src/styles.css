@@ -70,6 +70,20 @@ html,
   width: 100%;
 }
 
+/* Both desktop workspaces match the 90% browser-zoom reference, including
+   body portals. Mobile, login, print, and manual browser zoom stay unchanged. */
+@media screen and (min-width: 801px) {
+  html:has(.admin-workspace, .employee-experience.app-shell) {
+    --workspace-viewport-height: calc(100vh / 0.9);
+    zoom: 0.9;
+  }
+
+  .employee-experience.app-shell,
+  .employee-experience.app-shell > .main-shell {
+    min-height: var(--workspace-viewport-height);
+  }
+}
+
 main,
 section,
 article,

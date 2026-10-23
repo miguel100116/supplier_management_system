@@ -26,6 +26,7 @@ function survey(id: string, overrides: Partial<CustomForm> = {}): CustomForm {
 function response(company: string, respondentEmail = 'employee@example.com'): SurveyResponse {
   return {
     responseId: `response-${company}`,
+    surveyId: 'supplier',
     surveyType: 'Supplier',
     respondentType: 'Managerial',
     submissionDate: '2026-10-01T00:00:00.000Z',

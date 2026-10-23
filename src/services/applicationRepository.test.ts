@@ -22,6 +22,16 @@ import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 
 const now = '2026-09-24T00:00:00.000Z';
 
+test('survey distribution metadata is optional for legacy forms and validated as a pair', () => {
+  const form = { id: 'form', title: 'Evaluation', surveyType: 'Courier', createdAt: now, questions: [] };
+  assert.doesNotThrow(() => parseApplicationRecordPayload('survey', form, 'form'));
+  const sent = { ...form, distributionId: 'send-1', lastDistributedAt: now };
+  assert.deepEqual(parseApplicationRecordPayload('survey', sent, 'form'), sent);
+  for (const invalid of [{ ...form, distributionId: 'send-1' }, { ...form, lastDistributedAt: now }, { ...sent, lastDistributedAt: 'bad-date' }, { ...sent, distributionId: '' }]) {
+    assert.throws(() => parseApplicationRecordPayload('survey', invalid, 'form'));
+  }
+});
+
 test('Realtime shares one channel, accepts PK-only DELETE events, reconciles reconnects and cleans up', (t) => {
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   const target = new EventTarget();
@@ -58,7 +68,7 @@ test('Realtime shares one channel, accepts PK-only DELETE events, reconciles rec
   assert.deepEqual(changes.at(-1), { recordType: 'survey_response', recordId: 'r:q' });
   statusChanged('CHANNEL_ERROR');
   statusChanged('SUBSCRIBED');
-  assert.deepEqual(changes.at(-1), { recordType: 'survey_response', reason: 'reconnect' });
+  assert.deepEqual(changes.slice(-2), [{ recordType: 'survey_response', reason: 'reconnect' }, { recordType: 'survey', reason: 'reconnect' }]);
   const count = changes.length;
   cleanup();
   statusChanged('SUBSCRIBED');

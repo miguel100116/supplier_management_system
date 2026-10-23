@@ -68,7 +68,8 @@ test('Send Form lets the admin choose individual suppliers and refine the Top 20
 
 test('Send Form persists the Supplier draft only on confirmation, including already-active forms', () => {
   const source = readFileSync(new URL('./SurveyFormsPage.tsx', import.meta.url), 'utf8');
-  assert.match(source, /getSurveyStatus\(sendConfirmationSurvey\) === 'Running' && !sendCompanySelectionRequired && sendCompanyIds === null/);
+  assert.match(source, /distributionId: crypto\.randomUUID\(\), lastDistributedAt: new Date\(\)\.toISOString\(\)/);
+  assert.doesNotMatch(source, /Existing survey reminders will direct them to it/);
   assert.match(source, /sendCompanySelectionRequired && !sendCompanyIds\?\.length/);
   assert.match(source, /getEvaluationLeaderboardTopTwenty\(partnerCompanies, responses, sendConfirmationSurvey.surveyType\)/);
   assert.match(source, /await onUpdateSurvey\(\{ \.\.\.applyDistributionCompanySelection\(sendConfirmationSurvey, sendCompanyIds, partnerCompanies\)/);
