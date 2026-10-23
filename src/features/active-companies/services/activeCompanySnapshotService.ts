@@ -11,10 +11,10 @@ import { REPOSITORY_ACTIVE_COMPANY_SEED } from '../data/repositoryActiveCompanyS
 export async function loadActiveCompanySnapshots(): Promise<ActiveCompanySnapshot[]> {
   const values = await loadApplicationRecords<unknown>('active_company_snapshot');
   const stored = values.map(parseActiveCompanySnapshot);
-  const storedTypes = new Set(stored.map((snapshot) => snapshot.surveyType));
+  const storedIds = new Set(stored.map((snapshot) => snapshot.id));
   return [
     ...stored,
-    ...REPOSITORY_ACTIVE_COMPANY_SEED.filter((snapshot) => !storedTypes.has(snapshot.surveyType)),
+    ...REPOSITORY_ACTIVE_COMPANY_SEED.filter((snapshot) => !storedIds.has(snapshot.id)),
   ];
 }
 

@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { QueuedReportEmail } from '../types';
-import { Search, Filter, Download, Send, BarChart3, CheckCircle2, Clock, AlertTriangle, FileText } from 'lucide-react';
+import { Download, Send, BarChart3, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { exportTablesAsPDF, ExportTable } from '../../reports/services/exporters';
 import { SurveyDetailModal } from './SurveyDetailModal';
+import { FeedbackHubFilterBar } from './FeedbackHubFilterBar';
 import { submissionCount, submissionScores } from '../../analytics/domain/analytics';
 import { formatCompositeScore } from '../../../data/questionWeights';
-import { TableFilterBar } from '../../../components/TableFilterBar';
 import { compareDate, compareText, isWithinDateRange } from '../../../utils/tableFilters';
 
 interface PastResultsTabProps {
@@ -64,7 +64,7 @@ export function PastResultsTab({
         rows: [
           ['Survey Title', survey.title],
           ['Survey Type', survey.surveyType],
-          ['Completion Date', new Date(survey.createdAt).toLocaleDateString()],
+          ['Survey Created', new Date(survey.createdAt).toLocaleDateString()],
           ['Total Submissions', String(count)],
           ['Overall Score', formatCompositeScore(survey.surveyType, satisfactionScore).text],
         ],
@@ -79,51 +79,37 @@ export function PastResultsTab({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Filters Bar */}
-      <div className="flex flex-col sm:flex-row-reverse sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950">
-        <div className="relative flex-1 max-w-md w-full">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search results by form title or survey type..."
-            className="field text-xs !mt-0"
-            style={{ paddingLeft: '2.75rem' }}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-500">Filter Category:</span>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as any)}
-            className="field text-xs py-2 px-3 w-auto"
-          >
-            <option value="All">All Partner Types</option>
-            <option value="Courier">Courier</option>
-            <option value="Supplier">Supplier</option>
-            <option value="Subcontractor">Subcontractor</option>
-          </select>
-        </div>
-      </div>
-
-      <TableFilterBar
+    <div className="feedback-hub-tab feedback-results-tab space-y-4">
+      <FeedbackHubFilterBar
+        searchValue={search}
+        searchPlaceholder="Search survey results"
+        searchLabel="Search results by title or partner type"
+        onSearchChange={setSearch}
+        resultCount={filteredSurveys.length}
+        resultLabel={filteredSurveys.length === 1 ? 'result' : 'results'}
         sortOptions={[
-          { value: 'date-desc', label: 'Completion: newest first' },
-          { value: 'date-asc', label: 'Completion: oldest first' },
+          { value: 'date-desc', label: 'Created: newest first' },
+          { value: 'date-asc', label: 'Created: oldest first' },
           { value: 'title-asc', label: 'Survey: A–Z' },
           { value: 'title-desc', label: 'Survey: Z–A' },
         ]}
         sortValue={tableSort}
-        onSortChange={setTableSort}
-        resultCount={filteredSurveys.length}
+        defaultSortValue="date-desc"
+        onSortChange={(value) => setTableSort(value as typeof tableSort)}
+        categoryValue={selectedType}
+        categoryLabel="Partner type"
+        categoryOptions={[
+          { value: 'All', label: 'All partner types' },
+          { value: 'Courier', label: 'Courier' },
+          { value: 'Supplier', label: 'Supplier' },
+          { value: 'Subcontractor', label: 'Subcontractor' },
+        ]}
+        onCategoryChange={(value) => setSelectedType(value as SurveyType | 'All')}
         dateFrom={dateFrom}
         dateTo={dateTo}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
-        dateLabel="Completion date"
+        dateLabel="Survey created date"
         onReset={() => {
           setSearch('');
           setSelectedType('All');
@@ -132,17 +118,28 @@ export function PastResultsTab({
           setDateTo('');
         }}
       />
+      <p className="feedback-results-measure-note">Response totals are grouped across unarchived submissions for the partner type. The indicator reaches 100% at its 10-response display threshold.</p>
 
       {/* Table View */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
+      <div className="feedback-table-surface rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-xs">
+          <table className="feedback-data-table feedback-results-table w-full text-left text-xs">
+            <colgroup>
+              <col className="feedback-results-col-survey" />
+              <col className="feedback-results-col-type" />
+              <col className="feedback-results-col-scope" />
+              <col className="feedback-results-col-created" />
+              <col className="feedback-results-col-responses" />
+              <col className="feedback-results-col-status" />
+              <col className="feedback-results-col-actions" />
+            </colgroup>
             <thead className="bg-slate-50 text-slate-600 dark:bg-slate-900/80 dark:text-slate-300 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="px-4 py-3.5">Survey Name</th>
-                <th className="px-4 py-3.5">Company / Type</th>
-                <th className="px-4 py-3.5">Period / Date</th>
-                <th className="px-4 py-3.5">Completion Rate</th>
+                <th className="px-4 py-3.5">Partner type</th>
+                <th className="px-4 py-3.5">Scope</th>
+                <th className="px-4 py-3.5">Survey created</th>
+                <th className="px-4 py-3.5">Type response indicator</th>
                 <th className="px-4 py-3.5">Report Status</th>
                 <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
@@ -157,6 +154,7 @@ export function PastResultsTab({
                 const completionPct = Math.min(100, Math.round((count / targetQuota) * 100));
 
                 const matchingCompany = partnerCompanies.find((c) => c.type === survey.surveyType);
+                const hasCustomCompanyScope = Boolean(survey.evaluationCompanyIds?.length);
                 const reportLog = sentReports.find(
                   (r) => r.surveyId === survey.id
                 );
@@ -164,25 +162,25 @@ export function PastResultsTab({
                 return (
                   <tr key={survey.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/50 transition">
                     <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
-                      {survey.title}
+                      <button type="button" className="feedback-record-link" onClick={() => setSelectedSurveyForDetail(survey)}>{survey.title}</button>
                     </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="badge bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                          {survey.surveyType}
-                        </span>
-                        <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[160px]">
-                          {matchingCompany ? matchingCompany.name : `${survey.surveyType} Partners`}
-                        </span>
-                      </div>
+                    <td className="feedback-type-cell px-4 py-3.5 align-middle">
+                      <span className={`feedback-category-badge ${survey.surveyType.toLowerCase()} badge`}>
+                        {survey.surveyType}
+                      </span>
+                    </td>
+                    <td className="feedback-scope-cell px-4 py-3.5 align-middle font-medium text-slate-600 dark:text-slate-300">
+                      <span>
+                        {hasCustomCompanyScope ? 'Custom partner scope' : 'All partners in type'}
+                      </span>
                     </td>
                     <td className="px-4 py-3.5 text-slate-500 whitespace-nowrap">
-                      {new Date(survey.createdAt).toLocaleDateString()}
+                      {new Date(survey.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                     </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-white">{completionPct}%</span>
-                        <span className="text-[11px] text-slate-400">({count}/{targetQuota})</span>
+                    <td className="px-4 py-3.5" title={`${count} unarchived ${survey.surveyType} responses across the partner type; the display threshold is ${targetQuota} responses and the indicator caps at 100%.`}>
+                      <div role="group" className="feedback-result-completion" aria-label={`${completionPct}% of the display threshold; ${count} unarchived responses for ${survey.surveyType}, threshold ${targetQuota}`}>
+                        <div><strong>{completionPct}%</strong><span>{count} type responses / {targetQuota} threshold</span></div>
+                        <div className="feedback-result-track" aria-hidden="true"><span style={{ width: `${completionPct}%` }} /></div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
@@ -204,39 +202,29 @@ export function PastResultsTab({
                           Returned (Revise)
                         </span>
                       )}
-                      {(!reportLog || reportLog.status === 'Failed') && (
+                      {reportLog?.status === 'Failed' && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+                          <AlertTriangle size={12} aria-hidden="true" /> Delivery failed
+                        </span>
+                      )}
+                      {!reportLog && (
                         <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
                           Not Sent
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-right whitespace-nowrap space-x-1.5">
-                      <button
-                        onClick={() => setSelectedSurveyForDetail(survey)}
-                        className="secondary-button py-1 px-2.5 text-[11px] gap-1"
-                        title="View Analytics"
-                      >
-                        <BarChart3 size={13} />
-                        Analytics
-                      </button>
-
-                      <button
-                        onClick={() => handleExportPdfRow(survey)}
-                        className="secondary-button py-1 px-2.5 text-[11px] gap-1"
-                        title="Export PDF"
-                      >
-                        <Download size={13} />
-                        PDF
-                      </button>
-
-                      <button
-                        onClick={() => onOpenSendToPartner(survey, matchingCompany)}
-                        className="primary-button py-1 px-2.5 text-[11px] gap-1 bg-[#0063a9] hover:bg-blue-800"
-                        title="Send / Resend to Partner"
-                      >
-                        <Send size={13} />
-                        {reportLog?.status === 'Sent' ? 'Resend' : 'Send to Partner'}
-                      </button>
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      <div className="feedback-result-actions">
+                        <button type="button" onClick={() => setSelectedSurveyForDetail(survey)} className="secondary-button !h-8 !w-8 !min-h-8 !gap-0 !p-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50" title="View analytics" aria-label={`View analytics for ${survey.title}`}>
+                          <BarChart3 size={15} aria-hidden="true" />
+                        </button>
+                        <button type="button" onClick={() => handleExportPdfRow(survey)} className="secondary-button !h-8 !w-8 !min-h-8 !gap-0 !p-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50" title="Export PDF" aria-label={`Export PDF for ${survey.title}`}>
+                          <Download size={15} aria-hidden="true" />
+                        </button>
+                        <button type="button" onClick={() => onOpenSendToPartner(survey, matchingCompany)} className="secondary-button !h-8 !w-8 !min-h-8 !gap-0 !p-0 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-50" title={reportLog?.status === 'Sent' ? 'Resend report to partner' : 'Send report to partner'} aria-label={`${reportLog?.status === 'Sent' ? 'Resend report to partner' : 'Send report to partner'} for ${survey.title}`}>
+                          <Send size={15} aria-hidden="true" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -32,6 +32,12 @@ export function formatLogTime(isoDate: string): string {
   return parsed.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+export function formatLogDateTime(isoDate: string): string {
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return '\u2014';
+  return parsed.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 /**
  * Strictly validates a date string in dd/mm/yyyy format.
  * Rejects anything that isn't exactly two digits, a slash, two digits, a slash,

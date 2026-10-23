@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { QueuedReportEmail, EmailStatus } from '../types';
-import { Clock, CheckCircle2, RotateCcw, Send, AlertTriangle, FileText, Search, History, Sparkles, X, Settings, Eye, Mail } from 'lucide-react';
+import { SurveyType } from '../../../types/survey';
+import { Clock, CheckCircle2, RotateCcw, Send, AlertTriangle, FileText, History, X, Settings, Eye, Mail, Inbox, MoreHorizontal } from 'lucide-react';
 import { ReturnReasonModal } from './ReturnReasonModal';
-import { TableFilterBar } from '../../../components/TableFilterBar';
+import { FeedbackHubFilterBar } from './FeedbackHubFilterBar';
 import { compareDate, compareText, isWithinDateRange } from '../../../utils/tableFilters';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 
@@ -30,6 +31,7 @@ export function SentReportsTab({
   userEmail,
 }: SentReportsTabProps) {
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<SurveyType | 'All'>('All');
   const [statusFilter, setStatusFilter] = useState<EmailStatus | 'All'>('All');
   const [tableSort, setTableSort] = useState<'date-desc' | 'date-asc' | 'company-asc' | 'company-desc'>('date-desc');
   const [dateFrom, setDateFrom] = useState('');
@@ -65,13 +67,14 @@ export function SentReportsTab({
       r.surveyTitle.toLowerCase().includes(search.toLowerCase()) ||
       r.recipientEmail.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
-    return matchesSearch && matchesStatus && isWithinDateRange(r.sentAt ?? r.queuedAt, dateFrom, dateTo);
+    const matchesType = typeFilter === 'All' || r.surveyType === typeFilter;
+    return matchesSearch && matchesStatus && matchesType && isWithinDateRange(r.sentAt ?? r.queuedAt, dateFrom, dateTo);
   }).sort((a, b) => {
     if (tableSort === 'date-asc') return compareDate(a.sentAt ?? a.queuedAt, b.sentAt ?? b.queuedAt);
     if (tableSort === 'company-asc') return compareText(a.companyName, b.companyName);
     if (tableSort === 'company-desc') return compareText(b.companyName, a.companyName);
     return compareDate(b.sentAt ?? b.queuedAt, a.sentAt ?? a.queuedAt);
-  }), [sentReports, search, statusFilter, tableSort, dateFrom, dateTo]);
+  }), [sentReports, search, statusFilter, typeFilter, tableSort, dateFrom, dateTo]);
 
   // Calculate live time remaining string
   const getRemainingTimeStr = (expiresAtIso: string) => {
@@ -90,47 +93,14 @@ export function SentReportsTab({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row-reverse sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 dark:border-slate-800 dark:bg-slate-950">
-        <div className="relative flex-1 max-w-md w-full">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search email log by company, survey title, or recipient..."
-            className="field text-xs !mt-0"
-            style={{ paddingLeft: '2.75rem' }}
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="segmented-control shrink-0">
-            {(['All', 'Queued', 'Returned', 'Sent'] as const).map((st) => (
-              <button
-                key={st}
-                type="button"
-                onClick={() => setStatusFilter(st)}
-                className={statusFilter === st ? 'segmented-active' : ''}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            className="secondary-button text-xs gap-1 py-2 px-3"
-            title="Configure Default Queue Timer Duration"
-          >
-            <Settings size={14} />
-            Queue Config ({currentTimerMinutes}m)
-          </button>
-        </div>
-      </div>
-
-      <TableFilterBar
+    <div className="feedback-hub-tab feedback-sent-tab space-y-4">
+      <FeedbackHubFilterBar
+        searchValue={search}
+        searchPlaceholder="Search company, survey, or recipient"
+        searchLabel="Search report log by partner, title, or recipient"
+        onSearchChange={setSearch}
+        resultCount={filteredReports.length}
+        resultLabel={filteredReports.length === 1 ? 'report' : 'reports'}
         sortOptions={[
           { value: 'date-desc', label: 'Activity: newest first' },
           { value: 'date-asc', label: 'Activity: oldest first' },
@@ -138,15 +108,40 @@ export function SentReportsTab({
           { value: 'company-desc', label: 'Company: Z–A' },
         ]}
         sortValue={tableSort}
-        onSortChange={setTableSort}
-        resultCount={filteredReports.length}
+        defaultSortValue="date-desc"
+        onSortChange={(value) => setTableSort(value as typeof tableSort)}
+        categoryValue={typeFilter}
+        categoryLabel="Partner type"
+        categoryOptions={[
+          { value: 'All', label: 'All partner types' },
+          { value: 'Courier', label: 'Courier' },
+          { value: 'Supplier', label: 'Supplier' },
+          { value: 'Subcontractor', label: 'Subcontractor' },
+        ]}
+        onCategoryChange={(value) => setTypeFilter(value as SurveyType | 'All')}
+        statusValue={statusFilter}
+        statusLabel="Delivery status"
+        statusOptions={[
+          { value: 'All', label: 'All' },
+          { value: 'Queued', label: 'Queued' },
+          { value: 'Returned', label: 'Returned' },
+          { value: 'Sent', label: 'Sent' },
+          { value: 'Failed', label: 'Failed' },
+        ]}
+        onStatusChange={(value) => setStatusFilter(value as EmailStatus | 'All')}
         dateFrom={dateFrom}
         dateTo={dateTo}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
         dateLabel="Queued / sent date"
+        extraActions={(
+          <button type="button" onClick={() => setShowSettingsModal(true)} className="secondary-button feedback-queue-config" title="Configure default queue timer duration" aria-label={`Queue settings, ${currentTimerMinutes} minute timer`}>
+            <Settings size={14} aria-hidden="true" /> <span className="sr-only sm:not-sr-only">Queue timer</span> {currentTimerMinutes}m
+          </button>
+        )}
         onReset={() => {
           setSearch('');
+          setTypeFilter('All');
           setStatusFilter('All');
           setTableSort('date-desc');
           setDateFrom('');
@@ -155,9 +150,9 @@ export function SentReportsTab({
       />
 
       {/* Email Log Table */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
+      <div className={`feedback-table-surface feedback-log-surface rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 overflow-hidden${filteredReports.length === 0 ? ' is-empty' : ''}`}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] text-left text-xs">
+          <table className="feedback-data-table feedback-log-table w-full min-w-[920px] text-left text-xs">
             <thead className="bg-slate-50 text-slate-600 dark:bg-slate-900/80 dark:text-slate-300 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-800">
               <tr>
                 <th className="px-4 py-3.5">Date Queued / Sent</th>
@@ -171,8 +166,11 @@ export function SentReportsTab({
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-200">
               {filteredReports.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
-                    No partner feedback emails found in log.
+                  <td colSpan={6} className="feedback-log-empty px-4 py-12 text-center text-slate-400">
+                    <Inbox size={25} aria-hidden="true" />
+                    <strong>{sentReports.length === 0 ? 'No reports in the log yet' : 'No reports match these filters'}</strong>
+                    <span>{sentReports.length === 0 ? 'Reports queued for partner delivery will appear here for review and tracking.' : 'Try another status, search term, or date range.'}</span>
+                    {sentReports.length > 0 && <button type="button" onClick={() => { setSearch(''); setTypeFilter('All'); setStatusFilter('All'); setTableSort('date-desc'); setDateFrom(''); setDateTo(''); }}>Clear filters</button>}
                   </td>
                 </tr>
               ) : (
@@ -205,7 +203,7 @@ export function SentReportsTab({
                       {/* Partner Company */}
                       <td className="px-4 py-3.5 font-bold text-slate-900 dark:text-white">
                         <p>{report.companyName}</p>
-                        <span className="badge mt-0.5 text-[10px] bg-slate-100 dark:bg-slate-800">
+                        <span className={`feedback-category-badge ${report.surveyType.toLowerCase()} badge mt-0.5 text-[10px]`}>
                           {report.surveyType}
                         </span>
                       </td>
@@ -268,69 +266,24 @@ export function SentReportsTab({
                       </td>
 
                       {/* Actions */}
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap space-x-1.5">
-                        {isQueued && (
-                          <>
-                            <button
-                              onClick={() => setReportToPreview(report)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-blue-50 text-[#0063a9] hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 py-1 text-[11px] font-bold transition"
-                              title="Review the exact email text, formatting, and attached report document before it sends"
-                            >
-                              <Eye size={12} />
-                              Preview
-                            </button>
-
-                            <button
-                              onClick={() => onConfirmNow(report.id)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[11px] font-bold transition shadow-sm"
-                              title="Send immediately, skipping rest of timer"
-                            >
-                              <CheckCircle2 size={12} />
-                              Confirm Now
-                            </button>
-
-                            <button
-                              onClick={() => setReportToReturn(report)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-rose-100 text-rose-800 hover:bg-rose-200 dark:bg-rose-900/60 dark:text-rose-200 px-2.5 py-1 text-[11px] font-bold transition"
-                              title="Pause timer and return to sender with revision reason"
-                            >
-                              <RotateCcw size={12} />
-                              Return
-                            </button>
-                          </>
-                        )}
-
-                        {isReturned && (
-                          <button
-                            onClick={() => onReviseReport(report)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 text-[11px] font-bold transition shadow-sm"
-                          >
-                            <RotateCcw size={12} />
-                            Revise & Re-queue
-                          </button>
-                        )}
-
-                        {isSent && (
-                          <>
-                            <button
-                              onClick={() => onResendReport(report)}
-                              className="secondary-button py-1 px-2.5 text-[11px] gap-1"
-                              title="Re-open Send modal pre-filled"
-                            >
-                              <Send size={12} />
-                              Resend
-                            </button>
-
-                            <button
-                              onClick={() => setHistoryReport(report)}
-                              className="ghost-button py-1 px-2 text-[11px] gap-1 text-slate-500"
-                              title="View audit history"
-                            >
-                              <History size={12} />
-                              Log
-                            </button>
-                          </>
-                        )}
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                        <div className="feedback-log-actions">
+                          {isQueued && <button type="button" onClick={() => onConfirmNow(report.id)} className="feedback-confirm-report"><CheckCircle2 size={13} aria-hidden="true" /> Confirm now</button>}
+                          {isReturned && <button type="button" onClick={() => onReviseReport(report)} className="feedback-revise-report"><RotateCcw size={13} aria-hidden="true" /> Revise &amp; re-queue</button>}
+                          {isSent && <button type="button" onClick={() => onResendReport(report)} className="secondary-button py-1 px-2.5 text-[11px] gap-1" title="Re-open the send form with this report pre-filled"><Send size={12} aria-hidden="true" /> Resend</button>}
+                          {(isQueued || isSent) && (
+                            <details className="feedback-row-actions">
+                              <summary aria-label={`More review actions for ${report.companyName}`} title="More review actions"><MoreHorizontal size={16} aria-hidden="true" /></summary>
+                              <div className="feedback-row-actions-menu">
+                                {isQueued && <>
+                                  <button type="button" onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setReportToPreview(report); }}><Eye size={14} aria-hidden="true" /> Preview email</button>
+                                  <button type="button" onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setReportToReturn(report); }}><RotateCcw size={14} aria-hidden="true" /> Return for revision</button>
+                                </>}
+                                {isSent && <button type="button" onClick={(event) => { event.currentTarget.closest('details')?.removeAttribute('open'); setHistoryReport(report); }}><History size={14} aria-hidden="true" /> View audit history</button>}
+                              </div>
+                            </details>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -358,22 +311,24 @@ export function SentReportsTab({
       {/* Email Preview Modal — exact text/format that will be sent, plus a
           link to generate the same PDF document the recipient will get. */}
       {reportToPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+        <div className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="feedback-modal-panel w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden" role="dialog" aria-modal="true" aria-label="Email preview">
+            <div className="feedback-modal-header flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
               <div className="flex items-center gap-2 font-bold text-sm text-slate-900 dark:text-white">
                 <Mail size={18} className="text-[#0063a9]" />
                 Email Preview — {reportToPreview.companyName}
               </div>
               <button
                 onClick={() => setReportToPreview(null)}
+                type="button"
+                aria-label="Close email preview"
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="max-h-[70vh] space-y-4 overflow-y-auto p-4 text-xs sm:p-6">
+            <div className="feedback-modal-body max-h-[70vh] space-y-4 overflow-y-auto p-4 text-xs sm:p-5">
               <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex gap-2">
                   <span className="w-14 shrink-0 font-bold text-slate-500">To:</span>
@@ -429,22 +384,24 @@ export function SentReportsTab({
 
       {/* Audit History Log Modal */}
       {historyReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+        <div className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="feedback-modal-panel w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden" role="dialog" aria-modal="true" aria-label="Report audit history">
+            <div className="feedback-modal-header flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
               <div className="flex items-center gap-2 font-bold text-sm text-slate-900 dark:text-white">
                 <History size={18} className="text-[#0063a9]" />
                 Audit Trail Log - {historyReport.companyName}
               </div>
               <button
                 onClick={() => setHistoryReport(null)}
+                type="button"
+                aria-label="Close audit history"
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="feedback-modal-body p-5 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="text-xs text-slate-500 border-b border-slate-100 pb-3 dark:border-slate-800">
                 <p className="font-bold text-slate-800 dark:text-slate-200">{historyReport.surveyTitle}</p>
                 <p>Recipient: {historyReport.recipientEmail}</p>
@@ -485,14 +442,14 @@ export function SentReportsTab({
 
       {/* Queue Timer Settings Modal */}
       {showSettingsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+        <div className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="feedback-modal-panel w-full max-w-md rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden" role="dialog" aria-modal="true" aria-label="Queue timer settings">
+            <div className="feedback-modal-header flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Settings size={16} className="text-[#0063a9]" />
                 Default Queue Timer Duration Settings
               </h3>
-              <button onClick={() => setShowSettingsModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button type="button" aria-label="Close queue timer settings" onClick={() => setShowSettingsModal(false)} className="min-h-9 min-w-9 text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>

@@ -24,7 +24,7 @@ import { isMsalConfigured } from '../services/msalAuth';
 import { getSurveyCompletionSummary } from '../features/evaluations/domain/surveyCompletion';
 import { SurveyAccount } from '../hooks/useSurveyData';
 
-import { FileText, Archive, Send, Clock, ShieldAlert, Sparkles, SendToBack } from 'lucide-react';
+import { FileText, Archive, Send, ShieldAlert, SendToBack } from 'lucide-react';
 
 interface PartnersFeedbackHubPageProps {
   surveys: CustomForm[];
@@ -402,11 +402,11 @@ export function PartnersFeedbackHubPage({
   }
 
   return (
-    <div className="admin-feedback-page space-y-5 animate-fadeIn pb-12">
+    <div className="admin-feedback-page feedback-hub-page space-y-5 animate-fadeIn pb-12">
       <PageDescription>Review feedback collected from partners and employees in one place.</PageDescription>
       {/* The three tabs follow the feedback lifecycle; dispatch stays alongside the active work. */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 dark:border-slate-800 xl:flex-row xl:items-center xl:justify-between">
-        <nav aria-label="Feedback Hub workflow" className="flex min-w-0 flex-nowrap gap-1 overflow-x-auto rounded-lg bg-slate-50 p-1 dark:bg-slate-900">
+      <div className="feedback-hub-navigation">
+        <nav aria-label="Feedback Hub workflow" className="feedback-hub-tabs">
           <button
             aria-pressed={activeTab === 'current-forms'}
             onClick={() => setActiveTab('current-forms')}
@@ -459,38 +459,27 @@ export function PartnersFeedbackHubPage({
           </button>
         </nav>
 
-        {/* Relocated Bulk Sending Button - Rightmost position */}
-        <div aria-label="Report delivery actions" className="flex flex-wrap items-center gap-2.5 shrink-0 xl:border-l xl:border-slate-200 xl:pl-4 xl:dark:border-slate-800 xl:justify-end">
-          <span className="hidden text-[9px] font-bold uppercase tracking-wider text-slate-400 xl:inline">Report delivery</span>
-          {queuedCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2.5 py-1 text-[10px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-200 border border-amber-200 dark:border-amber-800 animate-pulse">
-              <Clock size={11} />
-              {queuedCount} Queued
-            </span>
-          )}
+        <div className="feedback-hub-delivery-actions">
           <button
             onClick={() => {
               setDispatchWizardBulkMode(true);
               setIsDispatchWizardOpen(true);
             }}
             disabled={!areAllSurveysCompleted}
-            className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all shrink-0 ${
-              areAllSurveysCompleted
-                ? 'bg-[#2187CD] hover:bg-[#2187CD]/90 text-white shadow-sm'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
-            }`}
+            aria-describedby={!areAllSurveysCompleted ? 'feedback-bulk-send-help' : undefined}
+            className="secondary-button feedback-bulk-send px-3 py-2 text-xs"
             title={
               areAllSurveysCompleted
                 ? 'Queue reports for all completed companies in bulk'
-                : 'Bulk Sending is locked until all active surveys are Completed'
+                : 'Complete all active surveys before bulk sending'
             }
           >
-            <Send size={13} />
-            Bulk Sending
+            <Send size={14} aria-hidden="true" />
+            Bulk send
           </button>
           {!areAllSurveysCompleted && (
-            <span className="text-[10px] text-slate-400 font-semibold max-w-[150px] leading-tight">
-              Needs all active surveys <strong>Completed</strong>
+            <span id="feedback-bulk-send-help" className="feedback-bulk-send-help">
+              Complete active surveys to enable
             </span>
           )}
         </div>
