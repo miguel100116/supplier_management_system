@@ -6,6 +6,7 @@ import { formatCompositeScore } from '../../../data/questionWeights';
 import { getSurveyCompletionSummary } from '../../evaluations/domain/surveyCompletion';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { SurveyAccount } from '../../../hooks/useSurveyData';
+import { formatLogDateTime } from '../../../utils/time';
 
 interface SurveyProgressModalProps {
   survey: CustomForm;
@@ -65,37 +66,32 @@ export function SurveyProgressModal({
     : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
+      <section className="feedback-modal-panel feedback-progress-panel w-full rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-labelledby="feedback-progress-title">
         {/* Modal Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-amber-50/50 px-4 py-4 dark:border-slate-800 dark:bg-amber-950/20 sm:items-center sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
-              <Clock size={20} />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
-                  Survey Ongoing
-                </span>
-                <span className="text-xs font-medium text-slate-500">{survey.surveyType} Survey</span>
-              </div>
-              <h3 className="mt-0.5 break-words text-base font-bold text-slate-900 dark:text-white sm:text-lg">{survey.title}</h3>
+        <div className="feedback-modal-header feedback-progress-header border-b border-slate-200 dark:border-slate-800">
+          <div className="feedback-progress-header-main">
+            <h2 id="feedback-progress-title" className="break-words text-base font-bold text-slate-900 dark:text-white">{survey.title}</h2>
+            <div className="feedback-progress-header-meta" aria-label="Survey status and category">
+              <span className="feedback-modal-status is-ongoing inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold">Ongoing</span>
+              <span className={`feedback-category-badge ${survey.surveyType.toLowerCase()}`}>{survey.surveyType}</span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition"
+            type="button"
+            aria-label="Close survey progress"
+            className="feedback-progress-close-icon rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] focus-visible:ring-offset-2 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
-            <X size={20} />
+            <X size={19} aria-hidden="true" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6">
+        <div className="feedback-modal-body feedback-progress-body flex-1 overflow-y-auto p-4 sm:p-5">
           {/* Ongoing Notification Banner */}
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 flex items-start gap-3 text-sm">
-            <AlertTriangle size={18} className="shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+          <div className="feedback-progress-notice flex items-start gap-2 text-sm">
+            <AlertTriangle size={17} className="shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold">Survey is actively gathering responses</p>
               <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
@@ -105,7 +101,7 @@ export function SurveyProgressModal({
           </div>
 
           {/* Progress Overview Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="feedback-progress-metrics grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-lg border border-slate-200 p-4 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50">
               <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
                 <span>Response Progress</span>
@@ -156,7 +152,7 @@ export function SurveyProgressModal({
                 No employees currently have access to this survey's department/role scope.
               </div>
             ) : (
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="feedback-modal-record-list divide-y divide-slate-100 dark:divide-slate-800">
                 {completion.eligibleEmployees.map((emp) => (
                   <div key={emp.email} className="flex items-center justify-between p-3 text-xs gap-3">
                     <div className="min-w-0">
@@ -191,7 +187,7 @@ export function SurveyProgressModal({
                 No employees have submitted responses yet.
               </div>
             ) : (
-              <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+              <div className="feedback-modal-record-list divide-y divide-slate-100 dark:divide-slate-800">
                 {respondentsList.map((resp, idx) => (
                   <div key={idx} className="flex items-start justify-between gap-2 p-3 text-xs min-[420px]:items-center">
                     <div className="flex min-w-0 items-center gap-2">
@@ -203,7 +199,7 @@ export function SurveyProgressModal({
                         <p className="text-[11px] text-slate-500">{resp.department}</p>
                       </div>
                     </div>
-                    <span className="shrink-0 text-right text-slate-400">{resp.date}</span>
+                    <time className="feedback-submission-time shrink-0 text-right text-slate-500" dateTime={resp.date} title={resp.date}>{formatLogDateTime(resp.date)}</time>
                   </div>
                 ))}
               </div>
@@ -212,32 +208,27 @@ export function SurveyProgressModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex flex-col items-stretch gap-3 border-t border-slate-200 bg-slate-50 px-4 py-4 dark:border-slate-800 dark:bg-slate-900 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between sm:px-6">
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-slate-500 max-w-xs">
-              Completes automatically once every employee reaches 100% or the deadline passes.
-            </span>
+        <div className="feedback-modal-footer feedback-progress-footer border-t border-slate-200">
+          <div className="feedback-progress-actions">
+            <button type="button" onClick={onClose} className="secondary-button feedback-progress-close">
+              Close Progress View
+            </button>
             {isAdmin && onMarkComplete && (
               <button
+                type="button"
                 onClick={() => {
                   onMarkComplete(survey.id);
                   onClose();
                 }}
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white hover:bg-emerald-700 transition w-fit"
+                className="primary-button feedback-progress-complete"
               >
-                <CheckCircle2 size={15} />
+                <CheckCircle2 size={15} aria-hidden="true" />
                 Mark Survey as Complete Now
               </button>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="secondary-button text-xs"
-          >
-            Close Progress View
-          </button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

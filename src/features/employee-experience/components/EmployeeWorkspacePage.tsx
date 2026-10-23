@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, Check, ClipboardList, FileText, History, LockKeyhole, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ClipboardList, FileText, History, LockKeyhole, Search } from 'lucide-react';
 import type { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { filterPendingEvaluations, getPendingEmployeeEvaluations, type EmployeeEvaluationFilter } from '../domain/pendingEvaluations';
@@ -136,6 +136,11 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
 
   return (
     <>
+      {view === 'Evaluations' && (
+        <button type="button" className="back-link" aria-label="Back to Home" onClick={() => onNavigate('Home')}>
+          <ArrowLeft size={16} aria-hidden="true" /> Back
+        </button>
+      )}
       <div className="page-heading">
         <div>
           <div className="eyebrow">YOUR PERSONAL WORKSPACE</div>

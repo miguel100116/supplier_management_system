@@ -163,7 +163,7 @@ Use a risk-based test pyramid:
 
 Test observable behavior rather than private implementation. Include negative cases, malformed external data, authorization boundaries, time zones/date edges, partial failures, and regression cases for bugs.
 
-Current repository reality: `npm test` uses Node's test runner through `tsx` for focused domain, import, and mapping tests. Coverage is not repository-wide. `npm run lint` performs TypeScript checks for the application and import scripts; ESLint is not configured. Report these checks by their real names instead of describing TypeScript checking as stylistic linting or claiming broader test coverage than exists.
+Current repository reality: `npm test` discovers colocated Node tests through `tsx` under `src/`, `server/`, and `scripts/`. `npm run test:unit` selects domain/utils; `npm run test:integration` includes remaining service, HTTP, presentation, import, and tooling tests. Playwright's `npm run test:e2e` exercises the built application with synthetic external-service responses at desktop/mobile sizes; it does not verify live RLS or hosting. Coverage is not repository-wide. `npm run lint` performs TypeScript checks; ESLint is not configured. Report these checks by their real names instead of describing TypeScript checking as stylistic linting or claiming broader test coverage than exists.
 
 Current verification commands:
 
@@ -171,13 +171,16 @@ Current verification commands:
 npm test
 npm run lint
 npm run build
+npm run test:e2e
 ```
+
+`npm run verify` runs these gates plus the dependency audit. Install Chromium with `npx playwright install chromium` before browser tests. `npm run hooks:install` enables the opt-in local pre-push gate; CI remains authoritative.
 
 When test and formatting scripts are introduced, use the scripts declared in `package.json`; CI and local verification must call the same commands.
 
 ## CI/CD contract
 
-CI does not currently exist in this repository. When CI/CD implementation is requested, build it around these rules:
+CI exists in `.github/workflows/verify.yml`: clean install, TypeScript checks, Node tests, production build, desktop/mobile E2E, dependency audit, and secret scan. Preserve these gates when evolving CI/CD:
 
 - Pull requests run on a clean checkout with `npm ci`, type checking, linting, automated tests, and a production build.
 - Add dependency/security scanning and secret scanning with explicit triage; do not silently ignore high-severity findings.

@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SurveyResponse } from '../types/survey';
 import {
+  loadApplicationRecordsByIds,
+  subscribeToApplicationChanges,
+  APPLICATION_RECORD_CHANGED_EVENT,
+  upsertApplicationRecords,
   advanceRealtimeSyncState,
   APPLICATION_RECORD_TYPES,
   batchApplicationRecordPageRanges,
@@ -16,6 +21,110 @@ import {
 import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 
 const now = '2026-09-24T00:00:00.000Z';
+
+test('Realtime shares one channel, accepts PK-only DELETE events, reconciles reconnects and cleans up', (t) => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  const target = new EventTarget();
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: target });
+  t.after(() => {
+    if (previousWindow) Object.defineProperty(globalThis, 'window', previousWindow);
+    else Reflect.deleteProperty(globalThis, 'window');
+  });
+  const registrations: Array<{ filter: { table: string; event: string; filter?: string }; callback: (payload: unknown) => void }> = [];
+  let statusChanged: (status: string) => void = () => {};
+  let channels = 0;
+  let removed = 0;
+  const channel = {
+    on: (_event: string, filter: typeof registrations[number]['filter'], callback: (payload: unknown) => void) => {
+      registrations.push({ filter, callback });
+      return channel;
+    },
+    subscribe: (callback: typeof statusChanged) => { statusChanged = callback; return channel; },
+  };
+  const client = {
+    channel: () => { channels++; return channel; },
+    removeChannel: () => { removed++; },
+  } as unknown as SupabaseClient;
+  const changes: Array<{ recordType: string; recordId?: string; reason?: string }> = [];
+  target.addEventListener(APPLICATION_RECORD_CHANGED_EVENT, (event) => changes.push((event as CustomEvent).detail));
+  t.mock.method(console, 'error', () => {});
+  const cleanup = subscribeToApplicationChanges(client);
+  assert.equal(channels, 1);
+  const records = registrations.find((entry) => entry.filter.table === 'application_records')!;
+  assert.equal(records.filter.event, '*');
+  assert.equal(records.filter.filter, undefined, 'Supabase cannot filter DELETE events');
+  statusChanged('SUBSCRIBED');
+  records.callback({ new: {}, old: { record_type: 'survey_response', record_id: 'r:q' }, eventType: 'DELETE' });
+  assert.deepEqual(changes.at(-1), { recordType: 'survey_response', recordId: 'r:q' });
+  statusChanged('CHANNEL_ERROR');
+  statusChanged('SUBSCRIBED');
+  assert.deepEqual(changes.at(-1), { recordType: 'survey_response', reason: 'reconnect' });
+  const count = changes.length;
+  cleanup();
+  statusChanged('SUBSCRIBED');
+  records.callback({ new: { record_type: 'survey_response', record_id: 'late:q' } });
+  assert.equal(changes.length, count, 'disposed subscription cannot publish stale changes');
+  assert.equal(removed, 1);
+});
+
+test('response imports commit in one statement, validate every row and fail without partial chunks', async () => {
+  const rows = Array.from({ length: 650 }, (_, index) => ({
+    responseId: `r-${index}`, surveyType: 'Supplier', respondentType: 'Employee', submissionDate: now,
+    company: 'Synthetic supplier', questionId: 'Q-SUP-1', questionNumber: 1,
+    question: 'Quality', questionCategory: 'Quality', rating: 0, comment: '',
+  } as SurveyResponse));
+  const calls: unknown[][] = [];
+  let failure = false;
+  const client = {
+    auth: { getUser: async () => ({ data: { user: { id: 'owner' } } }) },
+    from: (table: string) => {
+      assert.equal(table, 'application_records');
+      return { upsert: async (values: unknown[], options: unknown) => {
+        calls.push([values, options]);
+        return { error: failure ? { message: 'write rejected' } : null };
+      } };
+    },
+  } as unknown as SupabaseClient;
+  await upsertApplicationRecords('survey_response', rows, surveyResponseRecordId, { ownRecords: true }, client);
+  assert.equal(calls.length, 1);
+  assert.equal((calls[0][0] as unknown[]).length, 650);
+  assert.equal((calls[0][0] as Array<{ owner_id: string }>)[0].owner_id, 'owner');
+  await assert.rejects(upsertApplicationRecords('survey_response', [...rows, { ...rows[0], rating: 'invalid' as unknown as SurveyResponse['rating'] }], surveyResponseRecordId, undefined, client));
+  assert.equal(calls.length, 1, 'invalid last row must reject before any write');
+  failure = true;
+  await assert.rejects(upsertApplicationRecords('survey_response', rows, surveyResponseRecordId, undefined, client), /write rejected/);
+  assert.equal(calls.length, 2, 'failed bulk write cannot have committed an earlier chunk');
+});
+
+test('unchanged refreshed records retain references, including full reconnect reconciliation', () => {
+  const rows = [{ id: 'a', value: 1 }, { id: 'b', value: 2 }];
+  const merged = mergeApplicationRecordsById(rows, rows.map((r) => ({ ...r })), ['a', 'b'], (r) => r.id);
+  assert.equal(merged, rows);
+});
+
+test('a changed submission loads every answer across server-capped pages, not only the event row', async () => {
+  const answers = Array.from({ length: 5 }, (_, index) => ({
+    record_id: `r:q${index}`, created_at: now,
+    payload: { responseId: 'r', surveyType: 'Supplier', respondentType: 'Employee', submissionDate: now,
+      company: 'Synthetic supplier', questionId: `q${index}`, questionNumber: index + 1,
+      question: 'Quality', questionCategory: 'Quality', rating: 0, comment: '' },
+  }));
+  let requests = 0;
+  const query = {
+    select: () => query,
+    eq: (column: string, value: string) => { assert.deepEqual([column, value], ['record_type', 'survey_response']); return query; },
+    in: (column: string, ids: string[]) => { assert.equal(column, 'payload->>responseId'); assert.deepEqual(ids, ['r']); return query; },
+    order: () => query,
+    range: async (from: number) => { requests++; return { data: answers.slice(from, from + 2), error: null }; },
+  };
+  const client = { from: () => query } as unknown as SupabaseClient;
+  const rows = await loadApplicationRecordsByIds<SurveyResponse>('survey_response', ['r'], 'payload->>responseId', client);
+  assert.equal(rows.length, 5);
+  assert.equal(requests, 4);
+  const concurrentLocalRows = [rows[0]];
+  const merged = mergeApplicationRecordsById(concurrentLocalRows, rows, [], surveyResponseRecordId);
+  assert.equal(merged.length, 5, 'a locally saved row during the fetch cannot be duplicated');
+});
 
 const validApplicationRecords: Record<(typeof APPLICATION_RECORD_TYPES)[number], { id: string; payload: unknown }> = {
   partner_company: { id: 'company-1', payload: { id: 'company-1', name: 'Supplier One', type: 'Supplier', createdAt: now, branches: [] } },

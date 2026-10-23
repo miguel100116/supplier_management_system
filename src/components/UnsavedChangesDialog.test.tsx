@@ -7,6 +7,8 @@ import { SendFormConfirmation } from '../features/evaluations/components/SendFor
 import { UnsavedChangesDialog } from './UnsavedChangesDialog';
 import { CategoriesManagerPage } from '../pages/CategoriesManagerPage';
 import { DEFAULT_CATEGORIES } from '../data/questionCategories';
+import { EmployeeWorkspacePage } from '../features/employee-experience/components/EmployeeWorkspacePage';
+import { SurveyFillerPage } from '../pages/SurveyFillerPage';
 import { CreateSurveyPage } from '../pages/CreateSurveyPage';
 import { dismissModalFromBackdrop, getTopmostModalHandler } from '../hooks/modalDismissal';
 
@@ -26,6 +28,8 @@ function renderHooks<P>(Component: (props: P) => ReactElement, props: P) {
     },
     useRef(initial: unknown) { const index = cursor++; if (!(index in cells)) cells[index] = { current: initial }; return cells[index]; },
     useCallback(callback: unknown) { return callback; },
+    useMemo(factory: () => unknown) { return factory(); },
+    useImperativeHandle() {},
     useId() { return `test-${cursor++}`; },
     useEffect(effect: () => unknown) { effects.push(effect); },
   };
@@ -283,5 +287,60 @@ test('Send Form Escape and backdrop dismiss only approval, with priority over th
   } finally {
     cleanups.reverse().forEach((cleanup) => { if (typeof cleanup === 'function') cleanup(); });
     Object.assign(globalThis, { window: priorWindow, document: priorDocument });
+  }
+});
+
+test('evaluation submission waits for persistence, prevents double submit and retains answers on failure', async (t) => {
+  const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  let draftRemovals = 0;
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: () => null, setItem() {}, removeItem: () => draftRemovals++,
+  } });
+  t.after(() => {
+    if (previousStorage) Object.defineProperty(globalThis, 'localStorage', previousStorage);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  });
+  let resolve!: (value: string) => void;
+  let reject!: (reason: Error) => void;
+  let calls = 0;
+  const props: React.ComponentProps<typeof SurveyFillerPage> = {
+    surveys: [{ id: 'survey', title: 'Supplier review', description: '', surveyType: 'Supplier', status: 'Running', createdAt: '2026-10-01',
+      questions: [{ questionId: 'Q-SUP-1', questionNumber: 1, question: 'Quality?', questionCategory: 'Quality' }] }],
+    partnerCompanies: [{ id: 'one', name: 'Synthetic supplier', type: 'Supplier', createdAt: '2026-10-01' }],
+    responses: [], userEmail: 'review@example.com', defaultDepartment: 'Logistics', defaultRespondentType: 'Rank & File',
+    onSubmitted: () => { calls++; return new Promise<string>((yes, no) => { resolve = yes; reject = no; }); },
+  };
+  const component = (SurveyFillerPage as unknown as { render: (value: React.ComponentProps<typeof SurveyFillerPage>, ref: null) => ReactElement }).render;
+  const view = renderHooks((value: typeof props) => component(value, null), props);
+  find(view.render(), (e) => e.props.id === 'filler-company').props.onChange({ target: { value: 'Synthetic supplier' } });
+  find(view.render(), (e) => e.type === 'form').props.onSubmit({ preventDefault() {} });
+  const submit = find(view.render(), (e) => e.props.id === 'survey-filler-step-2').props.onSubmit;
+  const pending = submit({ preventDefault() {} });
+  await submit({ preventDefault() {} });
+  assert.equal(calls, 1);
+  assert.equal(find(view.render(), (e) => e.props.id === 'btn-filler-submit').props.disabled, true);
+  assert.equal(draftRemovals, 0);
+  reject(new Error('Save failed'));
+  await pending;
+  assert.equal(find(view.render(), (e) => e.props.id === 'btn-filler-submit').props.disabled, false);
+  assert.equal(draftRemovals, 0, 'failed saves keep the existing draft');
+  const retry = find(view.render(), (e) => e.props.id === 'survey-filler-step-2').props.onSubmit({ preventDefault() {} });
+  resolve('saved-response');
+  await retry;
+  assert.equal(calls, 2);
+  assert.equal(draftRemovals, 1);
+  assert.ok(find(view.render(), (e) => e.props.id === 'survey-filler-success'));
+});
+
+
+test('employee Evaluations Back returns Home even while the list is loading or unavailable', () => {
+  for (const state of [{ isLoading: false, error: null }, { isLoading: true, error: null }, { isLoading: false, error: 'Unavailable' }]) {
+    const destinations: string[] = [];
+    const view = renderHooks(EmployeeWorkspacePage, {
+      view: 'Evaluations' as const, surveys: [], partnerCompanies: [], responses: [], userEmail: 'employee@example.com',
+      ...state, onNavigate: (destination: string) => destinations.push(destination), onStartEvaluation() {},
+    });
+    find(view.render(), (element) => element.type === 'button' && element.props['aria-label'] === 'Back to Home').props.onClick();
+    assert.deepEqual(destinations, ['Home']);
   }
 });

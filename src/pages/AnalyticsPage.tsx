@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { memo, useMemo, useState, type ReactNode } from 'react';
 import { BarChart3, ChevronRight, Info, Trophy, X } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { CompanyAnalysisPanel } from '../features/analytics/components/CompanyAnalysisPanel';
@@ -13,6 +13,8 @@ import { AnalyticsDateRangeControls } from '../features/analytics/components/Ana
 import type { AnalyticsDateRange } from '../features/analytics/domain/dateRange';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { Pagination } from '../components/Pagination';
+import { createCompanyRankingUpdater } from '../features/analytics/domain/incrementalRankings';
+import type { AnalyticsCompanySummary } from '../features/analytics/domain/rankings';
 import { buildAnalyticsSnapshot } from '../features/analytics/domain/analyticsSnapshot';
 
 interface AnalyticsPageProps {
@@ -33,6 +35,7 @@ interface AnalyticsPageProps {
 }
 
 type CompanySummary = {
+  companyId?: string;
   name: string;
   type: SurveyType;
   average: number;
@@ -71,7 +74,7 @@ function AnalyticsTooltip({ text }: { text: string }) {
 }
 
 export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTypes = ['Courier', 'Supplier', 'Subcontractor'], filters, setFilters, dataScope = 'current', onChangeDataScope, archiveSeries = [], selectedSeriesIds = [], onChangeSelectedSeriesIds, dateRange = { from: '', to: '' }, onChangeDateRange, partnerCompanies = [], archivedResponses = [] }: AnalyticsPageProps) {
-  const [companySelection, setSelectedCompany] = useState<Pick<CompanySummary, 'name' | 'type'> | null>(null);
+  const [companySelection, setSelectedCompany] = useState<Pick<CompanySummary, 'companyId' | 'name' | 'type'> | null>(null);
   const [trendGranularity, setTrendGranularity] = useState<'monthly' | 'yearly' | 'series'>('monthly');
   const [leaderboardPage, setLeaderboardPage] = useState(0);
   const [questionPerformancePage, setQuestionPerformancePage] = useState(0);
@@ -88,10 +91,11 @@ export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTyp
   const ratingScaleText = selectedType === 'All'
     ? formatRatingScale('Courier')
     : formatRatingScale(selectedType);
-  const summary = useMemo(() => buildAnalyticsSnapshot(responses, activeSurveyTypes, partnerCompanies, archiveSeries), [responses, activeSurveyTypes, partnerCompanies, archiveSeries]);
+  const [updateRankings] = useState(createCompanyRankingUpdater);
+  const companySummaries = useMemo(() => updateRankings(responses, activeSurveyTypes), [responses, activeSurveyTypes, updateRankings]);
+  const summary = useMemo(() => buildAnalyticsSnapshot(responses, activeSurveyTypes, partnerCompanies, archiveSeries, companySummaries), [responses, activeSurveyTypes, partnerCompanies, archiveSeries, companySummaries]);
   const { totalSubmissions, scoredSubmissionCount, averageScore, evaluatedPartnerCount, partnerDenominator } = summary;
-  const companySummaries = summary.companies;
-  const selectedCompany = companySummaries.find((company) => company.name === companySelection?.name && company.type === companySelection.type) ?? null;
+  const selectedCompany = companySummaries.find((company) => company.type === companySelection?.type && (companySelection.companyId ? company.companyId === companySelection.companyId : company.name === companySelection.name)) ?? null;
   useModalEscape(Boolean(selectedCompany), closeSelectedCompany);
 
   const visibleCompanies = useMemo(() => selectedType === 'All' ? companySummaries : companySummaries.filter((company) => company.type === selectedType), [companySummaries, selectedType]);
@@ -237,19 +241,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTyp
             {leaderboardColumns.map((column, columnIndex) => (
               <ol key={columnIndex} start={column.startIndex + 1} className="min-w-0">
                 {column.items.map((company, index) => {
-                  const style = typeStyles[company.type];
-                  const scoreBand = getAnalyticsBand(company.type, company.rankScore);
-                  const rank = column.startIndex + index + 1;
-                  return (
-                    <li key={`${company.type}:${company.name}`} className={`min-w-0 border-b border-slate-100 dark:border-slate-800/70 ${rank % 2 === 1 ? 'bg-slate-50 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}`}>
-                      <button type="button" onClick={() => setSelectedCompany(company)} className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-center px-2 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900/70 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]">
-                        <span className="flex h-7 w-8 items-center justify-center rounded-md bg-slate-200 text-xs font-extrabold text-slate-800 dark:bg-slate-700 dark:text-slate-100">{rank}</span>
-                        <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: scoreBand.hex }} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · <span style={{ color: scoreBand.hex }}>{scoreBand.label}</span></span></span>
-                        <span className="flex items-center justify-end gap-1 text-xs font-bold tabular-nums" style={{ color: scoreBand.hex }}>{formatNumber(getAnalyticsScore(company.type, company.rankScore))}<ChevronRight size={13} /></span>
-                        <span className="hidden text-right text-[11px] font-medium tabular-nums text-slate-400 sm:block">{company.count}</span>
-                      </button>
-                    </li>
-                  );
+                  return <CompanyLeaderboardRow key={`${company.type}:${company.companyId || company.name}`} company={company} rank={column.startIndex + index + 1} onSelect={setSelectedCompany} />;
                 })}
               </ol>
             ))}
@@ -329,3 +321,21 @@ function AnalyticsHeader({ dataScope, onChangeDataScope }: { dataScope: 'current
 function KpiCard({ label, value, detail, tooltip }: { label: string; value: string; detail: string; tooltip: string }) {
   return <article className="px-4 py-4 first:pt-4 last:pb-4 md:px-5 md:py-4"><div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400"><span>{label}</span><AnalyticsTooltip text={tooltip} /></div><p className="mt-1.5 text-2xl font-bold tracking-tight text-[#2187CD]">{value}</p><p className="mt-1 text-[11px] text-slate-400">{detail}</p></article>;
 }
+
+const CompanyLeaderboardRow = memo(function CompanyLeaderboardRow({ company, rank, onSelect }: {
+  company: AnalyticsCompanySummary;
+  rank: number;
+  onSelect: (company: AnalyticsCompanySummary) => void;
+}) {
+  const scoreBand = getAnalyticsBand(company.type, company.rankScore);
+  return (
+    <li className={`min-w-0 border-b border-slate-100 dark:border-slate-800/70 ${rank % 2 === 1 ? 'bg-slate-50 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}`}>
+      <button type="button" onClick={() => onSelect(company)} className="grid w-full min-w-0 grid-cols-[2.5rem_minmax(0,1fr)_5rem] items-center px-2 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900/70 sm:grid-cols-[3rem_minmax(0,1fr)_7rem_4rem]">
+        <span className="flex h-7 w-8 items-center justify-center rounded-md bg-slate-200 text-xs font-extrabold text-slate-800 dark:bg-slate-700 dark:text-slate-100">{rank}</span>
+        <span className="min-w-0 pr-3"><span className="flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: scoreBand.hex }} /><span className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={company.name}>{company.name}</span></span><span className="mt-0.5 block truncate pl-4 text-[10px] text-slate-400">{company.type} · <span style={{ color: scoreBand.hex }}>{scoreBand.label}</span></span></span>
+        <span className="flex items-center justify-end gap-1 text-xs font-bold tabular-nums" style={{ color: scoreBand.hex }}>{formatNumber(getAnalyticsScore(company.type, company.rankScore))}<ChevronRight size={13} /></span>
+        <span className="hidden text-right text-[11px] font-medium tabular-nums text-slate-400 sm:block">{company.count}</span>
+      </button>
+    </li>
+  );
+});

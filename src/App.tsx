@@ -1022,8 +1022,8 @@ export default function App() {
     address: string | undefined,
     answers: any[],
     startTime?: string
-  ): string | null => {
-    if (!accountProfile) return null;
+  ): Promise<string | null> => {
+    if (!accountProfile) return Promise.resolve(null);
     return submitResponse(surveyId, company, accountProfile.department, accountProfile.designation, address, answers, account || undefined, startTime);
   };
 
@@ -1073,10 +1073,10 @@ export default function App() {
       />
     ) : (
       <DashboardPage
-        responses={filteredResponses}
+        responses={analyticsFilteredResponses}
         allResponses={userAccessibleAllResponses}
-        historyResponses={dataScope === 'all-time' ? userAccessibleAllTimeResponses : userAccessibleAllResponses}
-        dataScope={dataScope === 'custom' ? 'current' : dataScope}
+        historyResponses={analyticsFilteredResponses}
+        dataScope={dataScope}
         onChangeDataScope={setDataScope}
         partnerCompanies={userAccessiblePartnerCompanies}
         isLoading={isLoading}
@@ -1485,8 +1485,8 @@ export default function App() {
       >
         <div className="space-y-5">
           {realtimeSyncUnavailable && (
-            <div role="status" aria-live="polite" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Live Supabase synchronization is unavailable after repeated connection failures. It will retry automatically.
+            <div role="status" aria-live="polite" className="text-xs text-slate-500">
+              Live updates are disconnected. Reconnecting automatically.
             </div>
           )}
           {accountPersistenceError && (
@@ -1533,7 +1533,7 @@ export default function App() {
                       </EvaluationWorkspace>
                     ) : pageContent}
                   </Suspense>
-                  {isSupabaseConfigured && isRefreshing && (
+                  {isSupabaseConfigured && isRefreshing && activePage !== 'analytics' && (
                     <div
                       className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-center px-4"
                       role="status"

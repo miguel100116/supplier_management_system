@@ -79,3 +79,16 @@ test('SMS-15 opens and reopens on all-category overview while valid URL categori
   assert.match(partnerTotal(renderCategoryEntry('invalid')), />4<\/span>/);
   assert.match(partnerTotal(renderCategoryEntry()), />4<\/span>/);
 });
+
+test('pinned category strip keeps all categories reachable and exposes the selected category', () => {
+  for (const category of [undefined, 'courier']) {
+    const html = renderCategoryEntry(category);
+    const strip = html.slice(html.indexOf('class="document-category-filter'), html.indexOf('>Compliance Overview</h3>'));
+    assert.match(strip, /sticky top-20 z-20/);
+    assert.match(strip, /role="group" aria-label="Filter document register by category"/);
+    assert.match(strip, /overflow-x-auto/);
+    assert.equal((strip.match(/<button /g) ?? []).length, 5);
+    assert.equal((strip.match(/aria-pressed="true"/g) ?? []).length, 1);
+    assert.match(strip, new RegExp(`aria-pressed="true"[^>]*>[\\s\\S]*?<span>${category === 'courier' ? 'Courier' : 'All Categories'}</span>`));
+  }
+});

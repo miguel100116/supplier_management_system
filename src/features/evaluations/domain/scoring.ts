@@ -197,7 +197,7 @@ function legacyCompanyKey(company: string): string {
  * an ID fall back to a conservative trim/case comparison; legal suffixes and
  * punctuation are intentionally preserved to avoid merging distinct partners.
  */
-export function getCompanyComposites(responses: SurveyResponse[], surveyType: SurveyType): CompanyComposite[] {
+export function groupCompanyResponses(responses: SurveyResponse[], surveyType: SurveyType) {
   const groups = new Map<string, { companyId?: string; responses: SurveyResponse[] }>();
   const idKeysByLegacyName = new Map<string, Set<string>>();
   const relevantResponses = responses.filter((response) => response.surveyType === surveyType);
@@ -227,7 +227,11 @@ export function getCompanyComposites(responses: SurveyResponse[], surveyType: Su
     groups.set(key, group);
   });
 
-  return [...groups.values()].flatMap((group) => {
+  return groups;
+}
+
+export function getCompanyComposites(responses: SurveyResponse[], surveyType: SurveyType): CompanyComposite[] {
+  return [...groupCompanyResponses(responses, surveyType).values()].flatMap((group) => {
     const latest = [...group.responses].sort((left, right) =>
       right.submissionDate.localeCompare(left.submissionDate),
     )[0];

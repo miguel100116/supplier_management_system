@@ -140,14 +140,14 @@ Form headings use **Create Evaluation Form**, **Edit Evaluation Form**, **Evalua
 
 | Module | What it does |
 |---|---|
-| **Dashboard** | Personalized performance indicators and KPIs. |
+| **Dashboard** | Personalized performance indicators and KPIs. Evaluation results use the same authorized official responses, Current/All-Time/Custom scope, filters, counting rules, and two-decimal score formatting as Analytics and generated report summaries. Operational form/completion tracking remains current-round data; custom dates are selected in Analytics. |
 | **Survey Forms** | View, fill, and publish feedback forms. Manage Access and the Forms table use the same deadline-aware status, including explicit manual endings. Marking a form **Ended** archives the active results for its partner category; the category ranking remains available in Company Leaderboard → Archives and the archived responses remain in Archive Center. Legacy forms named with a leading Test/Tests label are hidden from employee evaluation choices and remain available to Admins. Respondent Info starts directly with the progress steps and has only “Proceed to Form Questions” in its footer; sidebar navigation and the later Questions Form Return actions remain available. Date-range questions support calendar pickers with month/year selection or typed `dd/mm/yyyy` dates; both dates are required and the end must be on or after the start. |
 | **Survey Explorer** | Review each survey submission, filter by respondent email, inspect answers, and export all or filtered responses to Excel. |
 | **Analytics** | Charts, trends, rankings, and company comparisons calculated locally from authorized loaded responses within permitted survey categories. Company Leaderboard has Current rankings and Archives views; choosing an archived category-period opens its company ranking list. |
 | **Reports** | Generate and History tabs for Summary / Company / Question / Executive-Summary builders and raw exports (PDF, Excel, CSV, Word where supported). Saved copies can be downloaded again; Regenerate opens saved builder options with current authorized data and filters. |
 | **Present** | Staggered slide-deck presentation builder (PDF/PPTX export). |
 | **Partner Companies** | Manage external courier, supplier, and subcontractor rosters, branches, documents, and the Admin-only dated Active Companies upload history. |
-| **Document Tracker** | Opens on All Categories with combined compliance figures. Category tabs filter the register; a valid `?category=supplier-local`, `supplier-foreign`, `courier`, or `subcontractor` link opens that category. Returning through normal navigation resets to All Categories. |
+| **Document Tracker** | Opens on All Categories with combined compliance figures. The category filter stays below the navigation bar while scrolling, with the floating document-table header below it. Category tabs filter the register; a valid `?category=supplier-local`, `supplier-foreign`, `courier`, or `subcontractor` link opens that category. Returning through normal navigation resets to All Categories. |
 | **Renew Compliance Documents** | Action permission: update document expiry/status without full Account Management access. |
 | **Partners Feedback Hub** | Send report cards to partner companies (single or bulk email via Microsoft Graph). |
 | **Account Management** | Create company-domain logins with a generated or customized initial password, and configure roles, ranks, departments, and per-user/per-department permissions. |
@@ -239,6 +239,8 @@ See [reference materials](reference-materials/README.md) for the relocated utili
 
 The verified frontend/backend contract, record-type matrix, Realtime routing, and known authorization gaps are documented in [`docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md`](docs/engineering/SUPABASE_FRONTEND_ALIGNMENT.md). Analytics calculates locally from the existing authorized response store. Current, All-Time, and Custom scopes retain official provenance, CSV identity reconciliation, inclusive local-day filtering, and optional archive-period selection. Category selection recalculates from the filtered loaded responses. Analytics does not request `/api/analytics` or require a server-only key; existing Supabase hydration, RLS, and Realtime refresh remain authoritative. Lower-rank users see their authorized response scope, not company-wide aggregates. No database migration is needed.
 
+Company Leaderboards use the existing shared Postgres Changes channel on `application_records` (`survey_response` INSERT/UPDATE/DELETE), with no polling. Events are batched for 500 ms (at most 1.5 seconds during a continuous stream), then complete affected submissions are fetched through RLS. Reconnection reconciles missed responses. Saved submissions and evaluation imports become visible after persistence succeeds; response batches use one atomic PostgREST upsert. Large imports must fit the deployed API request/transaction limits; a rejected batch reports failure instead of publishing partial evaluation scores. Company leaderboard rows reuse unchanged calculations and references while rank changes update in place. Existing score/count rules, official provenance, scope filters, and legacy import completion-date fallbacks remain unchanged. Live timing and Realtime publication/RLS must be verified separately in each environment.
+
 ---
 
 ## 8. Authentication
@@ -304,12 +306,27 @@ Full step-by-step Azure app-registration instructions are documented inline in [
 | `npm run start` | Run the built production server (`node dist/server.cjs`). |
 | `npm run preview` | Preview the built client with Vite. |
 | `npm run lint` | Type-check the frontend, Vite configuration, scripts, and Express server with their explicit TypeScript projects. ESLint is not configured. |
-| `npm test` | Run the focused automated tests, including stylesheet compilation compatibility. |
+| `npm test` | Discover and run all colocated Node tests, including domain, service, HTTP, component, import, and stylesheet checks. |
+| `npm run test:unit` | Run pure domain and utility tests. |
+| `npm run test:integration` | Run the remaining service, HTTP, component-presentation, import, and tooling tests. |
+| `npm run test:e2e` | Run Chromium browser journeys against the built Express application at desktop and mobile sizes. Build first. |
+| `npm run verify` | Run TypeScript checks, all Node tests, production build, browser tests, and the high/critical dependency audit. |
+| `npm run hooks:install` | Enable this checkout's pre-push verification hook. Each developer must run this once. |
 | `npm audit --audit-level=high` | Check dependency advisories; high and critical findings fail the verification workflow. |
 | `npm run db:cleanup:tests:preview --silent` | Print SQL that previews test evaluation rows, provides full rows for a private backup export, and rolls back. No database connection is made. |
 | `npm run db:cleanup:tests:sql --silent` | Print deletion SQL for reviewed test evaluation rows. Paste into the intended project's Supabase SQL Editor to execute; generating it does not delete data. |
 
-The [Verify workflow](.github/workflows/verify.yml) runs on pushes and pull requests with Node 22, a clean `npm ci`, TypeScript checks, tests, a production build, dependency auditing, and a separate secret scan.
+The [Verify workflow](.github/workflows/verify.yml) runs on pushes and pull requests with Node 22, a clean `npm ci`, TypeScript checks, discovered tests, a production build, desktop/mobile browser tests, dependency auditing, and a separate secret scan. The existing application check name is preserved for required-check compatibility. Browser diagnostics are uploaded on failure; they contain synthetic test data.
+
+### Before pushing
+
+Use Node 22 (`.nvmrc`), run `npm ci`, then `npx playwright install chromium` and `npm run hooks:install` once per checkout. Commit your changes before pushing; the hook rejects uncommitted files or outgoing commits different from the checked-out HEAD and runs `npm run verify`. Switch to each branch before pushing it. Run `npm run verify` manually before a commit when iterating. CI remains the required shared check because local hooks are opt-in and can be bypassed. Repository administrators should require the Verify application and Secret scan checks on pull requests; this change does not alter GitHub branch protection.
+
+Tests are discovered under `src/`, `server/`, and `scripts/` by the `.test.ts`, `.test.tsx`, or `.test.mjs` suffix. New files do not need a package-script entry. `test:unit` selects `domain/` and `utils/`; `test:integration` includes the remaining tests, including component rendering and source-contract checks. This partition does not claim every existing test exercises a full integration.
+
+Browser tests in `tests/e2e/` use the built application and actual Express host with synthetic Supabase responses. They cover signed-out deep links, rejected credentials, role mismatch, and Admin Directory search, archive dismissal, and persisted archive state. External requests are blocked; the test host overrides Supabase/Microsoft settings and clears server credentials. No live identity, business data, Supabase RLS, Microsoft, email, or deployment behavior is verified. Add critical journeys incrementally; passing this suite is not full-system coverage. Do not run two E2E instances concurrently on port 4173.
+
+A red commit status can come from hosting independently of Verify. On 2026-10-23, `regoris` at `bec4e6a` had successful Verify and Cloudflare checks but a Vercel **Deployment was blocked** status. Check the named failing status before changing code. Vercel project access, linked Git identities, and plan restrictions must be resolved in the hosting configuration; tests do not grant deployment access. See [Vercel collaboration troubleshooting](https://vercel.com/docs/deployments/troubleshoot-project-collaboration). Do not disable checks or rewrite commit authors to conceal a blocked deployment.
 
 ### Cleaning test evaluations
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
 import { surveyQuestions } from '../data/questions';
 import {
@@ -51,7 +51,8 @@ import {
   notificationReadStateUserKey,
   parseNotificationReadState,
 } from '../features/notifications/domain/notificationReadState';
-import { createCoalescedTaskRunner } from '../utils/coalescedTask';
+import { createDebouncedTask } from '../utils/debouncedTask';
+import { createCoalescedTaskRunner, createRefreshGuard } from '../utils/coalescedTask';
 
 // Versioned browser cache for the authenticated Partner Company registry.
 // A missing cache starts empty until Supabase hydration completes.
@@ -400,9 +401,17 @@ function decompressResponses(compressed: any[]): SurveyResponse[] {
 }
 
 export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?: string | null, isAdmin?: boolean) {
-  const [responses, setResponses] = useState<SurveyResponse[]>([]);
+  const [responses, setResponsesState] = useState<SurveyResponse[]>([]);
+  const activeUserRef = useRef(currentUserEmail);
+  activeUserRef.current = currentUserEmail;
   const responsesRef = useRef(responses);
-  responsesRef.current = responses;
+  const [responseRefreshGuard] = useState(createRefreshGuard);
+  const setResponses = useCallback((update: SetStateAction<SurveyResponse[]>) => {
+    const next = typeof update === 'function' ? update(responsesRef.current) : update;
+    if (next !== responsesRef.current) responseRefreshGuard.invalidate();
+    responsesRef.current = next;
+    setResponsesState(next);
+  }, [responseRefreshGuard]);
   const [surveys, setSurveys] = useState<CustomForm[]>([]);
   const [partnerCompanies, setPartnerCompanies] = useState<PartnerCompany[]>([]);
   const [categoryLabels, setCategoryLabels] = useState<Record<SurveyType, string[]>>(() => getStoredCategoryLabels());
@@ -432,7 +441,6 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   };
 
   const persistRemoteAsync = async (operation: Promise<void>): Promise<void> => {
-    if (!isSupabaseConfigured) return;
     setError(null);
     try {
       await operation;
@@ -1404,7 +1412,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUserEmail) return;
     let cancelled = false;
-    const refreshTimers = new Map<ApplicationRecordType, ReturnType<typeof setTimeout>>();
+    const refreshTimers = new Map<ApplicationRecordType, ReturnType<typeof createDebouncedTask>>();
     let activeBackgroundRefreshes = 0;
     let pendingSurveyResponseIds = new Set<string>();
     let refreshAllSurveyResponses = false;
@@ -1426,6 +1434,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     };
 
     const hydrateFromSupabase = async () => {
+      const isCurrent = responseRefreshGuard.start();
       setError(null);
       const sessionEmail = await getSupabaseSessionEmail();
       if (!sessionEmail || sessionEmail !== currentUserEmail.trim().toLowerCase()) return;
@@ -1445,9 +1454,13 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       if (cancelled) return;
       setPartnerCompanies(normalizedCompanies);
       setSurveys(normalizedSurveys);
-      responsesRef.current = normalizedResponses;
-      hasHydratedResponses = true;
-      setResponses(normalizedResponses);
+      if (isCurrent()) {
+        hasHydratedResponses = true;
+        setResponses(normalizedResponses);
+      } else {
+        refreshAllSurveyResponses = true;
+        runHydration(true, 'survey_response');
+      }
       safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(normalizedCompanies));
       safeSetItem('survey_analytics_surveys_v6', JSON.stringify(normalizedSurveys));
 
@@ -1462,8 +1475,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         });
       };
       scheduleAfterPaint(() => {
-        setNotifications(groupResponsesToNotifications(normalizedResponses).slice(0, INITIAL_NOTIFICATION_SEED));
-        safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(normalizedResponses)));
+        setNotifications(groupResponsesToNotifications(responsesRef.current).slice(0, INITIAL_NOTIFICATION_SEED));
+        safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(responsesRef.current)));
       });
 
       void (async () => {
@@ -1536,13 +1549,15 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           return;
         }
         case 'survey_response': {
-          const recordIds = [...pendingSurveyResponseIds];
-          const shouldRefreshAll = refreshAllSurveyResponses || recordIds.length === 0 || !hasHydratedResponses;
+          const isCurrent = responseRefreshGuard.start();
+          const submissionIds = [...pendingSurveyResponseIds];
+          const recordIds = responsesRef.current.filter((row) => pendingSurveyResponseIds.has(row.responseId)).map(surveyResponseRecordId);
+          const shouldRefreshAll = refreshAllSurveyResponses || submissionIds.length === 0 || !hasHydratedResponses;
           pendingSurveyResponseIds = new Set();
           refreshAllSurveyResponses = false;
           const storedResponses = shouldRefreshAll
             ? await loadApplicationRecords<SurveyResponse>('survey_response')
-            : await loadApplicationRecordsByIds<SurveyResponse>('survey_response', recordIds);
+            : await loadApplicationRecordsByIds<SurveyResponse>('survey_response', submissionIds, 'payload->>responseId');
           if (cancelled) return;
           const normalizedResponses = storedResponses.map(normalizeSurveyResponse);
           const mergedResponses = shouldRefreshAll
@@ -1553,9 +1568,18 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
               recordIds,
               surveyResponseRecordId,
             );
-          const nextResponses = mergedResponses.filter(await createImportedResponseFilter(mergedResponses));
+          const deduplicated = mergedResponses.filter(await createImportedResponseFilter(mergedResponses));
           if (cancelled) return;
-          responsesRef.current = nextResponses;
+          if (!isCurrent()) {
+            refreshAllSurveyResponses = true;
+            runHydration(true, 'survey_response');
+            return;
+          }
+          const nextResponses = mergeApplicationRecordsById(
+            responsesRef.current, deduplicated,
+            [...responsesRef.current, ...deduplicated].map(surveyResponseRecordId), surveyResponseRecordId,
+          );
+          if (cancelled) return;
           hasHydratedResponses = true;
           setResponses(nextResponses);
           setNotifications(groupResponsesToNotifications(nextResponses).slice(0, INITIAL_NOTIFICATION_SEED));
@@ -1623,30 +1647,30 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     };
 
     const refreshChangedRecord = (event: Event) => {
-      const detail = (event as CustomEvent<{ recordType?: ApplicationRecordType; recordId?: string }>).detail;
+      const detail = (event as CustomEvent<{ recordType?: ApplicationRecordType; recordId?: string; responseId?: string }>).detail;
       const recordType = detail?.recordType;
       if (!recordType || ![
         'partner_company', 'survey', 'survey_response', 'archive_series',
         'category_labels', 'notification_read_state',
       ].includes(recordType)) return;
       if (recordType === 'survey_response') {
-        if (detail.recordId && !refreshAllSurveyResponses) {
-          pendingSurveyResponseIds.add(detail.recordId);
-          if (pendingSurveyResponseIds.size > 100) {
-            pendingSurveyResponseIds = new Set();
-            refreshAllSurveyResponses = true;
-          }
+        const responseId = detail.responseId ?? responsesRef.current.find((row) => surveyResponseRecordId(row) === detail.recordId)?.responseId;
+        if (responseId && !refreshAllSurveyResponses) {
+          pendingSurveyResponseIds.add(responseId);
         } else {
           pendingSurveyResponseIds = new Set();
           refreshAllSurveyResponses = true;
         }
       }
-      const existingTimer = refreshTimers.get(recordType);
-      if (existingTimer) clearTimeout(existingTimer);
-      refreshTimers.set(recordType, setTimeout(() => {
-        refreshTimers.delete(recordType);
-        runHydration(true, recordType);
-      }, 100));
+      let batch = refreshTimers.get(recordType);
+      if (!batch) {
+        batch = createDebouncedTask(() => {
+          refreshTimers.delete(recordType);
+          runHydration(true, recordType);
+        }, recordType === 'survey_response' ? 500 : 100, 1500);
+        refreshTimers.set(recordType, batch);
+      }
+      batch.schedule();
     };
 
     const refreshResponsesAfterProfileChange = (event: Event) => {
@@ -1664,7 +1688,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
     return () => {
       cancelled = true;
-      refreshTimers.forEach((timer) => clearTimeout(timer));
+      refreshTimers.forEach((batch) => batch.cancel());
       refreshTimers.clear();
       window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshChangedRecord);
       window.removeEventListener(APPLICATION_PROFILES_CHANGED_EVENT, refreshResponsesAfterProfileChange);
@@ -1774,7 +1798,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   };
 
   // Submit a survey response
-  const submitResponse = (
+  const submitResponse = async (
     surveyId: string,
     company: string,
     department: string,
@@ -1823,16 +1847,15 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       respondentEmail,
     }));
 
-    const updatedResponses = [...responses, ...newResponses];
-    setResponses(updatedResponses);
-    safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updatedResponses)));
-
-    persistRemote(upsertApplicationRecords(
-      'survey_response',
-      newResponses,
-      surveyResponseRecordId,
-      { ownRecords: true },
+    await persistRemoteAsync(upsertApplicationRecords(
+      'survey_response', newResponses, surveyResponseRecordId, { ownRecords: true },
     ));
+    if (activeUserRef.current !== currentUserEmail) throw new Error('Your session changed while saving. Sign in again to view the saved evaluation.');
+    setResponses((current) => {
+      const updated = mergeApplicationRecordsById(current, newResponses, newResponses.map(surveyResponseRecordId), surveyResponseRecordId);
+      safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updated)));
+      return updated;
+    });
 
     // Add notification
     const notification = toNotification(newResponses);
@@ -2189,9 +2212,15 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // skipped - see mergeImportedResponses for the exact rules.
   const importArchivedResponses = async (file: File): Promise<ArchiveImportResult> => {
     const result = await importArchivedResponsesFromFile(file, responses, getOrCreateSeries);
-    setResponses(result.responses);
-    safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(result.responses)));
-    await persistRemoteAsync(replaceApplicationRecords('survey_response', result.responses, surveyResponseRecordId));
+    const existingIds = new Set(responses.map(surveyResponseRecordId));
+    const imported = result.responses.filter((row) => !existingIds.has(surveyResponseRecordId(row)));
+    await persistRemoteAsync(upsertApplicationRecords('survey_response', imported, surveyResponseRecordId));
+    if (activeUserRef.current !== currentUserEmail) throw new Error('Your session changed while importing. Sign in again to view the saved results.');
+    setResponses((current) => {
+      const updated = mergeApplicationRecordsById(current, imported, imported.map(surveyResponseRecordId), surveyResponseRecordId);
+      safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updated)));
+      return updated;
+    });
     return result;
   };
 
@@ -2213,42 +2242,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // place instead of duplicating them. Companies the admin chose "add as
   // partner" for are created as minimal, unaccredited registry entries.
   const commitRawEvaluations = async (preview: RawEvalPreview, decisions: Record<string, CompanyDecision>): Promise<RawEvalImportSummary> => {
-    const { responses: newRows, newPartnerCompanies, summary } = commitRawEvaluationImportRows(preview, decisions);
-    const keepResponse = await createImportedResponseFilter(newRows);
-
-    const newIds = new Set(newRows.map((r) => r.responseId));
-    const replaced = new Set(responses.filter((r) => newIds.has(r.responseId)).map((r) => r.responseId)).size;
-
-    // Functional updates so concurrent imports (e.g. Supplier/Subcontractor/
-    // Courier files staged and confirmed together) each apply on top of the
-    // latest state instead of the stale `responses`/`partnerCompanies`
-    // closure from whichever render kicked them off - otherwise the last
-    // commit to resolve silently clobbers the others.
-    setResponses((prevResponses) => {
-      const untouched = prevResponses.filter((r) => !newIds.has(r.responseId));
-      const updatedResponses = [...untouched, ...newRows].filter(keepResponse);
-      safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updatedResponses)));
-      persistRemote(upsertApplicationRecords('survey_response', newRows, surveyResponseRecordId));
-      return updatedResponses;
-    });
-
-    if (newPartnerCompanies.length) {
-      const normalizedNew = newPartnerCompanies.map(normalizePartnerCompany);
-      setPartnerCompanies((prevCompanies) => {
-        const updatedCompanies = [...prevCompanies, ...normalizedNew];
-        safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updatedCompanies));
-        persistRemote(upsertApplicationRecords('partner_company', normalizedNew, (company) => company.id));
-        return updatedCompanies;
-      });
-    }
-
-    const finalSummary: RawEvalImportSummary = { ...summary, replaced };
-    logAdminActivity(
-      `Imported ${preview.surveyType} evaluation responses`,
-      `${summary.imported} submissions from "${preview.fileName}"${replaced ? ` (${replaced} replaced)` : ''}` +
-        `${newPartnerCompanies.length ? `, ${newPartnerCompanies.length} new partner(s) added` : ''}`
-    );
-    return finalSummary;
+    const summaries = await commitRawEvaluationsBatch([{ preview, decisions }]);
+    return summaries[0];
   };
 
   const commitRawEvaluationsBatch = async (
@@ -2269,19 +2264,10 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     const addedCompaniesById = new Map<string, PartnerCompany>();
     committed.forEach((entry) => entry.newPartnerCompanies.forEach((company) => addedCompaniesById.set(company.id, company)));
     const newCompanies = [...addedCompaniesById.values()].map(normalizePartnerCompany);
-    const previousImportedResponses = responses.filter((response) => newIds.has(response.responseId) || !keepResponse(response));
-    const newCompanyIds = new Set(newCompanies.map((company) => company.id));
-    const previousCompanies = partnerCompanies.filter((company) => newCompanyIds.has(company.id));
-
-    // Update this session immediately after source archives have been stored.
-    // The remote write continues below; if it fails, restore just these IDs
-    // and let the repository's authoritative refresh reconcile any partial save.
-    setResponses((current) => {
-      const updatedResponses = [...current.filter((response) => !newIds.has(response.responseId)), ...allRows].filter(keepResponse);
-      safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updatedResponses)));
-      return updatedResponses;
-    });
+    // Publish only durable, complete evaluations; failed writes retain the current view.
     if (newCompanies.length) {
+      await persistRemoteAsync(upsertApplicationRecords('partner_company', newCompanies, (company) => company.id));
+      if (activeUserRef.current !== currentUserEmail) throw new Error('Your session changed while importing. Sign in again to continue.');
       setPartnerCompanies((current) => {
         const existingIds = new Set(current.map((company) => company.id));
         const updated = [...current, ...newCompanies.filter((company) => !existingIds.has(company.id))];
@@ -2289,31 +2275,13 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         return updated;
       });
     }
-
-    // Persist partner additions before responses that may reference them.
-    // The repository writes large record sets in bounded concurrent chunks.
-    let companiesSaved = false;
-    try {
-      if (newCompanies.length) {
-        await persistRemoteAsync(upsertApplicationRecords('partner_company', newCompanies, (company) => company.id));
-        companiesSaved = true;
-      }
-      await persistRemoteAsync(upsertApplicationRecords('survey_response', allRows, surveyResponseRecordId));
-    } catch (error) {
-      setResponses((current) => {
-        const restored = [...current.filter((response) => !newIds.has(response.responseId)), ...previousImportedResponses];
-        safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(restored)));
-        return restored;
-      });
-      if (!companiesSaved && newCompanyIds.size) {
-        setPartnerCompanies((current) => {
-          const restored = [...current.filter((company) => !newCompanyIds.has(company.id)), ...previousCompanies];
-          safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(restored));
-          return restored;
-        });
-      }
-      throw error;
-    }
+    await persistRemoteAsync(upsertApplicationRecords('survey_response', allRows, surveyResponseRecordId));
+    if (activeUserRef.current !== currentUserEmail) throw new Error('Your session changed while importing. Sign in again to view the saved results.');
+    setResponses((current) => {
+      const updated = [...current.filter((response) => !newIds.has(response.responseId)), ...allRows].filter(keepResponse);
+      safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(updated)));
+      return updated;
+    });
 
     const importedSurveyTypes = [...new Set(committed
       .filter((entry) => !testImportToken(entry.preview.importBatchId))

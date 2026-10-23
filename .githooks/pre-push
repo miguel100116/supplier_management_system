@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+push_head=$(git rev-parse HEAD)
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$local_sha" != "0000000000000000000000000000000000000000" ] && [ "$local_sha" != "$push_head" ]; then
+    echo "Switch to the branch being pushed before running its verification: $local_ref" >&2
+    exit 1
+  fi
+done
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Commit or stash changes before pushing so verification matches the commit." >&2
+  exit 1
+fi
+exec npm run verify

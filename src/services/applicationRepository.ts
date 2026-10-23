@@ -48,7 +48,7 @@ export interface RealtimeSyncState {
 
 export function advanceRealtimeSyncState(current: RealtimeSyncState, status: string): RealtimeSyncState {
   if (status === 'SUBSCRIBED') return { consecutiveFailures: 0, warningVisible: false };
-  if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') return current;
+  if (!['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) return current;
 
   const consecutiveFailures = current.consecutiveFailures + 1;
   return { consecutiveFailures, warningVisible: consecutiveFailures >= REALTIME_WARNING_FAILURE_THRESHOLD };
@@ -115,11 +115,17 @@ export function mergeApplicationRecordsById<T>(
   requestedIds: readonly string[],
   getId: (record: T) => string,
 ): T[] {
-  const changedIds = new Set(requestedIds);
-  return [
+  const changedIds = new Set([...requestedIds, ...refreshed.map(getId)]);
+  const existing = new Map(current.map((record) => [getId(record), record]));
+  const reconciled = refreshed.map((record) => {
+    const previous = existing.get(getId(record));
+    return previous && JSON.stringify(previous) === JSON.stringify(record) ? previous : record;
+  });
+  const merged = [
     ...current.filter((record) => !changedIds.has(getId(record))),
-    ...refreshed,
+    ...reconciled,
   ].sort((left, right) => getId(left).localeCompare(getId(right)));
+  return merged.length === current.length && merged.every((record, index) => record === current[index]) ? current as T[] : merged;
 }
 
 export function incompleteApplicationRecordPageRange(
@@ -139,8 +145,8 @@ export function incompleteApplicationRecordPageRange(
   return [from + receivedCount, to];
 }
 
-function requireConfigured(): void {
-  if (!isSupabaseConfigured) throw new Error('Supabase is not configured.');
+function requireConfigured(client = supabase): void {
+  if (client === supabase && !isSupabaseConfigured) throw new Error('Supabase is not configured.');
 }
 
 function requestAuthoritativeRefresh(recordType: ApplicationRecordType): void {
@@ -156,8 +162,8 @@ function assertObjectPayload(value: unknown, label: string): asserts value is Re
   }
 }
 
-async function currentUserId(): Promise<string> {
-  const { data, error } = await supabase.auth.getUser();
+async function currentUserId(client = supabase): Promise<string> {
+  const { data, error } = await client.auth.getUser();
   if (error || !data.user) throw new Error(error?.message ?? 'No authenticated Supabase user.');
   return data.user.id;
 }
@@ -250,8 +256,10 @@ export async function loadApplicationRecords<T>(recordType: ApplicationRecordTyp
 export async function loadApplicationRecordsByIds<T>(
   recordType: ApplicationRecordType,
   recordIds: readonly string[],
+  matchColumn: 'record_id' | 'payload->>responseId' = 'record_id',
+  client = supabase,
 ): Promise<T[]> {
-  requireConfigured();
+  requireConfigured(client);
   const ids = [...new Set(recordIds.filter((id) => typeof id === 'string' && id.length > 0))];
   if (ids.length === 0) return [];
 
@@ -260,14 +268,23 @@ export async function loadApplicationRecordsByIds<T>(
     chunks.push(ids.slice(index, index + WRITE_CHUNK_SIZE));
   }
   const pages = await Promise.all(chunks.map(async (chunk) => {
-    const { data, error } = await supabase
-      .from('application_records')
-      .select('record_id,payload,created_at')
-      .eq('record_type', recordType)
-      .in('record_id', chunk)
-      .order('record_id');
-    if (error) throw new Error(`Unable to load changed ${recordType} records: ${error.message}`);
-    return (data ?? []) as unknown as ApplicationRecordRow<T>[];
+    const rows: ApplicationRecordRow<T>[] = [];
+    let from = 0;
+    while (true) {
+      const { data, error } = await client
+        .from('application_records')
+        .select('record_id,payload,created_at')
+        .eq('record_type', recordType)
+        .in(matchColumn, chunk)
+        .order('record_id')
+        .range(from, from + READ_PAGE_SIZE - 1);
+      if (error) throw new Error(`Unable to load changed ${recordType} records: ${error.message}`);
+      const page = (data ?? []) as unknown as ApplicationRecordRow<T>[];
+      rows.push(...page);
+      // Continue even short pages: the server may enforce a smaller row cap.
+      if (!page.length) return rows;
+      from += page.length;
+    }
   }));
 
   const values: T[] = [];
@@ -294,10 +311,11 @@ export async function upsertApplicationRecords<T>(
   values: T[],
   getId: (value: T) => string,
   options?: { ownRecords?: boolean },
+  client = supabase,
 ): Promise<void> {
-  requireConfigured();
+  requireConfigured(client);
   if (values.length === 0) return;
-  const ownerId = options?.ownRecords ? await currentUserId() : null;
+  const ownerId = options?.ownRecords ? await currentUserId(client) : null;
   let rows: Array<{ record_type: ApplicationRecordType; record_id: string; payload: T; owner_id?: string }>;
   try {
     rows = values.map((value) => {
@@ -316,13 +334,16 @@ export async function upsertApplicationRecords<T>(
   }
 
   const writeChunks: Array<typeof rows> = [];
-  for (let index = 0; index < rows.length; index += WRITE_CHUNK_SIZE) {
-    writeChunks.push(rows.slice(index, index + WRITE_CHUNK_SIZE));
+  // One PostgREST statement commits a submission/import atomically under existing RLS.
+  // Chunked response writes expose incomplete forms to other sessions.
+  const chunkSize = recordType === 'survey_response' ? rows.length : WRITE_CHUNK_SIZE;
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    writeChunks.push(rows.slice(index, index + chunkSize));
   }
   for (let index = 0; index < writeChunks.length; index += WRITE_CHUNK_CONCURRENCY) {
     const chunkBatch = writeChunks.slice(index, index + WRITE_CHUNK_CONCURRENCY);
     const results = await Promise.allSettled(chunkBatch.map((chunk) =>
-      supabase
+      client
         .from('application_records')
         .upsert(chunk, { onConflict: 'record_type,record_id' }),
     ));
@@ -410,8 +431,8 @@ export async function replaceApplicationRecords<T>(
   await deleteApplicationRecords(recordType, removedIds);
 }
 
-export function subscribeToApplicationChanges(): () => void {
-  if (!isSupabaseConfigured || typeof window === 'undefined') return () => undefined;
+export function subscribeToApplicationChanges(client = supabase): () => void {
+  if ((client === supabase && !isSupabaseConfigured) || typeof window === 'undefined') return () => undefined;
 
   const realtimeRecordTypes: ApplicationRecordType[] = [
     'partner_company',
@@ -434,7 +455,9 @@ export function subscribeToApplicationChanges(): () => void {
     'active_company_snapshot',
   ];
   let realtimeSyncState: RealtimeSyncState = { consecutiveFailures: 0, warningVisible: false };
-  const channel = supabase
+  let disposed = false;
+  let hasSubscribed = false;
+  const channel = client
     .channel(`application-data-${crypto.randomUUID()}`)
     .on(
       'postgres_changes',
@@ -442,16 +465,19 @@ export function subscribeToApplicationChanges(): () => void {
         event: '*',
         schema: 'public',
         table: 'application_records',
-        filter: `record_type=in.(${realtimeRecordTypes.join(',')})`,
       },
       (payload) => {
+        if (disposed) return;
         const row = (payload.new && Object.keys(payload.new).length > 0 ? payload.new : payload.old) as {
           record_type?: ApplicationRecordType;
           record_id?: string;
+          payload?: { responseId?: unknown };
         };
-        if (!row.record_type) return;
+        if (!row.record_type || !realtimeRecordTypes.includes(row.record_type)) return;
         window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
-          detail: { recordType: row.record_type, recordId: row.record_id },
+          detail: { recordType: row.record_type, recordId: row.record_id,
+            ...(typeof row.payload?.responseId === 'string' ? { responseId: row.payload.responseId } : {}),
+          },
         }));
       },
     )
@@ -459,6 +485,7 @@ export function subscribeToApplicationChanges(): () => void {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'app_profiles' },
       (payload) => {
+        if (disposed) return;
         const row = (payload.new && Object.keys(payload.new).length > 0 ? payload.new : payload.old) as {
           email?: string;
         };
@@ -468,8 +495,9 @@ export function subscribeToApplicationChanges(): () => void {
       },
     )
     .subscribe((status, error) => {
+      if (disposed) return;
       const syncState = (realtimeSyncState = advanceRealtimeSyncState(realtimeSyncState, status));
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         const diagnosticError = error as (Error & { code?: unknown; status?: unknown }) | undefined;
         const code = typeof diagnosticError?.code === 'string' || typeof diagnosticError?.code === 'number'
           ? diagnosticError.code
@@ -487,6 +515,11 @@ export function subscribeToApplicationChanges(): () => void {
           detail: { status, consecutiveFailures: syncState.consecutiveFailures, warningVisible: syncState.warningVisible },
         }));
       } else if (status === 'SUBSCRIBED') {
+        // Reconcile even the first subscription: hydration may race channel setup.
+        window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
+          detail: { recordType: 'survey_response', reason: hasSubscribed ? 'reconnect' : 'subscribed' },
+        }));
+        hasSubscribed = true;
         window.dispatchEvent(new CustomEvent(APPLICATION_REALTIME_STATUS_EVENT, {
           detail: { status, consecutiveFailures: 0, warningVisible: false },
         }));
@@ -494,7 +527,8 @@ export function subscribeToApplicationChanges(): () => void {
     });
 
   return () => {
-    void supabase.removeChannel(channel);
+    disposed = true;
+    void client.removeChannel(channel);
   };
 }
 

@@ -5,6 +5,7 @@ import './styles.css';
 import './features/employee-experience/components/employeeExperience.css';
 import './adminWorkspace.css';
 import './adminRedesign.css';
+import './feedbackHub.css';
 import './darkTheme.css';
 
 async function startApp() {
