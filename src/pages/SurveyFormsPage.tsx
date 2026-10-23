@@ -57,6 +57,8 @@ const surveyTypeBadges: Record<SurveyType, string> = {
   Subcontractor: 'bg-orange-50 text-orange-700 border border-orange-100 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/20',
 };
 
+const surveyBadgeClassName = 'inline-flex items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold uppercase leading-4 tracking-wider';
+
 const departmentOptions = [
   'Accounts Payable - Trade',
   'Business Solutions Manager',
@@ -890,16 +892,16 @@ export function SurveyFormsPage({
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${surveyTypeBadges[survey.surveyType]}`}>
+                        <span className={`${surveyBadgeClassName} ${surveyTypeBadges[survey.surveyType]}`}>
                           {survey.surveyType}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wider ${
-                          effectiveStatus === 'Running' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400' :
-                          effectiveStatus === 'Paused' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/20 dark:text-amber-400' :
-                          effectiveStatus === 'Completed' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/20 dark:text-rose-400' :
-                          'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-400'
+                        <span className={`${surveyBadgeClassName} ${
+                          effectiveStatus === 'Running' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/20' :
+                          effectiveStatus === 'Paused' ? 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/20' :
+                          effectiveStatus === 'Completed' ? 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/20' :
+                          'bg-slate-50 text-slate-700 border-slate-100 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-800'
                         }`}>
                           {effectiveStatus === 'Running' ? 'ACTIVE' :
                            effectiveStatus === 'Completed' ? 'ENDED' :

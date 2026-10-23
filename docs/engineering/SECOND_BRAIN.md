@@ -2,6 +2,12 @@
 
 Last verified: 2026-10-23
 
+### 2026-10-23 - Workspace category and status badge consistency
+
+Forms table category/status badges share 12px semibold uppercase typography, line height, padding, pill shape, and border geometry in `src/pages/SurveyFormsPage.tsx`. Both use the existing soft category/status colors and thin borders; status calculation, labels, filters, and actions remain unchanged. The browser regression checks Courier/Supplier/Subcontractor and Active/Paused/Ended in both themes on desktop/mobile. Rollback is a presentation-code revert; no persistence change is involved.
+
+Local verification: 376 Node tests, TypeScript checks, production build, and 22 desktop/mobile browser journeys passed in an isolated checkout; the applied workspace files matched that checkout. The browser regression reproduced the previous 9px/12px text and badge-geometry mismatch. Light/dark desktop and mobile screenshots were inspected using synthetic forms. Hosted rendering was not checked; the existing bundle-size warning remains. No deployment or remote data changes occurred.
+
 ### 2026-10-23 - Consistent Admin module headers
 
 The Admin Shell matches the Partner directory's 22px/600 heading and 14px subtitle, with a 4px title-to-subtitle gap. `PageDescription` uses a Shell-provided portal target to place existing introductory copy below the title; outside that context it stays inline. Evaluation Workspace supplies its own header copy and keeps nested category explanations local. Header actions retain their existing handlers and wrap below the text on narrow screens. Dashboard and Employee layouts retain their existing presentation. Dark headings/subtitles use the shared theme tokens.
