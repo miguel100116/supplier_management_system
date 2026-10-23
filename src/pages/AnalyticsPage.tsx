@@ -216,18 +216,28 @@ export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTyp
                 <div className="flex items-center gap-2"><Trophy size={17} className="text-[#2187CD]" aria-hidden="true" /><h2 id="company-leaderboard-heading" className="text-sm font-bold text-slate-900 dark:text-white">Company Leaderboard</h2></div>
                 <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">Compare evaluated partners and select a company to review its category performance.</p>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 sm:flex-nowrap">
-                  <div role="group" aria-label="Company leaderboard color legend" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <div role="group" aria-label="Company leaderboard color legend" className="relative inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="text-xs font-semibold text-slate-500">Legend:</span>
-                    {ratingScale.map((band) => (
+                    {ratingScale.map((band, index) => (
                       <span key={band.label} className="inline-flex items-center gap-2 whitespace-nowrap text-xs text-slate-600 dark:text-slate-300">
                         <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ backgroundColor: band.hex }} />
                         {band.label}
+                        {index === ratingScale.length - 1 && (
+                          <details className="inline-flex" onKeyDown={(event) => {
+                            if (event.key === 'Escape') { event.currentTarget.open = false; event.stopPropagation(); }
+                          }} onBlur={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+                          }}>
+                            <summary aria-label="Company leaderboard rating scale" className="inline-flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded text-slate-500 hover:text-[#2187CD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] [&::-webkit-details-marker]:hidden">
+                              <Info size={13} aria-hidden="true" />
+                            </summary>
+                            <div className="absolute left-0 top-full z-20 mt-2 w-80 max-w-full whitespace-normal rounded-lg border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                              <span className="font-semibold">Rating scale: </span>{ratingScaleText}
+                            </div>
+                          </details>
+                        )}
                       </span>
                     ))}
-                  </div>
-                  <div aria-label="Company leaderboard rating scale" className="flex flex-wrap items-start gap-x-2 gap-y-1 text-xs text-slate-600 dark:text-slate-300 sm:ml-auto sm:max-w-[50%] sm:justify-end sm:text-right">
-                    <span className="font-semibold text-slate-500">Rating scale:</span>
-                    <span>{ratingScaleText}</span>
                   </div>
                 </div>
               </div>

@@ -114,6 +114,47 @@ test('Workspace category and status badges use consistent typography and geometr
   expect(service.errors).toEqual([]);
 });
 
+test('Leaderboard rating scale opens from the compact legend info control', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.records.push({ record_type: 'survey_response', record_id: 'legend:Q01', created_at: createdAt,
+    payload: { responseId: 'legend', surveyId: 'default-courier', companyId: 'synthetic-courier', company: 'Synthetic Courier',
+      surveyType: 'Courier', respondentType: 'Rank & File', submissionDate: createdAt,
+      questionId: 'Q01', questionNumber: 1, question: 'Reliability?', questionCategory: 'Reliability/Delivery',
+      rating: 15, comment: '', dataSource: 'client_csv' } });
+  await page.goto('/login');
+  await signIn(page);
+  await page.goto('/analytics');
+  const legend = page.getByRole('group', { name: 'Company leaderboard color legend' });
+  const info = legend.locator('summary');
+  const scale = legend.locator('details > div');
+  await expect(scale).toBeHidden();
+  await expect(info).toHaveAccessibleName('Company leaderboard rating scale');
+  expect(await info.locator('svg').getAttribute('width')).toBe('13');
+  await expect(info.locator('../..')).toContainText('Unsatisfactory');
+  const label = await info.locator('../..').boundingBox();
+  const icon = await info.boundingBox();
+  expect(icon!.x).toBeGreaterThan(label!.x);
+  expect(Math.abs(icon!.y + icon!.height / 2 - label!.y - label!.height / 2)).toBeLessThan(2);
+  await info.click();
+  await expect(scale).toBeVisible();
+  await expect(scale).toContainText('Excellent 95 to 100');
+  const bounds = await scale.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.screenshot({ path: testInfo.outputPath('leaderboard-rating-scale.png') });
+  await info.press('Escape');
+  await expect(scale).toBeHidden();
+  await info.press('Enter');
+  await expect(scale).toBeVisible();
+  await info.press('Space');
+  await expect(scale).toBeHidden();
+  await info.press('Enter');
+  await info.press('Tab');
+  await expect(scale).toBeHidden();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
 function headerFormat(element: Element) {
   const title = element.querySelector('h1')!;
   const subtitle = element.querySelector('p');
