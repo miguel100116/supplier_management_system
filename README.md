@@ -306,12 +306,27 @@ Full step-by-step Azure app-registration instructions are documented inline in [
 | `npm run start` | Run the built production server (`node dist/server.cjs`). |
 | `npm run preview` | Preview the built client with Vite. |
 | `npm run lint` | Type-check the frontend, Vite configuration, scripts, and Express server with their explicit TypeScript projects. ESLint is not configured. |
-| `npm test` | Run the focused automated tests, including stylesheet compilation compatibility. |
+| `npm test` | Discover and run all colocated Node tests, including domain, service, HTTP, component, import, and stylesheet checks. |
+| `npm run test:unit` | Run pure domain and utility tests. |
+| `npm run test:integration` | Run the remaining service, HTTP, component-presentation, import, and tooling tests. |
+| `npm run test:e2e` | Run Chromium browser journeys against the built Express application at desktop and mobile sizes. Build first. |
+| `npm run verify` | Run TypeScript checks, all Node tests, production build, browser tests, and the high/critical dependency audit. |
+| `npm run hooks:install` | Enable this checkout's pre-push verification hook. Each developer must run this once. |
 | `npm audit --audit-level=high` | Check dependency advisories; high and critical findings fail the verification workflow. |
 | `npm run db:cleanup:tests:preview --silent` | Print SQL that previews test evaluation rows, provides full rows for a private backup export, and rolls back. No database connection is made. |
 | `npm run db:cleanup:tests:sql --silent` | Print deletion SQL for reviewed test evaluation rows. Paste into the intended project's Supabase SQL Editor to execute; generating it does not delete data. |
 
-The [Verify workflow](.github/workflows/verify.yml) runs on pushes and pull requests with Node 22, a clean `npm ci`, TypeScript checks, tests, a production build, dependency auditing, and a separate secret scan.
+The [Verify workflow](.github/workflows/verify.yml) runs on pushes and pull requests with Node 22, a clean `npm ci`, TypeScript checks, discovered tests, a production build, desktop/mobile browser tests, dependency auditing, and a separate secret scan. The existing application check name is preserved for required-check compatibility. Browser diagnostics are uploaded on failure; they contain synthetic test data.
+
+### Before pushing
+
+Use Node 22 (`.nvmrc`), run `npm ci`, then `npx playwright install chromium` and `npm run hooks:install` once per checkout. Commit your changes before pushing; the hook rejects uncommitted files or outgoing commits different from the checked-out HEAD and runs `npm run verify`. Switch to each branch before pushing it. Run `npm run verify` manually before a commit when iterating. CI remains the required shared check because local hooks are opt-in and can be bypassed. Repository administrators should require the Verify application and Secret scan checks on pull requests; this change does not alter GitHub branch protection.
+
+Tests are discovered under `src/`, `server/`, and `scripts/` by the `.test.ts`, `.test.tsx`, or `.test.mjs` suffix. New files do not need a package-script entry. `test:unit` selects `domain/` and `utils/`; `test:integration` includes the remaining tests, including component rendering and source-contract checks. This partition does not claim every existing test exercises a full integration.
+
+Browser tests in `tests/e2e/` use the built application and actual Express host with synthetic Supabase responses. They cover signed-out deep links, rejected credentials, role mismatch, and Admin Directory search, archive dismissal, and persisted archive state. External requests are blocked; the test host overrides Supabase/Microsoft settings and clears server credentials. No live identity, business data, Supabase RLS, Microsoft, email, or deployment behavior is verified. Add critical journeys incrementally; passing this suite is not full-system coverage. Do not run two E2E instances concurrently on port 4173.
+
+A red commit status can come from hosting independently of Verify. On 2026-10-23, `regoris` at `bec4e6a` had successful Verify and Cloudflare checks but a Vercel **Deployment was blocked** status. Check the named failing status before changing code. Vercel project access, linked Git identities, and plan restrictions must be resolved in the hosting configuration; tests do not grant deployment access. See [Vercel collaboration troubleshooting](https://vercel.com/docs/deployments/troubleshoot-project-collaboration). Do not disable checks or rewrite commit authors to conceal a blocked deployment.
 
 ### Cleaning test evaluations
 

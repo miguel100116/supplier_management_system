@@ -1,6 +1,16 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-10-22
+Last verified: 2026-10-23
+
+### 2026-10-23 - Earlier verification and browser regression coverage
+
+`npm test` now discovers `.test.ts`, `.test.tsx`, and `.test.mjs` files under `src/`, `server/`, and `scripts/`, avoiding omissions from the former explicit package-script list. `test:unit` selects domain/utils; `test:integration` selects the remaining boundary, presentation, import, and tooling tests. A real Express HTTP integration test checks missing authentication, Employee rejection, malformed JSON, payload limits, and no-store errors. Playwright runs the built app and Express host with synthetic Supabase data on desktop/mobile Chromium: signed-out deep links, rejected passwords, role mismatch, and Directory filtering/archive dismissal/archive persistence. Test configuration clears server credentials and blocks external browser requests; this does not verify live Supabase, RLS, Microsoft, email, all critical journeys, or hosted behavior. Runtime application code is unchanged.
+
+`npm run verify` runs TypeScript, Node tests, build, E2E, and dependency audit. `.github/workflows/verify.yml` uses the same gates with Node 22 and a clean install, retaining the existing application check name and secret scan. Failure-only browser diagnostics contain synthetic records. `.githooks/pre-push` is executable, uses LF endings, rejects dirty trees and outgoing commits other than HEAD, and propagates verification failures; `npm run hooks:install` enables it per checkout and has been run locally. CI remains authoritative because hooks are opt-in and bypassable. Hook behavior is tested in a disposable Git repository without network pushes. DOMPurify's existing transitive dependency was patched from 3.4.16 to 3.4.17 after the current audit reported critical/high advisories; the audit then reported zero vulnerabilities. See [README verification instructions](../../README.md#before-pushing).
+
+Read-only GitHub evidence separates deployment and code failures: `regoris` at `bec4e6a` had successful Verify, secret scan, and Cloudflare checks, but Vercel reported **Deployment was blocked**. [The older failed Verify run](https://github.com/miguel100116/supplier_management_system/actions/runs/39536333373) failed its dependency-audit step. Vercel account/plan/author access remains unverified and unchanged; test changes cannot grant that access. No branch protection, remote data, deployment configuration, or commit author was changed. The owner separately authorized committing and pushing these testing changes to `second-branch` on 2026-10-23. Rollback is a code revert and `git config --local --unset core.hooksPath` to remove the checkout hook setting.
+
+Local verification on 2026-10-23: `npm run verify` passed with 366 Node tests, eight desktop/mobile browser tests, all four TypeScript projects, production build, and zero audit vulnerabilities. All 69 previously listed test files remain covered; discovery finds 72 files (29 domain/utils and 43 remaining tests). Git diff checks passed. The existing bundle-size warning remains. Hosted CI, clean Linux installation, live integrations, and Vercel deployment have not been verified for these local changes.
 
 ### 2026-10-23 - UI branch integration
 
@@ -207,7 +217,7 @@ Verification: all 243 tests, TypeScript checks, and the production build passed 
 Verified on 2026-09-21:
 
 - Verification correction (2026-10-06): root `tsc --noEmit` does not traverse frontend project references. `npm run lint` now explicitly checks the frontend, Vite configuration, scripts, and Express server projects. The 13 frontend type errors were corrected without changing the UI or the ES2020 target. ESLint is not configured.
-- `npm test` covers focused domain, persistence-contract, import, mapping, and authorization helpers; broader component, integration, and end-to-end coverage is not yet established. Use the current command output as the source for the exact test count.
+- Testing correction (2026-10-23): discovered Node tests cover focused domain, persistence-contract, import, mapping, authorization, HTTP, and presentation checks; Playwright adds a bounded desktop/mobile suite with synthetic backend responses. Coverage is not repository-wide; live integrations remain unverified. Use current command output for exact counts.
 - CI correction (2026-10-06): `.github/workflows/verify.yml` runs on pushes and pull requests with Node 22, `npm ci`, explicit TypeScript checks, tests, a production build, dependency auditing, a separate secret scan, and build-artifact upload.
 - Secret-scan permission correction (2026-10-20): [PR #49's failed run](https://github.com/miguel100116/supplier_management_system/actions/runs/39356209026) loaded the pinned action but failed in Gitleaks `ScanPullRequest` with HTTP 403 (`Resource not accessible by integration`) before scanning. The private repository's secret-scan job now declares `contents: read` and `pull-requests: read` so Gitleaks can list PR commits; other jobs retain the workflow's read-only contents permission. The action pin and scan settings are unchanged. Local tests, TypeScript checks, and build pass; a hosted rerun remains unverified. The configured Git remote still names the previous repository; authenticated API checks found the matching current commit under `miguel100116/supplier_management_system`.
 - The TypeScript source under `src/` is roughly 65,000 lines across about 100 files.
@@ -222,7 +232,7 @@ Verified on 2026-09-21:
 2. **Large orchestration units** — central hooks and pages mix state, business rules, persistence, and presentation, increasing regression risk.
 3. **Business-rule duplication** — scoring, RBAC, filtering, reporting, and status rules need canonical domain modules.
 4. **Boundary validation** — CSV/XLSX, browser storage, auth claims, Supabase rows, and API responses require runtime validation.
-5. **Delivery confidence** — missing automated tests and CI leave type checking and manual testing as the primary gates.
+5. **Delivery confidence** — CI and focused automated tests exist, but live integration coverage and full critical-journey coverage remain incomplete.
 6. **Repository hygiene** — generated artifacts, large data files, and duplicate server entry points obscure the deployable product.
 
 ## Target direction
