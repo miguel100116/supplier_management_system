@@ -1,6 +1,7 @@
 import { CustomForm, PartnerCompany, SurveyResponse } from '../../../types/survey';
 import { SurveyAccount } from '../../../hooks/useSurveyData';
-import { getSurveyEvaluationCompanies, hasAnsweredItem } from '../../analytics/domain/analytics';
+import { getSurveyEvaluationCompanies } from '../../analytics/domain/analytics';
+import { getPendingEvaluationCompanies } from './evaluationProgress';
 import { parseDDMMYYYY } from '../../../utils/time';
 import { getSurveyStatus } from './surveyStatus';
 
@@ -58,30 +59,17 @@ export function getSurveyCompletionSummary(
   survey: CustomForm,
   accounts: SurveyAccount[],
   partnerCompanies: PartnerCompany[],
-  responses: SurveyResponse[]
+  responses: SurveyResponse[],
+  surveys: CustomForm[] = [survey],
 ): SurveyCompletionSummary {
   const currentDateStr = new Date().toISOString().slice(0, 10);
   const evaluationCompanies = getSurveyEvaluationCompanies(survey, partnerCompanies, currentDateStr);
   const companiesTotal = evaluationCompanies.length;
-  const companyNameSet = new Set(evaluationCompanies.map((c) => c.name.trim().toLowerCase()));
 
   const eligibleAccounts = getSurveyEligibleEmployees(survey, accounts);
 
   const eligibleEmployees: EmployeeSurveyProgress[] = eligibleAccounts.map((acct) => {
-    const evaluatedNames = new Set(
-      responses
-        .filter(
-          (r) =>
-            !r.archived &&
-            hasAnsweredItem(r) &&
-            r.surveyType === survey.surveyType &&
-            r.respondentEmail &&
-            r.respondentEmail.trim().toLowerCase() === acct.email.trim().toLowerCase() &&
-            companyNameSet.has(r.company.trim().toLowerCase())
-        )
-        .map((r) => r.company.trim().toLowerCase())
-    );
-    const completed = evaluatedNames.size;
+    const completed = companiesTotal - getPendingEvaluationCompanies(survey, surveys, partnerCompanies, responses, acct.email).length;
     return {
       email: acct.email,
       department: acct.department,

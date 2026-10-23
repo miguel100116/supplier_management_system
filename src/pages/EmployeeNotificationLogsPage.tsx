@@ -16,6 +16,7 @@ interface EmployeeNotificationLogsPageProps {
   userEmail: string;
   profile: { department: string; designation: string; role: string } | null;
   surveys: CustomForm[];
+  knownSurveys?: CustomForm[];
   partnerCompanies: PartnerCompany[];
   responses: SurveyResponse[];
   onFillForm: (surveyId: string, companyName?: string) => void;
@@ -25,6 +26,7 @@ export function EmployeeNotificationLogsPage({
   userEmail,
   profile,
   surveys,
+  knownSurveys = surveys,
   partnerCompanies,
   responses,
   onFillForm,
@@ -39,10 +41,7 @@ export function EmployeeNotificationLogsPage({
   const readIds = getReadIds(userEmail);
   const deletedIds = getDeletedIds(userEmail);
 
-  const allNotifications = useMemo(
-    () => getEmployeePendingSurveys(userEmail, profile, surveys, partnerCompanies, responses),
-    [userEmail, profile, surveys, partnerCompanies, responses],
-  );
+  const allNotifications = getEmployeePendingSurveys(userEmail, profile, surveys, partnerCompanies, responses, knownSurveys);
   const notifications = useMemo(
     () => allNotifications.filter((item) => !deletedIds.has(item.id)),
     // The state service publishes changes rather than exposing a React store.

@@ -1,8 +1,9 @@
-import React from 'react';
-import { X, Clock, AlertTriangle, Users, BarChart3, CheckCircle2, ShieldAlert } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { X, CheckCircle2 } from 'lucide-react';
 import { CustomForm, PartnerCompany, SurveyResponse } from '../../../types/survey';
 import { submissionCount, submissionScores } from '../../analytics/domain/analytics';
 import { formatCompositeScore } from '../../../data/questionWeights';
+import { selectSurveyResponses } from '../../evaluations/domain/surveyResponses';
 import { getSurveyCompletionSummary } from '../../evaluations/domain/surveyCompletion';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { SurveyAccount } from '../../../hooks/useSurveyData';
@@ -10,6 +11,7 @@ import { formatLogDateTime } from '../../../utils/time';
 
 interface SurveyProgressModalProps {
   survey: CustomForm;
+  surveys: CustomForm[];
   responses: SurveyResponse[];
   partnerCompanies: PartnerCompany[];
   accounts?: SurveyAccount[];
@@ -20,6 +22,7 @@ interface SurveyProgressModalProps {
 
 export function SurveyProgressModal({
   survey,
+  surveys,
   responses,
   partnerCompanies,
   accounts = [],
@@ -27,11 +30,11 @@ export function SurveyProgressModal({
   onMarkComplete,
   isAdmin,
 }: SurveyProgressModalProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   useModalEscape(true, onClose);
+  useEffect(() => { closeButtonRef.current?.focus(); }, []);
   // Filter responses belonging to this survey
-  const surveyResponses = responses.filter(
-    (r) => r.surveyType === survey.surveyType && (!r.archived)
-  );
+  const surveyResponses = selectSurveyResponses(survey, surveys, responses).filter((row) => !row.archived);
 
   // Group unique respondents by email/department
   const uniqueRespondentsMap = new Map<string, { email: string; department?: string; date: string }>();
@@ -53,9 +56,8 @@ export function SurveyProgressModal({
   // Real target: the companies this survey is currently scoped to evaluate
   // (its "Modify Companies to Evaluate" selection, live against the Partner
   // Registry), plus each eligible employee's own progress against that list.
-  const completion = getSurveyCompletionSummary(survey, accounts, partnerCompanies, responses);
-  const targetResponses = Math.max(completion.companiesTotal, 1);
-  const progressPercent = Math.min(100, Math.round((totalCount / targetResponses) * 100));
+  const completion = getSurveyCompletionSummary(survey, accounts, partnerCompanies, responses, surveys);
+  const completedEmployees = completion.eligibleEmployees.filter((employee) => employee.total > 0 && employee.completed >= employee.total).length;
 
   // Compute partial score
   const numericRatings = surveyResponses
@@ -67,7 +69,7 @@ export function SurveyProgressModal({
 
   return (
     <div className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
-      <section className="feedback-modal-panel feedback-progress-panel w-full rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-labelledby="feedback-progress-title">
+      <section className="feedback-modal-panel feedback-progress-panel w-full rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-labelledby="feedback-progress-title" aria-describedby="feedback-progress-description">
         {/* Modal Header */}
         <div className="feedback-modal-header feedback-progress-header border-b border-slate-200 dark:border-slate-800">
           <div className="feedback-progress-header-main">
@@ -81,6 +83,7 @@ export function SurveyProgressModal({
             onClick={onClose}
             type="button"
             aria-label="Close survey progress"
+            ref={closeButtonRef}
             className="feedback-progress-close-icon rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] focus-visible:ring-offset-2 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             <X size={19} aria-hidden="true" />
@@ -88,130 +91,89 @@ export function SurveyProgressModal({
         </div>
 
         {/* Modal Body */}
-        <div className="feedback-modal-body feedback-progress-body flex-1 overflow-y-auto p-4 sm:p-5">
-          {/* Ongoing Notification Banner */}
-          <div className="feedback-progress-notice flex items-start gap-2 text-sm">
-            <AlertTriangle size={17} className="shrink-0 mt-0.5" />
+        <div className="feedback-modal-body feedback-progress-body flex-1 overflow-y-auto p-4 sm:p-5" role="region" aria-label="Survey progress details" tabIndex={0}>
+          <p id="feedback-progress-description" className="feedback-progress-description">
+            Responses are still being collected. Partner reports become available once this survey is complete.
+          </p>
+
+          <dl className="feedback-progress-metrics" aria-label="Survey overview">
             <div>
-              <p className="font-semibold">Survey is actively gathering responses</p>
-              <p className="mt-1 text-xs text-amber-800 dark:text-amber-300">
-                You are viewing real-time response progress. <strong>Export PDF</strong> and <strong>Send to Partner Report</strong> features will automatically unlock once the survey completes or reaches deadline.
-              </p>
+              <dt>Submitted evaluations</dt>
+              <dd>{totalCount}</dd>
+              <dd className="feedback-metric-detail">{completion.companiesTotal} companies in scope</dd>
             </div>
-          </div>
-
-          {/* Progress Overview Grid */}
-          <div className="feedback-progress-metrics grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rounded-lg border border-slate-200 p-4 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
-                <span>Response Progress</span>
-                <Users size={14} className="text-slate-400" />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-900 dark:text-white">{totalCount}</span>
-                <span className="text-xs text-slate-500">/ {targetResponses} target</span>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                <div className="h-full bg-amber-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
-              </div>
+            <div>
+              <dt>Partial overall score</dt>
+              <dd>{subScores.length > 0 ? formatCompositeScore(survey.surveyType, partialScore).text : 'N/A'}</dd>
+              <dd className="feedback-metric-detail">Based on {numericRatings.length} rated answers</dd>
             </div>
-
-            <div className="rounded-lg border border-slate-200 p-4 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
-                <span>Partial Overall Score</span>
-                <BarChart3 size={14} className="text-slate-400" />
-              </div>
-              <div className="mt-2 text-2xl font-bold text-amber-600 dark:text-amber-400">
-                {subScores.length > 0 ? formatCompositeScore(survey.surveyType, partialScore).text : 'N/A'}
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500">Based on {numericRatings.length} answer ratings</p>
+            <div>
+              <dt>Deadline</dt>
+              <dd>{survey.deadlineDate || 'No deadline set'}</dd>
+              <dd className="feedback-metric-detail">{survey.deadlineDate ? 'Open through the deadline day' : 'Remains open until completed'}</dd>
             </div>
+          </dl>
 
-            <div className="rounded-lg border border-slate-200 p-4 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50">
-              <div className="flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
-                <span>Survey Deadline</span>
-                <Clock size={14} className="text-slate-400" />
-              </div>
-              <div className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                {survey.deadlineDate || 'Active (No strict deadline)'}
-              </div>
-              <p className="mt-1 text-[11px] text-slate-500">Auto-completes at deadline</p>
+          <section className="feedback-detail-section" aria-labelledby="feedback-employee-title">
+            <div className="feedback-section-heading feedback-progress-section-heading">
+              <h3 id="feedback-employee-title">Employee completion</h3>
+              <span>{completedEmployees} of {completion.eligibleEmployees.length} employees complete</span>
             </div>
-          </div>
-
-          {/* Per-Employee Completion (drives the "all employees at 100%" auto-completion rule) */}
-          <div>
-            <h4 className="mb-3 flex flex-col gap-1 text-sm font-bold text-slate-900 dark:text-white min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
-              <span>
-                Employee Completion ({completion.eligibleEmployees.filter((e) => e.completed >= e.total && e.total > 0).length} / {completion.eligibleEmployees.length} at 100%)
-              </span>
-              <span className="text-xs font-normal text-slate-500">{completion.companiesTotal} companies in scope</span>
-            </h4>
             {completion.eligibleEmployees.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500 dark:border-slate-800">
-                No employees currently have access to this survey's department/role scope.
-              </div>
+              <p className="feedback-modal-empty-inline">No employees currently have access to this survey's department and role scope.</p>
             ) : (
-              <div className="feedback-modal-record-list divide-y divide-slate-100 dark:divide-slate-800">
-                {completion.eligibleEmployees.map((emp) => (
-                  <div key={emp.email} className="flex items-center justify-between p-3 text-xs gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-800 dark:text-slate-200 truncate">{emp.email}</p>
-                      <p className="text-[11px] text-slate-500">{emp.department}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <div className="hidden h-1.5 w-20 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700 min-[380px]:block">
-                        <div
-                          className={`h-full transition-all duration-300 ${emp.pct >= 100 ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                          style={{ width: `${emp.pct}%` }}
-                        />
-                      </div>
-                      <span className={`font-bold w-10 text-right ${emp.pct >= 100 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'}`}>
-                        {emp.completed}/{emp.total}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <table className="feedback-progress-table">
+                <caption className="sr-only">Employee evaluation completion</caption>
+                <thead><tr><th scope="col">Employee</th><th scope="col">Evaluations completed</th></tr></thead>
+                <tbody>
+                  {completion.eligibleEmployees.map((emp) => (
+                    <tr key={emp.email}>
+                      <td><span>{emp.email}</span><small>{emp.department}</small></td>
+                      <td>
+                        <div className="feedback-progress-coverage">
+                          {emp.total > 0 && <progress value={emp.completed} max={emp.total} aria-label={`Evaluations completed by ${emp.email}`} />}
+                          <strong>{emp.completed} / {emp.total}</strong>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
-          </div>
+          </section>
 
-          {/* List of Respondents */}
-          <div>
-            <h4 className="mb-3 flex flex-col gap-1 text-sm font-bold text-slate-900 dark:text-white min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
-              <span>Respondents Recorded ({respondentsList.length})</span>
-              <span className="text-xs font-normal text-slate-500">Real-time submissions</span>
-            </h4>
+          <section className="feedback-detail-section" aria-labelledby="feedback-respondents-title">
+            <div className="feedback-section-heading feedback-progress-section-heading">
+              <h3 id="feedback-respondents-title">Respondents recorded</h3>
+              <span>{respondentsList.length} respondents</span>
+            </div>
             {respondentsList.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500 dark:border-slate-800">
-                No employees have submitted responses yet.
-              </div>
+              <p className="feedback-modal-empty-inline">No employees have submitted responses yet.</p>
             ) : (
-              <div className="feedback-modal-record-list divide-y divide-slate-100 dark:divide-slate-800">
-                {respondentsList.map((resp, idx) => (
-                  <div key={idx} className="flex items-start justify-between gap-2 p-3 text-xs min-[420px]:items-center">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <div className="h-6 w-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[10px] dark:bg-blue-900/50 dark:text-blue-300">
-                        {resp.email.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="break-all font-medium text-slate-800 dark:text-slate-200">{resp.email}</p>
-                        <p className="text-[11px] text-slate-500">{resp.department}</p>
-                      </div>
-                    </div>
-                    <time className="feedback-submission-time shrink-0 text-right text-slate-500" dateTime={resp.date} title={resp.date}>{formatLogDateTime(resp.date)}</time>
-                  </div>
-                ))}
+              <div className="feedback-respondent-table-wrap">
+                <table className="feedback-respondent-table">
+                  <caption className="sr-only">Recorded respondents</caption>
+                  <thead><tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col">Submitted</th></tr></thead>
+                  <tbody>
+                    {respondentsList.map((resp, index) => (
+                      <tr key={index}>
+                        <td>{resp.email}</td>
+                        <td>{resp.department}</td>
+                        <td><time dateTime={resp.date} title={resp.date}>{formatLogDateTime(resp.date)}</time></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
-          </div>
+          </section>
         </div>
 
         {/* Modal Footer */}
         <div className="feedback-modal-footer feedback-progress-footer border-t border-slate-200">
           <div className="feedback-progress-actions">
             <button type="button" onClick={onClose} className="secondary-button feedback-progress-close">
-              Close Progress View
+              Close
             </button>
             {isAdmin && onMarkComplete && (
               <button
@@ -223,7 +185,7 @@ export function SurveyProgressModal({
                 className="primary-button feedback-progress-complete"
               >
                 <CheckCircle2 size={15} aria-hidden="true" />
-                Mark Survey as Complete Now
+                Complete survey
               </button>
             )}
           </div>

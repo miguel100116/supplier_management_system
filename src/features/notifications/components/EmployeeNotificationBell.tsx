@@ -8,12 +8,14 @@ import {
   markNotificationRead,
   subscribeNotificationState,
 } from '../services/employeeNotificationState';
-import { getReminderFrequency } from '../services/reminderSettings';
+import type { PersistedProfile } from '../../account-management/domain/accountProfile';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 
 interface EmployeeNotificationBellProps {
   userEmail: string;
+  profile: PersistedProfile | null;
   surveys: CustomForm[];
+  knownSurveys?: CustomForm[];
   partnerCompanies: PartnerCompany[];
   responses: SurveyResponse[];
   onFillForm: (surveyId: string) => void;
@@ -24,7 +26,9 @@ interface EmployeeNotificationBellProps {
 
 export function EmployeeNotificationBell({
   userEmail,
+  profile,
   surveys,
+  knownSurveys = surveys,
   partnerCompanies,
   responses,
   onFillForm,
@@ -42,47 +46,19 @@ export function EmployeeNotificationBell({
   // Re-render whenever read/deleted state changes anywhere (e.g. the Survey Reminders page).
   useEffect(() => subscribeNotificationState(() => forceTick((t) => t + 1)), []);
 
-  // Compute pending surveys dynamically
-  // To get the user profile structure for matching permissions, we retrieve accounts or create a fallback
-  const userAccountsSaved = localStorage.getItem('survey_accounts_v1');
-  let matchedProfile = { role: 'Employee', department: 'Logistics', designation: 'Rank & File' };
-  if (userAccountsSaved) {
-    try {
-      const accounts = JSON.parse(userAccountsSaved);
-      const found = accounts.find((a: any) => a.email.trim().toLowerCase() === userEmail.trim().toLowerCase());
-      if (found) {
-        matchedProfile = found;
-      }
-    } catch (e) {
-      // Use fallback
-    }
-  }
-
   const deletedIds = getDeletedIds(userEmail);
   const readIds = getReadIds(userEmail);
 
   const notifications = getEmployeePendingSurveys(
     userEmail,
-    matchedProfile,
+    profile,
     surveys,
     partnerCompanies,
-    responses
+    responses,
+    knownSurveys,
   ).filter((item) => !deletedIds.has(item.id));
 
   const unreadCount = notifications.filter((item) => !readIds.has(item.id)).length;
-
-  // Retrieve admin notification frequency configuration from localStorage
-  const freqHours = getReminderFrequency();
-  const frequencyLabel =
-    freqHours === '4'
-      ? '4 hours'
-      : freqHours === '8'
-      ? '8 hours'
-      : freqHours === '12'
-      ? '12 hours'
-      : freqHours === '48'
-      ? '48 hours (1 per 2 days)'
-      : '24 hours (1 per day)';
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -188,6 +164,7 @@ export function EmployeeNotificationBell({
           isOpen ? 'bg-white/10 text-white' : 'text-blue-100 hover:text-white'
         }`}
         title="Pending Survey Reminders"
+        aria-label="Pending Survey Reminders"
         id="btn-employee-bell"
         aria-expanded={isOpen}
       >
@@ -200,7 +177,7 @@ export function EmployeeNotificationBell({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[min(400px,calc(100vw-1rem))] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
+        <div className="fixed inset-x-2 top-16 z-50 mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-full sm:w-[min(400px,calc(100vw-1rem))] dark:border-slate-800 dark:bg-slate-900">
           {renderDropdownContent()}
         </div>
       )}
@@ -223,7 +200,7 @@ export function EmployeeNotificationBell({
           </span>
         </div>
 
-        {unreadCount === 0 ? (
+        {notifications.length === 0 ? (
           <div className="flex flex-col items-center gap-2 bg-white px-5 py-8 text-center dark:bg-slate-900">
             <Inbox size={22} className="text-slate-300 dark:text-slate-700" />
             <p className="text-[13px] font-semibold text-slate-700 dark:text-slate-200">No pending surveys</p>
@@ -251,7 +228,7 @@ export function EmployeeNotificationBell({
                           {item.sender}
                         </p>
                         <span className="shrink-0 text-[10px] text-slate-400 dark:text-slate-500">
-                          Today
+                          {new Date(item.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                       <p className={`mt-1 truncate text-[13px] leading-5 ${isRead ? 'font-medium text-slate-600 dark:text-slate-300' : 'font-semibold text-slate-800 dark:text-slate-100'}`}>
@@ -288,7 +265,7 @@ export function EmployeeNotificationBell({
   function renderGmailModal() {
     if (!selectedNotification) return null;
 
-    const formattedDate = new Date().toLocaleDateString(undefined, {
+    const formattedDate = new Date(selectedNotification.createdAt).toLocaleDateString(undefined, {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
@@ -379,7 +356,7 @@ export function EmployeeNotificationBell({
               <p className="font-semibold">Dear Employee,</p>
 
               <p>
-                This is a system-generated reminder that you have pending supplier performance evaluations for:
+                This is a system-generated reminder that you have pending partner evaluations for:
                 <span className="font-bold block mt-1.5 text-slate-900 dark:text-white">
                   &bull; {selectedNotification.surveyTitle}
                 </span>
@@ -415,8 +392,7 @@ export function EmployeeNotificationBell({
 
               {/* Dynamic Notification Frequency Note */}
               <div className="bg-amber-50/60 dark:bg-amber-950/10 border border-amber-200/50 dark:border-amber-900/30 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-400">
-                <span className="font-bold">Automated Notification System:</span> This reminder is automatically dispatched{' '}
-                <span className="font-bold">every {frequencyLabel}</span> in accordance with administrative policy, and will continue until all partner companies under this survey have been fully evaluated.
+                <span className="font-bold">Evaluation reminder:</span> This in-app reminder remains available until your assigned evaluations are completed or the form closes. Reading it does not complete an evaluation.
               </div>
 
               {/* Call to Action */}

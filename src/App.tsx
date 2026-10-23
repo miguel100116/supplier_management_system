@@ -1061,6 +1061,7 @@ export default function App() {
       <EmployeeWorkspacePage
         view="Home"
         surveys={userAccessibleSurveys}
+        knownSurveys={surveys}
         partnerCompanies={userAccessiblePartnerCompanies}
         responses={userAccessibleAllResponses}
         userEmail={account || ''}
@@ -1161,6 +1162,7 @@ export default function App() {
     'survey-forms': (
       <SurveyFormsPage
         surveys={userAccessibleSurveys}
+        knownSurveys={surveys}
         responses={userAccessibleResponses}
         partnerCompanies={userAccessiblePartnerCompanies}
         userEmail={account || ''}
@@ -1221,6 +1223,7 @@ export default function App() {
       <EmployeeWorkspacePage
         view="My submissions"
         surveys={userAccessibleSurveys}
+        knownSurveys={surveys}
         partnerCompanies={userAccessiblePartnerCompanies}
         responses={userAccessibleAllTimeResponses}
         userEmail={account || ''}
@@ -1271,7 +1274,8 @@ export default function App() {
         <EmployeeNotificationLogsPage
           userEmail={account || ''}
           profile={profile}
-          surveys={surveys}
+          surveys={userAccessibleSurveys}
+          knownSurveys={surveys}
           partnerCompanies={partnerCompanies}
           responses={responses}
           onFillForm={(id, companyName) => {
@@ -1297,6 +1301,7 @@ export default function App() {
           if (editingSurveyId) {
             const currentSurvey = surveys.find(s => s.id === editingSurveyId);
             return await updateSurvey({
+              ...currentSurvey,
               ...surveyData,
               id: editingSurveyId,
               createdAt: currentSurvey?.createdAt || new Date().toISOString(),
@@ -1340,6 +1345,7 @@ export default function App() {
       <EmployeeWorkspacePage
         view="Evaluations"
         surveys={userAccessibleSurveys}
+        knownSurveys={surveys}
         partnerCompanies={userAccessiblePartnerCompanies}
         responses={userAccessibleAllResponses}
         userEmail={account || ''}
@@ -1354,6 +1360,7 @@ export default function App() {
       <SurveyFillerPage
         ref={surveyFillerRef}
         surveys={userAccessibleSurveys}
+        knownSurveys={surveys}
         partnerCompanies={userAccessiblePartnerCompanies}
         initialSurveyId={selectedSurveyId}
         initialCompanyName={selectedEvaluationCompany}
@@ -1453,8 +1460,10 @@ export default function App() {
             ) : (
               <div className="pr-1 sm:pr-3">
                 <EmployeeNotificationBell
+                  profile={profile}
                   userEmail={account || ''}
-                  surveys={surveys}
+                  surveys={userAccessibleSurveys}
+                  knownSurveys={surveys}
                   partnerCompanies={partnerCompanies}
                   responses={responses}
                   onFillForm={(id) => {
@@ -1605,7 +1614,8 @@ export default function App() {
                     <EmployeeNotificationLogsPage
                       userEmail={account || ''}
                       profile={profile}
-                      surveys={surveys}
+                      surveys={userAccessibleSurveys}
+                      knownSurveys={surveys}
                       partnerCompanies={partnerCompanies}
                       responses={responses}
                       onFillForm={(id, companyName) => {

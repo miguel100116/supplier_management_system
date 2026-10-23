@@ -7,6 +7,7 @@ const createdAt = '2026-01-01T00:00:00.000Z';
 // Only the external identity/data service is mocked; the built app and Express host run normally.
 async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectPassword = false) {
   const profile = { email, user_id: userId, role, designation: 'Rank & File', department: 'TASS' };
+  const profiles = [profile];
   const user = { id: userId, email, email_confirmed_at: createdAt, aud: 'authenticated',
     role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: createdAt };
   const company = { id: 'synthetic-courier', name: 'Synthetic Courier', type: 'Courier',
@@ -16,6 +17,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
   ];
   const unexpected: string[] = [];
   const errors: string[] = [];
+  const failures = { surveyWrites: false };
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
     const request = route.request();
@@ -36,7 +38,9 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     if (url.pathname === '/auth/v1/user') return reply(user);
     if (url.pathname === '/auth/v1/logout') return reply({});
     if (url.pathname === '/rest/v1/app_profiles' && request.method() === 'GET') {
-      return reply(request.headers().accept?.includes('object+json') ? profile : [profile]);
+      const requestedEmail = url.searchParams.get('email')?.replace(/^eq\./, '');
+      const matches = requestedEmail ? profiles.filter(item => item.email === requestedEmail) : profiles;
+      return reply(request.headers().accept?.includes('object+json') ? matches[0] ?? null : matches);
     }
     if (url.pathname === '/rest/v1/application_records') {
       if (request.method() === 'GET') {
@@ -48,6 +52,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
       }
       if (request.method() === 'POST') {
         const body = request.postDataJSON();
+        if (failures.surveyWrites && (Array.isArray(body) ? body : [body]).some(row => row.record_type === 'survey')) return reply({ message: 'Synthetic survey write rejected' }, 500);
         for (const row of Array.isArray(body) ? body : [body]) {
           const existing = records.findIndex(record => record.record_type === row.record_type && record.record_id === row.record_id);
           const saved = { ...row, created_at: row.created_at ?? createdAt };
@@ -60,7 +65,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     unexpected.push(`${request.method()} ${url.pathname}`);
     return route.abort();
   });
-  return { records, unexpected, errors };
+  return { records, unexpected, errors, failures, profiles };
 }
 
 async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
@@ -264,6 +269,142 @@ test('Admin directory filtering, archive dismissal and archive persistence work 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Restore Synthetic Courier from archive', exact: true }).filter({ visible: true })).toBeVisible();
   await checkActionSpacing('archived');
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+const evaluationForm = {
+  id: 'synthetic-form', title: 'Synthetic evaluation', surveyType: 'Courier', description: 'Synthetic only',
+  createdAt, status: 'Running', deadlineDate: '31/12/2099',
+  questions: [{ questionId: 'Q1', questionNumber: 1, question: 'Service quality?', questionCategory: 'Quality' }],
+};
+
+test('employee read reminders remain pending, persist on reload and renew after a saved resend', async ({ page }, testInfo) => {
+  const service = await backend(page, 'Employee');
+  const record = { record_type: 'survey', record_id: evaluationForm.id, payload: { ...evaluationForm }, created_at: createdAt };
+  service.records.push(record);
+  await page.goto('/login');
+  await signIn(page, 'Employee');
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const bell = page.getByRole('button', { name: 'Pending Survey Reminders', exact: true });
+  await bell.click();
+  await expect(page.getByText('1 unread', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /REMINDER - Survey Accomplishment/ }).click();
+  await expect(page.getByText('This in-app reminder remains available', { exact: false })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await bell.click();
+  await expect(page.getByText('0 unread', { exact: true })).toBeVisible();
+  await expect(page.getByText('Synthetic evaluation (1 pending)', { exact: true })).toBeVisible();
+  await expect(page.getByText('No pending surveys', { exact: true })).toHaveCount(0);
+  const bounds = await page.locator('#btn-employee-bell + div').boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.screenshot({ path: testInfo.outputPath('employee-read-reminders.png') });
+  await page.reload();
+  await bell.click();
+  await expect(page.getByText('0 unread', { exact: true })).toBeVisible();
+  Object.assign(record.payload, { distributionId: 'saved-resend', lastDistributedAt: '2026-10-23T02:00:00Z' });
+  await page.reload();
+  await bell.click();
+  await expect(page.getByText('1 unread', { exact: true })).toBeVisible();
+  expect(service.records.find(row => row.record_type === 'employee_notification_state')?.payload.readIds).toContain('reminder-synthetic-form');
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Admin sends and resends explicitly; rejected persistence does not publish a distribution', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.employee@mgenesis.com', role: 'Employee' });
+  service.records[0].payload.type = 'Subcontractor';
+  const record = { record_type: 'survey', record_id: evaluationForm.id, payload: { ...evaluationForm, surveyType: 'Subcontractor', status: 'Paused' }, created_at: createdAt };
+  service.records.push(record);
+  await page.goto('/login');
+  await signIn(page);
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto('/evaluation-workspace');
+  await page.getByTitle('Preview and send form', { exact: true }).click();
+  await page.getByRole('button', { name: 'Send Form', exact: true }).click();
+  const review = page.getByRole('dialog', { name: 'Confirm form distribution' });
+  await expect(review).toContainText('1 eligible employee');
+  await review.getByRole('button', { name: 'Confirm & Make Available' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Proceed with sending?' });
+  await page.screenshot({ path: testInfo.outputPath('admin-send-confirmation.png') });
+  service.failures.surveyWrites = true;
+  await confirmation.getByRole('button', { name: 'Yes, proceed' }).click();
+  await expect(confirmation.getByRole('alert')).toContainText('Synthetic survey write rejected');
+  expect(record.payload.status).toBe('Paused');
+  expect(record.payload).not.toHaveProperty('distributionId');
+  service.failures.surveyWrites = false;
+  await confirmation.getByRole('button', { name: 'Yes, proceed' }).click();
+  await expect(confirmation).toHaveCount(0);
+  const first = service.records.find(row => row.record_type === 'survey')!.payload.distributionId;
+  expect(first).toEqual(expect.any(String));
+  await page.getByRole('button', { name: 'Send Form', exact: true }).click();
+  await review.getByRole('button', { name: 'Confirm & Resend' }).click();
+  await confirmation.getByRole('button', { name: 'Yes, proceed' }).click();
+  await expect(confirmation).toHaveCount(0);
+  expect(service.records.find(row => row.record_type === 'survey')!.payload.distributionId).not.toBe(first);
+  service.records.push({ record_type: 'survey_response', record_id: 'remote-submission:Q1', created_at: createdAt,
+    payload: { responseId: 'remote-submission', surveyId: evaluationForm.id, companyId: 'synthetic-courier', company: 'Synthetic Courier',
+      surveyType: 'Subcontractor', respondentType: 'Employee', submissionDate: '2026-10-23T02:00:00Z',
+      questionId: 'Q1', questionNumber: 1, question: 'Quality?', questionCategory: 'Quality', rating: 0, comment: '' } });
+  await page.goto('/notifications');
+  await page.getByRole('button', { name: 'Mark as read: Synthetic Courier', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Mark as unread: Synthetic Courier', exact: true })).toBeVisible();
+  await expect(page.getByText('Unavailable', { exact: true }).first()).toBeVisible();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Courier feedback card opens a readable progress dialog and dismisses without completing', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.records.push({ record_type: 'partner_company', record_id: 'courier-two', created_at: createdAt,
+    payload: { id: 'courier-two', name: 'Second Synthetic Courier', type: 'Courier', createdAt } });
+  const form = { ...evaluationForm, title: 'Courier Satisfaction Survey' };
+  service.records.push({ record_type: 'survey', record_id: form.id, payload: form, created_at: createdAt });
+  for (let index = 0; index < 8; index++) {
+    const employeeEmail = `synthetic.employee-${index}@mgenesis.com`;
+    service.profiles.push({ ...service.profiles[0], email: employeeEmail, role: 'Employee' });
+    if (index < 2) service.records.push({ record_type: 'survey_response', record_id: `progress-${index}:Q01`, created_at: createdAt,
+      payload: { responseId: `progress-${index}`, surveyId: form.id, companyId: 'synthetic-courier', company: 'Synthetic Courier',
+        surveyType: 'Courier', respondentEmail: employeeEmail, respondentType: 'Rank & File', department: 'TASS',
+        submissionDate: '2026-10-23T02:00:00Z', questionId: 'Q01', questionNumber: 1,
+        question: 'Reliability?', questionCategory: 'Reliability/Delivery', rating: 15, comment: '' } });
+  }
+  await page.goto('/login');
+  await signIn(page);
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto('/feedback-hub');
+  const card = page.getByRole('button', { name: 'Courier Satisfaction Survey, Courier, Ongoing. View details', exact: true });
+  await card.click();
+  const dialog = page.getByRole('dialog', { name: 'Courier Satisfaction Survey', exact: true });
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(bounds!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await dialog.getByRole('heading', { name: 'Courier Satisfaction Survey', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('table', { name: 'Employee evaluation completion' })).toBeVisible();
+  await expect(dialog.getByText('0 of 8 employees complete', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('progressbar', { name: 'Evaluations completed by synthetic.employee-0@mgenesis.com', exact: true })).toHaveAttribute('value', '1');
+  const body = dialog.getByRole('region', { name: 'Survey progress details' });
+  expect(await body.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const backdrop = await page.locator('.feedback-modal-backdrop').boundingBox();
+  expect(backdrop!.y).toBe(0);
+  expect(backdrop!.height).toBe(page.viewportSize()!.height);
+  await page.screenshot({ path: testInfo.outputPath('courier-progress.png') });
+  await dialog.getByRole('table', { name: 'Recorded respondents', exact: true }).scrollIntoViewIfNeeded();
+  await expect(dialog.getByRole('button', { name: 'Complete survey', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(card).toBeFocused();
+  await card.click();
+  await page.mouse.click(2, 2);
+  await expect(dialog).toHaveCount(0);
+  expect(service.records.find(record => record.record_id === form.id)?.payload.status).toBe('Running');
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
 });

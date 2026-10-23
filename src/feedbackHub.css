@@ -264,6 +264,8 @@
   inset: 0;
   padding: clamp(24px, 4vh, 40px);
 }
+/* Match spacing utility specificity without changing responsive backdrop padding. */
+.feedback-hub-page .feedback-modal-backdrop.fixed { margin: 0; }
 .feedback-hub-page .feedback-modal-panel {
   max-height: min(82dvh, 820px);
   border-color: var(--border-subtle);
@@ -282,7 +284,7 @@
 .feedback-hub-page .feedback-modal-header { min-height: 64px; padding-right: 24px; padding-left: 24px; }
 .feedback-hub-page .feedback-modal-header h2 { font-family: var(--workspace-heading-font); font-size: 16px; font-weight: 700; line-height: 1.35; }
 .feedback-hub-page .feedback-modal-header > button { min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
-.feedback-hub-page .feedback-progress-header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; }
+.feedback-hub-page .feedback-progress-header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; background: color-mix(in srgb, var(--workspace-selected) 7%, var(--surface-card)); box-shadow: inset 0 3px 0 var(--workspace-selected); }
 .feedback-hub-page .feedback-progress-header-main { display: flex; min-width: 0; flex: 1; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
 .feedback-hub-page .feedback-progress-header h2 { min-width: 0; flex: 0 1 auto; font-size: 17px; line-height: 1.35; overflow-wrap: anywhere; }
 .feedback-hub-page .feedback-progress-header-meta { display: flex; min-width: 0; flex: 0 0 auto; align-items: center; flex-wrap: wrap; gap: 7px; }
@@ -330,9 +332,30 @@
 .feedback-hub-page .feedback-modal-status.is-ongoing { border-color: #ead9a6; color: #876318; background: #fbf7eb; }
 .feedback-hub-page .feedback-progress-notice { padding: 10px 12px; border: 1px solid #ead9a6; border-radius: 7px; color: #765a1d; background: #fbf7eb; }
 .feedback-hub-page .feedback-progress-notice p { font-size: 12px; line-height: 1.5; }
-.feedback-hub-page .feedback-progress-metrics > div { padding: 12px 13px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-card); }
-.feedback-hub-page .feedback-progress-metrics > div > div:nth-child(2) { font-size: 20px; font-variant-numeric: tabular-nums; }
-.feedback-hub-page .feedback-progress-metrics > div:nth-child(2) .text-amber-600 { color: var(--foreground); }
+.feedback-hub-page .feedback-progress-description { margin: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+.feedback-hub-page .feedback-progress-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; padding: 0 0 16px; border-bottom: 1px solid var(--border-subtle); }
+.feedback-hub-page .feedback-progress-metrics > div { min-width: 0; padding-right: 18px; }
+.feedback-hub-page .feedback-progress-metrics > div + div { padding-left: 18px; border-left: 1px solid var(--border-subtle); }
+.feedback-hub-page .feedback-progress-metrics dt { margin-bottom: 5px; color: var(--muted-foreground); font-size: 12px; font-weight: 550; }
+.feedback-hub-page .feedback-progress-metrics dd { margin: 0; color: var(--foreground); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.feedback-hub-page .feedback-progress-metrics > div:not(:last-child) > dd:not(.feedback-metric-detail) { color: color-mix(in srgb, var(--workspace-selected) 75%, var(--foreground)); }
+.feedback-hub-page .feedback-progress-metrics .feedback-metric-detail { margin-top: 4px; color: var(--muted-foreground); font-size: 11px; font-weight: 400; line-height: 1.5; }
+.feedback-hub-page .feedback-progress-metrics > div:last-child dd:not(.feedback-metric-detail) { font-size: 16px; }
+.feedback-hub-page .feedback-progress-section-heading { flex-wrap: wrap; gap: 4px 12px; }
+.feedback-hub-page .feedback-progress-table { width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; }
+.feedback-hub-page .feedback-progress-table th:first-child { width: 62%; }
+.feedback-hub-page .feedback-progress-table th { padding: 8px 0; border-top: 1px solid var(--border-subtle); color: var(--muted-foreground); font-size: 11px; font-weight: 550; }
+.feedback-hub-page .feedback-progress-table th:last-child { text-align: right; }
+.feedback-hub-page .feedback-progress-panel :is(.feedback-progress-table, .feedback-respondent-table) th { color: color-mix(in srgb, var(--workspace-selected) 55%, var(--foreground)); background: color-mix(in srgb, var(--workspace-selected) 6%, var(--surface-card)); }
+.feedback-hub-page .feedback-progress-table td { padding: 10px 0; border-top: 1px solid var(--border-subtle); color: var(--foreground); font-size: 12px; overflow-wrap: anywhere; }
+.feedback-hub-page .feedback-progress-table td:first-child { padding-right: 12px; }
+.feedback-hub-page .feedback-progress-table small { display: block; margin-top: 3px; color: var(--muted-foreground); font-size: 11px; }
+.feedback-hub-page .feedback-progress-coverage { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+.feedback-hub-page .feedback-progress-coverage strong { min-width: 34px; font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+.feedback-hub-page .feedback-progress-coverage progress { width: 80px; max-width: 50%; height: 6px; overflow: hidden; appearance: none; border: 0; border-radius: 4px; background: var(--surface-muted); }
+.feedback-hub-page .feedback-progress-coverage progress::-webkit-progress-bar { border-radius: 4px; background: var(--surface-muted); }
+.feedback-hub-page .feedback-progress-coverage progress::-webkit-progress-value { border-radius: 4px; background: var(--workspace-selected); }
+.feedback-hub-page .feedback-progress-coverage progress::-moz-progress-bar { border-radius: 4px; background: var(--workspace-selected); }
 .feedback-hub-page .feedback-progress-body > div > h4 { margin-bottom: 7px; }
 .feedback-hub-page .feedback-modal-record-list { border-top: 1px solid var(--border-subtle); }
 .feedback-hub-page .feedback-modal-record-list > div { min-height: 48px; padding: 8px 10px; }
@@ -379,6 +402,12 @@
   .feedback-hub-page .feedback-category-row { grid-template-columns: minmax(72px, 1.15fr) minmax(42px, 1fr) 46px 56px; gap: 4px; }
 }
 @media (max-width: 520px) {
+  .feedback-hub-page .feedback-progress-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
+  .feedback-hub-page .feedback-progress-metrics > div { padding-right: 12px; }
+  .feedback-hub-page .feedback-progress-metrics > div + div { padding-left: 12px; }
+  .feedback-hub-page .feedback-progress-metrics > div:last-child { grid-column: 1 / -1; padding: 12px 0 0; border-top: 1px solid var(--border-subtle); border-left: 0; }
+  .feedback-hub-page .feedback-progress-metrics dd { font-size: 18px; }
+  .feedback-hub-page .feedback-progress-coverage { gap: 6px; }
   .feedback-hub-page .feedback-progress-actions { flex-direction: column-reverse; align-items: stretch; }
   .feedback-hub-page .feedback-progress-actions :is(.secondary-button, .primary-button) { width: 100%; white-space: normal; }
   .feedback-hub-page .feedback-submission-time { flex-basis: 128px; max-width: 48%; }

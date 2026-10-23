@@ -321,7 +321,7 @@ export function NotificationLogsPage({
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-[#0063a9] dark:text-blue-400">
-                      {item.designation === 'Document Alert' ? '⚠️ SYSTEM ALERT' : item.respondentEmail}
+                      {item.designation === 'Document Alert' ? '⚠️ SYSTEM ALERT' : item.respondentEmail || 'Unavailable'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-semibold text-xs">
                       {item.designation === 'Document Alert' ? (
@@ -334,7 +334,7 @@ export function NotificationLogsPage({
                           ))}
                           {(item.documentDetails?.length ?? 0) > 3 && <div className="mt-1 text-[10px] font-medium">+{(item.documentDetails?.length ?? 0) - 3} more document(s)</div>}
                         </div>
-                      ) : item.department}
+                      ) : item.department || 'Unavailable'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 text-xs">
                       <span className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-extrabold ${

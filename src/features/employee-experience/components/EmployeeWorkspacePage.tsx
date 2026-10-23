@@ -14,6 +14,7 @@ const EMPLOYEE_ROWS_PER_PAGE = 10;
 interface EmployeeWorkspacePageProps {
   view: WorkspaceView;
   surveys: CustomForm[];
+  knownSurveys?: CustomForm[];
   partnerCompanies: PartnerCompany[];
   responses: SurveyResponse[];
   userEmail: string;
@@ -42,7 +43,7 @@ function formatDateTime(value: string) {
   return Number.isNaN(parsed.getTime()) ? 'Date unavailable' : parsed.toLocaleString();
 }
 
-export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, responses, userEmail, isLoading, error, onNavigate, onStartEvaluation, initialEvaluationFilter, onEvaluationFilterChange }: EmployeeWorkspacePageProps) {
+export function EmployeeWorkspacePage({ view, surveys, knownSurveys = surveys, partnerCompanies, responses, userEmail, isLoading, error, onNavigate, onStartEvaluation, initialEvaluationFilter, onEvaluationFilterChange }: EmployeeWorkspacePageProps) {
   const [filter, setFilter] = useState<'All evaluations' | SurveyType>('All evaluations');
   const [localEvaluationFilter, setLocalEvaluationFilter] = useState<EmployeeEvaluationFilter>(initialEvaluationFilter ?? 'All evaluations');
   const evaluationFilter = initialEvaluationFilter ?? localEvaluationFilter;
@@ -52,7 +53,7 @@ export function EmployeeWorkspacePage({ view, surveys, partnerCompanies, respons
   const [evaluationPage, setEvaluationPage] = useState(1);
   useModalEscape(Boolean(detail), () => setDetail(null));
 
-  const evaluations = useMemo(() => getPendingEmployeeEvaluations(surveys, partnerCompanies, responses, userEmail), [partnerCompanies, responses, surveys, userEmail]);
+  const evaluations = useMemo(() => getPendingEmployeeEvaluations(surveys, partnerCompanies, responses, userEmail, new Date(), knownSurveys), [partnerCompanies, responses, surveys, knownSurveys, userEmail]);
   const categoryEvaluations = useMemo(() => filterPendingEvaluations(evaluations, evaluationFilter), [evaluations, evaluationFilter]);
   const categoryCounts = useMemo(() => {
     const counts: Record<SurveyType, number> = { Courier: 0, Supplier: 0, Subcontractor: 0 };
