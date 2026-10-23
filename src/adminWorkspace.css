@@ -14,7 +14,7 @@
   --radius: 12px;
   --interface-font: var(--workspace-interface-font);
   --heading-font: var(--workspace-heading-font);
-  min-height: 100vh;
+  min-height: var(--workspace-viewport-height, 100vh);
   overflow-x: clip;
   color: var(--foreground);
   background: var(--canvas);
@@ -120,7 +120,7 @@
 .admin-sidebar-extra { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); }
 .admin-sidebar button:focus-visible { outline: 3px solid #91b7ff; outline-offset: 3px; }
 
-.admin-main-shell { width: calc(100% - 238px); min-width: 0; min-height: 100vh; margin-left: 238px; transition: width .18s ease, margin-left .18s ease; }
+.admin-main-shell { width: calc(100% - 238px); min-width: 0; min-height: var(--workspace-viewport-height, 100vh); margin-left: 238px; transition: width .18s ease, margin-left .18s ease; }
 .admin-topbar { position: sticky; z-index: 25; top: 0; display: flex; height: 79px; align-items: center; justify-content: space-between; gap: 18px; padding: 0 39px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .admin-topbar-title { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: 11px; overflow: hidden; color: #95a0b1; font-size: 12px; line-height: 1.4; white-space: nowrap; }
 .admin-topbar-title > svg { flex: 0 0 auto; color: #9da9b9; }

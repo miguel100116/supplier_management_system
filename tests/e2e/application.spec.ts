@@ -70,6 +70,109 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
 }
 
+test('Admin desktop uses the compact workspace scale while mobile retains its normal scale', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  const survey = { id: 'synthetic-survey', title: 'Courier Satisfaction Survey', surveyType: 'Courier',
+    description: 'Standard satisfaction reporting for external courier and logistics.', createdAt,
+    status: 'Running', deadlineDate: '2099-12-31', questions: [] };
+  service.records.push({ record_type: 'survey', record_id: survey.id, payload: survey, created_at: createdAt });
+  await page.goto('/login');
+  await expect(page.locator('html')).toHaveCSS('zoom', '1');
+  await signIn(page);
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.goto('/evaluation-workspace');
+  await expect(page.getByRole('button', { name: `Preview ${survey.title}`, exact: true })).toBeVisible();
+  const desktop = !testInfo.project.use.isMobile;
+  await expect(page.locator('html')).toHaveCSS('zoom', desktop ? '0.9' : '1');
+  const geometry = await page.evaluate(() => ({
+    viewport: { width: innerWidth, height: innerHeight },
+    sidebar: document.querySelector('.admin-sidebar')!.getBoundingClientRect().toJSON(),
+    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+  }));
+  expect(geometry.overflow).toBe(false);
+  expect(geometry.sidebar.bottom).toBeCloseTo(geometry.viewport.height, 0);
+  if (desktop) {
+    expect(geometry.sidebar.width).toBeCloseTo(238 * 0.9, 0);
+    const normalHeaderHeight = await page.locator('.admin-topbar').evaluate(element => {
+      document.documentElement.style.zoom = '1';
+      const height = element.getBoundingClientRect().height;
+      document.documentElement.style.removeProperty('zoom');
+      return height;
+    });
+    const compactHeader = await page.locator('.admin-topbar').boundingBox();
+    expect(compactHeader!.height).toBeCloseTo(normalHeaderHeight * 0.9, 0);
+  }
+  await page.screenshot({ path: testInfo.outputPath('workspace.png') });
+  await page.getByRole('table').getByRole('button', { name: 'Archive', exact: true }).click();
+  const dialog = page.getByRole('heading', { name: 'Archive this form?', exact: true });
+  await expect(dialog).toBeVisible();
+  const dialogBox = await dialog.boundingBox();
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
+  expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(geometry.viewport.height);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  expect(service.records.find(record => record.record_id === survey.id)?.payload.status).toBe('Running');
+  if (desktop) {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect(page.locator('html')).toHaveCSS('zoom', '0.9');
+    await page.screenshot({ path: testInfo.outputPath('workspace-small-laptop.png') });
+    await page.setViewportSize({ width: 800, height: 768 });
+    await expect(page.locator('html')).toHaveCSS('zoom', '1');
+    await page.setViewportSize({ width: 801, height: 768 });
+    await expect(page.locator('html')).toHaveCSS('zoom', '0.9');
+  }
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Employee desktop shares the compact scale while mobile and login retain normal sizing', async ({ page }, testInfo) => {
+  const service = await backend(page, 'Employee');
+  await page.goto('/login');
+  await expect(page.locator('html')).toHaveCSS('zoom', '1');
+  await signIn(page, 'Employee');
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole('heading', { name: 'Good to see you, Synthetic.', exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('employee-home.png'), animations: 'disabled' });
+  const desktop = !testInfo.project.use.isMobile;
+  await expect(page.locator('html')).toHaveCSS('zoom', desktop ? '0.9' : '1');
+  const sidebar = await page.locator('.employee-experience.app-shell > .sidebar').boundingBox();
+  expect(sidebar!.y + sidebar!.height).toBeCloseTo(page.viewportSize()!.height, 0);
+  if (desktop) expect(sidebar!.width).toBeCloseTo(238 * 0.9, 0);
+
+  const navigation = page.getByRole('navigation', { name: 'Main navigation', exact: true });
+  await navigation.getByRole('button', { name: 'Evaluations', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Evaluations', exact: true })).toBeVisible();
+  await navigation.getByRole('button', { name: 'My submissions', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'My submissions', exact: true })).toBeVisible();
+  if (desktop) {
+    const shell = await page.locator('.employee-experience.app-shell').boundingBox();
+    expect(shell!.height).toBeGreaterThanOrEqual(page.viewportSize()!.height - 1);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.getByRole('button', { name: 'View quick guide', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Your experience. Your feedback.', exact: true });
+  await expect(dialog).toBeVisible();
+  const dialogBox = await dialog.boundingBox();
+  expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
+  expect(dialogBox!.y).toBeGreaterThanOrEqual(0);
+  expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(dialogBox!.y + dialogBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  if (desktop) {
+    await navigation.getByRole('button', { name: 'Home', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Good to see you, Synthetic.', exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.screenshot({ path: testInfo.outputPath('employee-home-small-laptop.png'), animations: 'disabled' });
+    await page.setViewportSize({ width: 800, height: 768 });
+    await expect(page.locator('html')).toHaveCSS('zoom', '1');
+    await page.setViewportSize({ width: 801, height: 768 });
+    await expect(page.locator('html')).toHaveCSS('zoom', '0.9');
+  }
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
 test('a forged browser account cannot open a protected deep link', async ({ page }) => {
   const service = await backend(page);
   await page.addInitScript(() => localStorage.setItem('user_account', 'synthetic.admin@mgenesis.com'));
@@ -103,7 +206,7 @@ test('an Employee identity cannot sign in through the Admin selection', async ({
   expect(service.errors).toEqual([]);
 });
 
-test('Admin directory filtering, archive dismissal and archive persistence work in the built UI', async ({ page }) => {
+test('Admin directory filtering, archive dismissal and archive persistence work in the built UI', async ({ page }, testInfo) => {
   const service = await backend(page);
   await page.goto('/login');
   await signIn(page);
@@ -112,6 +215,37 @@ test('Admin directory filtering, archive dismissal and archive persistence work 
   const directory = page.getByRole('button', { name: 'Open Synthetic Courier partner record', exact: true }).filter({ visible: true });
   const search = page.getByRole('textbox', { name: 'Search partners by name or BP Code' });
   await expect(directory).toBeVisible();
+  const checkActionSpacing = async (state: string) => {
+    if (testInfo.project.use.isMobile) {
+      await page.locator('.admin-directory-table-shell').screenshot({ path: testInfo.outputPath(`directory-${state}-mobile.png`) });
+      return;
+    }
+    for (const width of [1920, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.locator('.admin-directory-table-shell').screenshot({ path: testInfo.outputPath(`directory-${state}-${width}.png`) });
+      const spacing = await page.locator('.admin-directory-table tbody tr').first().evaluate(row => {
+        const cells = row.querySelectorAll('td');
+        const health = cells[cells.length - 2];
+        const contentRight = Math.max(...Array.from(health.querySelectorAll('span'), span => span.getBoundingClientRect().right));
+        const actions = row.querySelector('.admin-directory-actions')!;
+        const archivedDate = document.createRange();
+        if (cells.length === 7) archivedDate.selectNodeContents(cells[3]);
+        return {
+          gap: actions.firstElementChild!.getBoundingClientRect().left - contentRight,
+          rowRight: row.getBoundingClientRect().right,
+          actionsRight: actions.lastElementChild!.getBoundingClientRect().right,
+          archivedDateGap: cells.length === 7
+            ? cells[4].firstElementChild!.getBoundingClientRect().left - archivedDate.getBoundingClientRect().right
+            : null,
+        };
+      });
+      expect(spacing.gap).toBeGreaterThanOrEqual(12);
+      expect(spacing.gap).toBeLessThanOrEqual(80);
+      expect(spacing.actionsRight).toBeLessThanOrEqual(spacing.rowRight);
+      if (spacing.archivedDateGap !== null) expect(spacing.archivedDateGap).toBeGreaterThanOrEqual(8);
+    }
+  };
+  await checkActionSpacing('active');
   await search.fill('does-not-exist');
   await expect(directory).toHaveCount(0);
   await search.fill('Synthetic');
@@ -129,6 +263,7 @@ test('Admin directory filtering, archive dismissal and archive persistence work 
   await expect.poll(() => service.records.find(record => record.record_id === 'synthetic-courier')?.payload.isArchived).toBe(true);
   await page.reload();
   await expect(page.getByRole('button', { name: 'Restore Synthetic Courier from archive', exact: true }).filter({ visible: true })).toBeVisible();
+  await checkActionSpacing('archived');
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
 });

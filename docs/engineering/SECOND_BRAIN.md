@@ -2,6 +2,18 @@
 
 Last verified: 2026-10-23
 
+### 2026-10-23 - Directory trailing-column spacing
+
+The desktop Directory keeps Document health and partner actions at compact fixed widths in `src/adminRedesign.css`; partner names use the remaining space. The same sizing applies when archived partners add the Archived column, which reserves enough width for its date/time without touching Branch status. Existing mobile cards, row padding, actions, filters, and persistence are retained. The Directory E2E journey checks the visible health-to-action gap, action bounds, and archived-date separation at 1280px and 1920px before and after archiving. Its new spacing assertion reproduced the previous 232px wide-screen gap. Rollback is a stylesheet revert.
+
+Local verification: 366 Node tests, TypeScript checks, production build, and the twelve-case browser suite passed. After the archived-date refinement, all seven focused presentation tests, the final build, and both Directory browser journeys passed. Screenshots were inspected at both desktop widths and mobile using synthetic records; hosted rendering was not checked. The existing bundle-size warning remains.
+
+### 2026-10-23 - Compact desktop workspace scale
+
+Desktop Admin and Employee workspaces above 800 CSS pixels use one document-level 90% scale in `src/styles.css`, matching the approved zoomed-out references while including body portals. Both shells compensate their minimum viewport height so short pages still fill the window; Admin consumes the shared height variable in `src/adminWorkspace.css`. Mobile, login, print, and manual browser zoom retain their existing behavior. No data, permissions, or persistence contracts changed. `tests/e2e/application.spec.ts` covers desktop/mobile scale, sidebar bounds, horizontal overflow, Admin archive-dialog dismissal, Employee navigation, and quick-guide bounds/dismissal using synthetic records. Rollback is a stylesheet revert.
+
+Local verification: 366 Node tests, all four TypeScript projects, production build, and twelve desktop/mobile browser tests passed. The Employee scale regression failed against the previous build and passed after the shared rule was applied; both focused Employee cases also passed after screenshot stabilization. Rendered Admin/Employee screenshots were inspected at 1280px, 1024px, and mobile widths with synthetic records; live hosted rendering was not checked. The existing bundle-size warning remains.
+
 ### 2026-10-23 - Earlier verification and browser regression coverage
 
 `npm test` now discovers `.test.ts`, `.test.tsx`, and `.test.mjs` files under `src/`, `server/`, and `scripts/`, avoiding omissions from the former explicit package-script list. `test:unit` selects domain/utils; `test:integration` selects the remaining boundary, presentation, import, and tooling tests. A real Express HTTP integration test checks missing authentication, Employee rejection, malformed JSON, payload limits, and no-store errors. Playwright runs the built app and Express host with synthetic Supabase data on desktop/mobile Chromium: signed-out deep links, rejected passwords, role mismatch, and Directory filtering/archive dismissal/archive persistence. Test configuration clears server credentials and blocks external browser requests; this does not verify live Supabase, RLS, Microsoft, email, all critical journeys, or hosted behavior. Runtime application code is unchanged.
