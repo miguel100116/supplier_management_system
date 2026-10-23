@@ -8,15 +8,48 @@
   font-size: 14px;
 }
 
-.admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading {
+.admin-workspace .admin-content > .admin-page-heading {
   align-items: center;
-  margin-bottom: 20px;
+  gap: 14px;
+  margin-bottom: var(--admin-content-gap);
 }
 
-.admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading h1 {
-  font-size: 25px;
-  letter-spacing: -.55px;
-  line-height: 1.25;
+.admin-page-heading-copy { min-width: 0; }
+
+.admin-workspace .admin-page-heading h1,
+.admin-directory-page .admin-directory-header h1 {
+  margin: 0;
+  color: var(--admin-text-primary, #0f2742);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -.025em;
+  line-height: 1.2;
+}
+
+.admin-workspace .admin-page-heading-copy p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.dark .admin-workspace :is(.admin-page-heading, .admin-directory-header) h1 { color: var(--foreground); }
+.dark .admin-workspace .admin-page-heading-copy p { color: var(--subtle-foreground); }
+
+.admin-workspace .admin-page-heading #shell-header-action {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
+
+.admin-workspace .admin-page-heading #shell-header-action:empty { display: none; }
+
+@media (max-width: 560px) {
+  .admin-workspace .admin-content > .admin-page-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .admin-workspace .admin-page-heading #shell-header-action { justify-content: flex-start; }
 }
 
 .admin-workspace .admin-main :is(.panel, [class*="rounded-xl"][class*="border"][class*="bg-white"]) {
@@ -134,13 +167,6 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 .admin-directory-page table td {
   padding-top: 10px;
   padding-bottom: 10px;
-}
-
-.admin-directory-page .admin-directory-header h1 {
-  color: var(--admin-text-primary, #0f2742);
-  font-size: 22px;
-  line-height: 1.2;
-  font-weight: 600;
 }
 
 .admin-directory-page .admin-directory-table-shell {
@@ -806,7 +832,6 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 
 @media (max-width: 760px) {
   .admin-workspace .admin-main:not(:has(.dashboard-page)) { padding: 25px 22px 30px; }
-  .admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading { margin-bottom: 17px; }
   .admin-response-explorer-page { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .admin-response-explorer-page > section:first-child {
     position: static;
@@ -861,7 +886,6 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 
 @media (max-width: 560px) {
   .admin-workspace .admin-main:not(:has(.dashboard-page)) { padding: 22px 16px 26px; }
-  .admin-workspace .admin-main:not(:has(.dashboard-page)) > .admin-page-heading h1 { font-size: 23px; }
   .admin-directory-page .admin-directory-header { align-items: stretch; flex-direction: column; }
   .admin-directory-page .admin-directory-header > .flex { width: 100%; }
   .admin-directory-page .admin-directory-header > .flex > button { flex: 1 1 auto; }

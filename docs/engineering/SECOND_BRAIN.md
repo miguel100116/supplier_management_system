@@ -2,6 +2,26 @@
 
 Last verified: 2026-10-23
 
+### 2026-10-23 - Workspace category and status badge consistency
+
+Forms table category/status badges share 12px semibold uppercase typography, line height, padding, pill shape, and border geometry in `src/pages/SurveyFormsPage.tsx`. Both use the existing soft category/status colors and thin borders; status calculation, labels, filters, and actions remain unchanged. The browser regression checks Courier/Supplier/Subcontractor and Active/Paused/Ended in both themes on desktop/mobile. Rollback is a presentation-code revert; no persistence change is involved.
+
+Local verification: 376 Node tests, TypeScript checks, production build, and 22 desktop/mobile browser journeys passed in an isolated checkout; the applied workspace files matched that checkout. The browser regression reproduced the previous 9px/12px text and badge-geometry mismatch. Light/dark desktop and mobile screenshots were inspected using synthetic forms. Hosted rendering was not checked; the existing bundle-size warning remains. No deployment or remote data changes occurred.
+
+### 2026-10-23 - Leaderboard rating-scale disclosure
+
+Analytics keeps the rating-scale explanation behind a 13px Info icon beside the last color-legend label (Unsatisfactory for the shared percentage scale). The native disclosure supports click/tap and Enter/Space, closes on Escape or focus leaving, and bounds its explanation to the legend width for mobile. Category-specific rating text still comes from the existing canonical bands/range formatter; scores, filters and persistence are unchanged. Evidence: `src/pages/AnalyticsPage.tsx` and the compact legend browser journey in `tests/e2e/application.spec.ts`. Rollback is a presentation-code revert.
+
+Verification: 376 Node tests, all four TypeScript projects, production build and 22 desktop/mobile browser journeys passed. Screenshots were inspected at both viewports; the new journey checks icon size/placement, initially hidden content, viewport bounds and keyboard dismissal/toggling. Dark-mode visuals and hosted rendering were not checked; the existing bundle-size warning remains. No push or deployment was performed.
+
+### 2026-10-23 - Consistent Admin module headers
+
+The Admin Shell matches the Partner directory's 22px/600 heading and 14px subtitle, with a 4px title-to-subtitle gap. `PageDescription` uses a Shell-provided portal target to place existing introductory copy below the title; outside that context it stays inline. Evaluation Workspace supplies its own header copy and keeps nested category explanations local. Header actions retain their existing handlers and wrap below the text on narrow screens. Dashboard and Employee layouts retain their existing presentation. Dark headings/subtitles use the shared theme tokens.
+
+Evidence: `src/layouts/Shell.tsx`, `src/components/PageDescription.tsx`, `src/adminRedesign.css`, Evaluation Workspace, and the module-header browser journey in `tests/e2e/application.spec.ts`. Rollback is a revert of these presentation changes; no persistence or migration is involved.
+
+Local verification: all 376 Node tests, TypeScript checks, production build, twenty desktop/mobile browser journeys, and Git diff whitespace checks passed. The header regression reproduced the previous Documents typography mismatch. Screenshots were inspected at desktop, small-laptop, and mobile widths with synthetic records, including dark mode. Hosted rendering was not checked; the existing bundle-size warning remains. No deployment or remote data changes were performed.
+
 ### 2026-10-23 - Notification and Feedback release review
 
 Integrated `origin/regoris` at `53fd9db` into local `second-branch` by fast-forward, preserving the notification fixes, Feedback progress dialog and UI/UX agent rules. Both documentation additions were retained during stash restoration; the browser journeys merged without conflicts. The combined tree passed 376 Node tests, all four TypeScript projects, production build and 18 desktop/mobile browser journeys, including the Feedback dialog under the new desktop scale. The dependency audit reported zero vulnerabilities. The owner authorized committing and pushing this reviewed work to `second-branch`; the local pre-push hook reruns verification against the commit. No migration or deployment is included. Hosted delivery timing and dark-mode visual review remain unverified; the existing bundle-size warning remains.

@@ -2,6 +2,7 @@ import { LucideIcon, Menu, ChevronLeft, ChevronRight, ChevronDown } from 'lucide
 import { ReactNode, useEffect, useState } from 'react';
 import { EmployeeExperienceShell } from '../features/employee-experience/components/EmployeeExperienceShell';
 import { AdminQuickGuide } from './AdminQuickGuide';
+import { PageDescriptionTarget } from '../components/PageDescription';
 
 interface NavChild<T extends string> {
   key: T;
@@ -86,6 +87,7 @@ export function Shell<T extends string>({
 }: ShellProps<T>) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [descriptionTarget, setDescriptionTarget] = useState<HTMLDivElement | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set());
 
   const flatPages = flattenPages(pages);
@@ -298,12 +300,17 @@ export function Shell<T extends string>({
             <div className="admin-content">
               {!hidePageHeading && (
                 <div className={`admin-page-heading${compactPageHeader ? ' is-compact' : ''}`}>
-                  <h1>{contentHeading}</h1>
+                  <div className="admin-page-heading-copy">
+                    <h1>{contentHeading}</h1>
+                    <div ref={setDescriptionTarget} />
+                  </div>
                   <div id="shell-header-action" />
                 </div>
               )}
               {hidePageHeading && <div id="shell-header-action" className={`admin-header-action-anchor${activePage === dashboardPage ? ' is-dashboard' : ''}`} />}
-              {children}
+              <PageDescriptionTarget.Provider value={hidePageHeading ? null : descriptionTarget}>
+                {children}
+              </PageDescriptionTarget.Provider>
             </div>
           </main>
         </div>

@@ -138,6 +138,8 @@ The Admin sidebar groups **Directory**, **Documents**, and **Feedback** under **
 
 Form headings use **Create Evaluation Form**, **Edit Evaluation Form**, **Evaluation Details**, and **Fill Out Evaluation Survey**. The company report screen is labeled **Partners Report Builder**; the evaluation company-picker preset is labeled **Active Partners**.
 
+Admin module headers follow the compact Partner directory format: matching title typography, a subtitle directly below when present, and header actions alongside the text on desktop or below it on narrow screens. The Dashboard retains its greeting and welcome banner.
+
 | Module | What it does |
 |---|---|
 | **Dashboard** | Personalized performance indicators and KPIs. Evaluation results use the same authorized official responses, Current/All-Time/Custom scope, filters, counting rules, and two-decimal score formatting as Analytics and generated report summaries. Operational form/completion tracking remains current-round data; custom dates are selected in Analytics. |
