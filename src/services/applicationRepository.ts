@@ -320,7 +320,7 @@ export async function upsertApplicationRecords<T>(
   try {
     rows = values.map((value) => {
       const recordId = getId(value);
-      const parsed = parseApplicationRecordPayload(recordType, value, recordId) as T;
+      const parsed = parseApplicationRecordPayload(recordType, value, recordId, { operation: 'write' }) as T;
       return {
         record_type: recordType,
         record_id: recordId,

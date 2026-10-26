@@ -26,11 +26,11 @@ export interface ExportTable {
 /** One or more tables in a single CSV file, each preceded by a title line and a blank line separator. */
 export function exportTablesAsCSV(tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe) {
   const chunks = tables.map((table) => {
-    const csvBody = Papa.unparse({ fields: table.columns, data: table.rows });
+    const csvBody = Papa.unparse({ fields: table.columns, data: table.rows }, { escapeFormulae: true });
     return `${table.title}\n${csvBody}`;
   });
   const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8' });
-  void saveReportDownload(blob, tables[0]?.title || filenameBase, 'csv', recipe);
+  return saveReportDownload(blob, tables[0]?.title || filenameBase, 'csv', recipe);
 }
 
 /** One workbook, one sheet per table (sheet name = table title, truncated to Excel's 31-char limit). */
@@ -53,7 +53,7 @@ export function exportTablesAsExcel(tables: ExportTable[], filenameBase: string,
     XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
   });
 
-  void saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), tables[0]?.title || filenameBase, 'excel', recipe);
+  return saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), tables[0]?.title || filenameBase, 'excel', recipe);
 }
 
 /** One PDF, one heading + table per section, stacked vertically (auto page-breaks via autoTable). */
@@ -153,5 +153,5 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
     );
   }
 
-  void saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
+  return saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
 }

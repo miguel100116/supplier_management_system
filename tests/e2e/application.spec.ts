@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import * as XLSX from 'xlsx';
 
 const email = 'synthetic.admin@mgenesis.com';
 const userId = '00000000-0000-4000-8000-000000000001';
@@ -73,6 +75,8 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   await page.getByRole('textbox', { name: 'Company email' }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill('Synthetic-password-123!');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  // Let authentication settle before the next navigation can interrupt it.
+  await expect(page.getByRole('main').or(page.getByRole('alert')).first()).toBeVisible();
 }
 
 test('Workspace category and status badges use consistent typography and geometry', async ({ page }, testInfo) => {
@@ -464,6 +468,238 @@ const evaluationForm = {
   createdAt, status: 'Running', deadlineDate: '31/12/2099',
   questions: [{ questionId: 'Q1', questionNumber: 1, question: 'Service quality?', questionCategory: 'Quality' }],
 };
+
+test('Archived report builders select one item, update the document preview and retain export scope', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const service = await backend(page);
+  service.records[0].payload.isArchived = true;
+  for (const [id, name, type] of [['second-courier', 'Second archived courier', 'Courier'], ['empty-courier', 'Archived company without evaluations', 'Courier'], ['supplier', 'Archived supplier', 'Supplier']]) {
+    service.records.push({ record_type: 'partner_company', record_id: id, created_at: createdAt, payload: { id, name, type, createdAt, isArchived: true } });
+  }
+  for (const [id, title] of [['archive-a', 'First archived survey'], ['archive-b', 'Second archived survey']]) {
+    service.records.push({ record_type: 'survey', record_id: id, created_at: createdAt, payload: { ...evaluationForm, id, title, status: 'Archived',
+      questions: [{ questionId: 'Q01', questionNumber: 1, question: 'Delivery reliability', questionCategory: 'Delivery' }] } });
+  }
+  for (const [id, label] of [['half-one', 'First half'], ['half-two', 'Second half']]) {
+    service.records.push({ record_type: 'archive_series', record_id: id, created_at: createdAt, payload: { id, label, createdAt } });
+  }
+  for (const [id, surveyId, companyId, seriesId, rating, source] of [
+    ['a-one', 'archive-a', 'synthetic-courier', 'half-one', 15, 'client_csv'],
+    ['a-two', 'archive-a', 'second-courier', 'half-one', 10, 'client_csv'],
+    ['a-three', 'archive-a', 'synthetic-courier', 'half-two', 0, 'client_csv'],
+    ['b-one', 'archive-b', 'second-courier', 'half-one', 5, 'client_csv'],
+    ['test-only', 'archive-a', 'synthetic-courier', 'half-one', 15, 'test_submission'],
+  ]) {
+    service.records.push({ record_type: 'survey_response', record_id: `${id}:Q01`, created_at: createdAt, payload: {
+      responseId: id, surveyId, companyId, company: companyId === 'second-courier' ? 'Second archived courier' : 'Synthetic Courier',
+      surveyType: 'Courier', respondentType: 'Employee', respondentEmail: 'private@example.test', submissionDate: '2026-06-01T00:00:00Z',
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery reliability', questionCategory: 'Delivery', rating,
+      comment: '=SUM(1,1)', archived: true, archivedAt: '2026-07-01T00:00:00Z', seriesId, dataSource: source,
+    } });
+  }
+  const openBuilder = async (title: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+  await page.goto('/login');
+  await signIn(page);
+  await page.goto('/reports');
+  await expect(page.getByRole('heading', { name: 'Archived reports', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Data source', exact: true })).toHaveCount(0);
+  await openBuilder('Archived Survey Report');
+  await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('archive-a');
+  await page.getByRole('combobox', { name: 'Archived survey', exact: true }).selectOption('');
+  await expect(page.getByRole('button', { name: 'Download report', exact: true })).toBeDisabled();
+  await page.getByRole('combobox', { name: 'Archived survey', exact: true }).selectOption('archive-a');
+  const preview = page.getByLabel('Archived report preview', { exact: true });
+  await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
+  await expect(preview.getByRole('row', { name: 'Staging/test answer rows 1', exact: true })).toBeVisible();
+  await expect(preview.getByRole('row', { name: 'Evaluated companies 2', exact: true })).toBeVisible();
+  await expect(preview).not.toContainText('private@example.test');
+  await expect(preview).not.toContainText('=SUM(1,1)');
+  await expect(page.getByRole('option', { name: 'All companies', exact: true })).toHaveCount(0);
+  const optionsBox = await page.getByRole('complementary', { name: 'Archived report options' }).boundingBox();
+  const documentBox = await page.getByRole('region', { name: 'Archived report document', exact: true }).boundingBox();
+  if (testInfo.project.use.isMobile) {
+    expect(optionsBox!.y + optionsBox!.height).toBeLessThanOrEqual(documentBox!.y);
+    const table = preview.getByRole('region', { name: 'Company performance', exact: true });
+    expect(await table.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+  } else expect(optionsBox!.x + optionsBox!.width).toBeLessThan(documentBox!.x);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('archived-survey-builder.png'), fullPage: true, animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.add('dark'));
+  await page.screenshot({ path: testInfo.outputPath('archived-survey-builder-dark.png'), fullPage: true, animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.remove('dark'));
+  for (const format of ['pdf', 'excel']) {
+    await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption(format);
+    const downloaded = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download report', exact: true }).click();
+    const bytes = await readFile((await (await downloaded).path())!);
+    if (format === 'pdf') expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+    else {
+      const workbook = XLSX.read(bytes);
+      const scope = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+      expect(scope).toContainEqual(['Selected item', 'First archived survey']);
+      expect(scope).toContainEqual(['Stored submissions', 4]);
+    }
+  }
+  await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(2);
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.getByText(/Courier \| First archived survey/).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Regenerate', exact: true }).first().click();
+  await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('archive-a');
+  await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Category', exact: true }).selectOption('Supplier');
+  await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('');
+  await expect(preview).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Download report', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Back to Reports', exact: true }).click();
+  await openBuilder('Archived Response Report');
+  await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-one');
+  await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
+  await page.getByLabel('Include respondent comments', { exact: true }).check();
+  await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption('csv');
+  const csvDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download report', exact: true }).click();
+  const csv = await readFile((await (await csvDownload).path())!, 'utf8');
+  expect(csv).toContain("'=SUM(1,1)");
+  expect(csv).not.toContain('a-three');
+  expect(csv).not.toContain('private@example.test');
+  await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-two');
+  await expect(preview.getByRole('row', { name: 'Stored submissions 1', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to Reports', exact: true }).click();
+  await openBuilder('Archived Company Report');
+  await page.getByRole('combobox', { name: 'Archived company', exact: true }).selectOption('synthetic-courier');
+  await expect(preview.getByRole('row', { name: 'Stored submissions 3', exact: true })).toBeVisible();
+  await expect(preview).not.toContainText('Second archived courier');
+  await page.getByRole('combobox', { name: 'Archived company', exact: true }).selectOption('empty-courier');
+  await expect(page.getByRole('heading', { name: 'No evaluation data', exact: true })).toBeVisible();
+  await expect(preview.getByRole('table', { name: 'Company profile', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download report', exact: true })).toBeEnabled();
+  await page.screenshot({ path: testInfo.outputPath('archived-company-builder-empty.png'), fullPage: true, animations: 'disabled' });
+  await page.reload();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(3);
+  expect(service.records[0].payload.isArchived).toBe(true);
+  expect(service.records.find(record => record.record_type === 'survey')?.payload.status).toBe('Archived');
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('a staging-only Supplier response archive matches Archive Center and all report downloads recover from failure', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  const service = await backend(page);
+  const archiveLabel = 'Single staged supplier archive';
+  service.records.push({ record_type: 'archive_series', record_id: 'staged-only', created_at: createdAt,
+    payload: { id: 'staged-only', label: archiveLabel, createdAt } });
+  service.records.push({ record_type: 'survey_response', record_id: 'RESP-staged-only:Q39', created_at: createdAt, payload: {
+    responseId: 'RESP-staged-only', surveyId: 'supplier-form', companyId: 'supplier-company', company: 'Sample supplier', surveyType: 'Supplier',
+    respondentType: 'Employee', submissionDate: '2026-06-01T00:00:00Z', questionId: 'Q39', questionNumber: 1,
+    question: 'Delivery reliability', questionCategory: 'Delivery', rating: 'N/A', comment: '', dataSource: 'test_submission',
+    archived: true, archivedAt: '2026-07-01T00:00:00Z', archivedBySurveyId: 'supplier-form', archivedBySurveyTitle: archiveLabel, seriesId: 'staged-only',
+  } });
+  await page.goto('/login');
+  await signIn(page);
+  await page.goto('/archive-center');
+  await page.getByRole('button', { name: /Archived Responses/ }).click();
+  await expect(page.getByLabel('Archived survey forms', { exact: true }).getByText(archiveLabel, { exact: true })).toBeVisible();
+  await page.goto('/reports');
+  await page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Archived Response Report', exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: 'Category', exact: true })).toHaveValue('Supplier');
+  const selector = page.getByRole('combobox', { name: 'Response archive', exact: true });
+  await expect(selector).toHaveValue('staged-only');
+  await expect(selector.getByRole('option', { name: archiveLabel, exact: true })).toHaveCount(1);
+  const preview = page.getByLabel('Archived report preview', { exact: true });
+  await expect(preview.getByRole('row', { name: 'Stored submissions 1', exact: true })).toBeVisible();
+  await expect(preview.getByRole('row', { name: 'Countable evaluations 0', exact: true })).toBeVisible();
+  await expect(preview.getByRole('row', { name: 'Staging/test answer rows 1', exact: true })).toBeVisible();
+  const downloadButton = page.getByRole('button', { name: 'Download report', exact: true });
+  await expect(downloadButton).toBeEnabled();
+  await page.evaluate(() => {
+    const original = URL.createObjectURL;
+    URL.createObjectURL = () => { URL.createObjectURL = original; throw new Error('Synthetic download blocked'); };
+    Object.defineProperty(crypto, 'randomUUID', { configurable: true, value: undefined });
+  });
+  await downloadButton.click();
+  await expect(page.getByRole('alert')).toContainText('Synthetic download blocked');
+  await expect(downloadButton).toBeEnabled();
+  expect(service.records.filter(record => record.record_type === 'export_history')).toHaveLength(0);
+  for (const format of ['pdf', 'excel', 'csv']) {
+    await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption(format);
+    const downloaded = page.waitForEvent('download');
+    await downloadButton.click();
+    const download = await downloaded;
+    const bytes = await readFile((await download.path())!);
+    expect(bytes.length).toBeGreaterThan(0);
+    expect(download.suggestedFilename()).toMatch(/^sms_archived-response-report_.*\.(pdf|xlsx|csv)$/);
+    if (format === 'pdf') expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
+    else if (format === 'excel') {
+      const workbook = XLSX.read(bytes);
+      expect(XLSX.utils.sheet_to_json(workbook.Sheets['Response details'], { header: 1 })).toContainEqual([
+        'RESP-staged-only', 'Sample supplier', '2026-06-01T00:00:00Z', 'Delivery reliability', 'N/A',
+      ]);
+    } else expect(bytes.toString()).toContain('RESP-staged-only');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  }
+  await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(3);
+  expect(service.records.filter(record => record.record_type === 'export_history').every(record => /^EXP-[a-f0-9]{32}$/.test(String(record.payload.id)))).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('staging-archive-downloads.png'), fullPage: true, animations: 'disabled' });
+  await page.reload();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(3);
+  await page.getByRole('button', { name: 'Regenerate', exact: true }).first().click();
+  await expect(page.getByRole('combobox', { name: 'Category', exact: true })).toHaveValue('Supplier');
+  await expect(page.getByRole('combobox', { name: 'Response archive', exact: true })).toHaveValue('staged-only');
+  expect(service.records.find(record => record.record_type === 'survey_response')?.payload.archived).toBe(true);
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('History retains saved files across recipe versions without quarantine warnings', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const service = await backend(page);
+  const fileDataUrl = 'data:application/pdf;base64,JVBERi10ZXN0';
+  const base = { format: 'pdf', exportedAt: '2026-10-26T00:00:00Z', fileDataUrl };
+  for (let index = 0; index < 5; index++) service.records.push({ record_type: 'export_history', record_id: `legacy-${index}`, created_at: createdAt,
+    payload: { ...base, id: `legacy-${index}`, title: `Legacy saved report ${index}`, filename: `legacy-${index}.pdf` } });
+  const current = { kind: 'archived-responses', parameters: { category: 'Supplier', archivedItemId: 'one-archive', archivedItemLabel: 'One archive' } };
+  service.records.push({ record_type: 'export_history', record_id: 'current-history', created_at: createdAt,
+    payload: { ...base, id: 'current-history', title: 'Current archived response report', filename: 'current.pdf', recipe: current } });
+  await page.goto('/login');
+  await signIn(page);
+  await page.goto('/reports?tab=history');
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(6);
+  const currentEntry = page.getByRole('article').filter({ hasText: 'Current archived response report' });
+  await expect(currentEntry.getByRole('button', { name: 'Regenerate', exact: true })).toBeEnabled();
+  await expect(page.getByText(/quarantined during refresh/)).toHaveCount(0);
+
+  const futureRecipe = { kind: 'future-report-builder', parameters: {} };
+  service.records.push({ record_type: 'export_history', record_id: 'future-history', created_at: createdAt,
+    payload: { ...base, id: 'future-history', title: 'Future-version saved report', filename: 'future.pdf', recipe: futureRecipe } });
+  service.records.push({ record_type: 'export_history', record_id: 'invalid-options', created_at: createdAt,
+    payload: { ...base, id: 'invalid-options', title: 'Saved report with invalid options', filename: 'invalid-options.pdf', recipe: { kind: 'summary', parameters: [] } } });
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(8);
+  const futureEntry = page.getByRole('article').filter({ hasText: 'Future-version saved report' });
+  const invalidEntry = page.getByRole('article').filter({ hasText: 'Saved report with invalid options' });
+  for (const entry of [futureEntry, invalidEntry]) {
+    await expect(entry).toContainText('Saved options are incompatible or invalid.');
+    await expect(entry.getByRole('button', { name: 'Download again', exact: true })).toBeEnabled();
+    await expect(entry.getByRole('button', { name: 'Regenerate', exact: true })).toBeDisabled();
+    await expect(entry.getByRole('button', { name: 'Regenerate', exact: true })).toHaveAttribute('title', /Saved options are unavailable/);
+  }
+  await expect(currentEntry.getByRole('button', { name: 'Regenerate', exact: true })).toBeEnabled();
+  await expect(page.getByText(/quarantined during refresh/)).toHaveCount(0);
+  const downloaded = page.waitForEvent('download');
+  await futureEntry.getByRole('button', { name: 'Download again', exact: true }).click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toBe('future.pdf');
+  expect(await readFile((await download.path())!, 'utf8')).toBe('%PDF-test');
+  await page.screenshot({ path: testInfo.outputPath('history-recipe-compatibility.png'), fullPage: true, animations: 'disabled' });
+  expect(service.records.filter(record => record.record_type === 'export_history')).toHaveLength(8);
+  const stored = service.records.find(record => record.record_id === 'future-history')!.payload;
+  expect(stored.recipe).toEqual(futureRecipe);
+  expect(stored).not.toHaveProperty('recipeUnavailable');
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
 
 test('employee read reminders remain pending, persist on reload and renew after a saved resend', async ({ page }, testInfo) => {
   const service = await backend(page, 'Employee');

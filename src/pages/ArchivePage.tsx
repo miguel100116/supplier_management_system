@@ -19,6 +19,7 @@ import { seriesTrend, companySeriesTrend } from '../features/analytics/domain/an
 import { compareDate, compareText, isWithinDateRange } from '../utils/tableFilters';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { useEvaluationImportArchives } from '../features/evaluation-imports/hooks/useEvaluationImportArchives';
+import { describeArchiveResponseGroup } from '../features/archives/domain/archiveResponseGroup';
 
 interface ArchivePageProps {
   surveys: CustomForm[];
@@ -112,13 +113,10 @@ export function ArchivePage({
     }> = {};
 
     archivedResponses.forEach((r) => {
-      const seriesId = r.seriesId && seriesById.has(r.seriesId) ? r.seriesId : undefined;
+      const { id: groupId, label, seriesId, sortKey } = describeArchiveResponseGroup(r, seriesById);
       // Use fallback for older data that doesn't have these properties
       const legacySurveyId = r.archivedBySurveyId || r.surveyType;
       const legacyArchivedAt = r.archivedAt || r.submissionDate;
-      const groupId = seriesId ?? `legacy_${legacySurveyId}_${legacyArchivedAt}`;
-      const label = seriesId ? seriesById.get(seriesId)!.label : (r.archivedBySurveyTitle || r.surveyType + ' Form');
-      const sortKey = legacyArchivedAt;
 
       if (!groups[groupId]) {
         groups[groupId] = {
