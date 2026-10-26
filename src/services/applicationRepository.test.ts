@@ -22,6 +22,16 @@ import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 
 const now = '2026-09-24T00:00:00.000Z';
 
+test('new export-history writes reject unsupported recipes before making a Supabase request', async () => {
+  let requests = 0;
+  const client = { from() { requests++; throw new Error('Unexpected database write'); } } as unknown as SupabaseClient;
+  await assert.rejects(upsertApplicationRecords('export_history', [{
+    id: 'new-history', title: 'Report', filename: 'report.pdf', format: 'pdf', exportedAt: now,
+    recipe: { kind: 'future-report', parameters: {} },
+  }], entry => entry.id, undefined, client), /Invalid report recipe/);
+  assert.equal(requests, 0);
+});
+
 test('survey distribution metadata is optional for legacy forms and validated as a pair', () => {
   const form = { id: 'form', title: 'Evaluation', surveyType: 'Courier', createdAt: now, questions: [] };
   assert.doesNotThrow(() => parseApplicationRecordPayload('survey', form, 'form'));

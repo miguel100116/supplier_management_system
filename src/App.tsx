@@ -1205,6 +1205,13 @@ export default function App() {
     explorer: <SurveyExplorerPage responses={userAccessibleResponses} surveys={userAccessibleSurveys} />,
     reports: (
       <ReportsPage
+        archivedData={{
+          responses: userAccessibleAllTimeResponses,
+          surveys: userAccessibleSurveys,
+          knownSurveys: surveys,
+          companies: partnerCompanies.filter(company => effectiveSurveyTypes.some(type => type === company.type)),
+          series: archiveSeries,
+        }}
         responses={filteredResponses}
         rankingResponses={analyticsFilteredResponses}
         companyReportResponses={analyticsFilteredResponses}

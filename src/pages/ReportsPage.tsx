@@ -12,8 +12,11 @@ import { SummaryReportBuilderPage } from './SummaryReportBuilderPage';
 import { ExecutiveSummaryReportBuilderPage } from './ExecutiveSummaryReportBuilderPage';
 import { RawDataExportPage } from './RawDataExportPage';
 import { PageDescription } from '../components/PageDescription';
+import { ArchivedReportBuilder } from '../features/reports/components/ArchivedReportBuilder';
+import { ARCHIVED_REPORT_TITLES, isArchivedReportKind, type ArchivedReportData, type ArchivedReportKind } from '../features/reports/domain/archivedReports';
 
 interface ReportsPageProps {
+  archivedData?: ArchivedReportData;
   responses: SurveyResponse[];
   rankingResponses?: SurveyResponse[];
   companyReportResponses?: SurveyResponse[];
@@ -31,6 +34,7 @@ function runExport(format: ExportFormat, reportTitle: string, tables: ExportTabl
 }
 
 export function ReportsPage(props: ReportsPageProps) {
+  const [archivedKind, setArchivedKind] = useState<ArchivedReportKind | null>(props.initialRecipe && isArchivedReportKind(props.initialRecipe.kind) ? props.initialRecipe.kind : null);
   const [tab, setTab] = useState(() => window.location.pathname.endsWith('/export-history') || new URLSearchParams(window.location.search).get('tab') === 'history' ? 'history' : 'generate');
   const [recipe, setRecipe] = useState<ReportRecipe | undefined>(props.initialRecipe);
   const [revision, setRevision] = useState(0);
@@ -56,13 +60,16 @@ export function ReportsPage(props: ReportsPageProps) {
         event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#reports-${next}`)?.focus();
       }} aria-selected={tab === value} aria-controls="reports-panel" id={`reports-${value}`} className={tab === value ? 'primary-button' : 'secondary-button'} onClick={() => chooseTab(value)}>{value === 'generate' ? 'Generate' : 'History'}</button>)}
     </div>
-    <div role="tabpanel" id="reports-panel" aria-labelledby={`reports-${tab}`}>
-      {tab === 'history' ? <ExportHistoryPage canExport={props.canExport} onRegenerate={saved => { setRecipe(saved); setRevision(value => value + 1); chooseTab('generate'); }} /> : <ReportGenerator key={revision} {...props} initialRecipe={recipe} />}
+    <div role="tabpanel" id="reports-panel" aria-labelledby={`reports-${tab}`} className="min-w-0">
+      {tab === 'history' ? <ExportHistoryPage canExport={props.canExport} onRegenerate={saved => { setRecipe(saved); setArchivedKind(isArchivedReportKind(saved.kind) ? saved.kind : null); setRevision(value => value + 1); chooseTab('generate'); }} /> : archivedKind ? <>
+        <PageDescription>Generate a report for one archived survey, response archive, or company.</PageDescription>
+        <ArchivedReportBuilder key={revision} kind={archivedKind} data={props.archivedData ?? { responses: [], surveys: [], knownSurveys: [], companies: [], series: [] }} canExport={props.canExport ?? false} initialSettings={recipe?.kind === archivedKind ? recipe.parameters : undefined} onBack={() => { setArchivedKind(null); setRecipe(undefined); }} />
+      </> : <ReportGenerator key={revision} {...props} initialRecipe={recipe} onOpenArchivedReport={kind => { setArchivedKind(kind); setRecipe(undefined); setRevision(value => value + 1); }} />}
     </div>
   </div>;
 }
 
-function ReportGenerator({ initialRecipe, responses: rawResponses, rankingResponses = rawResponses, companyReportResponses, partnerCompanies = [], canExport = false }: ReportsPageProps) {
+function ReportGenerator({ initialRecipe, responses: rawResponses, rankingResponses = rawResponses, companyReportResponses, partnerCompanies = [], canExport = false, onOpenArchivedReport }: ReportsPageProps & { onOpenArchivedReport: (kind: ArchivedReportKind) => void }) {
   const responses = rankingResponses;
   const [showSummaryBuilder, setShowSummaryBuilder] = useState(initialRecipe?.kind === 'summary');
   const [showCompanyBuilder, setShowCompanyBuilder] = useState(initialRecipe?.kind === 'company');
@@ -245,6 +252,15 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
           onExport={() => {}}
           onOpenBuilder={() => setShowRawDataExport(true)}
         />
+        </div>
+      </section>
+
+      <section aria-labelledby="archived-report-library" className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-800"><h2 id="archived-report-library" className="text-sm font-bold text-slate-800 dark:text-slate-100">Archived reports</h2><p className="mt-1 text-xs text-slate-500">Choose a report, then select one archived item to configure and preview.</p></div>
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          <ReportCard title={ARCHIVED_REPORT_TITLES['archived-survey']} description="One survey with its related companies and evaluation results" icon={FileBarChart} showExport={false} onExport={() => {}} onOpenBuilder={() => onOpenArchivedReport('archived-survey')} />
+          <ReportCard title={ARCHIVED_REPORT_TITLES['archived-responses']} description="One response archive from Archive Center" icon={Database} showExport={false} onExport={() => {}} onOpenBuilder={() => onOpenArchivedReport('archived-responses')} />
+          <ReportCard title={ARCHIVED_REPORT_TITLES['archived-company']} description="One archived company and its evaluation history" icon={Handshake} showExport={false} onExport={() => {}} onOpenBuilder={() => onOpenArchivedReport('archived-company')} />
         </div>
       </section>
 

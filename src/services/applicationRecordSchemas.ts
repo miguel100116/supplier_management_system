@@ -7,6 +7,7 @@ type JsonObject = Record<string, unknown>;
 
 export interface ApplicationRecordParseContext {
   recordCreatedAt?: string;
+  operation?: 'read' | 'write';
 }
 
 const SURVEY_TYPES = ['Courier', 'Supplier', 'Subcontractor'] as const;
@@ -333,18 +334,28 @@ function parseDocumentModification(value: unknown, recordId: string, label: stri
   return candidate;
 }
 
-function parseExportHistory(value: unknown, recordId: string, label: string): JsonObject {
+function parseExportHistory(value: unknown, recordId: string, label: string, operation: 'read' | 'write' = 'read'): JsonObject {
   const candidate = parseSimpleIdRecord(value, recordId, label);
   text(candidate.title, `${label}.title`, { max: 2_000 });
   oneOf(candidate.format, ['pdf', 'csv', 'excel', 'docx'], `${label}.format`);
   text(candidate.filename, `${label}.filename`, { max: 2_000 });
   isoDate(candidate.exportedAt, `${label}.exportedAt`);
-  if (candidate.recipe !== undefined) validateReportRecipe(candidate.recipe);
   if (candidate.fileDataUrl !== undefined) {
     text(candidate.fileDataUrl, `${label}.fileDataUrl`, { max: 22_000_000 });
     if (!/^data:(application\/(pdf|octet-stream|vnd\.openxmlformats-officedocument\.(spreadsheetml\.sheet|wordprocessingml\.document))|text\/csv)(;charset=[^;,]+)?;base64,[A-Za-z0-9+/]*={0,2}$/.test(String(candidate.fileDataUrl))) throw new Error('Invalid saved export file.');
   }
-  return candidate;
+  const parsed = { ...candidate };
+  delete parsed.recipeUnavailable;
+  if (candidate.recipe !== undefined) {
+    try { validateReportRecipe(candidate.recipe); }
+    catch (error) {
+      if (operation === 'write') throw error;
+      // Optional regeneration settings must not discard an otherwise valid saved file.
+      parsed.recipe = undefined;
+      parsed.recipeUnavailable = true;
+    }
+  }
+  return parsed;
 }
 
 function parseRankingHistory(value: unknown, recordId: string, label: string): JsonObject {
@@ -408,7 +419,7 @@ export function parseApplicationRecordPayload(
     case 'notification_read_state': return parseNotificationReadState(value, recordId, label);
     case 'admin_activity': return parseAdminActivity(value, recordId, label);
     case 'document_modification': return parseDocumentModification(value, recordId, label);
-    case 'export_history': return parseExportHistory(value, recordId, label);
+    case 'export_history': return parseExportHistory(value, recordId, label, context?.operation);
     case 'supplier_ranking_history': return parseRankingHistory(value, recordId, label);
     case 'employee_notification_state': return parseEmployeeNotificationState(value, recordId, label);
     case 'reminder_settings': return parseReminderSettings(value, recordId, label);

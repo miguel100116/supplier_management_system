@@ -1,6 +1,6 @@
 import { deleteApplicationRecords, loadApplicationRecords, upsertApplicationRecords } from '../../../services/applicationRepository';
 import { supabase } from '../../../services/supabaseClient';
-import { reportFilename, type ReportFormat, type ReportRecipe } from '../domain/reportHistory';
+import { createReportId, reportFilename, type ReportFormat, type ReportRecipe } from '../domain/reportHistory';
 
 export interface ExportHistoryEntry {
   id: string;
@@ -10,6 +10,7 @@ export interface ExportHistoryEntry {
   exportedAt: string;
   exportedBy?: string;
   recipe?: ReportRecipe;
+  recipeUnavailable?: boolean;
   fileDataUrl?: string;
 }
 
@@ -26,7 +27,7 @@ export function getExportHistory(): ExportHistoryEntry[] { return history; }
 export async function logExport(entry: Omit<ExportHistoryEntry, 'id' | 'exportedAt'>) {
   const userId = historyUser;
   try {
-    const next = { ...entry, id: `EXP-${crypto.randomUUID()}`, exportedAt: new Date().toISOString() };
+    const next = { ...entry, id: `EXP-${createReportId()}`, exportedAt: new Date().toISOString() };
     await upsertApplicationRecords('export_history', [next], item => item.id, { ownRecords: true });
     if (userId !== historyUser) return;
     history = [next, ...history.filter(item => item.id !== next.id)].sort((a, b) => b.exportedAt.localeCompare(a.exportedAt));
