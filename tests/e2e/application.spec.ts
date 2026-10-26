@@ -75,6 +75,8 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   await page.getByRole('textbox', { name: 'Company email' }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill('Synthetic-password-123!');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  // Let authentication settle before the next navigation can interrupt it.
+  await expect(page.getByRole('main').or(page.getByRole('alert')).first()).toBeVisible();
 }
 
 test('Workspace category and status badges use consistent typography and geometry', async ({ page }, testInfo) => {
