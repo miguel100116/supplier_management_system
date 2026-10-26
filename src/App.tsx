@@ -46,6 +46,7 @@ import { createBrowserPageHistory } from './utils/pageHistory';
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(({ AnalyticsPage }) => ({ default: AnalyticsPage })));
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(({ DashboardPage }) => ({ default: DashboardPage })));
 const NotificationLogsPage = lazy(() => import('./pages/NotificationLogsPage').then(({ NotificationLogsPage }) => ({ default: NotificationLogsPage })));
+const AdminNotificationCenter = lazy(() => import('./pages/AdminNotificationCenter').then(({ AdminNotificationCenter }) => ({ default: AdminNotificationCenter })));
 const EmployeeNotificationLogsPage = lazy(() => import('./pages/EmployeeNotificationLogsPage').then(({ EmployeeNotificationLogsPage }) => ({ default: EmployeeNotificationLogsPage })));
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then(({ ReportsPage }) => ({ default: ReportsPage })));
 const SurveyExplorerPage = lazy(() => import('./pages/SurveyExplorerPage').then(({ SurveyExplorerPage }) => ({ default: SurveyExplorerPage })));
@@ -1452,6 +1453,7 @@ export default function App() {
                 <NotificationBell
                   notifications={notifications}
                   unreadCount={unreadCount}
+                  unreadNotificationIds={unreadNotificationIds}
                   onOpen={() => undefined}
                   onViewAll={() => setIsNotificationModalOpen(true)}
                   appearance="neutral"
@@ -1569,7 +1571,7 @@ export default function App() {
           aria-modal="true"
           aria-labelledby="notification-center-title"
         >
-          <div className={`flex w-full ${isAdmin ? 'max-h-[92vh] max-w-7xl rounded-2xl' : 'max-h-[84vh] max-w-4xl rounded-xl'} flex-col overflow-hidden border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950`} style={{ width: '100%', maxWidth: isAdmin ? '80rem' : '56rem', maxHeight: isAdmin ? '92vh' : '84vh', backgroundColor: darkMode ? 'var(--background)' : '#f8fafc' }}>
+          <div className="flex max-h-[84vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-2xl dark:border-slate-800 dark:bg-slate-950" style={{ width: '100%', maxWidth: '56rem', maxHeight: '84vh', backgroundColor: darkMode ? 'var(--background)' : '#f8fafc' }}>
             <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
               <div>
                 <h2 id="notification-center-title" className="text-lg font-bold text-slate-900 dark:text-white">
@@ -1589,7 +1591,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${isAdmin ? 'p-4 sm:p-6' : 'p-3 sm:p-4'}`}>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-4">
               <Suspense
                 fallback={(
                   <div className="flex min-h-64 items-center justify-center" role="status" aria-live="polite">
@@ -1601,7 +1603,7 @@ export default function App() {
                 )}
               >
                 {isAdmin ? (
-                  <NotificationLogsPage
+                  <AdminNotificationCenter
                     notifications={notifications}
                     unreadCount={unreadCount}
                     unreadNotificationIds={unreadNotificationIds}
