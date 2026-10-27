@@ -136,12 +136,13 @@ export function restoreDefaultNotificationSettings(): DocNotificationRule[] {
   return DEFAULT_NOTIFICATION_RULES;
 }
 
-export async function hydrateNotificationSettingsFromSupabase(canMigrate = false): Promise<void> {
-  let rules = await loadApplicationRecords<DocNotificationRule>('document_notification_rule');
+export async function hydrateNotificationSettingsFromSupabase(canMigrate = false, signal?: AbortSignal): Promise<void> {
+  let rules = await loadApplicationRecords<DocNotificationRule>('document_notification_rule', { signal });
   if (rules.length === 0 && canMigrate && localStorage.getItem(MIGRATION_STORAGE_KEY) !== 'true') {
     rules = getNotificationSettings();
     await replaceApplicationRecords('document_notification_rule', rules, (rule) => rule.docName);
   }
+  signal?.throwIfAborted();
   if (rules.length > 0 || canMigrate) localStorage.setItem(MIGRATION_STORAGE_KEY, 'true');
   localStorage.setItem(STORAGE_KEY, JSON.stringify(rules.length > 0 ? rules : DEFAULT_NOTIFICATION_RULES));
   window.dispatchEvent(new Event(SETTINGS_CHANGED_EVENT));

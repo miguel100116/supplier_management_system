@@ -469,7 +469,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                   <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
                     <SummaryStat label="Leaderboard score" value={volumeWeightedSummary?.score === null || volumeWeightedSummary?.score === undefined ? 'N/A' : formatAnalyticsScore(composite.surveyType, volumeWeightedSummary.score)} accent />
                     <SummaryStat label="Rating band" value={volumeWeightedSummary?.band.label ?? composite.band.label} />
-                    <SummaryStat label="Evaluations" value={String(composite.evaluationCount)} />
+                    <SummaryStat label="Responses" value={String(composite.evaluationCount)} />
                   </div>
 
                   {graphs.bar && (
@@ -671,7 +671,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
       </div>
 
       {/* Bottom bar: always-visible cancel + export */}
-      <div className="panel sticky bottom-4 flex flex-wrap items-center justify-between gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 dark:border-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10 z-10">
+      <div className="panel sticky bottom-4 max-[560px]:bottom-20 flex flex-wrap items-center justify-between gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 dark:border-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10 z-10">
         <button type="button" onClick={onBack} className="secondary-button">
           Cancel
         </button>

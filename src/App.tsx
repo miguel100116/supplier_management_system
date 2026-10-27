@@ -27,7 +27,7 @@ import {
   subscribeToApplicationChanges,
   type PersistedProfile,
 } from './services/applicationRepository';
-import { hydrateChangedSharedStore, hydrateSharedClientStores } from './services/sharedStoreHydration';
+import { createSharedStoreHydrator } from './services/sharedStoreHydration';
 import { isOfficialAnalyticsResponse } from './features/analytics/domain/responseProvenance';
 import { filterCustomAnalyticsResponses, type AnalyticsDateRange } from './features/analytics/domain/dateRange';
 import { getVisibleSurveyForms } from './features/evaluations/domain/surveySelection';
@@ -418,6 +418,10 @@ export default function App() {
   const [isSupabaseHydrating, setIsSupabaseHydrating] = useState(isSupabaseConfigured);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const sharedStoresRef = useRef<ReturnType<typeof createSharedStoreHydrator> | null>(null);
+  const [sharedStorePageLoading, setSharedStorePageLoading] = useState(false);
+  const [sharedStorePageError, setSharedStorePageError] = useState('');
+  const [sharedStoreRetry, setSharedStoreRetry] = useState(0);
   useModalEscape(isNotificationModalOpen, () => setIsNotificationModalOpen(false), 9999);
   useModalEscape(isSettingsModalOpen, () => setIsSettingsModalOpen(false), 200);
   useModalEscape(isSessionWarningVisible, staySignedIn, 300);
@@ -946,24 +950,42 @@ export default function App() {
     return () => window.removeEventListener(APPLICATION_REALTIME_STATUS_EVENT, handleRealtimeStatus);
   }, []);
 
+  const canUseFeedbackHub = !!profile && (isAdmin || profile.designation !== 'Rank & File');
   useEffect(() => {
-    if (!isSupabaseConfigured || !account || !profile) return;
-    const canUseFeedbackHub = profile.role === 'Admin' || profile.designation !== 'Rank & File';
-    const access = { userEmail: account, isAdmin, canUseFeedbackHub };
-    void hydrateSharedClientStores(access).catch((loadError) => {
-      setAccountPersistenceError(loadError instanceof Error ? loadError.message : 'Unable to load shared Supabase data.');
-    });
+    if (!isSupabaseConfigured || !account) return;
+    const stores = createSharedStoreHydrator({ userEmail: account, isAdmin, canUseFeedbackHub });
+    sharedStoresRef.current = stores;
+    let cancelled = false;
+    const reportError = (loadError: unknown) => {
+      if (!cancelled) setAccountPersistenceError(loadError instanceof Error ? loadError.message : 'Unable to load shared Supabase data.');
+    };
+    void stores.loadStartup().catch(reportError);
 
     const refreshSharedStore = (event: Event) => {
       const recordType = (event as CustomEvent<{ recordType?: ApplicationRecordType }>).detail?.recordType;
       if (!recordType) return;
-      void hydrateChangedSharedStore(recordType, access).catch((loadError) => {
-        setAccountPersistenceError(loadError instanceof Error ? loadError.message : 'Unable to refresh shared Supabase data.');
-      });
+      void stores.refresh(recordType).catch(reportError);
     };
     window.addEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshSharedStore);
-    return () => window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshSharedStore);
-  }, [account, profile, isAdmin]);
+    return () => {
+      cancelled = true;
+      stores.dispose();
+      sharedStoresRef.current = null;
+      window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshSharedStore);
+    };
+  }, [account, isAdmin, canUseFeedbackHub]);
+
+  useEffect(() => {
+    const stores = sharedStoresRef.current;
+    if (!stores) return;
+    let cancelled = false;
+    setSharedStorePageLoading(!stores.isPageReady(activePage, isSettingsModalOpen));
+    setSharedStorePageError('');
+    void stores.loadPage(activePage, isSettingsModalOpen).catch((loadError) => {
+      if (!cancelled) setSharedStorePageError(loadError instanceof Error ? loadError.message : 'Unable to load this module.');
+    }).finally(() => { if (!cancelled) setSharedStorePageLoading(false); });
+    return () => { cancelled = true; };
+  }, [account, isAdmin, canUseFeedbackHub, activePage, isSettingsModalOpen, sharedStoreRetry]);
 
   const handleLogin = async (role: LoginRole, authenticate: LoginAttempt) => {
     if (loginPending.current) return;
@@ -1522,7 +1544,7 @@ export default function App() {
           )}
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
             <div className="relative min-w-0 flex-1">
-              {isSupabaseConfigured && isLoading ? (
+              {isSupabaseConfigured && (isLoading || sharedStorePageLoading) ? (
                 <div
                   className="flex min-h-64 items-center justify-center rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
                   role="status"
@@ -1532,6 +1554,11 @@ export default function App() {
                     <div className="h-7 w-7 animate-spin rounded-full border-4 border-slate-300 border-t-[#0063a9] dark:border-slate-700 dark:border-t-blue-500" />
                     <p className="text-sm font-medium">Refreshing shared data...</p>
                   </div>
+                </div>
+              ) : sharedStorePageError ? (
+                <div role="alert" className="panel space-y-3">
+                  <p className="text-sm text-rose-700">{sharedStorePageError}</p>
+                  <button type="button" className="secondary-button" onClick={() => setSharedStoreRetry(value => value + 1)}>Retry loading module</button>
                 </div>
               ) : (
                 <>
@@ -1728,7 +1755,14 @@ export default function App() {
               )}
             >
               <div className="employee-profile-dialog-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 py-7">
-                {isAdmin ? (
+                {isAdmin && isSupabaseConfigured && !sharedStoresRef.current?.isPageReady(activePage, true) ? (
+                  sharedStorePageError ? (
+                    <div role="alert" className="space-y-3">
+                      <p className="text-sm text-rose-700">{sharedStorePageError}</p>
+                      <button type="button" className="secondary-button" onClick={() => setSharedStoreRetry(value => value + 1)}>Retry loading settings</button>
+                    </div>
+                  ) : <p role="status" className="text-sm text-slate-500">Loading settings...</p>
+                ) : isAdmin ? (
                   <SettingsPage
                     modalLayout
                     email={account || ''}

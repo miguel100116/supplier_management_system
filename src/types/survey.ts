@@ -199,6 +199,8 @@ export interface CustomForm {
   /** Timestamp when an Admin explicitly ended this survey, independent of its deadline. */
   manuallyEndedAt?: string;
   deadlineDate?: string;
+  /** Shared period prefilled on employee submissions; kept in sync across Courier and Supplier forms. */
+  periodCovered?: '1st Half' | '2nd Half' | 'Annual';
   status?: 'Running' | 'Paused' | 'Completed' | 'Archived';
   accessDepartments?: string[];
   accessRoles?: SurveyAccessRole[];

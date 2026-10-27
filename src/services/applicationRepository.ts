@@ -72,42 +72,6 @@ interface ApplicationRecordRow<T> {
 const WRITE_CHUNK_SIZE = 300;
 const WRITE_CHUNK_CONCURRENCY = 4;
 const READ_PAGE_SIZE = 1_000;
-const READ_PAGE_CONCURRENCY = 6;
-
-export function applicationRecordPageRanges(totalCount: number, pageSize = READ_PAGE_SIZE): Array<[number, number]> {
-  if (!Number.isInteger(totalCount) || totalCount <= 0 || !Number.isInteger(pageSize) || pageSize <= 0) return [];
-  const ranges: Array<[number, number]> = [];
-  for (let from = 0; from < totalCount; from += pageSize) {
-    ranges.push([from, Math.min(from + pageSize - 1, totalCount - 1)]);
-  }
-  return ranges;
-}
-
-export function batchApplicationRecordPageRanges(
-  ranges: Array<[number, number]>,
-  batchSize = READ_PAGE_CONCURRENCY,
-): Array<Array<[number, number]>> {
-  if (!Number.isInteger(batchSize) || batchSize <= 0) return [];
-  const batches: Array<Array<[number, number]>> = [];
-  for (let index = 0; index < ranges.length; index += batchSize) {
-    batches.push(ranges.slice(index, index + batchSize));
-  }
-  return batches;
-}
-
-export function nextApplicationRecordPageBatch(
-  from: number,
-  pageSize = READ_PAGE_SIZE,
-  batchSize = READ_PAGE_CONCURRENCY,
-): Array<[number, number]> {
-  if (!Number.isInteger(from) || from < 0 || !Number.isInteger(pageSize) || pageSize <= 0 || !Number.isInteger(batchSize) || batchSize <= 0) {
-    return [];
-  }
-  return Array.from({ length: batchSize }, (_, index) => {
-    const pageFrom = from + index * pageSize;
-    return [pageFrom, pageFrom + pageSize - 1];
-  });
-}
 
 export function mergeApplicationRecordsById<T>(
   current: readonly T[],
@@ -126,23 +90,6 @@ export function mergeApplicationRecordsById<T>(
     ...reconciled,
   ].sort((left, right) => getId(left).localeCompare(getId(right)));
   return merged.length === current.length && merged.every((record, index) => record === current[index]) ? current as T[] : merged;
-}
-
-export function incompleteApplicationRecordPageRange(
-  from: number,
-  to: number,
-  receivedCount: number,
-): [number, number] | null {
-  if (
-    !Number.isInteger(from)
-    || !Number.isInteger(to)
-    || !Number.isInteger(receivedCount)
-    || from < 0
-    || to < from
-    || receivedCount < 0
-  ) return null;
-  if (receivedCount === 0 || receivedCount >= to - from + 1) return null;
-  return [from + receivedCount, to];
 }
 
 function requireConfigured(client = supabase): void {
@@ -172,9 +119,9 @@ export function surveyResponseRecordId(response: SurveyResponse): string {
   return `${response.responseId}:${response.questionId}`;
 }
 
-export async function loadApplicationRecords<T>(recordType: ApplicationRecordType, options?: { ownRecords?: boolean }): Promise<T[]> {
-  requireConfigured();
-  const ownerId = options?.ownRecords ? await currentUserId() : null;
+export async function loadApplicationRecords<T>(recordType: ApplicationRecordType, options?: { ownRecords?: boolean; signal?: AbortSignal }, client = supabase): Promise<T[]> {
+  requireConfigured(client);
+  const ownerId = options?.ownRecords ? await currentUserId(client) : null;
   const values: T[] = [];
   let invalidCount = 0;
   const invalidReasons = new Map<string, number>();
@@ -197,48 +144,22 @@ export async function loadApplicationRecords<T>(recordType: ApplicationRecordTyp
     }
   };
 
-  const loadCompleteRange = async (
-    from: number,
-    to: number,
-    expectedCount: number,
-  ): Promise<ApplicationRecordRow<T>[]> => {
-    if (expectedCount <= 0) return [];
-    let query = supabase.from('application_records').select('record_id,payload,created_at').eq('record_type', recordType);
+  // Seek through the primary key instead of rescanning and discarding growing offsets.
+  let cursor: string | undefined;
+  while (true) {
+    options?.signal?.throwIfAborted();
+    let query = client.from('application_records').select('record_id,payload,created_at').eq('record_type', recordType);
     if (ownerId) query = query.eq('owner_id', ownerId);
-    const { data, error } = await query.order('record_id').range(from, to);
+    if (cursor !== undefined) query = query.gt('record_id', cursor);
+    if (options?.signal) query = query.abortSignal(options.signal);
+    const { data, error } = await query.order('record_id').limit(READ_PAGE_SIZE);
+    options?.signal?.throwIfAborted();
     if (error) throw new Error(`Unable to load ${recordType} records: ${error.message}`);
     const rows = (data ?? []) as unknown as ApplicationRecordRow<T>[];
-    if (rows.length === 0) return [];
-    const remainingRange = incompleteApplicationRecordPageRange(from, to, rows.length);
-    if (!remainingRange) return rows;
-    const remainingRows = await loadCompleteRange(
-      remainingRange[0],
-      remainingRange[1],
-      expectedCount - rows.length,
-    );
-    return [...rows, ...remainingRows];
-  };
-
-  // Avoid an exact count here: under response RLS it makes Postgres scan every
-  // visible response before returning the first page. Discover later pages in
-  // bounded parallel batches instead of waiting on one request per page.
-  const firstRows = await loadCompleteRange(0, READ_PAGE_SIZE - 1, READ_PAGE_SIZE);
-  appendRows(firstRows);
-
-  let from = firstRows.length;
-  let hasMore = firstRows.length === READ_PAGE_SIZE;
-  while (hasMore) {
-    const ranges = nextApplicationRecordPageBatch(from);
-    const pages = await Promise.all(ranges.map(([pageFrom, pageTo]) =>
-      loadCompleteRange(pageFrom, pageTo, pageTo - pageFrom + 1)));
-    for (let index = 0; index < pages.length; index += 1) {
-      appendRows(pages[index]);
-      if (pages[index].length < READ_PAGE_SIZE) {
-        hasMore = false;
-        break;
-      }
-    }
-    if (hasMore) from += ranges.length * READ_PAGE_SIZE;
+    if (rows.length === 0) break;
+    appendRows(rows);
+    cursor = rows.at(-1)!.record_id;
+    // Continue after short pages too: PostgREST may enforce a smaller row cap.
   }
   if (invalidCount > 0 && typeof window !== 'undefined') {
     const reasonSummary = [...invalidReasons.entries()]
@@ -258,6 +179,7 @@ export async function loadApplicationRecordsByIds<T>(
   recordIds: readonly string[],
   matchColumn: 'record_id' | 'payload->>responseId' = 'record_id',
   client = supabase,
+  signal?: AbortSignal,
 ): Promise<T[]> {
   requireConfigured(client);
   const ids = [...new Set(recordIds.filter((id) => typeof id === 'string' && id.length > 0))];
@@ -267,25 +189,30 @@ export async function loadApplicationRecordsByIds<T>(
   for (let index = 0; index < ids.length; index += WRITE_CHUNK_SIZE) {
     chunks.push(ids.slice(index, index + WRITE_CHUNK_SIZE));
   }
-  const pages = await Promise.all(chunks.map(async (chunk) => {
+  const pages: ApplicationRecordRow<T>[][] = [];
+  for (const chunk of chunks) {
     const rows: ApplicationRecordRow<T>[] = [];
-    let from = 0;
+    let cursor: string | undefined;
     while (true) {
-      const { data, error } = await client
+      signal?.throwIfAborted();
+      let query = client
         .from('application_records')
         .select('record_id,payload,created_at')
         .eq('record_type', recordType)
-        .in(matchColumn, chunk)
-        .order('record_id')
-        .range(from, from + READ_PAGE_SIZE - 1);
+        .in(matchColumn, chunk);
+      if (cursor !== undefined) query = query.gt('record_id', cursor);
+      if (signal) query = query.abortSignal(signal);
+      const { data, error } = await query.order('record_id').limit(READ_PAGE_SIZE);
+      signal?.throwIfAborted();
       if (error) throw new Error(`Unable to load changed ${recordType} records: ${error.message}`);
       const page = (data ?? []) as unknown as ApplicationRecordRow<T>[];
       rows.push(...page);
       // Continue even short pages: the server may enforce a smaller row cap.
-      if (!page.length) return rows;
-      from += page.length;
+      if (!page.length) break;
+      cursor = page.at(-1)!.record_id;
     }
-  }));
+    pages.push(rows);
+  }
 
   const values: T[] = [];
   let invalidCount = 0;
@@ -516,12 +443,11 @@ export function subscribeToApplicationChanges(client = supabase): () => void {
         }));
       } else if (status === 'SUBSCRIBED') {
         // Reconcile even the first subscription: hydration may race channel setup.
-        window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
-          detail: { recordType: 'survey_response', reason: hasSubscribed ? 'reconnect' : 'subscribed' },
-        }));
-        window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
-          detail: { recordType: 'survey', reason: hasSubscribed ? 'reconnect' : 'subscribed' },
-        }));
+        for (const recordType of hasSubscribed ? realtimeRecordTypes : ['survey_response', 'survey'] as ApplicationRecordType[]) {
+          window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
+            detail: { recordType, reason: hasSubscribed ? 'reconnect' : 'subscribed' },
+          }));
+        }
         hasSubscribed = true;
         window.dispatchEvent(new CustomEvent(APPLICATION_REALTIME_STATUS_EVENT, {
           detail: { status, consecutiveFailures: 0, warningVisible: false },

@@ -225,7 +225,7 @@ export function buildRawResponseExportTables(responses: SurveyResponse[], survey
   if (rows.length === 0) return [];
 
   return [{
-    title: `${surveyType} Raw Evaluations`,
+    title: `${surveyType} Raw Responses`,
     columns,
     rows: rows.map(({ index, first, byQuestionId, company }) => [
       ...spec.metaFields.map((kind) => metaCellValue(kind, index, first, company)),
@@ -235,11 +235,11 @@ export function buildRawResponseExportTables(responses: SurveyResponse[], survey
 }
 
 export function exportRawResponsesAsExcel(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string) {
-  exportTablesAsExcel(buildRawResponseExportTables(responses, surveyType), filenameBase, { kind: 'raw', parameters: { category: surveyType } });
+  return exportTablesAsExcel(buildRawResponseExportTables(responses, surveyType), filenameBase, { kind: 'raw', parameters: { category: surveyType } });
 }
 
 export function exportRawResponsesAsCSV(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string) {
-  exportTablesAsCSV(buildRawResponseExportTables(responses, surveyType), filenameBase, { kind: 'raw', parameters: { category: surveyType } });
+  return exportTablesAsCSV(buildRawResponseExportTables(responses, surveyType), filenameBase, { kind: 'raw', parameters: { category: surveyType } });
 }
 
 // Short informational columns ("Period Covered", "Project Name") stay
@@ -442,5 +442,5 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
     );
   }
 
-  void saveReportDownload(doc.output('blob'), `Raw Data Export (${surveyType})`, 'pdf', { kind: 'raw', parameters: { category: surveyType } });
+  return saveReportDownload(doc.output('blob'), `Raw Data Export (${surveyType})`, 'pdf', { kind: 'raw', parameters: { category: surveyType } });
 }

@@ -49,10 +49,10 @@ function saveIds(userEmail: string, kind: 'read' | 'deleted', ids: Set<string>) 
   window.dispatchEvent(new Event(EVENT_NAME));
 }
 
-export async function hydrateEmployeeNotificationStateFromSupabase(userEmail: string): Promise<void> {
+export async function hydrateEmployeeNotificationStateFromSupabase(userEmail: string, signal?: AbortSignal): Promise<void> {
   const email = normalizedEmail(userEmail);
   const migrationKey = `survey_reminders_supabase_migrated_v1:${email}`;
-  let states = await loadApplicationRecords<PersistedEmployeeNotificationState>('employee_notification_state');
+  let states = await loadApplicationRecords<PersistedEmployeeNotificationState>('employee_notification_state', { ownRecords: true, signal });
   let state = states.find((candidate) => candidate.userEmail === email);
   if (!state && localStorage.getItem(migrationKey) !== 'true') {
     state = {
@@ -65,6 +65,7 @@ export async function hydrateEmployeeNotificationStateFromSupabase(userEmail: st
     await upsertApplicationRecords('employee_notification_state', [state], (item) => item.id, { ownRecords: true });
     states = [state];
   }
+  signal?.throwIfAborted();
   localStorage.setItem(migrationKey, 'true');
   localStorage.setItem(storageKey(email, 'read'), JSON.stringify(state?.readIds ?? []));
   localStorage.setItem(storageKey(email, 'deleted'), JSON.stringify(state?.deletedIds ?? []));

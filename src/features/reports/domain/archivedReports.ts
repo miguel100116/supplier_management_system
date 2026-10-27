@@ -78,8 +78,8 @@ export function buildArchivedReport(data: ArchivedReportData, selection: Archive
   const officialRows = rows.filter(isOfficialAnalyticsResponse).length;
   const tables: ExportTable[] = [{ title, columns: ['Report scope', 'Value'], rows: [
     ['Selected item', item.label], ['Category', category], ['Stored submissions', new Set(rows.map(row => row.responseId)).size],
-    ['Stored answer rows', rows.length], ['Countable evaluations', count], ['Evaluated companies', composites.length],
-    ['Submission dates', dates.length ? `${dates[0]} to ${dates[dates.length - 1]}` : 'No evaluation data'],
+    ['Stored answer rows', rows.length], ['Countable responses', count], ['Evaluated companies', composites.length],
+    ['Submission dates', dates.length ? `${dates[0]} to ${dates[dates.length - 1]}` : 'No response data'],
     ['Mean submission score (%)', scores.length ? formatNumber(averageRating(scoredResponses(rows))) : 'No Score Yet'],
     ['Official answer rows', officialRows], ['Staging/test answer rows', rows.length - officialRows],
     ['Data basis', 'Stored records for this item, including staging/test records; current rubric. Not an immutable archive-time snapshot.'],

@@ -74,7 +74,7 @@ function dataUrlDimensions(dataUrl: string): Promise<{ width: number; height: nu
 }
 
 /** Fetches the Microgenesis wordmark from /public and returns it as a data URL for embedding. */
-async function fetchLogoDataUrl(): Promise<string | null> {
+export async function fetchLogoDataUrl(): Promise<string | null> {
   try {
     const res = await fetch(LOGO_URL);
     if (!res.ok) return null;
@@ -690,7 +690,7 @@ export async function exportCompanyReportAsDocx(data: CompanyReportData, recipe?
             children: [
               new Paragraph({
                 spacing: { after: 80 },
-                children: [new TextRun({ text: 'EVALUATIONS', bold: true, size: 18, color: MUTED_HEX })],
+                children: [new TextRun({ text: 'RESPONSES', bold: true, size: 18, color: MUTED_HEX })],
               }),
               new Paragraph({
                 children: [new TextRun({ text: String(data.composite?.evaluationCount ?? 0), bold: true, size: 36, color: INK_HEX })],

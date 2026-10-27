@@ -1,7 +1,8 @@
+import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, Layers, PackageSearch, Table2, Truck } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, FileType, Layers, PackageSearch, Table2, Truck } from 'lucide-react';
 import { SurveyResponse, SurveyType } from '../types/survey';
-import { exportRawResponsesAsCSV, exportRawResponsesAsExcel, exportRawResponsesAsPDF } from '../features/reports/services/rawResponseExport';
+import { buildRawResponseExportTables, exportRawResponsesAsCSV, exportRawResponsesAsExcel, exportRawResponsesAsPDF } from '../features/reports/services/rawResponseExport';
 
 interface RawDataExportPageProps {
   responses: SurveyResponse[];
@@ -10,12 +11,12 @@ interface RawDataExportPageProps {
   onBack: () => void;
 }
 
-type RawExportFormat = 'csv' | 'excel' | 'pdf';
+type RawExportFormat = 'csv' | 'excel' | 'pdf' | 'docx';
 
 const CATEGORY_CONFIG: { type: SurveyType; icon: typeof Truck; description: string }[] = [
-  { type: 'Courier', icon: Truck, description: 'Raw evaluation submissions for courier partners, one merged sheet sorted by submission date.' },
-  { type: 'Supplier', icon: PackageSearch, description: 'Raw evaluation submissions for suppliers, one merged sheet sorted by submission date.' },
-  { type: 'Subcontractor', icon: Layers, description: 'Raw evaluation submissions for subcontractors, one merged sheet sorted by submission date.' },
+  { type: 'Courier', icon: Truck, description: 'Raw response submissions for courier partners, one merged sheet sorted by submission date.' },
+  { type: 'Supplier', icon: PackageSearch, description: 'Raw response submissions for suppliers, one merged sheet sorted by submission date.' },
+  { type: 'Subcontractor', icon: Layers, description: 'Raw response submissions for subcontractors, one merged sheet sorted by submission date.' },
 ];
 
 export function RawDataExportPage({ responses, canExport = false, onBack, initialCategory }: RawDataExportPageProps) {
@@ -28,7 +29,7 @@ export function RawDataExportPage({ responses, canExport = false, onBack, initia
         </button>
         <div className="text-right">
           <h2 className="text-base font-semibold">Raw Data Export</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Export raw evaluation submissions in the original form layout - one sortable sheet per category, ordered by date and time answered</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Export raw response submissions in the original form layout - one sortable sheet per category, ordered by date and time answered</p>
         </div>
       </div>
 
@@ -45,11 +46,12 @@ export function RawDataExportPage({ responses, canExport = false, onBack, initia
               companyCount={companyCount}
               canExport={canExport}
               disabled={typeResponses.length === 0}
-              onExport={(format) => {
+              onExport={async (format) => {
                 const filenameBase = `${type.toLowerCase()}_raw_evaluations`;
-                if (format === 'csv') exportRawResponsesAsCSV(responses, type, filenameBase);
-                else if (format === 'excel') exportRawResponsesAsExcel(responses, type, filenameBase);
-                else exportRawResponsesAsPDF(responses, type, filenameBase);
+                if (format === 'docx') await exportTablesAsWord(`Raw Data Export (${type})`, buildRawResponseExportTables(responses, type), filenameBase, { kind: 'raw', parameters: { category: type } });
+                else if (format === 'csv') await exportRawResponsesAsCSV(responses, type, filenameBase);
+                else if (format === 'excel') await exportRawResponsesAsExcel(responses, type, filenameBase);
+                else await exportRawResponsesAsPDF(responses, type, filenameBase);
               }}
             />
           );
@@ -74,7 +76,7 @@ function RawExportCard({
   companyCount: number;
   canExport?: boolean;
   disabled: boolean;
-  onExport: (format: RawExportFormat) => void;
+  onExport: (format: RawExportFormat) => void | Promise<void>;
 }) {
   return (
     <article className="panel flex flex-col items-center text-center">
@@ -98,8 +100,10 @@ function RawExportCard({
 }
 
 /** "Export As ▾" trigger restricted to Excel / CSV / PDF, used on each category card. */
-function RawExportMenu({ onExport }: { onExport: (format: RawExportFormat) => void }) {
+function RawExportMenu({ onExport }: { onExport: (format: RawExportFormat) => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -113,18 +117,21 @@ function RawExportMenu({ onExport }: { onExport: (format: RawExportFormat) => vo
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  const choose = (format: RawExportFormat) => {
-    onExport(format);
-    setOpen(false);
+  const choose = async (format: RawExportFormat) => {
+    setOpen(false); setExporting(true); setError('');
+    try { await onExport(format); }
+    catch { setError('Unable to export this report. Please retry.'); }
+    finally { setExporting(false); }
   };
 
   return (
     <div className="relative mt-4 inline-block" ref={containerRef}>
-      <button className="ghost-button" type="button" onClick={() => setOpen((v) => !v)}>
+      <button className="ghost-button" type="button" disabled={exporting} onClick={() => setOpen((v) => !v)}>
         <Download size={15} />
         Export As
         <ChevronDown size={14} />
       </button>
+      {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
       {open ? (
         <div className="absolute left-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
           <button
@@ -147,6 +154,13 @@ function RawExportMenu({ onExport }: { onExport: (format: RawExportFormat) => vo
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <FileText size={14} /> PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => choose('docx')}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <FileType size={14} /> Word (.docx)
           </button>
         </div>
       ) : null}

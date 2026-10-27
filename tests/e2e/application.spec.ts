@@ -19,7 +19,8 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
   ];
   const unexpected: string[] = [];
   const errors: string[] = [];
-  const failures = { surveyWrites: false };
+  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false };
+  const historyReads: Array<{ select: string; id: string | null }> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
     const request = route.request();
@@ -49,7 +50,24 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
         const type = url.searchParams.get('record_type')?.replace(/^eq\./, '');
         const offset = Number(url.searchParams.get('offset') ?? 0);
         const limit = Number(url.searchParams.get('limit') ?? 1000);
-        const rows = records.filter(record => record.record_type === type).slice(offset, offset + limit);
+        let matching = records.filter(record => record.record_type === type);
+        const id = url.searchParams.get('record_id');
+        if (id?.startsWith('eq.')) matching = matching.filter(row => row.record_id === id.slice(3));
+        if (id?.startsWith('in.')) matching = matching.filter(row => id.slice(4, -1).split(',').map(value => value.replace(/"/g, '')).includes(row.record_id));
+        if (id?.startsWith('gt.')) matching = matching.filter(row => row.record_id > id.slice(3));
+        if (url.searchParams.has('order')) matching.sort((a, b) => a.record_id.localeCompare(b.record_id));
+        if (url.searchParams.has('payload->>fileDataUrl')) matching = matching.filter(row => row.payload.fileDataUrl != null);
+        const selected = matching.slice(offset, offset + limit);
+        const projection = url.searchParams.get('select') ?? '';
+        if (type === 'export_history') {
+          historyReads.push({ select: projection, id });
+          if (projection.includes(',payload') && (failures.historyBulkReads && !id?.startsWith('eq.') || failures.historyFileReads)) {
+            return reply({ code: '57014', message: 'canceling statement due to statement timeout' }, 500);
+          }
+        }
+        const rows = type === 'export_history' && projection.includes('title:payload')
+          ? selected.map(row => ({ record_id: row.record_id, ...Object.fromEntries(['id', 'title', 'format', 'filename', 'exportedAt', 'exportedBy', 'recipe'].map(key => [key, row.payload[key] ?? null])) }))
+          : type === 'export_history' && projection === 'record_id' ? selected.map(row => ({ record_id: row.record_id })) : selected;
         return reply(request.headers().accept?.includes('object+json') ? rows[0] ?? null : rows);
       }
       if (request.method() === 'POST') {
@@ -67,7 +85,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     unexpected.push(`${request.method()} ${url.pathname}`);
     return route.abort();
   });
-  return { records, unexpected, errors, failures, profiles };
+  return { records, unexpected, errors, failures, profiles, historyReads };
 }
 
 async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
@@ -90,7 +108,7 @@ test('Workspace category and status badges use consistent typography and geometr
   await signIn(page);
   await page.goto('/evaluation-workspace');
   const rows = page.locator('.admin-survey-forms-page table tbody tr');
-  await expect(rows).toHaveCount(3);
+  await expect(rows).toHaveCount(3, { timeout: 10_000 });
   for (const dark of [false, true]) {
     await page.evaluate(enabled => document.body.classList.toggle('dark', enabled), dark);
     await page.screenshot({ path: testInfo.outputPath(`workspace-badges-${dark ? 'dark' : 'light'}.png`), animations: 'disabled' });
@@ -527,20 +545,31 @@ test('Archived report builders select one item, update the document preview and 
   await page.evaluate(() => document.body.classList.add('dark'));
   await page.screenshot({ path: testInfo.outputPath('archived-survey-builder-dark.png'), fullPage: true, animations: 'disabled' });
   await page.evaluate(() => document.body.classList.remove('dark'));
-  for (const format of ['pdf', 'excel']) {
+  for (const format of ['pdf', 'excel', 'docx']) {
     await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption(format);
     const downloaded = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download report', exact: true }).click();
     const bytes = await readFile((await (await downloaded).path())!);
-    if (format === 'pdf') expect(bytes.subarray(0, 5).toString()).toBe('%PDF-');
-    else {
+    if (format === 'pdf') {
+      const pdf = bytes.toString('latin1');
+      expect(pdf).toMatch(/^%PDF-/);
+      for (const text of ['Archived Survey Report', 'First archived survey', 'MBS Partner Evaluation System', 'Report scope', 'Microgenesis Supplier Management System']) {
+        expect(pdf).toContain(text);
+      }
+      expect(pdf).not.toContain('This report provides a comprehensive summary of survey analytics');
+    }
+    else if (format === 'docx') {
+      const archive = XLSX.CFB.read(bytes, { type: 'buffer' });
+      const xml = XLSX.CFB.find(archive, '/word/document.xml')!;
+      expect(Buffer.from(xml.content as Uint8Array).toString()).toContain('First archived survey');
+    } else {
       const workbook = XLSX.read(bytes);
       const scope = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
       expect(scope).toContainEqual(['Selected item', 'First archived survey']);
       expect(scope).toContainEqual(['Stored submissions', 4]);
     }
   }
-  await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(2);
+  await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(3);
   await page.getByRole('tab', { name: 'History', exact: true }).click();
   await expect(page.getByText(/Courier \| First archived survey/).first()).toBeVisible();
   await page.getByRole('button', { name: 'Regenerate', exact: true }).first().click();
@@ -570,13 +599,13 @@ test('Archived report builders select one item, update the document preview and 
   await expect(preview.getByRole('row', { name: 'Stored submissions 3', exact: true })).toBeVisible();
   await expect(preview).not.toContainText('Second archived courier');
   await page.getByRole('combobox', { name: 'Archived company', exact: true }).selectOption('empty-courier');
-  await expect(page.getByRole('heading', { name: 'No evaluation data', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No response data', exact: true })).toBeVisible();
   await expect(preview.getByRole('table', { name: 'Company profile', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download report', exact: true })).toBeEnabled();
   await page.screenshot({ path: testInfo.outputPath('archived-company-builder-empty.png'), fullPage: true, animations: 'disabled' });
   await page.reload();
   await page.getByRole('tab', { name: 'History', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(3);
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(4);
   expect(service.records[0].payload.isArchived).toBe(true);
   expect(service.records.find(record => record.record_type === 'survey')?.payload.status).toBe('Archived');
   expect(service.unexpected).toEqual([]);
@@ -608,7 +637,7 @@ test('a staging-only Supplier response archive matches Archive Center and all re
   await expect(selector.getByRole('option', { name: archiveLabel, exact: true })).toHaveCount(1);
   const preview = page.getByLabel('Archived report preview', { exact: true });
   await expect(preview.getByRole('row', { name: 'Stored submissions 1', exact: true })).toBeVisible();
-  await expect(preview.getByRole('row', { name: 'Countable evaluations 0', exact: true })).toBeVisible();
+  await expect(preview.getByRole('row', { name: 'Countable responses 0', exact: true })).toBeVisible();
   await expect(preview.getByRole('row', { name: 'Staging/test answer rows 1', exact: true })).toBeVisible();
   const downloadButton = page.getByRole('button', { name: 'Download report', exact: true });
   await expect(downloadButton).toBeEnabled();
@@ -655,6 +684,7 @@ test('a staging-only Supplier response archive matches Archive Center and all re
 test('History retains saved files across recipe versions without quarantine warnings', async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   const service = await backend(page);
+  service.failures.historyBulkReads = true;
   const fileDataUrl = 'data:application/pdf;base64,JVBERi10ZXN0';
   const base = { format: 'pdf', exportedAt: '2026-10-26T00:00:00Z', fileDataUrl };
   for (let index = 0; index < 5; index++) service.records.push({ record_type: 'export_history', record_id: `legacy-${index}`, created_at: createdAt,
@@ -687,6 +717,11 @@ test('History retains saved files across recipe versions without quarantine warn
   }
   await expect(currentEntry.getByRole('button', { name: 'Regenerate', exact: true })).toBeEnabled();
   await expect(page.getByText(/quarantined during refresh/)).toHaveCount(0);
+  expect(service.historyReads.every(read => !read.select.includes(',payload'))).toBe(true);
+  service.failures.historyFileReads = true;
+  await futureEntry.getByRole('button', { name: 'Download again', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Unable to download the saved file. Please retry');
+  service.failures.historyFileReads = false;
   const downloaded = page.waitForEvent('download');
   await futureEntry.getByRole('button', { name: 'Download again', exact: true }).click();
   const download = await downloaded;
@@ -699,6 +734,188 @@ test('History retains saved files across recipe versions without quarantine warn
   expect(stored).not.toHaveProperty('recipeUnavailable');
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
+});
+
+test('Admin Settings waits for activity and retries a failed first load', async ({ page }) => {
+  const service = await backend(page);
+  let releaseFirstRead: (() => void) | undefined;
+  const firstRead = new Promise<void>(resolve => { releaseFirstRead = resolve; });
+  let activityReads = 0;
+  await page.route('**/rest/v1/application_records?*', async route => {
+    const type = new URL(route.request().url()).searchParams.get('record_type');
+    if (type !== 'eq.admin_activity') return route.fallback();
+    activityReads += 1;
+    if (activityReads === 1) {
+      await firstRead;
+      return route.fulfill({ status: 500, json: { message: 'Synthetic activity read failure' } });
+    }
+    return route.fallback();
+  });
+  await page.goto('/login');
+  await signIn(page);
+  await page.locator('#account-menu-trigger').click();
+  await page.locator('#settings-button').click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog.getByRole('status')).toContainText('Loading settings');
+  await expect(dialog.getByText('System Snapshot')).toHaveCount(0);
+  await expect.poll(() => activityReads).toBe(1);
+  releaseFirstRead!();
+  await expect(dialog.getByRole('alert')).toContainText('Synthetic activity read failure');
+  await dialog.getByRole('button', { name: 'Retry loading settings' }).click();
+  await expect(dialog.getByText('System Snapshot')).toBeVisible();
+  expect(activityReads).toBe(2);
+  expect(service.errors).toEqual([]);
+  expect(service.unexpected).toEqual([]);
+});
+
+test('Reports load History only on first visit and reuse it on return navigation', async ({ page }) => {
+  const service = await backend(page);
+  await page.goto('/login');
+  await signIn(page);
+  await expect(page.getByRole('main')).toBeVisible();
+  expect(service.historyReads.length).toBe(0);
+  await page.goto('/reports?tab=history');
+  await expect(page.getByText('No exports yet')).toBeVisible();
+  const firstVisitReads = service.historyReads.length;
+  expect(firstVisitReads).toBeGreaterThan(0);
+  await page.getByRole('tab', { name: 'Generate', exact: true }).click();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  expect(service.historyReads.length).toBe(firstVisitReads);
+  expect(service.errors).toEqual([]);
+});
+
+test('Question Report quick export exposes and downloads Word below the report library', async ({ page }, testInfo) => {
+  await backend(page);
+  await page.goto('/login');
+  await signIn(page);
+  await page.goto('/reports');
+  const question = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Question Report', exact: true }) });
+  await question.getByRole('button', { name: 'Export', exact: true }).click();
+  const word = question.getByRole('button', { name: 'Word (.docx)', exact: true });
+  await word.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('question-quick-export-menu.png'), fullPage: true, animations: 'disabled' });
+  const event = page.waitForEvent('download');
+  await word.click();
+  const download = await event;
+  expect(download.suggestedFilename()).toMatch(/\.docx$/);
+  const archive = XLSX.CFB.read(await readFile((await download.path())!), { type: 'buffer' });
+  const document = XLSX.CFB.find(archive, '/word/document.xml');
+  expect(document).toBeTruthy();
+  expect(Buffer.from(document!.content as Uint8Array).toString('utf8')).toContain('Question Report (All Questions)');
+});
+
+test('Word reports export complete descending company rankings and History refresh avoids retained file bulk reads', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  const service = await backend(page);
+  service.failures.historyBulkReads = true;
+  const names = Array.from({ length: 24 }, (_, index) => `Ranking Partner ${String(index).padStart(2, '0')}`);
+  names[0] = '=1+1';
+  names.forEach((company, index) => {
+    service.records.push({ record_type: 'partner_company', record_id: `ranking-company-${index}`, created_at: createdAt,
+      payload: { id: `ranking-company-${index}`, name: company, type: 'Courier', createdAt, branches: [], isArchived: false } });
+    service.records.push({ record_type: 'survey_response', record_id: `ranking-${index}:Q01`, created_at: createdAt,
+    payload: { responseId: `ranking-${index}`, companyId: `ranking-company-${index}`, company, surveyType: 'Courier', respondentType: 'Rank & File',
+      submissionDate: new Date().toISOString(), questionId: 'Q01', questionNumber: 1, question: 'Reliability?', questionCategory: 'Reliability/Delivery',
+      rating: 15 * (index + 1) / 24, comment: '', dataSource: 'client_csv' } });
+  });
+  await page.goto('/login');
+  await signIn(page);
+  const library = async () => {
+    const back = page.getByRole('button', { name: 'Go back', exact: true }).or(page.getByRole('button', { name: 'Back to Reports', exact: true }));
+    if (await back.count()) await back.first().click();
+    else { await page.goto('/reports'); await expect(page.getByRole('main')).toBeVisible(); }
+    await expect(page.getByRole('heading', { name: 'Companies Report', exact: true })).toBeVisible();
+  };
+  let exports = 0;
+  const card = (name: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) });
+  const word = async () => {
+    const event = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Word (.docx)', exact: true }).click();
+    const download = await event;
+    expect(download.suggestedFilename()).toMatch(/\.docx$/);
+    const bytes = await readFile((await download.path())!);
+    await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(++exports);
+    const archive = XLSX.CFB.read(bytes, { type: 'buffer' });
+    const file = XLSX.CFB.find(archive, '/word/document.xml');
+    expect(file).toBeTruthy();
+    return { bytes, xml: Buffer.from(file!.content as Uint8Array).toString('utf8') };
+  };
+  const checkRanking = (xml: string) => {
+    const table = Array.from(xml.matchAll(/<w:tbl\b[\s\S]*?<\/w:tbl>/g)).map(match => match[0]).find(value => value.includes('Leaderboard Score'))!;
+    expect(table).toContain('Responses');
+    let previous = -1;
+    for (const company of names.slice().reverse()) {
+      const index = table.indexOf(company);
+      expect(index).toBeGreaterThan(previous);
+      previous = index;
+    }
+    expect(xml).not.toMatch(/Least Rated Companies|Lowest Rated Partners|Evaluations Count|Bottom 10/);
+  };
+
+  const footerExport = async () => {
+    const button = page.getByRole('button', { name: 'Export', exact: true });
+    await button.scrollIntoViewIfNeeded();
+    if (testInfo.project.use.isMobile) {
+      const control = await button.boundingBox();
+      const navigation = await page.locator('.admin-sidebar').boundingBox();
+      expect(control!.y + control!.height).toBeLessThanOrEqual(navigation!.y);
+    }
+    await button.click();
+    if (testInfo.project.use.isMobile) await page.screenshot({ path: testInfo.outputPath('mobile-footer-export.png'), fullPage: true, animations: 'disabled' });
+  };
+  await library();
+  await card('Companies Report').getByRole('button', { name: 'Export', exact: true }).click();
+  checkRanking((await word()).xml);
+  await card('Companies Report').getByRole('button', { name: 'Build report', exact: true }).click();
+  await footerExport();
+  await expect(page.getByRole('button', { name: 'Word (.docx)', exact: true })).toBeVisible();
+  await library();
+  await card('Summary Report').getByRole('button', { name: 'Build report', exact: true }).click();
+  const ranking = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: 'Company Name', exact: true }) });
+  await expect(ranking.locator('tbody tr')).toHaveCount(24);
+  await expect(ranking.getByRole('columnheader', { name: 'Responses', exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: /Lowest Rated/ })).toHaveCount(0);
+  await page.getByRole('heading', { name: 'Company Rankings (Highest to Lowest)', exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('summary-descending-rankings.png'), fullPage: true, animations: 'disabled' });
+  await page.getByRole('button', { name: 'Export Report', exact: true }).click();
+  const csvDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV Spreadsheet', exact: true }).click();
+  const csv = await readFile((await (await csvDownload).path())!, 'utf8');
+  expect(csv).toContain("\"'=1+1\"");
+  await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(++exports);
+  await page.getByRole('button', { name: 'Export Report', exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath('word-export-menu.png'), fullPage: true, animations: 'disabled' });
+  checkRanking((await word()).xml);
+
+  await library();
+  await page.getByRole('button', { name: 'Build Executive Report', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Company Rankings (Highest to Lowest)', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Export Executive Dossier', exact: true }).click();
+  checkRanking((await word()).xml);
+
+  await library();
+  await card('Question Report').getByRole('button', { name: 'Build report', exact: true }).click();
+  await footerExport();
+  expect((await word()).xml).toContain('Reliability?');
+
+  await library();
+  await card('Raw Data Export').getByRole('button', { name: 'Build report', exact: true }).click();
+  await page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Courier', exact: true }) }).getByRole('button', { name: 'Export As', exact: true }).click();
+  const raw = await word();
+  for (const company of names) expect(raw.xml).toContain(company);
+  await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(6);
+  await page.getByRole('button', { name: 'Back to Reports', exact: true }).click();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await page.reload();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(6);
+  expect(service.historyReads.every(read => !read.select.includes(',payload'))).toBe(true);
+  const saved = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download again', exact: true }).first().click();
+  expect((await readFile((await (await saved).path())!)).equals(raw.bytes)).toBe(true);
+  await expect(page.getByText(/statement timeout|quarantined during refresh/)).toHaveCount(0);
+  expect(service.errors).toEqual([]);
+  expect(service.unexpected).toEqual([]);
 });
 
 test('employee read reminders remain pending, persist on reload and renew after a saved resend', async ({ page }, testInfo) => {

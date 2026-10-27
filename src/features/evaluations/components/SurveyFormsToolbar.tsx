@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, Search, SlidersHorizontal, Settings2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowDownUp, CalendarDays, Check, Plus, Search, Settings2 } from 'lucide-react';
 import type { SurveyType } from '../../../types/survey';
 
 export type SurveyFormSort = 'title-asc' | 'title-desc' | 'deadline-asc' | 'deadline-desc' | 'created-desc';
@@ -21,6 +21,7 @@ interface SurveyFormsToolbarProps {
 }
 
 const categoryOptions: Array<'All' | SurveyType> = ['All', 'Courier', 'Supplier', 'Subcontractor'];
+type OpenFilterPopover = 'sort' | 'date' | null;
 
 export function countActiveFormFilters(sort: SurveyFormSort, from: string, to: string): number {
   return Number(sort !== 'title-asc') + Number(Boolean(from || to));
@@ -41,11 +42,51 @@ export function SurveyFormsToolbar({
   onCreateForm,
   onManageAccess,
 }: SurveyFormsToolbarProps) {
-  const activeFilterCount = countActiveFormFilters(sort, deadlineFrom, deadlineTo);
+  const [openPopover, setOpenPopover] = useState<OpenFilterPopover>(null);
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const sortTriggerRef = useRef<HTMLButtonElement>(null);
+  const dateTriggerRef = useRef<HTMLButtonElement>(null);
+  const hasActiveSort = sort !== 'title-asc';
+  const hasActiveDateRange = Boolean(deadlineFrom || deadlineTo);
+
+  useEffect(() => {
+    if (!openPopover) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !filtersRef.current?.contains(event.target)) setOpenPopover(null);
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      const trigger = openPopover === 'sort' ? sortTriggerRef.current : dateTriggerRef.current;
+      setOpenPopover(null);
+      trigger?.focus();
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    document.addEventListener('keydown', dismissOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside);
+      document.removeEventListener('keydown', dismissOnEscape);
+    };
+  }, [openPopover]);
+
+  const filterTriggerClass = (active: boolean, expanded: boolean) =>
+    `icon-button relative shrink-0 ${active || expanded ? '!border-[#a9d4ef] !bg-[#edf7fd] !text-[#145f91] dark:!border-[#285d7e] dark:!bg-[rgb(33_135_205_/_16%)] dark:!text-[#b8e0fa]' : ''}`;
+  const sortOptions: Array<{ value: SurveyFormSort; label: string }> = [
+    { value: 'title-asc', label: 'Title: A-Z' },
+    { value: 'title-desc', label: 'Title: Z-A' },
+    { value: 'deadline-asc', label: 'Deadline: earliest first' },
+    { value: 'deadline-desc', label: 'Deadline: latest first' },
+    { value: 'created-desc', label: 'Created: newest first' },
+  ];
+  const selectSort = (value: SurveyFormSort) => {
+    onSortChange(value);
+    setOpenPopover(null);
+    sortTriggerRef.current?.focus();
+  };
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Survey forms controls">
-      <div className="segmented-control w-full max-w-full sm:w-auto" role="group" aria-label="Survey category">
+    <div className="survey-forms-toolbar mb-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Survey forms controls">
+      <div className="survey-forms-category segmented-control w-full max-w-full sm:w-auto" role="group" aria-label="Survey category">
         {categoryOptions.map((option) => (
           <button
             key={option}
@@ -59,7 +100,7 @@ export function SurveyFormsToolbar({
         ))}
       </div>
 
-      <label className="relative min-w-0 flex-1 basis-24 sm:min-w-[160px]">
+      <label className="survey-forms-search relative min-w-0 flex-1 basis-24 sm:min-w-[160px]">
         <span className="sr-only">Search survey forms</span>
         <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -71,11 +112,11 @@ export function SurveyFormsToolbar({
         />
       </label>
 
-      <div className="ml-auto flex shrink-0 items-center justify-end gap-1 sm:gap-2">
+      <div className="survey-forms-primary-actions ml-auto flex shrink-0 items-center justify-end gap-1 sm:gap-2">
         <button
           type="button"
           onClick={onCreateForm}
-          className="inline-flex h-10 items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-emerald-600 px-3 text-xs font-semibold sm:px-4 sm:text-sm text-white hover:bg-emerald-700"
+          className="inline-flex h-9 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-emerald-600 px-2.5 text-xs font-semibold text-white hover:bg-emerald-700 sm:px-3"
         >
           <Plus size={16} aria-hidden="true" className="hidden sm:block" />
           <span>Create Form</span>
@@ -83,69 +124,107 @@ export function SurveyFormsToolbar({
         <button
           type="button"
           onClick={onManageAccess}
-          className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-[#0063a9] px-3 text-xs font-semibold text-white hover:bg-[#00528c] sm:px-4 sm:text-sm dark:bg-blue-600 dark:hover:bg-blue-700"
+          className="inline-flex h-9 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-[#0063a9] px-2.5 text-xs font-semibold text-white hover:bg-[#00528c] sm:px-3 dark:bg-blue-600 dark:hover:bg-blue-700"
         >
           <Settings2 size={15} aria-hidden="true" />
           <span>Manage Access</span>
         </button>
       </div>
 
-      <details className="relative shrink-0">
-        <summary className="flex h-10 cursor-pointer list-none items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold sm:gap-1.5 sm:px-3 sm:text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
-          <SlidersHorizontal size={15} aria-hidden="true" className="hidden sm:block" />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="rounded-full bg-[#0063a9] px-1.5 py-0.5 text-[10px] leading-none text-white" aria-label={activeFilterCount + ' active filters'}>
-              {activeFilterCount}
-            </span>
-          )}
-        </summary>
-        <div className="absolute right-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-950">
-          <label className="block">
-            <span className="sr-only">Sort forms</span>
-            <select
-              value={sort}
-              onChange={(event) => onSortChange(event.target.value as SurveyFormSort)}
-              aria-label="Sort forms"
-              className="field !mt-0 w-full py-2 text-sm"
-            >
-              <option value="title-asc">Title: A-Z</option>
-              <option value="title-desc">Title: Z-A</option>
-              <option value="deadline-asc">Deadline: earliest first</option>
-              <option value="deadline-desc">Deadline: latest first</option>
-              <option value="created-desc">Created: newest first</option>
-            </select>
-          </label>
-          <fieldset className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <legend className="sr-only">Deadline range</legend>
-            <label className="min-w-0 text-xs text-slate-500 dark:text-slate-400">
-              From
-              <input
-                type="date"
-                value={deadlineFrom}
-                max={deadlineTo || undefined}
-                onChange={(event) => onDeadlineFromChange(event.target.value)}
-                aria-label="Deadline range from"
-                className="field !mt-1 w-full py-2 text-xs"
-              />
-            </label>
-            <label className="min-w-0 text-xs text-slate-500 dark:text-slate-400">
-              To
-              <input
-                type="date"
-                value={deadlineTo}
-                min={deadlineFrom || undefined}
-                onChange={(event) => onDeadlineToChange(event.target.value)}
-                aria-label="Deadline range to"
-                className="field !mt-1 w-full py-2 text-xs"
-              />
-            </label>
-          </fieldset>
-          <button type="button" onClick={onResetFilters} className="text-xs font-semibold text-[#0063a9] hover:underline dark:text-blue-400">
-            Reset filters
+      <div ref={filtersRef} className="survey-forms-filters flex shrink-0 items-center gap-1" aria-label="Form filters">
+        <div className="admin-directory-popover-anchor">
+          <button
+            ref={sortTriggerRef}
+            type="button"
+            className={filterTriggerClass(hasActiveSort, openPopover === 'sort')}
+            aria-label="Sort forms"
+            title="Sort forms"
+            aria-expanded={openPopover === 'sort'}
+            aria-haspopup="dialog"
+            onClick={() => setOpenPopover((current) => current === 'sort' ? null : 'sort')}
+          >
+            <ArrowDownUp size={16} aria-hidden="true" />
+            {hasActiveSort && <span className="admin-directory-active-dot" aria-hidden="true" />}
           </button>
+          {openPopover === 'sort' && (
+            <div className="admin-directory-compact-popover" role="dialog" aria-label="Sort forms" style={{ width: 'min(270px, calc(100vw - 28px))' }}>
+              <div role="group" aria-label="Sort options" className="grid gap-1">
+                {sortOptions.map((option) => {
+                  const selected = sort === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={selected}
+                      className={`flex min-h-9 w-full items-center justify-between gap-3 rounded-md px-2.5 text-left text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#2187cd] ${selected ? 'bg-[#edf7fd] text-[#145f91] dark:bg-[#172f43] dark:text-[#b8e0fa]' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                      onClick={() => selectSort(option.value)}
+                    >
+                      <span>{option.label}</span>
+                      {selected && <Check size={15} aria-hidden="true" className="shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+              <button type="button" className="admin-directory-popover-reset border-t border-slate-100 pt-2 dark:border-slate-800" onClick={() => selectSort('title-asc')}>
+                Reset sorting
+              </button>
+            </div>
+          )}
         </div>
-      </details>
+
+        <div className="admin-directory-popover-anchor">
+          <button
+            ref={dateTriggerRef}
+            type="button"
+            className={filterTriggerClass(hasActiveDateRange, openPopover === 'date')}
+            aria-label="Filter forms by deadline date"
+            title="Filter by deadline date"
+            aria-expanded={openPopover === 'date'}
+            aria-haspopup="dialog"
+            onClick={() => setOpenPopover((current) => current === 'date' ? null : 'date')}
+          >
+            <CalendarDays size={16} aria-hidden="true" />
+            {hasActiveDateRange && <span className="admin-directory-active-dot" aria-hidden="true" />}
+          </button>
+          {openPopover === 'date' && (
+            <div className="admin-directory-compact-popover" role="dialog" aria-label="Filter forms by deadline date" style={{ width: 'min(320px, calc(100vw - 28px))' }}>
+              <fieldset className="admin-directory-date-popover grid grid-cols-2 gap-2">
+                <legend>Deadline range</legend>
+                <label className="admin-directory-popover-field">
+                  <span>From</span>
+                  <input
+                    type="date"
+                    value={deadlineFrom}
+                    max={deadlineTo || undefined}
+                    onChange={(event) => onDeadlineFromChange(event.target.value)}
+                    aria-label="Deadline range from"
+                    className="field !mt-0 w-full"
+                  />
+                </label>
+                <label className="admin-directory-popover-field">
+                  <span>To</span>
+                  <input
+                    type="date"
+                    value={deadlineTo}
+                    min={deadlineFrom || undefined}
+                    onChange={(event) => onDeadlineToChange(event.target.value)}
+                    aria-label="Deadline range to"
+                    className="field !mt-0 w-full"
+                  />
+                </label>
+              </fieldset>
+              <div className="flex items-center justify-between gap-2">
+                <button type="button" className="admin-directory-popover-reset !justify-self-start" onClick={() => { onDeadlineFromChange(''); onDeadlineToChange(''); }}>
+                  Reset date range
+                </button>
+                <button type="button" className="admin-directory-popover-reset" onClick={onResetFilters}>
+                  Reset filters
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
     </div>
   );

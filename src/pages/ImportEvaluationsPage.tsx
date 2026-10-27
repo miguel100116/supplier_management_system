@@ -200,7 +200,7 @@ export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, ar
     setIsScanning(true);
     try {
       if (isLoadingArchives) throw new Error('Wait for Stored Source Files to finish loading before selecting files.');
-      const responseCounts = await loadEvaluationImportResponseCounts();
+      const responseCounts = await loadEvaluationImportResponseCounts(responses);
       const added: SelectedEvaluationFile[] = [];
       const existingFiles = summaries ? [] : selectedFiles;
       const seenBatches = new Set(existingFiles.map((item) => item.importBatchId));

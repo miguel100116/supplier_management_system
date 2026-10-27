@@ -36,8 +36,8 @@ export async function loadEvaluationImportArchives(): Promise<EvaluationImportAr
     .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
 }
 
-export async function loadEvaluationImportResponseCounts(): Promise<Map<string, number>> {
-  const responses = await loadApplicationRecords<SurveyResponse>('survey_response');
+export async function loadEvaluationImportResponseCounts(loadedResponses?: readonly SurveyResponse[]): Promise<Map<string, number>> {
+  const responses = loadedResponses ?? await loadApplicationRecords<SurveyResponse>('survey_response');
   const uniqueByBatch = new Map<string, Set<string>>();
   for (const response of responses) {
     if (response.dataSource !== 'client_csv' || !response.importBatchId) continue;

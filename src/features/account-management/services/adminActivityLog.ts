@@ -34,14 +34,15 @@ export function logAdminActivity(action: string, details?: string) {
   }
 }
 
-export async function hydrateAdminActivityFromSupabase(): Promise<void> {
-  let entries = await loadApplicationRecords<AdminActivityEntry>('admin_activity');
+export async function hydrateAdminActivityFromSupabase(signal?: AbortSignal): Promise<void> {
+  let entries = await loadApplicationRecords<AdminActivityEntry>('admin_activity', { signal });
   if (entries.length === 0 && localStorage.getItem(MIGRATION_KEY) !== 'true') {
     entries = getAdminActivity();
     if (entries.length > 0) {
       await upsertApplicationRecords('admin_activity', entries, (entry) => entry.id);
     }
   }
+  signal?.throwIfAborted();
   const ordered = entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, HISTORY_LIMIT);
   localStorage.setItem(MIGRATION_KEY, 'true');
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ordered));

@@ -1,3 +1,4 @@
+import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -70,14 +71,13 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
   const [showKpis, setShowKpis] = useState(initialSettings.showKpis ?? true);
   const [showChart, setShowChart] = useState(initialSettings.showChart ?? true);
   const [showTable, setShowTable] = useState(initialSettings.showTable ?? true);
-  const [showTopCompanies, setShowTopCompanies] = useState(initialSettings.showTopCompanies ?? true);
-  const [showBottomCompanies, setShowBottomCompanies] = useState(initialSettings.showBottomCompanies ?? true);
+  const [showTopCompanies, setShowTopCompanies] = useState((initialSettings.showTopCompanies ?? true) || initialSettings.showBottomCompanies === true);
   const [showQuestions, setShowQuestions] = useState(initialSettings.showQuestions ?? true);
 
   const [chartMetric, setChartMetric] = useState<'responses' | 'rating'>(initialSettings.chartMetric ?? 'responses');
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | null>(null);
+  const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const chartWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -129,13 +129,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
     }));
   }, [filteredRankingResponses, activeTypes]);
 
-  const topCompanies = useMemo(() => {
-    return companyPerformance.slice(0, 5);
-  }, [companyPerformance]);
-
-  const leastRatedCompanies = useMemo(() => {
-    return companyPerformance.slice().reverse().slice(0, 5);
-  }, [companyPerformance]);
+  const topCompanies = companyPerformance;
 
   // Questions highlights
   const questionRows = useMemo(() => {
@@ -145,7 +139,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
   // Whether the export produces a 3rd page (Partner Performance & Question
   // Highlights) - shared between the preview's page count and the PDF export
   // so the two never drift on how many pages the document actually has.
-  const hasExtraSections = showTopCompanies || showBottomCompanies || showQuestions;
+  const hasExtraSections = showTopCompanies || showQuestions;
 
   // Recharts Chart Data
   const chartData = useMemo(() => {
@@ -205,12 +199,12 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
     }
   };
 
-  const handleExport = async (format: 'pdf' | 'csv' | 'excel') => {
+  const handleExport = async (format: 'pdf' | 'csv' | 'excel' | 'docx') => {
     if (!canExport) return;
     setIsExporting(format);
     setExportMenuOpen(false);
     try {
-      const recipe = { kind: 'summary' as const, parameters: { selectedTypes, showKpis, showChart, showTable, showTopCompanies, showBottomCompanies, showQuestions, chartMetric } };
+      const recipe = { kind: 'summary' as const, parameters: { selectedTypes, showKpis, showChart, showTable, showTopCompanies, showQuestions, chartMetric } };
 
       const reportTitle = 'Summary Report';
 
@@ -244,20 +238,14 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
       // Add Highest Rated
       if (showTopCompanies && topCompanies.length > 0) {
         tables.push({
-          title: 'Highest Rated Evaluated Companies',
-          columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Evaluations Count', 'Remarks'],
+          title: 'Company Rankings (Highest to Lowest)',
+          columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Responses', 'Remarks'],
           rows: topCompanies.map(r => [r.company, r.surveyType, formatAnalyticsScore(r.surveyType, r.average), r.evaluations, getRemarkText(getAnalyticsBand(r.surveyType, r.average))]),
         });
       }
 
-      // Add Lowest Rated
-      if (showBottomCompanies && leastRatedCompanies.length > 0) {
-        tables.push({
-          title: 'Lowest Rated Evaluated Companies',
-          columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Evaluations Count', 'Remarks'],
-          rows: leastRatedCompanies.map(r => [r.company, r.surveyType, formatAnalyticsScore(r.surveyType, r.average), r.evaluations, getRemarkText(getAnalyticsBand(r.surveyType, r.average))]),
-        });
-      }
+
+
 
       // Add Question highlights
       if (showQuestions && questionRows.length > 0) {
@@ -268,9 +256,11 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         });
       }
 
-      if (format === 'csv') {
+      if (format === 'docx') {
+        await exportTablesAsWord(reportTitle, tables, reportTitle, recipe);
+      } else if (format === 'csv') {
         const chunks = tables.map((table) => {
-          const csvBody = Papa.unparse({ fields: table.columns, data: table.rows });
+          const csvBody = Papa.unparse({ fields: table.columns, data: table.rows }, { escapeFormulae: true });
           return `${table.title}\n${csvBody}`;
         });
         const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8' });
@@ -340,7 +330,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         let pageIndex = 2;
         const addHeaderAndFooter = (pdfDoc: jsPDF) => {
           pdfDoc.addPage();
-          
+
           // Header
           if (logoDataUrl) {
             pdfDoc.addImage(logoDataUrl, 'PNG', marginLeft, 20, 100, 100 * LOGO_ASPECT);
@@ -352,7 +342,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
           pdfDoc.setFont('helvetica', 'normal');
           pdfDoc.setTextColor(130);
           pdfDoc.text('MBS Partner Evaluation System', pageWidth - marginLeft, 44, { align: 'right' });
-          
+
           pdfDoc.setDrawColor(226, 232, 240);
           pdfDoc.setLineWidth(0.75);
           pdfDoc.line(marginLeft, 72, pageWidth - marginLeft, 72);
@@ -378,7 +368,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         // KPI block (2x2 Grid)
         if (showKpis) {
           const gridColWidth = contentWidth / 2 - 10;
-          
+
           // Cell 1: Total Responses
           doc.setFillColor(248, 250, 252);
           doc.setDrawColor(226, 232, 240);
@@ -496,10 +486,10 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.setTextColor(30);
-            doc.text('Highest Rated Evaluated Companies', marginLeft, cursorY);
+            doc.text('Company Rankings (Highest to Lowest)', marginLeft, cursorY);
             cursorY += 10;
 
-            const tableHeaders = ['Rank', 'Company Name', 'Survey Type', 'Leaderboard Score', 'Evaluations Count', 'Remarks'];
+            const tableHeaders = ['Rank', 'Company Name', 'Survey Type', 'Leaderboard Score', 'Responses', 'Remarks'];
             const tableRows = topCompanies.map((row, idx) => [
               `#${idx + 1}`,
               row.company,
@@ -522,41 +512,8 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
             cursorY = (doc as any).lastAutoTable.finalY + 25;
           }
 
-          // Lowest Performing Companies
-          if (showBottomCompanies && leastRatedCompanies.length > 0) {
-            if (cursorY > pageHeight - 140) {
-              addHeaderAndFooter(doc);
-              cursorY = 95;
-            }
 
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(30);
-            doc.text('Lowest Rated Evaluated Companies', marginLeft, cursorY);
-            cursorY += 10;
 
-            const tableHeaders = ['Rank', 'Company Name', 'Survey Type', 'Leaderboard Score', 'Evaluations Count', 'Remarks'];
-            const tableRows = leastRatedCompanies.map((row, idx) => [
-              `#${leastRatedCompanies.length - idx}`,
-              row.company,
-              row.surveyType,
-              formatAnalyticsScore(row.surveyType, row.average),
-              String(row.evaluations),
-              getRemarkText(getAnalyticsBand(row.surveyType, row.average))
-            ]);
-
-            autoTable(doc, {
-              startY: cursorY,
-              head: [tableHeaders],
-              body: tableRows,
-              margin: { left: marginLeft, right: marginLeft, top: 100, bottom: 60 },
-              styles: { fontSize: 8.5, cellPadding: 4.5 },
-              headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold' }, // Rose theme
-              alternateRowStyles: { fillColor: [248, 250, 252] },
-            });
-
-            cursorY = (doc as any).lastAutoTable.finalY + 25;
-          }
 
           // Question Highlights
           if (showQuestions && questionRows.length > 0) {
@@ -712,18 +669,10 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
                 onChange={(e) => setShowTopCompanies(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
               />
-              <span className="text-sm text-slate-700 dark:text-slate-300">Top Performing Companies</span>
+              <span className="text-sm text-slate-700 dark:text-slate-300">Company Rankings (Highest to Lowest)</span>
             </label>
 
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showBottomCompanies}
-                onChange={(e) => setShowBottomCompanies(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">Lowest Rated Companies</span>
-            </label>
+
 
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
               <input
@@ -792,6 +741,13 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
                     >
                       <FileType size={15} className="text-emerald-500" /> Export Excel Worksheet
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExport('docx')}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <FileType size={15} className="text-[#2187CD]" /> Word (.docx)
+                    </button>
                   </div>
                 )}
               </>
@@ -843,7 +799,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
                     <span className="block text-lg font-bold text-[#0063a9]">{summary.totalResponses}</span>
-                    <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Submitted Evaluations</span>
+                    <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Total Submitted Responses</span>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-900/40">
                     <span className="block text-lg font-bold text-[#0063a9]">{formatNumber(summary.averageRating)}%</span>
@@ -985,7 +941,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
                   <div className="mt-5 space-y-2">
                     <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-white">
                       <Award size={14} className="text-emerald-500" />
-                      <span>Highest Rated Evaluated Companies</span>
+                      <span>Company Rankings (Highest to Lowest)</span>
                     </h3>
                     <div className="overflow-hidden border border-slate-100 dark:border-slate-800 rounded-lg text-[10px]">
                       <table className="w-full text-left">
@@ -995,7 +951,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
                             <th className="px-3 py-1.5">Company Name</th>
                             <th className="px-3 py-1.5">Survey Type</th>
                             <th className="px-3 py-1.5 text-center">Leaderboard Score</th>
-                            <th className="px-3 py-1.5 text-center">Evaluations Count</th>
+                            <th className="px-3 py-1.5 text-center">Responses</th>
                             <th className="px-3 py-1.5 text-center">Remarks</th>
                           </tr>
                         </thead>
@@ -1021,45 +977,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
                   </div>
                 )}
 
-                {showBottomCompanies && leastRatedCompanies.length > 0 && (
-                  <div className="mt-5 space-y-2">
-                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-white">
-                      <AlertTriangle size={14} className="text-rose-500" />
-                      <span>Lowest Rated Evaluated Companies</span>
-                    </h3>
-                    <div className="overflow-hidden border border-slate-100 dark:border-slate-800 rounded-lg text-[10px]">
-                      <table className="w-full text-left">
-                        <thead className="bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-400 font-bold">
-                          <tr>
-                            <th className="px-3 py-1.5">Rank</th>
-                            <th className="px-3 py-1.5">Company Name</th>
-                            <th className="px-3 py-1.5">Survey Type</th>
-                            <th className="px-3 py-1.5 text-center">Leaderboard Score</th>
-                            <th className="px-3 py-1.5 text-center">Evaluations Count</th>
-                            <th className="px-3 py-1.5 text-center">Remarks</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {leastRatedCompanies.map((row, idx) => {
-                            const band = getAnalyticsBand(row.surveyType, row.average);
-                            return (
-                              <tr key={`${row.surveyType}:${row.company}`} className={idx % 2 === 0 ? 'bg-slate-50 dark:bg-slate-900/20' : 'bg-white dark:bg-slate-950'}>
-                                <td className="px-3 py-1 font-bold text-rose-600 dark:text-rose-400">#{companyPerformance.length - idx}</td>
-                                <td className="px-3 py-1 font-semibold text-slate-800 dark:text-slate-200">{row.company}</td>
-                                <td className="px-3 py-1 text-slate-500">{row.surveyType}</td>
-                                <td className="px-3 py-1 text-center font-bold text-slate-700 dark:text-slate-300">{formatAnalyticsScore(row.surveyType, row.average)}</td>
-                                <td className="px-3 py-1 text-center text-slate-500">{row.evaluations}</td>
-                                <td className="px-3 py-1 text-center">
-                                  <span className="badge" style={{ backgroundColor: `${band.hex}1a`, color: band.hex }}>{getRemarkText(band)}</span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
+
 
                 {showQuestions && questionRows.length > 0 && (
                   <div className="mt-5 space-y-2">

@@ -1,26 +1,59 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SurveyResponse } from '../types/survey';
 import {
   loadApplicationRecordsByIds,
+  loadApplicationRecords,
   subscribeToApplicationChanges,
   APPLICATION_RECORD_CHANGED_EVENT,
   upsertApplicationRecords,
   advanceRealtimeSyncState,
   APPLICATION_RECORD_TYPES,
-  batchApplicationRecordPageRanges,
-  applicationRecordPageRanges,
-  incompleteApplicationRecordPageRange,
   mergeApplicationRecordsById,
-  nextApplicationRecordPageBatch,
   parsePersistedProfile,
   surveyResponseRecordId,
 } from './applicationRepository';
 import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 
 const now = '2026-09-24T00:00:00.000Z';
+
+test('cursor loading returns every response under a small server row cap and stops on cancellation', async () => {
+  const records = Array.from({ length: 1305 }, (_, index) => ({
+    record_id: `response-${String(index).padStart(4, '0')}:q1`, created_at: now,
+    payload: { responseId: `response-${String(index).padStart(4, '0')}`, surveyType: 'Supplier',
+      respondentType: 'Employee', submissionDate: now, company: 'Synthetic supplier',
+      questionId: 'q1', questionNumber: 1, question: 'Quality', questionCategory: 'Quality', rating: 2, comment: '' },
+  }));
+  const requests: URL[] = [];
+  let controller: AbortController | undefined;
+  const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async input => {
+      const url = new URL(String(input));
+      requests.push(url);
+      assert.equal(url.searchParams.get('record_type'), 'eq.survey_response');
+      assert.equal(url.searchParams.get('order'), 'record_id.asc');
+      assert.equal(url.searchParams.has('offset'), false);
+      const cursor = url.searchParams.get('record_id')?.slice(3);
+      const rows = records.filter(row => !cursor || row.record_id > cursor).slice(0, 256);
+      if (controller) controller.abort();
+      return new Response(JSON.stringify(rows), { headers: { 'Content-Type': 'application/json' } });
+    } },
+  });
+  const loaded = await loadApplicationRecords<SurveyResponse>('survey_response', undefined, client);
+  assert.equal(loaded.length, records.length);
+  assert.deepEqual(loaded.map(row => row.responseId), records.map(row => row.payload.responseId));
+  assert.equal(requests.length, 7);
+  const config = readFileSync(new URL('../../supabase/config.toml', import.meta.url), 'utf8');
+  const maxRows = Number(config.match(/^max_rows\s*=\s*(\d+)/m)?.[1]);
+  assert.ok(requests.every(url => Number(url.searchParams.get('limit')) <= maxRows));
+  controller = new AbortController();
+  await assert.rejects(loadApplicationRecords('survey_response', { signal: controller.signal }, client), /abort/i);
+  assert.equal(requests.length, 8, 'abort prevents the next database page');
+});
 
 test('new export-history writes reject unsupported recipes before making a Supabase request', async () => {
   let requests = 0;
@@ -78,7 +111,8 @@ test('Realtime shares one channel, accepts PK-only DELETE events, reconciles rec
   assert.deepEqual(changes.at(-1), { recordType: 'survey_response', recordId: 'r:q' });
   statusChanged('CHANNEL_ERROR');
   statusChanged('SUBSCRIBED');
-  assert.deepEqual(changes.slice(-2), [{ recordType: 'survey_response', reason: 'reconnect' }, { recordType: 'survey', reason: 'reconnect' }]);
+  assert.ok(changes.some(change => change.recordType === 'export_history' && change.reason === 'reconnect'));
+  assert.ok(changes.some(change => change.recordType === 'survey_response' && change.reason === 'reconnect'));
   const count = changes.length;
   cleanup();
   statusChanged('SUBSCRIBED');
@@ -134,8 +168,9 @@ test('a changed submission loads every answer across server-capped pages, not on
     select: () => query,
     eq: (column: string, value: string) => { assert.deepEqual([column, value], ['record_type', 'survey_response']); return query; },
     in: (column: string, ids: string[]) => { assert.equal(column, 'payload->>responseId'); assert.deepEqual(ids, ['r']); return query; },
+    gt: (column: string, id: string) => { assert.equal(column, 'record_id'); assert.match(id, /^r:q/); return query; },
     order: () => query,
-    range: async (from: number) => { requests++; return { data: answers.slice(from, from + 2), error: null }; },
+    limit: async () => { const from = (requests++) * 2; return { data: answers.slice(from, from + 2), error: null }; },
   };
   const client = { from: () => query } as unknown as SupabaseClient;
   const rows = await loadApplicationRecordsByIds<SurveyResponse>('survey_response', ['r'], 'payload->>responseId', client);
@@ -177,35 +212,6 @@ test('uses the submission and question IDs as the stable response-row key', () =
   assert.equal(surveyResponseRecordId(response), 'response-1:Q-SUP-01');
 });
 
-test('splits application-record reads into complete, non-overlapping pages', () => {
-  assert.deepEqual(applicationRecordPageRanges(0), []);
-  assert.deepEqual(applicationRecordPageRanges(1), [[0, 0]]);
-  assert.deepEqual(applicationRecordPageRanges(1_001), [[0, 999], [1_000, 1_000]]);
-  assert.deepEqual(applicationRecordPageRanges(1_001, 500), [
-    [0, 499],
-    [500, 999],
-    [1_000, 1_000],
-  ]);
-});
-
-test('fetches the documented response dataset in one bounded follow-up page batch', () => {
-  const remainingPages = applicationRecordPageRanges(6_355).slice(1);
-  const batches = batchApplicationRecordPageRanges(remainingPages);
-
-  assert.equal(remainingPages.length, 6);
-  assert.equal(batches.length, 1);
-  assert.equal(batches[0].length, 6);
-  assert.deepEqual(batches.flat(), remainingPages);
-  assert.deepEqual(batchApplicationRecordPageRanges(remainingPages, 5).map((batch) => batch.length), [5, 1]);
-  assert.deepEqual(batchApplicationRecordPageRanges(remainingPages, 0), []);
-});
-
-test('discovers later application-record pages in bounded parallel batches', () => {
-  assert.deepEqual(nextApplicationRecordPageBatch(0), Array.from({ length: 6 }, (_, index) => [index * 1_000, index * 1_000 + 999]));
-  assert.deepEqual(nextApplicationRecordPageBatch(1_000, 500, 3), [[1_000, 1_499], [1_500, 1_999], [2_000, 2_499]]);
-  assert.deepEqual(nextApplicationRecordPageBatch(-1), []);
-});
-
 test('merges changed application records and removes changed IDs absent from the RLS result', () => {
   const oldResponse = { ...validApplicationRecords.survey_response.payload as SurveyResponse };
   const keepResponse = { ...oldResponse, responseId: 'response-2' };
@@ -229,20 +235,6 @@ test('shows the realtime warning only after three consecutive failures and clear
   state = advanceRealtimeSyncState(state, 'CHANNEL_ERROR');
   assert.deepEqual(state, { consecutiveFailures: 3, warningVisible: true });
   assert.deepEqual(advanceRealtimeSyncState(state, 'SUBSCRIBED'), { consecutiveFailures: 0, warningVisible: false });
-});
-
-test('keeps application-record page requests within the configured Supabase API row limit', () => {
-  const config = readFileSync(new URL('../../supabase/config.toml', import.meta.url), 'utf8');
-  const maxRows = Number(config.match(/^max_rows\s*=\s*(\d+)/m)?.[1]);
-  assert.ok(Number.isInteger(maxRows) && maxRows > 0);
-  assert.ok(applicationRecordPageRanges(maxRows + 1).every(([from, to]) => to - from + 1 <= maxRows));
-});
-
-test('finds the contiguous remainder when Supabase caps a requested page', () => {
-  assert.deepEqual(incompleteApplicationRecordPageRange(0, 999, 500), [500, 999]);
-  assert.deepEqual(incompleteApplicationRecordPageRange(500, 999, 250), [750, 999]);
-  assert.equal(incompleteApplicationRecordPageRange(0, 999, 1_000), null);
-  assert.equal(incompleteApplicationRecordPageRange(0, 999, 0), null);
 });
 
 test('keeps frontend application record types aligned with the latest database constraint', () => {

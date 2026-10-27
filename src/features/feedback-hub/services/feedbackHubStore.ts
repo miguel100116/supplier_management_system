@@ -93,11 +93,11 @@ export function saveFeedbackHubSettings(settings: FeedbackHubSettings): void {
   }
 }
 
-export async function hydrateFeedbackHubFromSupabase(): Promise<void> {
+export async function hydrateFeedbackHubFromSupabase(signal?: AbortSignal): Promise<void> {
   let [contacts, reports, settings] = await Promise.all([
-    loadApplicationRecords<PartnerContact>('feedback_contact'),
-    loadApplicationRecords<QueuedReportEmail>('feedback_report'),
-    loadApplicationRecords<FeedbackHubSettings>('feedback_settings'),
+    loadApplicationRecords<PartnerContact>('feedback_contact', { signal }),
+    loadApplicationRecords<QueuedReportEmail>('feedback_report', { signal }),
+    loadApplicationRecords<FeedbackHubSettings>('feedback_settings', { signal }),
   ]);
 
   if (contacts.length === 0 && reports.length === 0 && settings.length === 0
@@ -115,6 +115,7 @@ export async function hydrateFeedbackHubFromSupabase(): Promise<void> {
     settings = [localSettings];
   }
 
+  signal?.throwIfAborted();
   localStorage.setItem(MIGRATION_STORAGE_KEY, 'true');
   localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(contacts));
   localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));

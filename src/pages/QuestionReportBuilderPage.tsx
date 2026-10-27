@@ -1,3 +1,4 @@
+import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -59,7 +60,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
     lowest: true,
   }));
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | null>(null);
+  const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close export menu on click outside
@@ -200,7 +201,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
     }
   };
 
-  const handleExport = async (format: 'pdf' | 'csv' | 'excel') => {
+  const handleExport = async (format: 'pdf' | 'csv' | 'excel' | 'docx') => {
     if (!canExport) return;
     setIsExporting(format);
     setOpenMenu(false);
@@ -264,9 +265,11 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
         });
       });
 
-      if (format === 'csv') {
+      if (format === 'docx') {
+        await exportTablesAsWord(reportTitle, tables, reportTitle, recipe);
+      } else if (format === 'csv') {
         const chunks = tables.map((table) => {
-          const csvBody = Papa.unparse({ fields: table.columns, data: table.rows });
+          const csvBody = Papa.unparse({ fields: table.columns, data: table.rows }, { escapeFormulae: true });
           return `${table.title}\n${csvBody}`;
         });
         const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8' });
@@ -742,7 +745,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
       </div>
 
       {/* Sticky footer build report control buttons */}
-      <div className="panel sticky bottom-4 flex flex-wrap items-center justify-between gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 dark:border-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10 z-10">
+      <div className="panel sticky bottom-4 max-[560px]:bottom-20 flex flex-wrap items-center justify-between gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.15)] border border-slate-200/80 dark:border-slate-800 ring-1 ring-slate-900/5 dark:ring-white/10 z-10">
         <button type="button" onClick={onBack} className="secondary-button">
           Cancel
         </button>
@@ -774,6 +777,13 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
                   <Table2 size={14} /> Excel Workbook
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExport('docx')}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  <FileType size={14} /> Word (.docx)
                 </button>
                 <button
                   type="button"

@@ -1,4 +1,5 @@
-import { deleteApplicationRecords, loadApplicationRecords, upsertApplicationRecords } from '../../../services/applicationRepository';
+import { deleteApplicationRecords, upsertApplicationRecords } from '../../../services/applicationRepository';
+import { loadExportHistoryMetadata, loadSavedExportFile } from './exportHistoryRepository';
 import { supabase } from '../../../services/supabaseClient';
 import { createReportId, reportFilename, type ReportFormat, type ReportRecipe } from '../domain/reportHistory';
 
@@ -12,6 +13,7 @@ export interface ExportHistoryEntry {
   recipe?: ReportRecipe;
   recipeUnavailable?: boolean;
   fileDataUrl?: string;
+  hasSavedFile?: boolean;
 }
 
 let history: ExportHistoryEntry[] = [];
@@ -68,7 +70,11 @@ export async function saveReportDownload(blob: Blob, title: string, format: Repo
   }
 }
 
-export function downloadExportAgain(entry: ExportHistoryEntry) {
+export async function downloadExportAgain(entry: ExportHistoryEntry) {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error('Sign in again to download this saved export.');
+  entry = await loadSavedExportFile(entry.id, data.user.id);
+  if (historyUser !== data.user.id) throw new Error('The active account changed. Please retry.');
   if (!entry.fileDataUrl) throw new Error('This legacy export has no saved file.');
   const [header, encoded] = entry.fileDataUrl.split(',');
   const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0));
@@ -84,12 +90,14 @@ export async function clearExportHistory() {
   notify();
 }
 
-export async function hydrateExportHistoryFromSupabase(): Promise<void> {
-  const { data } = await supabase.auth.getUser();
+export async function hydrateExportHistoryFromSupabase(signal?: AbortSignal): Promise<void> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw new Error('Unable to verify the export history owner.');
   const userId = data.user?.id ?? null;
   if (historyUser !== userId) { historyUser = userId; history = []; notify(); }
-  const entries = await loadApplicationRecords<ExportHistoryEntry>('export_history', { ownRecords: true });
-  if (userId !== historyUser) return;
+  if (!userId) return;
+  const entries = await loadExportHistoryMetadata(userId, supabase, signal);
+  if (signal?.aborted || userId !== historyUser) return;
   history = entries.sort((a, b) => b.exportedAt.localeCompare(a.exportedAt));
   notify();
 }

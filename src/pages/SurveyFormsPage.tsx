@@ -126,6 +126,10 @@ export function SurveyFormsPage({
   const [statusRefresh, setStatusRefresh] = useState(0);
   const [accessPickerOpen, setAccessPickerOpen] = useState(false);
   const [previewSurveyId, setPreviewSurveyId] = useState<string | null>(null);
+  const [isSavingPreviewPeriod, setIsSavingPreviewPeriod] = useState(false);
+  const [previewPeriodSaveMessage, setPreviewPeriodSaveMessage] = useState('');
+  const [previewPeriodSaveError, setPreviewPeriodSaveError] = useState('');
+  const previewPeriodSaveInFlight = useRef(false);
   const [previewEditSurveyId, setPreviewEditSurveyId] = useState<string | null>(null);
   const [sendConfirmationSurveyId, setSendConfirmationSurveyId] = useState<string | null>(null);
   const [isSendApprovalOpen, setIsSendApprovalOpen] = useState(false);
@@ -247,6 +251,30 @@ export function SurveyFormsPage({
     }
   };
 
+  const handlePreviewPeriodChange = async (periodCovered: NonNullable<CustomForm['periodCovered']>) => {
+    if (!previewSurvey || !isAdmin || (!onUpdateSurveysBulk && !onUpdateSurvey) || previewPeriodSaveInFlight.current) return;
+    const sharedSurveys = knownSurveys.filter((survey) => survey.surveyType === 'Courier' || survey.surveyType === 'Supplier');
+    if (sharedSurveys.length > 0 && sharedSurveys.every((survey) => (survey.periodCovered ?? '1st Half') === periodCovered)) return;
+
+    previewPeriodSaveInFlight.current = true;
+    setIsSavingPreviewPeriod(true);
+    setPreviewPeriodSaveMessage('');
+    setPreviewPeriodSaveError('');
+    try {
+      const updatedSurveys = knownSurveys
+        .filter((survey) => survey.surveyType === 'Courier' || survey.surveyType === 'Supplier')
+        .map((survey) => ({ ...survey, periodCovered }));
+      if (onUpdateSurveysBulk) await onUpdateSurveysBulk(updatedSurveys);
+      else if (onUpdateSurvey) await Promise.all(updatedSurveys.map((survey) => onUpdateSurvey(survey)));
+      setPreviewPeriodSaveMessage('Saved. Employee evaluations will use this period.');
+    } catch (error) {
+      setPreviewPeriodSaveError(error instanceof Error ? error.message : 'Unable to save this period. Please try again.');
+    } finally {
+      previewPeriodSaveInFlight.current = false;
+      setIsSavingPreviewPeriod(false);
+    }
+  };
+
   const handleConfirmSend = async () => {
     if (!isSendApprovalOpen || !isAdmin || !sendConfirmationSurvey || !onUpdateSurvey || isSendingForm || eligibleRecipients.length === 0) return;
     if (getSurveyStatus(sendConfirmationSurvey) === 'Archived') {
@@ -280,6 +308,7 @@ export function SurveyFormsPage({
 
   // Notification configuration states
   const [modifyStep, setModifyStep] = useState<1 | 2>(1);
+  const [newPeriodCovered, setNewPeriodCovered] = useState<NonNullable<CustomForm['periodCovered']>>('1st Half');
   const [notificationFrequency, setNotificationFrequency] = useState(() => {
     return getReminderFrequency();
   });
@@ -470,6 +499,7 @@ export function SurveyFormsPage({
     setIsSelectMode(false);
     setModifyStep(1);
     setNewStatus(getSurveyStatus(survey));
+    setNewPeriodCovered(survey.periodCovered ?? '1st Half');
     setArchiveEndedCategory(false);
     setNewDeadlineDate(ddmmToYyyymmdd(survey.deadlineDate || ''));
     setAccessDepartments(survey.accessDepartments?.length ? survey.accessDepartments : departmentOptions);
@@ -570,6 +600,9 @@ export function SurveyFormsPage({
         // snapshot. Other full-default selections stay unset so they keep
         // following the active Partner Registry; custom selections save IDs.
         if (!isSelectMode) {
+          if (survey.surveyType === 'Courier' || survey.surveyType === 'Supplier') {
+            updated.periodCovered = newPeriodCovered;
+          }
           const allIdsOfType = getSurveyEvaluationCompanies(
             { surveyType: survey.surveyType, evaluationCompanyIds: undefined },
             partnerCompanies
@@ -584,6 +617,19 @@ export function SurveyFormsPage({
         updatedSurveysList.push(updated);
       }
     });
+
+    if (!isSelectMode) {
+      const singleUpdate = updatedSurveysList[0];
+      if (singleUpdate?.surveyType === 'Courier' || singleUpdate?.surveyType === 'Supplier') {
+        const updatedById = new Map(updatedSurveysList.map((survey) => [survey.id, survey]));
+        knownSurveys.forEach((survey) => {
+          if (survey.surveyType !== 'Courier' && survey.surveyType !== 'Supplier') return;
+          const updatedSurvey = updatedById.get(survey.id) ?? survey;
+          updatedById.set(survey.id, { ...updatedSurvey, periodCovered: singleUpdate.periodCovered ?? newPeriodCovered });
+        });
+        updatedSurveysList.splice(0, updatedSurveysList.length, ...updatedById.values());
+      }
+    }
 
     // Save selected notification frequency
     saveReminderFrequency(notificationFrequency);
@@ -854,15 +900,23 @@ export function SurveyFormsPage({
           />
         ) : (
           <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-            <table className="w-full min-w-[720px] border-collapse text-[13px]">
+            <table className="survey-forms-table w-full min-w-[960px] table-fixed border-collapse text-xs">
+              <colgroup>
+                <col className="survey-forms-title-column" />
+                <col className="survey-forms-category-column" />
+                <col className="survey-forms-status-column" />
+                <col className="survey-forms-completion-column" />
+                <col className="survey-forms-deadline-column" />
+                <col className="survey-forms-actions-column" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-400">
-                  <th className="px-4 py-3">Survey Title</th>
-                  <th className="px-4 py-3">Category Type</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Completion</th>
-                  <th className="px-4 py-3">Deadline Date</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th scope="col" className="px-3 py-2.5">Survey Title</th>
+                  <th scope="col" className="px-3 py-2.5">Category Type</th>
+                  <th scope="col" className="px-3 py-2.5">Status</th>
+                  <th scope="col" className="px-3 py-2.5">Completion</th>
+                  <th scope="col" className="px-3 py-2.5">Deadline Date</th>
+                  <th scope="col" className="px-3 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -874,29 +928,29 @@ export function SurveyFormsPage({
  
                   return (
                     <tr key={survey.id} className={`align-middle hover:bg-slate-50/40 dark:hover:bg-slate-900/10 ${survey.status === 'Archived' ? 'bg-slate-50/80 text-slate-400 opacity-70 dark:bg-slate-950/50' : ''}`}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="space-y-0.5 max-w-sm">
+                      <td className="px-3 py-2.5">
+                        <div className="min-w-0">
+                          <div className="space-y-0.5">
                             <button
                               type="button"
-                              onClick={() => { setPreviewSurveyId(survey.id); setDistributionFeedback(null); }}
-                              className="text-left font-bold text-slate-800 hover:text-[#2187CD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] dark:text-slate-100 dark:hover:text-blue-300"
+                              onClick={() => { setPreviewSurveyId(survey.id); setDistributionFeedback(null); setPreviewPeriodSaveMessage(''); setPreviewPeriodSaveError(''); }}
+                              className="block max-w-full truncate text-left text-[13px] font-semibold leading-5 text-slate-800 hover:text-[#2187CD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] dark:text-slate-100 dark:hover:text-blue-300"
                               aria-label={`Preview ${survey.title}`}
                             >
                               {survey.title}
                             </button>
-                            <p className="text-xs text-slate-400 dark:text-slate-500 line-clamp-1" title={survey.description}>
+                            <p className="line-clamp-1 text-[11px] leading-4 text-slate-400 dark:text-slate-500" title={survey.description}>
                               {survey.description || 'No description provided.'}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <span className={`${surveyBadgeClassName} ${surveyTypeBadges[survey.surveyType]}`}>
                           {survey.surveyType}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <span className={`${surveyBadgeClassName} ${
                           effectiveStatus === 'Running' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/20' :
                           effectiveStatus === 'Paused' ? 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/20' :
@@ -908,36 +962,36 @@ export function SurveyFormsPage({
                            effectiveStatus.toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2.5">
                         <CompletionStatusBar completed={completedForType} total={totalForType} />
                       </td>
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                        <span className="inline-flex items-center gap-1.5">
+                      <td className="px-3 py-2.5 text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs">
                           <CalendarClock size={13} className="text-slate-400" />
                           {deadlineLabel}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-2.5 text-right">
                         {isAdmin ? (
-                          <div className="flex items-center justify-end gap-2.5">
+                          <div className="survey-forms-row-actions flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => { setSelectedSurveyIds(new Set([survey.id])); setArchiveError(''); setIsArchiveConfirmOpen(true); }}
                               disabled={survey.status === 'Archived'}
-                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300 px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40"
+                              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-slate-200 px-2.5 text-xs font-semibold leading-none text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
                               type="button"
                               title="Archive form"
                             >
-                              <Archive size={15} />
+                              <Archive size={14} aria-hidden="true" />
                               <span>Archive</span>
                             </button>
                             <button
-                              onClick={() => { setPreviewSurveyId(survey.id); setDistributionFeedback(null); }}
+                              onClick={() => { setPreviewSurveyId(survey.id); setDistributionFeedback(null); setPreviewPeriodSaveMessage(''); setPreviewPeriodSaveError(''); }}
                               disabled={survey.status === 'Archived'}
-                              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2187CD] text-white hover:bg-[#1976B5] dark:bg-blue-600 dark:hover:bg-blue-700 px-3 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-40"
+                              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-[#2187CD] px-2.5 text-xs font-semibold leading-none text-white transition hover:bg-[#1976B5] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-600 dark:hover:bg-blue-700"
                               type="button"
                               title="Preview and send form"
                             >
-                              <Send size={15} />
+                              <Send size={14} aria-hidden="true" />
                               <span>Send</span>
                             </button>
                           </div>
@@ -1055,10 +1109,10 @@ export function SurveyFormsPage({
       )}
       {previewSurvey && !previewEditSurveyId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="survey-preview-title">
-          <div aria-hidden="true" className="absolute inset-0 bg-slate-950/45" />
+          <div aria-hidden="true" className="fixed inset-0 bg-slate-950/45" />
           <section className="relative flex max-h-[88vh] w-full max-w-[780px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <header className="flex items-start justify-between border-b border-slate-100 px-6 py-5 dark:border-slate-800"><div><p className="text-xs font-bold uppercase tracking-wide text-[#2187CD]">Read-only preview · {previewSurvey.surveyType}</p><h2 id="survey-preview-title" className="mt-1 text-xl font-bold">{previewSurvey.title}</h2><p className="mt-1 text-sm text-slate-500">{previewSurvey.description}</p></div><button onClick={() => setPreviewSurveyId(null)} aria-label="Close preview"><X size={24}/></button></header>
-            <div className="flex-1 space-y-3 overflow-y-auto p-5 sm:p-7">{previewSurvey.questions.slice().sort((a,b) => a.questionNumber-b.questionNumber).map((question, index) => <article key={question.questionId} className="rounded-xl border border-slate-200 p-5 dark:border-slate-700"><p className="text-xs font-semibold text-slate-500">{question.section ? `${question.section} · ` : ''}{question.questionCategory} · Question {question.questionNumber || index + 1}</p><h3 className="mt-2 font-semibold text-slate-800 dark:text-slate-100">{question.question}</h3>{question.inputType === 'checkbox' || question.inputType === 'select' ? <div className="mt-3 space-y-2">{(question.options ?? []).map((option) => <div key={option} className="flex items-center gap-3 text-sm text-slate-600"><span className="h-4 w-4 rounded border border-slate-300"/>{option}</div>)}</div> : question.inputType === 'matrix' ? <div className="mt-3 space-y-2">{(question.subQuestions ?? []).map((item) => <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800"><b>{item.label}</b>{item.description && <p className="text-xs text-slate-500">{item.description}</p>}</div>)}</div> : <div className="mt-3 max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-400">{question.inputType === 'typed-rating' ? `Enter a number from ${question.validationRange?.min ?? 0} to ${question.validationRange?.max ?? previewSurvey.maxRating ?? 100}${question.validationRange?.allowNa ? ' or N/A' : ''}` : question.inputType === 'date-range' ? 'Select date range' : question.inputType === 'text' ? 'Enter your response' : `Rating scale: 0 to ${previewSurvey.maxRating ?? 100}`}</div>}</article>)}</div>
+            <header className="flex items-start justify-between border-b border-slate-100 px-6 py-5 dark:border-slate-800"><div><p className="text-xs font-bold uppercase tracking-wide text-[#2187CD]">Survey preview · {previewSurvey.surveyType}</p><h2 id="survey-preview-title" className="mt-1 text-xl font-bold">{previewSurvey.title}</h2><p className="mt-1 text-sm text-slate-500">{previewSurvey.description}</p></div><button onClick={() => setPreviewSurveyId(null)} aria-label="Close preview"><X size={24}/></button></header>
+            <div className="flex-1 space-y-3 overflow-y-auto p-5 sm:p-7">{previewSurvey.questions.slice().sort((a,b) => a.questionNumber-b.questionNumber).map((question, index) => <article key={question.questionId} className="rounded-xl border border-slate-200 p-5 dark:border-slate-700 dark:bg-slate-900"><p className="text-xs font-semibold text-slate-500">{question.section ? `${question.section} · ` : ''}{question.questionCategory} · Question {question.questionNumber || index + 1}</p><h3 className="mt-2 font-semibold text-slate-800 dark:text-slate-100">{question.question}</h3>{question.question === 'Period Covered' && isAdmin ? <><div className="mt-3 space-y-2" role="radiogroup" aria-label="Set period covered for employee evaluations">{(['1st Half', '2nd Half', 'Annual'] as const).map((option) => <label key={option} className="flex min-h-8 cursor-pointer items-center gap-3 text-sm text-slate-600 dark:text-slate-300"><input type="radio" name={`period-covered-${previewSurvey.id}`} className="h-4 w-4 accent-[#2187CD] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2187CD]" checked={(previewSurvey.periodCovered ?? '1st Half') === option} disabled={(!onUpdateSurveysBulk && !onUpdateSurvey) || isSavingPreviewPeriod} onClick={() => void handlePreviewPeriodChange(option)} onChange={() => void handlePreviewPeriodChange(option)}/>{option}</label>)}</div>{isSavingPreviewPeriod && <p className="mt-2 text-xs text-slate-500" role="status">Saving period…</p>}{previewPeriodSaveMessage && <p className="mt-2 text-xs text-emerald-700" role="status">{previewPeriodSaveMessage}</p>}{previewPeriodSaveError && <p className="mt-2 text-xs text-rose-600" role="alert">{previewPeriodSaveError}</p>}</> : question.inputType === 'checkbox' || question.inputType === 'select' ? <div className="mt-3 space-y-2">{(question.options ?? []).map((option) => <div key={option} className="flex items-center gap-3 text-sm text-slate-600"><span className="h-4 w-4 rounded border border-slate-300"/>{option}</div>)}</div> : question.inputType === 'matrix' ? <div className="mt-3 space-y-2">{(question.subQuestions ?? []).map((item) => <div key={item.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-800"><b>{item.label}</b>{item.description && <p className="text-xs text-slate-500">{item.description}</p>}</div>)}</div> : <div className="mt-3 max-w-sm rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-400">{question.inputType === 'typed-rating' ? `Enter a number from ${question.validationRange?.min ?? 0} to ${question.validationRange?.max ?? previewSurvey.maxRating ?? 100}${question.validationRange?.allowNa ? ' or N/A' : ''}` : question.inputType === 'date-range' ? 'Select date range' : question.inputType === 'text' ? 'Enter your response' : `Rating scale: 0 to ${previewSurvey.maxRating ?? 100}`}</div>}</article>)}</div>
             <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 p-4 dark:border-slate-800">{distributionFeedback && <p className={`mr-auto text-sm ${distributionFeedback.kind === 'error' ? 'text-rose-600' : 'text-emerald-700'}`} role="status">{distributionFeedback.text}</p>}<div className="ml-auto flex gap-2"><button onClick={() => { setPreviewEditError(''); setPreviewEditSurveyId(previewSurvey.id); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold"><Pencil size={15}/> Edit Form</button><button onClick={() => { setSendCompanyIds(null); setDistributionFeedback(null); setSendConfirmationSurveyId(previewSurvey.id); }} className="inline-flex items-center gap-2 rounded-lg bg-[#2187CD] px-4 py-2 text-sm font-semibold text-white"><Send size={15}/> Send Form</button></div></footer>
           </section>
         </div>
@@ -1303,7 +1357,7 @@ export function SurveyFormsPage({
               />
 
               {/* Centered Modal Container */}
-              <div className="relative w-full max-w-2xl h-[88vh] max-h-[88vh] min-h-[34rem] rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="relative w-full max-w-2xl h-[88vh] max-h-[calc(100dvh-2rem)] min-h-0 rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                 
                 {/* Modal Title/Header (Static) */}
                 <div className="border-b border-slate-100 dark:border-slate-800 px-6 py-4 flex justify-between items-center shrink-0">
@@ -1496,6 +1550,30 @@ export function SurveyFormsPage({
                     </>
                   ) : (
                     <>
+                      {!isSelectMode && (() => {
+                        const selectedSurvey = surveys.find((survey) => selectedSurveyIds.has(survey.id));
+                        if (!selectedSurvey || (selectedSurvey.surveyType !== 'Courier' && selectedSurvey.surveyType !== 'Supplier')) return null;
+
+                        return (
+                          <div className="space-y-2">
+                            <p className="text-xs font-bold uppercase text-slate-900 dark:text-slate-100">PERIOD COVERED</p>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+                              <label htmlFor="manage-access-period" className="mb-2 block text-[11px] font-medium text-slate-600 dark:text-slate-300">Prefilled on employee evaluations</label>
+                              <select
+                                id="manage-access-period"
+                                className="h-9 w-full max-w-xs rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#2187CD] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                value={newPeriodCovered}
+                                onChange={(event) => setNewPeriodCovered(event.target.value as NonNullable<CustomForm['periodCovered']>)}
+                              >
+                                <option value="1st Half">1st Half</option>
+                                <option value="2nd Half">2nd Half</option>
+                                <option value="Annual">Annual</option>
+                              </select>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* Section 3: Set Deadline */}
                       <div className="space-y-2">
                         <label className="block text-xs font-bold uppercase text-slate-900 dark:text-slate-100">SET DEADLINE</label>

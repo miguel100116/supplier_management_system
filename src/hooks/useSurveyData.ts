@@ -1351,6 +1351,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUserEmail) return;
     let cancelled = false;
+    const controller = new AbortController();
+    const readOptions = { signal: controller.signal };
+    let initialHydration: Promise<void> | undefined;
     const refreshTimers = new Map<ApplicationRecordType, ReturnType<typeof createDebouncedTask>>();
     let activeBackgroundRefreshes = 0;
     let pendingSurveyResponseIds = new Set<string>();
@@ -1378,9 +1381,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       const sessionEmail = await getSupabaseSessionEmail();
       if (!sessionEmail || sessionEmail !== currentUserEmail.trim().toLowerCase()) return;
       const [storedCompanies, storedSurveys, storedResponses] = await Promise.all([
-        loadApplicationRecords<PartnerCompany>('partner_company'),
-        loadApplicationRecords<CustomForm>('survey'),
-        loadApplicationRecords<SurveyResponse>('survey_response'),
+        loadApplicationRecords<PartnerCompany>('partner_company', readOptions),
+        loadApplicationRecords<CustomForm>('survey', readOptions),
+        loadApplicationRecords<SurveyResponse>('survey_response', readOptions),
       ]);
       const companies = storedCompanies.length > 0
         ? storedCompanies
@@ -1420,8 +1423,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
       void (async () => {
         let [storedSeries, storedCategoryLabels, remoteNotificationState] = await Promise.all([
-          loadApplicationRecords<ArchiveSeries>('archive_series'),
-          loadApplicationRecords<Record<SurveyType, string[]>>('category_labels'),
+          loadApplicationRecords<ArchiveSeries>('archive_series', readOptions),
+          loadApplicationRecords<Record<SurveyType, string[]>>('category_labels', readOptions),
           loadNotificationReadState(currentUserEmail),
         ]);
 
@@ -1465,13 +1468,16 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     };
 
     const refreshRecordType = async (recordType: ApplicationRecordType) => {
+      // Reconcile the subscription gap after startup, without two competing full reads.
+      await initialHydration?.catch(() => {});
+      if (cancelled) return;
       setError(null);
       const sessionEmail = await getSupabaseSessionEmail();
       if (!sessionEmail || sessionEmail !== currentUserEmail.trim().toLowerCase()) return;
 
       switch (recordType) {
         case 'partner_company': {
-          const storedCompanies = await loadApplicationRecords<PartnerCompany>('partner_company');
+          const storedCompanies = await loadApplicationRecords<PartnerCompany>('partner_company', readOptions);
           const companies = storedCompanies.length > 0 ? storedCompanies : await loadNormalizedPartnerCompanies();
           if (cancelled) return;
           const normalizedCompanies = companies.map(normalizeDatabasePartnerCompany).map(normalizePartnerCompany);
@@ -1480,7 +1486,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           return;
         }
         case 'survey': {
-          const storedSurveys = await loadApplicationRecords<CustomForm>('survey');
+          const storedSurveys = await loadApplicationRecords<CustomForm>('survey', readOptions);
           if (cancelled) return;
           const normalizedSurveys = storedSurveys.map(normalizeCustomForm);
           setSurveys(normalizedSurveys);
@@ -1495,8 +1501,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           pendingSurveyResponseIds = new Set();
           refreshAllSurveyResponses = false;
           const storedResponses = shouldRefreshAll
-            ? await loadApplicationRecords<SurveyResponse>('survey_response')
-            : await loadApplicationRecordsByIds<SurveyResponse>('survey_response', submissionIds, 'payload->>responseId');
+            ? await loadApplicationRecords<SurveyResponse>('survey_response', readOptions)
+            : await loadApplicationRecordsByIds<SurveyResponse>('survey_response', submissionIds, 'payload->>responseId', undefined, controller.signal);
           if (cancelled) return;
           const normalizedResponses = storedResponses.map(normalizeSurveyResponse);
           const mergedResponses = shouldRefreshAll
@@ -1526,14 +1532,14 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           return;
         }
         case 'archive_series': {
-          const storedSeries = await loadApplicationRecords<ArchiveSeries>('archive_series');
+          const storedSeries = await loadApplicationRecords<ArchiveSeries>('archive_series', readOptions);
           if (cancelled) return;
           setArchiveSeries(storedSeries);
           safeSetItem('survey_archive_series_v1', JSON.stringify(storedSeries));
           return;
         }
         case 'category_labels': {
-          const storedCategoryLabels = await loadApplicationRecords<Record<SurveyType, string[]>>('category_labels');
+          const storedCategoryLabels = await loadApplicationRecords<Record<SurveyType, string[]>>('category_labels', readOptions);
           if (cancelled) return;
           const hydratedCategoryLabels = storedCategoryLabels[0] ?? {
             Courier: [...DEFAULT_CATEGORIES.Courier],
@@ -1566,7 +1572,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
       const operation = backgroundRefresh && recordType
         ? refreshRecordTypeCoalesced(recordType)
-        : hydrateFromSupabase();
+        : (initialHydration = hydrateFromSupabase());
 
       void operation
       .catch((loadError) => {
@@ -1627,6 +1633,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
     return () => {
       cancelled = true;
+      controller.abort();
       refreshTimers.forEach((batch) => batch.cancel());
       refreshTimers.clear();
       window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshChangedRecord);
@@ -1638,8 +1645,16 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const createSurvey = async (newForm: Omit<CustomForm, 'id' | 'createdAt'>) => {
     const id = `survey-${Date.now()}`;
     const createdAt = new Date().toISOString();
+    const configuredPeriod = surveys.find((survey) =>
+      (survey.surveyType === 'Courier' || survey.surveyType === 'Supplier') && survey.periodCovered
+    )?.periodCovered ?? '1st Half';
     const surveyWithId: CustomForm = {
-      ...normalizeCustomForm(newForm as CustomForm),
+      ...normalizeCustomForm({
+        ...newForm,
+        ...((newForm.surveyType === 'Courier' || newForm.surveyType === 'Supplier')
+          ? { periodCovered: newForm.periodCovered ?? configuredPeriod }
+          : {}),
+      } as CustomForm),
       id,
       createdAt,
     };
