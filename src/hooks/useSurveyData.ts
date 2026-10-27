@@ -1645,8 +1645,16 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const createSurvey = async (newForm: Omit<CustomForm, 'id' | 'createdAt'>) => {
     const id = `survey-${Date.now()}`;
     const createdAt = new Date().toISOString();
+    const configuredPeriod = surveys.find((survey) =>
+      (survey.surveyType === 'Courier' || survey.surveyType === 'Supplier') && survey.periodCovered
+    )?.periodCovered ?? '1st Half';
     const surveyWithId: CustomForm = {
-      ...normalizeCustomForm(newForm as CustomForm),
+      ...normalizeCustomForm({
+        ...newForm,
+        ...((newForm.surveyType === 'Courier' || newForm.surveyType === 'Supplier')
+          ? { periodCovered: newForm.periodCovered ?? configuredPeriod }
+          : {}),
+      } as CustomForm),
       id,
       createdAt,
     };

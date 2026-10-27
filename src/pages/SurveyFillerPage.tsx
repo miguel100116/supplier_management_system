@@ -7,6 +7,12 @@ import { formatSurveyDateRange, validateSurveyDateRange } from '../features/eval
 import { SurveyDateRangeQuestion } from '../features/evaluations/components/SurveyDateRangeQuestion';
 import { RatingScale } from '../features/evaluations/components/RatingScale';
 import { resolveSelectableSurveyId } from '../features/evaluations/domain/surveySelection';
+import {
+  isOptionalEmployeeRemark,
+  isOverallFeedbackQuestion,
+  isValidOverallFeedbackAnswer,
+  OVERALL_FEEDBACK_VALIDATION_MESSAGE,
+} from '../features/evaluations/domain/surveyQuestionRequirements';
 import { getQuestionMaxPoints } from '../data/questionWeights';
 import { getPendingEvaluationCompanies } from '../features/evaluations/domain/evaluationProgress';
 import { getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
@@ -120,7 +126,6 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   const respondentType = defaultRespondentType ?? '';
   const hasOrganizationalProfile = Boolean(department && respondentType);
   const [address, setAddress] = useState('');
-  const [periodCovered, setPeriodCovered] = useState('1st Half');
 
   // Answers state
   const [ratings, setRatings] = useState<Record<string, any>>({});
@@ -132,6 +137,15 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   const [copyPreviousAnswers, setCopyPreviousAnswers] = useState(true);
 
   const activeSurvey = surveys.find((s) => s.id === selectedSurveyId);
+  const periodCovered = activeSurvey?.periodCovered ?? '1st Half';
+  const periodQuestionId = activeSurvey?.questions.find((question) => question.question === 'Period Covered')?.questionId;
+  useEffect(() => {
+    if (!periodQuestionId) return;
+    setRatings((previous) => previous[periodQuestionId] === periodCovered
+      ? previous
+      : { ...previous, [periodQuestionId]: periodCovered });
+  }, [periodCovered, periodQuestionId]);
+
   useEffect(() => {
     const nextId = resolveSelectableSurveyId(surveys, selectedSurveyId);
     if (nextId === selectedSurveyId) return;
@@ -301,12 +315,14 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       const qMax = getQuestionMaxPoints(activeSurvey.surveyType, q.questionId);
       const previousAnswer = copyPreviousAnswers ? lastSubmissionForType?.answers.get(q.questionId) : undefined;
 
-      if (draftRatings[q.questionId] !== undefined) {
+      if (q.question === 'Period Covered') {
+        // The Admin-managed form setting is authoritative, including when a
+        // draft contains a value saved before the setting changed.
+        initialRatings[q.questionId] = periodCovered;
+      } else if (draftRatings[q.questionId] !== undefined) {
         initialRatings[q.questionId] = draftRatings[q.questionId];
       } else {
-        if (q.question === 'Period Covered') {
-          initialRatings[q.questionId] = periodCovered;
-        } else if (q.inputType === 'checkbox') {
+        if (q.inputType === 'checkbox') {
           initialRatings[q.questionId] = [];
         } else if (q.inputType === 'matrix') {
           // Copy each sub-question's previous rating individually, keyed the same
@@ -477,7 +493,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
            }
         });
       } else if (q.inputType === 'text') {
-        if (!valStr) {
+        if (employeeExperience && isOverallFeedbackQuestion(q) && !isValidOverallFeedbackAnswer(val)) {
+          errors[q.questionId] = OVERALL_FEEDBACK_VALIDATION_MESSAGE;
+        } else if (!valStr && !isOptionalEmployeeRemark(q, employeeExperience)) {
           errors[q.questionId] = 'This field is required. Please enter your answer.';
         }
       } else if (q.inputType === 'typed-rating') {
@@ -622,7 +640,6 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   const handleReset = () => {
     setCompany('');
     setAddress('');
-    setPeriodCovered('1st Half');
     setRatings({});
     setComments({});
     setValidationErrors({});
@@ -835,16 +852,13 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 {activeSurvey && (activeSurvey.surveyType === 'Courier' || activeSurvey.surveyType === 'Supplier') && (
                   <div>
                     <label htmlFor="filler-period" className="field-label">Period Covered</label>
-                    <select
+                    <input
                       id="filler-period"
                       className="field"
                       value={periodCovered}
-                      onChange={(e) => setPeriodCovered(e.target.value)}
-                    >
-                      <option value="1st Half">1st Half</option>
-                      <option value="2nd Half">2nd Half</option>
-                      <option value="Annual">Annual</option>
-                    </select>
+                      readOnly
+                      aria-readonly="true"
+                    />
                   </div>
                 )}
 
@@ -920,8 +934,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             <section className="review-summary" aria-label="Evaluation answers">
               {activeSurvey.questions.filter((question) => question.question !== 'Period Covered').map((question, index) => {
                 const answer = ratings[question.questionId];
+                const optionalRemark = isOptionalEmployeeRemark(question, employeeExperience);
                 const answerText = answer == null || answer === ''
-                  ? 'Not answered'
+                  ? optionalRemark ? 'Optional — left blank' : 'Not answered'
                   : Array.isArray(answer)
                     ? answer.join(', ')
                     : typeof answer === 'object'
@@ -955,6 +970,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 }
 
                 const maxVal = getQuestionMaxPoints(activeSurvey.surveyType, q.questionId);
+                const optionalRemark = isOptionalEmployeeRemark(q, employeeExperience);
                 const ratingMin = q.inputType === 'typed-rating' ? (q.validationRange?.min ?? 0) : 0;
                 const ratingMax = q.inputType === 'typed-rating' ? (q.validationRange?.max ?? 100) : maxVal;
                 const ratingAllowsNa = q.inputType === 'typed-rating' ? (q.validationRange?.allowNa ?? true) : true;
@@ -981,7 +997,9 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                         <div className="flex items-start justify-between gap-4">
                           <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">
                             <span className="text-slate-400 font-bold mr-1.5">{idx + 1}.</span>
-                            {q.question} <span className="text-rose-500 font-bold">*</span>
+                            {q.question}{' '}{optionalRemark
+                              ? <span className="text-xs font-medium text-slate-500 dark:text-slate-400">(optional)</span>
+                              : <span className="text-rose-500 font-bold">*</span>}
                           </h4>
                           {!employeeExperience && <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                             {q.questionCategory}
@@ -1020,18 +1038,31 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                             type="text"
                             placeholder="Enter your answer"
                             className="field w-full"
+                            aria-required={!optionalRemark}
+                            aria-invalid={Boolean(validationErrors[q.questionId]) || undefined}
+                            aria-describedby={validationErrors[q.questionId] ? `question-error-${q.questionId}` : undefined}
                             value={ratings[q.questionId] !== undefined ? ratings[q.questionId].toString() : ''}
                             onChange={(e) => {
-                              handleRatingChange(q.questionId, e.target.value);
+                              const nextValue = e.target.value;
+                              handleRatingChange(q.questionId, nextValue);
                               if (validationErrors[q.questionId]) {
                                 setValidationErrors(prev => {
                                   const copy = { ...prev };
-                                  delete copy[q.questionId];
+                                  if (employeeExperience && isOverallFeedbackQuestion(q) && !isValidOverallFeedbackAnswer(nextValue)) {
+                                    copy[q.questionId] = OVERALL_FEEDBACK_VALIDATION_MESSAGE;
+                                  } else {
+                                    delete copy[q.questionId];
+                                  }
                                   return copy;
                                 });
                               }
                             }}
                           />
+                          {validationErrors[q.questionId] && (
+                            <p id={`question-error-${q.questionId}`} className="mt-2 text-xs font-semibold text-rose-500" role="alert">
+                              {validationErrors[q.questionId]}
+                            </p>
+                          )}
                         </div>
                       ) : q.inputType === 'checkbox' ? (
                         <div>

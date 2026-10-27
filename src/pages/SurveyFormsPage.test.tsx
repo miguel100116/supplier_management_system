@@ -120,8 +120,6 @@ test('SMS-55 keeps the admin Forms controls while removing duplicate navigation 
   assert.doesNotMatch(html, /Select Forms/);
   assert.match(html, /Search survey forms/);
   assert.match(html, /Search survey title or description/);
-  assert.match(html, /Deadline range/);
-  assert.match(html, /Reset/);
   assert.match(html, /<button\b(?=[^>]*aria-label="Preview Example Form")[^>]*>Example Form<\/button>/);
   assert.match(html, /Manage Access/);
   assert.match(html, /Archive/);
@@ -154,12 +152,14 @@ test('employee Forms keeps its existing context heading and survey actions', () 
   assert.match(html, /Answer Survey/);
 });
 
-test('SMS-56 puts the admin controls in one toolbar and counts changed sort and date range filters', () => {
+test('SMS-56 keeps the admin controls in one responsive toolbar and exposes sort and date filters', () => {
   const html = renderFormsPage(true);
   assert.match(html, /role="toolbar" aria-label="Survey forms controls"/);
   assert.match(html, /role="group" aria-label="Survey category"/);
-  assert.match(html, /<details class="relative shrink-0">/);
-  assert.match(html, /Reset filters/);
+  assert.match(html, /aria-label="Sort forms"[^>]*aria-expanded="false" aria-haspopup="dialog"/);
+  assert.match(html, /aria-label="Filter forms by deadline date"[^>]*aria-expanded="false" aria-haspopup="dialog"/);
+  assert.match(html, /class="survey-forms-table/);
+  assert.match(html, /class="survey-forms-row-actions/);
   assert.match(html, /1 form/);
   assert.doesNotMatch(html, /rounded-xl border border-slate-200 bg-slate-50\/70 p-3/);
   assert.equal(countActiveFormFilters('title-asc', '', ''), 0);
