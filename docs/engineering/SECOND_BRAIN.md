@@ -6,6 +6,12 @@ Last verified: 2026-10-27
 
 Archived Survey, Response, and Company PDFs now use the configured Report Library's A4 cover, Microgenesis logo, selected-item/category metadata, running page header, and numbered confidentiality footer. The complete archived tables and saved History recipe are unchanged; Word, Excel, and CSV already use the shared report exporters. The previous generic PDF introduction claimed broad analytics content that archived single-item reports do not contain. Evidence: `src/features/reports/services/archivedReportExport.ts`, `src/features/reports/components/ArchivedReportBuilder.tsx`, and the desktop/mobile archived download journeys. TypeScript checks, production build, and four focused desktop/mobile browser cases passed. Visual inspection in a native PDF reader and hosted downloads remain unverified.
 
+### 2026-10-26 - Admin-managed evaluation period
+
+Courier and Supplier surveys share one `periodCovered` setting, synchronized across their existing survey records to preserve the current persistence model. Admins can change it directly in any survey preview or in single-form **Workspace → Manage Access → Schedule & Notifications**; preview changes save immediately across Courier and Supplier forms. New forms inherit the configured value. Employee forms display the saved value read-only and use it for the submitted Period Covered answer, even when resuming an older draft. Legacy forms default to `1st Half`. Evidence: `src/types/survey.ts`, `src/pages/SurveyFormsPage.tsx`, `src/pages/SurveyFillerPage.tsx`, and `src/hooks/useSurveyData.ts`.
+
+Verification on 2026-10-26: `npm.cmd run lint`, `npm.cmd run build`, and `git diff --check` passed. Automated tests and rendered browser comparison were not run; no database migration or remote changes are needed because survey configuration is already stored in the shared survey record.
+
 ### 2026-10-26 - Bounded application reads and module-scoped shared data
 
 `applicationRepository.ts` now walks `application_records` by `(record_type, record_id)` cursor instead of increasing offsets and up to six concurrent full-payload pages. It continues through short server-capped pages, validates every returned record, and supports aborting reads when `useSurveyData` is disposed. Initial hydration and subscription reconciliation no longer run competing full response reads. Changed-submission reads use the same cursor and preserve full answer sets. Reconnect requests authoritative refreshes for active shared stores; canceled or failed reads do not replace cached state.

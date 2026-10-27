@@ -82,7 +82,14 @@ test('directory filters open from icons and reset independently inside their pop
   for (const label of ['Filter by supplier origin', 'Filter by document status', 'Filter by registration date']) assert.ok(activeMarkup.includes(label), label);
   assert.match(activeMarkup, /Clear partner search/);
   assert.match(FILTER_TOOLBAR_SOURCE, /FileCheck2/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /<select aria-label="Document status"/);
+  assert.doesNotMatch(FILTER_TOOLBAR_SOURCE, /<select aria-label="Document status"/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /optionList\('documents', 'Document status'/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /optionList\('sort', 'Sort partners by'/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /aria-pressed=\{selected\}/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /selectOption\(kind, option\.value, onSelect\)/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /onClick=\{\(\) => onDocumentFilterChange\('all'\)\}/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /onClick=\{\(\) => onSortChange\('default'\)\}/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /onRegisteredFromChange\(''\); onRegisteredToChange\(''\)/);
   assert.equal((FILTER_TOOLBAR_SOURCE.match(/className="admin-directory-popover-reset"/g) ?? []).length, 4);
   assert.match(ADMIN_REDESIGN_SOURCE, /\.admin-directory-popover-reset/);
   assert.match(ADMIN_REDESIGN_SOURCE, /#partner-company-search \{[\s\S]*?padding-left: 38px;[\s\S]*?padding-right: 38px;/);
