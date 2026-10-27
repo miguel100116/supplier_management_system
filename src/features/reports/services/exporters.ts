@@ -5,12 +5,32 @@ import autoTable from 'jspdf-autotable';
 import { saveReportDownload } from './exportHistory';
 import type { ReportRecipe } from '../domain/reportHistory';
 
+/** An editable Word document using the same complete tables as the other formats. */
+export async function exportTablesAsWord(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import('docx');
+  const doc = new Document({ styles: { default: {
+    document: { run: { font: 'Arial', size: 20 } },
+    title: { run: { color: '0063A9', bold: true, size: 36 } },
+    heading1: { run: { color: '0063A9', bold: true, size: 24 } },
+  } }, sections: [{ children: [
+    new Paragraph({ text: reportTitle, heading: HeadingLevel.TITLE }),
+    ...tables.flatMap(table => [
+      new Paragraph({ text: table.title, heading: HeadingLevel.HEADING_1 }),
+      new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [table.columns, ...table.rows].map((row, index) =>
+        new TableRow({ tableHeader: index === 0, children: row.map(value => new TableCell({ shading: index === 0 ? { fill: '0063A9' } : undefined, children: [
+          new Paragraph({ children: [new TextRun({ text: String(value), bold: index === 0, color: index === 0 ? 'FFFFFF' : '1E293B' })] }),
+        ] })) })) }),
+    ]),
+  ] }] });
+  await saveReportDownload(await Packer.toBlob(doc), reportTitle || filenameBase, 'docx', recipe);
+}
+
 /**
  * Shared client-side export helpers. Everything here runs entirely in the
  * browser - there's no export API on the server, so these functions build
  * the file in memory and hand the browser a Blob/data URI to download.
  * Keeping the "shape" (title + column headers + row arrays) generic means
- * the same three functions can back every export button in the app instead
+ * the same functions can back every export button in the app instead
  * of each page hand-rolling its own CSV/XLSX/PDF logic.
  */
 
@@ -107,10 +127,8 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
     doc.setTextColor(100);
     doc.setFont('helvetica', 'normal');
     let description = '';
-    if (table.title.includes('Top Performing')) {
-      description = 'This section lists the highest-ranked partner companies based on overall satisfaction and average scores across evaluated categories.';
-    } else if (table.title.includes('Least Rated')) {
-      description = 'This section lists partner companies that received lower relative ratings, identifying potential areas for engagement and improvement.';
+    if (table.title.includes('Company Rankings')) {
+      description = 'All scored partner companies, ordered from highest to lowest leaderboard score.';
     } else if (table.title.includes('Summary')) {
       description = 'High-level key performance metrics representing the aggregate evaluation data.';
     } else if (table.title.includes('Question')) {

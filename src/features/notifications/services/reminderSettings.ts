@@ -32,8 +32,8 @@ export function saveReminderFrequency(frequencyHours: string): void {
   window.dispatchEvent(new Event(REMINDER_SETTINGS_CHANGED_EVENT));
 }
 
-export async function hydrateReminderSettingsFromSupabase(canMigrate = false): Promise<void> {
-  let settings = await loadApplicationRecords<ReminderSettings>('reminder_settings');
+export async function hydrateReminderSettingsFromSupabase(canMigrate = false, signal?: AbortSignal): Promise<void> {
+  let settings = await loadApplicationRecords<ReminderSettings>('reminder_settings', { signal });
   if (settings.length === 0 && canMigrate && localStorage.getItem(MIGRATION_KEY) !== 'true') {
     const localSettings: ReminderSettings = {
       id: 'global',
@@ -43,6 +43,7 @@ export async function hydrateReminderSettingsFromSupabase(canMigrate = false): P
     await upsertApplicationRecords('reminder_settings', [localSettings], (item) => item.id);
     settings = [localSettings];
   }
+  signal?.throwIfAborted();
   if (settings.length > 0 || canMigrate) localStorage.setItem(MIGRATION_KEY, 'true');
   localStorage.setItem(STORAGE_KEY, settings[0]?.frequencyHours ?? DEFAULT_FREQUENCY);
   window.dispatchEvent(new Event(REMINDER_SETTINGS_CHANGED_EVENT));

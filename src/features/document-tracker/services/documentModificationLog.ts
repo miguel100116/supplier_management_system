@@ -37,14 +37,15 @@ export function logDocumentModification(entry: Omit<DocumentModificationEntry, '
   }
 }
 
-export async function hydrateDocumentModificationsFromSupabase(canMigrate = false): Promise<void> {
-  let entries = await loadApplicationRecords<DocumentModificationEntry>('document_modification');
+export async function hydrateDocumentModificationsFromSupabase(canMigrate = false, signal?: AbortSignal): Promise<void> {
+  let entries = await loadApplicationRecords<DocumentModificationEntry>('document_modification', { signal });
   if (entries.length === 0 && canMigrate && localStorage.getItem(MIGRATION_KEY) !== 'true') {
     entries = getDocumentModifications();
     if (entries.length > 0) {
       await upsertApplicationRecords('document_modification', entries, (entry) => entry.id, { ownRecords: true });
     }
   }
+  signal?.throwIfAborted();
   const ordered = entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, HISTORY_LIMIT);
   if (entries.length > 0 || canMigrate) localStorage.setItem(MIGRATION_KEY, 'true');
   localStorage.setItem(STORAGE_KEY, JSON.stringify(ordered));

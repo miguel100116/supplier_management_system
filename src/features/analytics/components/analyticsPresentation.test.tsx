@@ -13,6 +13,8 @@ import { QuestionReportBuilderPage } from '../../../pages/QuestionReportBuilderP
 import { CompanyReportBuilderPage } from '../../../pages/CompanyReportBuilderPage';
 import { questionWeights } from '../../../data/questionWeights';
 import { ReportsPage } from '../../../pages/ReportsPage';
+import { SummaryReportBuilderPage } from '../../../pages/SummaryReportBuilderPage';
+import { getAnalyticsCompanyRankings } from '../domain/rankings';
 
 function renderReport(element: React.ReactElement) {
   const previousReact = (globalThis as { React?: typeof React }).React;
@@ -22,6 +24,36 @@ function renderReport(element: React.ReactElement) {
   try { return renderToStaticMarkup(element); }
   finally { Object.assign(globalThis, { React: previousReact, localStorage: previousStorage, window: previousWindow }); }
 }
+
+test('summary and executive reports show every company once in descending order with response labels', () => {
+  const weight = questionWeights.Courier[0];
+  const responses: SurveyResponse[] = Array.from({ length: 24 }, (_, index) => ({
+    responseId: `submission-${index}`, companyId: `company-${index}`, company: `Ranked Partner ${String(index).padStart(2, '0')}`,
+    surveyType: 'Courier', respondentType: 'Employee', submissionDate: '2026-10-01', questionId: weight.questionId,
+    questionNumber: 1, question: 'Delivery reliability', questionCategory: weight.section,
+    rating: weight.maxPoints * (index + 1) / 24, comment: '', dataSource: 'client_csv',
+  }));
+  const expected = getAnalyticsCompanyRankings(responses, ['Courier']).map(row => row.name);
+  for (const builder of [
+    <SummaryReportBuilderPage responses={responses} partnerCompanies={[]} onBack={() => {}} />,
+    <ExecutiveSummaryReportBuilderPage responses={responses} partnerCompanies={[]} onBack={() => {}} />,
+    <SummaryReportBuilderPage responses={responses} partnerCompanies={[]} initialSettings={{ showTopCompanies: false, showBottomCompanies: true }} onBack={() => {}} />,
+  ]) {
+    const markup = renderReport(builder);
+    assert.doesNotMatch(markup, /Lowest Rated Companies|Lowest Rated Partners|Least Rated Companies|Bottom 10|Evaluations Count|Total Submitted Evaluations/);
+    const tables = [...markup.matchAll(/<table\b[\s\S]*?<\/table>/g)].map(match => match[0]);
+    const ranking = tables.find(table => table.includes('Leaderboard Score'));
+    assert.ok(ranking);
+    assert.match(ranking, />Responses</);
+    let previous = -1;
+    for (const name of expected) {
+      const position = ranking.indexOf(name);
+      assert.ok(position > previous, `${name} must appear in canonical descending order`);
+      assert.equal(ranking.split(name).length, 2, 'a company must appear once');
+      previous = position;
+    }
+  }
+});
 
 test('empty executive reports do not invent findings or declining performance', () => {
   const markup = renderReport(<ExecutiveSummaryReportBuilderPage responses={[]} partnerCompanies={[]} onBack={() => {}} />);

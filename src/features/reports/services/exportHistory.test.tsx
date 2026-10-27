@@ -6,6 +6,22 @@ import { createClient } from '@supabase/supabase-js';
 import { createReportId, describeReportParameters, reportFilename, validateReportRecipe } from '../domain/reportHistory';
 import { parseApplicationRecordPayload } from '../../../services/applicationRecordSchemas';
 
+function historyRows(rows: Array<{ record_id: string; owner_id?: string; payload: Record<string, unknown> }>, url: URL) {
+  let result = rows.filter(row => !row.owner_id || `eq.${row.owner_id}` === url.searchParams.get('owner_id'));
+  const id = url.searchParams.get('record_id');
+  if (id?.startsWith('eq.')) result = result.filter(row => row.record_id === id.slice(3));
+  if (id?.startsWith('in.')) result = result.filter(row => id.slice(4, -1).split(',').map(value => value.replace(/"/g, '')).includes(row.record_id));
+  if (id?.startsWith('gt.')) result = result.filter(row => row.record_id > id.slice(3));
+  if (url.searchParams.has('order')) result.sort((a, b) => a.record_id.localeCompare(b.record_id));
+  if (url.searchParams.has('payload->>fileDataUrl')) result = result.filter(row => row.payload.fileDataUrl != null);
+  const offset = Number(url.searchParams.get('offset') ?? 0);
+  result = result.slice(offset, offset + Number(url.searchParams.get('limit') ?? 1000));
+  if (url.searchParams.get('select')?.includes('title:payload')) return result.map(row => ({ record_id: row.record_id,
+    ...Object.fromEntries(['id', 'title', 'format', 'filename', 'exportedAt', 'exportedBy', 'recipe'].map(key => [key, row.payload[key] ?? null])) }));
+  if (url.searchParams.get('select') === 'record_id') return result.map(row => ({ record_id: row.record_id }));
+  return result;
+}
+
 test('filenames share one safe convention and distinguish repeated exports', () => {
   const date = new Date('2026-10-19T08:09:10.123Z');
   assert.equal(reportFilename('Company / Example', 'excel', date, '12345678-abcd'), 'sms_company-example_2026-10-19T08-09-10-123Z_12345678.xlsx');
@@ -94,7 +110,7 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
       if (init?.method === 'POST') rows.push(...JSON.parse(String(init.body)));
       const matching = rows.filter(row => `eq.${row.owner_id}` === url.searchParams.get('owner_id'));
       if (init?.method === 'DELETE') for (const row of matching) rows.splice(rows.indexOf(row), 1);
-      return new Response(JSON.stringify(init?.method === 'GET' ? matching.slice(Number(url.searchParams.get('offset') ?? 0), Number(url.searchParams.get('offset') ?? 0) + Number(url.searchParams.get('limit') ?? 1000)) : null), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(init?.method === 'GET' ? historyRows(rows, url) : null), { headers: { 'Content-Type': 'application/json' } });
     } },
   });
   mock.method(supabase, 'from', (name: string) => provider.from(name));
@@ -115,7 +131,7 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   mock.method(URL, 'revokeObjectURL', () => {});
   const anchor = { href: '', download: '', click() {}, remove() {} };
   Object.assign(globalThis, { document: { createElement: () => anchor, body: { appendChild() {} } } });
-  service.downloadExportAgain(service.getExportHistory()[0]);
+  await service.downloadExportAgain(service.getExportHistory()[0]);
   assert.equal(await downloaded!.text(), '%PDF-test');
   assert.equal(anchor.download, 'summary.pdf');
 
@@ -162,7 +178,18 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   await service.saveReportDownload(new Blob(['csv bytes'], { type: 'text/csv;charset=utf-8' }), 'Raw Data', 'csv', { kind: 'raw', parameters: { category: 'Supplier' } });
   assert.match(service.getExportHistory()[0].filename, /^sms_raw-data_.*\.csv$/);
   assert.equal(service.getExportHistory()[0].fileDataUrl, 'data:text/csv;charset=utf-8;base64,Y3N2IGJ5dGVz');
-  const { exportTablesAsCSV } = await import('./exporters');
+  const { exportTablesAsCSV, exportTablesAsWord } = await import('./exporters');
+  await exportTablesAsWord('Editable report', [{ title: 'Company Rankings', columns: ['Company', 'Responses'], rows: [['A < B & C', 3], ['Other company', 2]] }], 'report', recipe);
+  const XLSX = await import('xlsx');
+  const archive = XLSX.CFB.read(Buffer.from(await downloaded!.arrayBuffer()), { type: 'buffer' });
+  const document = XLSX.CFB.find(archive, '/word/document.xml');
+  assert.ok(document, 'Word export must be a real DOCX package');
+  const xml = Buffer.from(document.content as Uint8Array).toString('utf8');
+  assert.match(xml, /Editable report/);
+  assert.match(xml, /A &lt; B &amp; C/);
+  assert.match(xml, /Other company/);
+  assert.equal(service.getExportHistory()[0].format, 'docx');
+  assert.match(service.getExportHistory()[0].filename, /\.docx$/);
   createUrl.mock.restore();
   const rejectedDownload = mock.method(URL, 'createObjectURL', () => { throw new Error('Synthetic download blocked'); });
   await assert.rejects(exportTablesAsCSV([{ title: 'Archive', columns: ['Value'], rows: [['Saved answer']] }], 'archive'), /Synthetic download blocked/);
@@ -172,7 +199,7 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   mock.restoreAll();
 });
 
-test('refresh retains valid files with incompatible recipes without quarantine warnings, while unsafe files stay quarantined', async (t) => {
+test('metadata refresh retains incompatible options without loading files; unsafe downloads are rejected', async (t) => {
   const browser = new EventTarget();
   Object.assign(browser, { __SMS_RUNTIME_CONFIG__: { supabaseUrl: 'https://synthetic.supabase.co', supabasePublishableKey: 'synthetic-test-key' } });
   Object.assign(globalThis, { window: browser });
@@ -197,18 +224,18 @@ test('refresh retains valid files with incompatible recipes without quarantine w
       assert.equal(url.searchParams.get('owner_id'), 'eq.history-user');
       const offset = Number(url.searchParams.get('offset') ?? 0);
       const limit = Number(url.searchParams.get('limit') ?? 1000);
-      return new Response(JSON.stringify(records.slice(offset, offset + limit)), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(historyRows(records, url)), { headers: { 'Content-Type': 'application/json' } });
     } },
   });
   t.mock.method(supabase, 'from', (name: string) => provider.from(name));
   const service = await import('./exportHistory');
   await service.hydrateExportHistoryFromSupabase();
-  assert.equal(service.getExportHistory().length, 2);
+  assert.equal(service.getExportHistory().length, 3);
+  assert.ok(service.getExportHistory().every(entry => entry.fileDataUrl === undefined));
   assert.equal(service.getExportHistory().find(entry => entry.id === 'future')?.recipeUnavailable, true);
   assert.equal(service.getExportHistory().find(entry => entry.id === 'current')?.recipe?.kind, 'archived-responses');
-  assert.equal(alerts.length, 1);
-  assert.match(alerts[0], /Invalid saved export file/);
-  assert.doesNotMatch(alerts[0], /Invalid report recipe/);
+  assert.deepEqual(alerts, []);
+  await assert.rejects(service.downloadExportAgain(service.getExportHistory().find(entry => entry.id === 'unsafe')!), /Invalid saved export file/);
   assert.equal(JSON.stringify(records), original);
   records.pop();
   alerts.length = 0;
@@ -218,6 +245,6 @@ test('refresh retains valid files with incompatible recipes without quarantine w
   t.mock.method(URL, 'createObjectURL', (blob: Blob) => { downloaded = blob; return 'blob:history-test'; });
   t.mock.method(URL, 'revokeObjectURL', () => {});
   Object.assign(globalThis, { document: { createElement: () => ({ click() {}, remove() {} }), body: { appendChild() {} } } });
-  service.downloadExportAgain(service.getExportHistory().find(entry => entry.id === 'future')!);
+  await service.downloadExportAgain(service.getExportHistory().find(entry => entry.id === 'future')!);
   assert.equal(await downloaded!.text(), '%PDF-test');
 });

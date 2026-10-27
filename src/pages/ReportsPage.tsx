@@ -1,11 +1,11 @@
 import { ExportHistoryPage } from './ExportHistoryPage';
 import type { ReportRecipe } from '../features/reports/domain/reportHistory';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Database, Download, FileBarChart, FileSpreadsheet, FileText, Table2, Handshake, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Database, Download, FileType, FileBarChart, FileSpreadsheet, FileText, Table2, Handshake, Search } from 'lucide-react';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { formatNumber, getKpiSummary, questionPerformance, averageBySurveyType } from '../features/analytics/domain/analytics';
 import { formatAnalyticsScore, getAnalyticsCompanyRankings } from '../features/analytics/domain/rankings';
-import { ExportTable, exportTablesAsCSV, exportTablesAsExcel, exportTablesAsPDF } from '../features/reports/services/exporters';
+import { ExportTable, exportTablesAsCSV, exportTablesAsExcel, exportTablesAsPDF, exportTablesAsWord } from '../features/reports/services/exporters';
 import { CompanyReportBuilderPage } from './CompanyReportBuilderPage';
 import { QuestionReportBuilderPage } from './QuestionReportBuilderPage';
 import { SummaryReportBuilderPage } from './SummaryReportBuilderPage';
@@ -25,12 +25,13 @@ interface ReportsPageProps {
   initialRecipe?: ReportRecipe;
 }
 
-type ExportFormat = 'pdf' | 'csv' | 'excel';
+type ExportFormat = 'pdf' | 'csv' | 'excel' | 'docx';
 
-function runExport(format: ExportFormat, reportTitle: string, tables: ExportTable[], filenameBase: string) {
-  if (format === 'csv') exportTablesAsCSV(tables, filenameBase);
-  else if (format === 'excel') exportTablesAsExcel(tables, filenameBase);
-  else exportTablesAsPDF(reportTitle, tables, filenameBase);
+async function runExport(format: ExportFormat, reportTitle: string, tables: ExportTable[], filenameBase: string) {
+  if (format === 'docx') return exportTablesAsWord(reportTitle, tables, filenameBase);
+  if (format === 'csv') return exportTablesAsCSV(tables, filenameBase);
+  else if (format === 'excel') return exportTablesAsExcel(tables, filenameBase);
+  else return exportTablesAsPDF(reportTitle, tables, filenameBase);
 }
 
 export function ReportsPage(props: ReportsPageProps) {
@@ -89,9 +90,7 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
     evaluations: ranking.count,
   }));
   
-  const splitCount = Math.min(10, Math.floor(companyPerformance.length / 2) || 1);
-  const topCompanies = companyPerformance.slice(0, splitCount);
-  const leastRatedCompanies = companyPerformance.slice().reverse().slice(0, splitCount);
+  const topCompanies = companyPerformance;
 
   // --- Table builders: same underlying data the page renders, reshaped
   // into the generic { title, columns, rows } shape the export utils need.
@@ -115,15 +114,9 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
   };
 
   const topCompaniesTable: ExportTable = {
-    title: `Top Performing Companies (Top ${splitCount})`,
-    columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Evaluations'],
+    title: 'Company Rankings (Highest to Lowest)',
+    columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Responses'],
     rows: topCompanies.map((row) => [row.company, row.surveyType, formatAnalyticsScore(row.surveyType, row.score), row.evaluations]),
-  };
-
-  const leastRatedCompaniesTable: ExportTable = {
-    title: `Least Rated Companies (Bottom ${splitCount})`,
-    columns: ['Company', 'Survey Type', 'Leaderboard Score', 'Evaluations'],
-    rows: leastRatedCompanies.map((row) => [row.company, row.surveyType, formatAnalyticsScore(row.surveyType, row.score), row.evaluations]),
   };
 
   const questionHighlightsTable: ExportTable = {
@@ -139,14 +132,14 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
   };
 
   const handleExecutiveExport = (format: ExportFormat) => {
-    const tables = [summaryTable, topCompaniesTable, leastRatedCompaniesTable, questionHighlightsTable];
+    const tables = [summaryTable, topCompaniesTable, questionHighlightsTable];
     runExport(format, 'Executive Summary', tables, 'executive_summary');
   };
 
   const handleCardExport = (format: ExportFormat, card: 'summary' | 'question' | 'survey' | 'companies') => {
-    if (card === 'summary') runExport(format, 'Summary Report', [summaryTable, surveyReportTable], 'summary_report');
-    else if (card === 'question') runExport(format, 'Question Report', [questionReportTable], 'question_report');
-    else if (card === 'companies') runExport(format, 'Companies Performance Report', [topCompaniesTable, leastRatedCompaniesTable], 'companies_report');
+    if (card === 'summary') return runExport(format, 'Summary Report', [summaryTable, surveyReportTable], 'summary_report');
+    else if (card === 'question') return runExport(format, 'Question Report', [questionReportTable], 'question_report');
+    else if (card === 'companies') return runExport(format, 'Companies Performance Report', [topCompaniesTable], 'companies_report');
   };
 
   if (showSummaryBuilder) {
@@ -212,8 +205,8 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
 
   return (
     <div className="space-y-6">
-      <PageDescription>Create evaluation and partner reports and export them in your preferred format.</PageDescription>
-      <section aria-label="Available reports" className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <PageDescription>Create response and partner reports and export them in your preferred format.</PageDescription>
+      <section aria-label="Available reports" className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
         <div className="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-end sm:justify-between">
           <div><h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Report library</h2><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Choose a report to configure, preview, and download.</p></div>
           <span className="text-[11px] text-slate-400">{canExport ? 'Exports available' : 'Export access restricted'}</span>
@@ -229,7 +222,7 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
         />
         <ReportCard
           title="Companies Report"
-          description="Compare company performance and evaluation volume"
+          description="Compare company performance and response volume"
           icon={Handshake}
           canExport={canExport}
           onExport={(format) => handleCardExport(format, 'companies')}
@@ -245,7 +238,7 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
         />
         <ReportCard
           title="Raw Data Export"
-          description="Select evaluation records and fields for export"
+          description="Select response records and fields for export"
           icon={Database}
           canExport={canExport}
           showExport={false}
@@ -323,7 +316,7 @@ function ReportCard({
   icon: typeof FileBarChart;
   canExport?: boolean;
   showExport?: boolean;
-  onExport: (format: ExportFormat) => void;
+  onExport: (format: ExportFormat) => void | Promise<void>;
   onOpenBuilder?: () => void;
 }) {
   return (
@@ -342,8 +335,10 @@ function ReportCard({
 }
 
 /** Compact "Export ▾" trigger that reveals PDF / CSV / Excel choices, used on each report card. */
-function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void }) {
+function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void | Promise<void> }) {
   const [open, setOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -357,18 +352,21 @@ function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void }) 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  const choose = (format: ExportFormat) => {
-    onExport(format);
-    setOpen(false);
+  const choose = async (format: ExportFormat) => {
+    setOpen(false); setExporting(true); setError('');
+    try { await onExport(format); }
+    catch { setError('Unable to export this report. Please retry.'); }
+    finally { setExporting(false); }
   };
 
   return (
     <div className="relative inline-block" ref={containerRef}>
-      <button className="ghost-button" type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      <button className="ghost-button" type="button" disabled={exporting} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         <Download size={15} />
         Export
         <ChevronDown size={14} />
       </button>
+      {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
       {open ? (
         <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
           <button
@@ -391,6 +389,13 @@ function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void }) 
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <FileSpreadsheet size={14} /> Excel
+          </button>
+          <button
+            type="button"
+            onClick={() => choose('docx')}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <FileType size={14} /> Word (.docx)
           </button>
         </div>
       ) : null}

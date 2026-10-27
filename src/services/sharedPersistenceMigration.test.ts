@@ -18,6 +18,16 @@ const optimizedResponseReadsMigration = readFileSync(
   new URL('../../supabase/migrations/202610070001_optimize_application_response_reads.sql', import.meta.url),
   'utf8',
 ).toLowerCase();
+const lookupIndexesMigration = readFileSync(
+  new URL('../../supabase/migrations/202610260001_application_record_lookup_indexes.sql', import.meta.url),
+  'utf8',
+).toLowerCase();
+
+test('lookup indexes match owner-scoped History and submission refresh without weakening RLS', () => {
+  assert.match(lookupIndexesMigration, /\(owner_id, record_id\)[\s\S]*?record_type = 'export_history'/);
+  assert.match(lookupIndexesMigration, /payload ->> 'responseid'\), record_id\)[\s\S]*?record_type = 'survey_response'/);
+  assert.doesNotMatch(lookupIndexesMigration, /\b(delete from|truncate table|drop table|disable row level security)\b/);
+});
 const provenanceMigration = readFileSync(
   new URL('../../supabase/migrations/202609220001_response_provenance.sql', import.meta.url),
   'utf8',

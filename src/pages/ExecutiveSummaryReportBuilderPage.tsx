@@ -1,3 +1,4 @@
+import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -113,7 +114,7 @@ export function ExecutiveSummaryReportBuilderPage({
   const [customNotesText, setCustomNotesText] = useState(initialSettings.customNotesText ?? '');
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | null>(null);
+  const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const chartWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -148,7 +149,7 @@ export function ExecutiveSummaryReportBuilderPage({
   // Analytics based on filtered responses
   const summary = useMemo(() => getKpiSummary(filteredResponses), [filteredResponses]);
   const surveyPerformance = useMemo(() => averageBySurveyType(filteredResponses), [filteredResponses]);
-  
+
   // Company ranking lists
   const companyPerformance = useMemo(
     () => getAnalyticsCompanyRankings(filteredRankingResponses, activeTypes).map((ranking) => ({
@@ -159,17 +160,15 @@ export function ExecutiveSummaryReportBuilderPage({
     })),
     [filteredRankingResponses, activeTypes],
   );
-  const splitCount = Math.min(5, Math.floor(companyPerformance.length / 2) || 1);
-  const topCompanies = useMemo(() => companyPerformance.slice(0, splitCount), [companyPerformance, splitCount]);
-  const leastRatedCompanies = useMemo(() => companyPerformance.slice().reverse().slice(0, splitCount), [companyPerformance, splitCount]);
+  const topCompanies = companyPerformance;
 
   // Question Performance Stats
   const questionStats = useMemo(() => {
     const list: QuestionStats[] = [];
-    
+
     // Group responses by surveyType & questionId
     const groups = new Map<string, { questionText: string; surveyType: SurveyType; category: string; responses: SurveyResponse[] }>();
-    
+
     filteredResponses.forEach((r) => {
       if (isOverallCategory(r.questionCategory) || r.questionId.includes('OVERALL-FEEDBACK')) return;
       const key = `${r.surveyType}::${r.questionId}`;
@@ -268,14 +267,14 @@ export function ExecutiveSummaryReportBuilderPage({
 
     ALL_SURVEY_TYPES.forEach((surveyType) => {
       const typeResponses = responses.filter(r => r.surveyType === surveyType);
-      
+
       // Group by questionId
       const questionGroups = new Map<string, { questionText: string; responses: SurveyResponse[] }>();
-      
+
       typeResponses.forEach(r => {
         const key = r.questionId;
         if (isOverallCategory(r.questionCategory) || key.includes('OVERALL-FEEDBACK')) return;
-        
+
         if (!questionGroups.has(key)) {
           questionGroups.set(key, { questionText: r.question, responses: [] });
         }
@@ -395,7 +394,7 @@ export function ExecutiveSummaryReportBuilderPage({
     }
 
     // Least performing company action
-    const worstCompany = leastRatedCompanies[0];
+    const worstCompany = companyPerformance.at(-1);
     if (worstCompany && worstCompany.average < 70) {
       items.push({
         type: 'action',
@@ -405,7 +404,7 @@ export function ExecutiveSummaryReportBuilderPage({
     }
 
     return items;
-  }, [summary, surveyPerformance, questionStats, leastRatedCompanies, filteredResponses]);
+  }, [summary, surveyPerformance, questionStats, companyPerformance, filteredResponses]);
 
   // Recharts Chart Data
   const chartData = useMemo(() => {
@@ -462,7 +461,7 @@ export function ExecutiveSummaryReportBuilderPage({
     }
   };
 
-  const handleExport = async (format: 'pdf' | 'csv' | 'excel') => {
+  const handleExport = async (format: 'pdf' | 'csv' | 'excel' | 'docx') => {
     if (!canExport) return;
     setIsExporting(format);
     setExportMenuOpen(false);
@@ -480,7 +479,7 @@ export function ExecutiveSummaryReportBuilderPage({
           title: 'Executive KPI Metrics',
           columns: ['KPI Metric', 'Measurement'],
           rows: [
-            ['Total Submissions Count', summary.totalResponses],
+            ['Total Responses', summary.totalResponses],
             ['Average Rating Score', `${formatNumber(summary.averageRating)}%`],
             ['Satisfaction Index Score', `${formatNumber(summary.overallSatisfactionScore)}%`],
             ['N/A Frequency Rate', `${formatNumber(summary.naPercentage)}%`],
@@ -517,15 +516,11 @@ export function ExecutiveSummaryReportBuilderPage({
       // 4. Partner Rankings
       if (showCompanyRankings) {
         tables.push({
-          title: 'Highest Rated Partners',
-          columns: ['Partner Company', 'Survey Type', 'Leaderboard Score', 'Submissions Count', 'Remarks'],
+          title: 'Company Rankings (Highest to Lowest)',
+          columns: ['Partner Company', 'Survey Type', 'Leaderboard Score', 'Responses', 'Remarks'],
           rows: topCompanies.map((r) => [r.company, r.surveyType, formatAnalyticsScore(r.surveyType, r.average), r.evaluations, getRemarkText(getAnalyticsBand(r.surveyType, r.average))]),
         });
-        tables.push({
-          title: 'Lowest Rated Partners (Operational Alert)',
-          columns: ['Partner Company', 'Survey Type', 'Leaderboard Score', 'Submissions Count', 'Remarks'],
-          rows: leastRatedCompanies.map((r) => [r.company, r.surveyType, formatAnalyticsScore(r.surveyType, r.average), r.evaluations, getRemarkText(getAnalyticsBand(r.surveyType, r.average))]),
-        });
+
       }
 
       // 5. Strategic recommendations
@@ -545,7 +540,7 @@ export function ExecutiveSummaryReportBuilderPage({
           const questionsList = statsByType[type];
           tables.push({
             title: `${label} Questions`,
-            columns: ['Question', 'Average Score (%)', 'Responses Count', 'Highest Scoring Company', 'Lowest Scoring Company'],
+            columns: ['Question', 'Average Score (%)', 'Responses', 'Highest Scoring Company', 'Lowest Scoring Company'],
             rows: questionsList.map((row) => [
               row.questionText,
               `${formatNumber(row.average)}%`,
@@ -557,9 +552,11 @@ export function ExecutiveSummaryReportBuilderPage({
         });
       }
 
-      if (format === 'csv') {
+      if (format === 'docx') {
+        await exportTablesAsWord(reportTitle, tables, reportTitle, recipe);
+      } else if (format === 'csv') {
         const chunks = tables.map((table) => {
-          const csvBody = Papa.unparse({ fields: table.columns, data: table.rows });
+          const csvBody = Papa.unparse({ fields: table.columns, data: table.rows }, { escapeFormulae: true });
           return `${table.title}\n${csvBody}`;
         });
         const blob = new Blob([chunks.join('\n\n')], { type: 'text/csv;charset=utf-8' });
@@ -635,7 +632,7 @@ export function ExecutiveSummaryReportBuilderPage({
           if (showCoverPage || pageIndex > 1) {
             pdfDoc.addPage();
           }
-          
+
           // Header
           if (logoDataUrl) {
             pdfDoc.addImage(logoDataUrl, 'PNG', marginLeft, 20, 100, 100 * LOGO_ASPECT);
@@ -647,7 +644,7 @@ export function ExecutiveSummaryReportBuilderPage({
           pdfDoc.setFont('helvetica', 'normal');
           pdfDoc.setTextColor(130);
           pdfDoc.text('MBS Partner Evaluation System', pageWidth - marginLeft, 44, { align: 'right' });
-          
+
           pdfDoc.setDrawColor(226, 232, 240);
           pdfDoc.setLineWidth(0.75);
           pdfDoc.line(marginLeft, 72, pageWidth - marginLeft, 72);
@@ -673,7 +670,7 @@ export function ExecutiveSummaryReportBuilderPage({
         // KPI summary 2x2 layout
         if (showKpis) {
           const gridColWidth = contentWidth / 2 - 10;
-          
+
           // Row 1
           doc.setFillColor(248, 250, 252);
           doc.setDrawColor(226, 232, 240);
@@ -758,7 +755,7 @@ export function ExecutiveSummaryReportBuilderPage({
           doc.text('Survey Division Breakdown Summary', marginLeft, cursorY);
           cursorY += 10;
 
-          const tableHeaders = ['Survey Division Category', 'Average Score', 'Total Submitted Evaluations'];
+          const tableHeaders = ['Survey Division Category', 'Average Score', 'Total Submitted Responses'];
           const tableRows = surveyPerformance.map((row) => [
             row.surveyType,
             formatAnalyticsScore(row.surveyType, row.average),
@@ -799,7 +796,7 @@ export function ExecutiveSummaryReportBuilderPage({
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(8.5);
           doc.setTextColor(60);
-          
+
           const splitLines = doc.splitTextToSize(customNotesText, contentWidth - 24);
           doc.text(splitLines, marginLeft + 12, cursorY + 16);
 
@@ -863,70 +860,24 @@ export function ExecutiveSummaryReportBuilderPage({
           cursorY = (doc as any).lastAutoTable.finalY + 25;
         }
 
-        // Top & Bottom Partner Listings
-        if (showCompanyRankings && (topCompanies.length > 0 || leastRatedCompanies.length > 0)) {
-          if (cursorY > pageHeight - 220) {
-            addHeaderAndFooter(doc);
-            cursorY = 95;
-          }
-
+        // All companies in the canonical descending leaderboard order.
+        if (showCompanyRankings && topCompanies.length > 0) {
+          if (cursorY > pageHeight - 220) { addHeaderAndFooter(doc); cursorY = 95; }
           doc.setFont('helvetica', 'bold');
           doc.setFontSize(14);
           doc.setTextColor(20);
-          doc.text('3. Partner Performance Rankings', marginLeft, cursorY);
-          cursorY += 20;
-
-          if (topCompanies.length > 0) {
-            const tableHeaders = ['Rank', 'Partner Company Name', 'Survey Type', 'Leaderboard Score', 'Remarks'];
-            const tableRows = topCompanies.map((row, idx) => [
-              `#${idx + 1}`,
-              row.company,
-              row.surveyType,
-              formatAnalyticsScore(row.surveyType, row.average),
-              getRemarkText(getAnalyticsBand(row.surveyType, row.average)),
-            ]);
-
-            const leastHeaders = ['Alert Rank', 'Partner Company Name', 'Survey Type', 'Leaderboard Score', 'Remarks'];
-            const leastRows = leastRatedCompanies.map((row, idx) => [
-              `ALERT #${idx + 1}`,
-              row.company,
-              row.surveyType,
-              formatAnalyticsScore(row.surveyType, row.average),
-              getRemarkText(getAnalyticsBand(row.surveyType, row.average)),
-            ]);
-
-            const startY = cursorY;
-            const tableWidth = (contentWidth - 10) / 2;
-
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(10.5);
-            doc.setTextColor(16, 185, 129);
-            doc.text(`Highest Rated Partners (Top ${splitCount})`, marginLeft, startY);
-            doc.setTextColor(239, 68, 68);
-            doc.text(`Lowest Rated Partners`, marginLeft + tableWidth + 10, startY);
-
-            autoTable(doc, {
-              startY: startY + 8,
-              head: [tableHeaders],
-              body: tableRows,
-              margin: { left: marginLeft, right: marginLeft + tableWidth + 10 },
-              styles: { fontSize: 8, cellPadding: 4 },
-              headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
-              alternateRowStyles: { fillColor: [240, 253, 250] },
-            });
-
-            autoTable(doc, {
-              startY: startY + 8,
-              head: [leastHeaders],
-              body: leastRows,
-              margin: { left: marginLeft + tableWidth + 10, right: marginLeft },
-              styles: { fontSize: 8, cellPadding: 4 },
-              headStyles: { fillColor: [239, 68, 68], textColor: 255, fontStyle: 'bold' },
-              alternateRowStyles: { fillColor: [254, 242, 242] },
-            });
-            
-            cursorY = Math.max((doc as any).lastAutoTable.finalY, (doc as any).lastAutoTable.finalY) + 30;
-          }
+          doc.text('3. Company Rankings (Highest to Lowest)', marginLeft, cursorY);
+          autoTable(doc, {
+            startY: cursorY + 20,
+            head: [['Rank', 'Partner Company', 'Survey Type', 'Leaderboard Score', 'Responses', 'Remarks']],
+            body: topCompanies.map((row, index) => [index + 1, row.company, row.surveyType,
+              formatAnalyticsScore(row.surveyType, row.average), row.evaluations, getRemarkText(getAnalyticsBand(row.surveyType, row.average))]),
+            margin: { left: marginLeft, right: marginLeft, top: 100, bottom: 60 },
+            styles: { fontSize: 8, cellPadding: 4 },
+            headStyles: { fillColor: [0, 99, 169], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+          });
+          cursorY = (doc as any).lastAutoTable.finalY + 30;
         }
 
         // Recommendations
@@ -993,14 +944,14 @@ export function ExecutiveSummaryReportBuilderPage({
             doc.setFillColor(248, 250, 252);
             doc.setDrawColor(226, 232, 240);
             doc.setLineWidth(1);
-            
+
             const companiesLabel = `Evaluated Companies (${companiesList.length}):`;
-            
+
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(9.5);
             doc.setTextColor(70);
             const labelLines: string[] = doc.splitTextToSize(companiesLabel, contentWidth - 24);
-            
+
             // Divide companies into 2 columns for the PDF export
             const half = Math.ceil(companiesList.length / 2);
             const leftCompanies = companiesList.slice(0, half);
@@ -1019,11 +970,11 @@ export function ExecutiveSummaryReportBuilderPage({
               const split = doc.splitTextToSize(`• ${comp}`, colWidth);
               rightLines.push(...split);
             });
-            
+
             const maxTextLines = Math.max(leftLines.length, rightLines.length);
             const boxHeight = labelLines.length * 14 + maxTextLines * 13 + 18;
             doc.rect(marginLeft, cursorY, contentWidth, boxHeight, 'FD');
-            
+
             let boxY = cursorY + 14;
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(50);
@@ -1031,7 +982,7 @@ export function ExecutiveSummaryReportBuilderPage({
               doc.text(l, marginLeft + 12, boxY);
               boxY += 14;
             });
-            
+
             // Draw left column
             let leftY = boxY;
             doc.setFont('helvetica', 'normal');
@@ -1236,7 +1187,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 onChange={(e) => setShowCompanyRankings(e.target.checked)}
                 className="h-3.5 w-3.5 rounded border-slate-300 text-[#0063a9] focus:ring-[#0063a9]"
               />
-              <span className="text-slate-600 dark:text-slate-300">Top / Bottom Rated Partners</span>
+              <span className="text-slate-600 dark:text-slate-300">Company Rankings (Highest to Lowest)</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer text-xs select-none">
               <input
@@ -1316,6 +1267,13 @@ export function ExecutiveSummaryReportBuilderPage({
                     >
                       <FileType size={15} className="text-emerald-500" /> Export Excel Worksheet
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleExport('docx')}
+                      className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+                    >
+                      <FileType size={15} className="text-[#2187CD]" /> Word (.docx)
+                    </button>
                   </div>
                 )}
               </>
@@ -1330,7 +1288,7 @@ export function ExecutiveSummaryReportBuilderPage({
         {/* Paper Container */}
         <div className="flex-1 bg-slate-100 dark:bg-slate-900/60 rounded-xl p-4 md:p-8 overflow-y-auto max-h-[820px] border border-slate-200/50 dark:border-slate-800/40">
           <div className="relative mx-auto max-w-[800px] space-y-7 border border-slate-200 bg-white p-4 text-slate-800 shadow-md dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 sm:p-8 md:p-12">
-            
+
             {/* Confidential Cover Page Preview if checked */}
             {showCoverPage && (
               <div className="border-b-4 border-[#0063a9] pb-8 mb-8 animate-fade-in text-center">
@@ -1376,7 +1334,7 @@ export function ExecutiveSummaryReportBuilderPage({
                 <div className="grid grid-cols-2 gap-3.5">
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
                     <span className="text-lg font-black text-[#0063a9] block">{summary.totalResponses}</span>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">Total Submitted Survey Evaluations</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">Total Submitted Survey Responses</span>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-150 dark:border-slate-800/60 rounded-lg p-3">
                     <span className="text-lg font-black text-[#0063a9] block">{formatNumber(summary.averageRating)}%</span>
@@ -1449,7 +1407,7 @@ export function ExecutiveSummaryReportBuilderPage({
                           <tr className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                             <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px]">Survey Division Category</th>
                             <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px] text-right">Average Score</th>
-                            <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px] text-right">Total Submitted Evaluations</th>
+                            <th className="p-2 font-bold text-slate-500 uppercase tracking-wider text-[9px] text-right">Total Submitted Responses</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-150 dark:divide-slate-800">
@@ -1508,7 +1466,7 @@ export function ExecutiveSummaryReportBuilderPage({
                         // Alert indicator color based on score severity
                         const scoreColor = q.average < 75 ? 'text-red-500' : 'text-amber-500';
                         const scoreBg = q.average < 75 ? 'bg-red-50 dark:bg-red-950/20' : 'bg-amber-50 dark:bg-amber-950/20';
-                        
+
                         return (
                           <tr key={`${q.surveyType}-${q.questionId}`} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                             <td className="p-2.5 font-medium max-w-[200px] leading-relaxed">
@@ -1550,20 +1508,20 @@ export function ExecutiveSummaryReportBuilderPage({
             )}
 
             {/* 3. Partner Performance Rankings Section */}
-            {showCompanyRankings && (topCompanies.length > 0 || leastRatedCompanies.length > 0) && (
+            {showCompanyRankings && topCompanies.length > 0 && (
               <div className="space-y-4 pt-1">
                 <h3 className="text-xs font-extrabold text-[#0063a9] uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   <Award size={14} />
                   <span>3. Partner Performance Rankings</span>
                 </h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-5">
                   {/* Top rated */}
                   {topCompanies.length > 0 && (
                     <div className="space-y-2">
                       <h4 className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
                         <CheckCircle2 size={12} />
-                        <span>Highest Rated Partners (Top {splitCount})</span>
+                        <span>Company Rankings (Highest to Lowest)</span>
                       </h4>
                       <div className="rounded-lg border border-emerald-100 dark:border-emerald-950/30 overflow-hidden">
                         <table className="w-full text-left text-[10px] border-collapse">
@@ -1573,6 +1531,7 @@ export function ExecutiveSummaryReportBuilderPage({
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Partner Company Name</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase">Survey Type</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Leaderboard Score</th>
+                              <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Responses</th>
                               <th className="p-2 font-bold text-emerald-700 text-[9px] uppercase text-right">Remarks</th>
                             </tr>
                           </thead>
@@ -1585,6 +1544,7 @@ export function ExecutiveSummaryReportBuilderPage({
                                   <td className="p-2 font-medium">{c.company}</td>
                                   <td className="p-2 text-slate-500">{c.surveyType}</td>
                                   <td className="p-2 text-right font-black text-emerald-600">{formatAnalyticsScore(c.surveyType, c.average)}</td>
+                                  <td className="p-2 text-right">{c.evaluations}</td>
                                   <td className="p-2 text-right">
                                     <span className="badge" style={{ backgroundColor: `${band.hex}1a`, color: band.hex }}>{getRemarkText(band)}</span>
                                   </td>
@@ -1597,44 +1557,8 @@ export function ExecutiveSummaryReportBuilderPage({
                     </div>
                   )}
 
-                  {/* Least rated */}
-                  {leastRatedCompanies.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-[10px] font-bold text-rose-500 uppercase tracking-wider flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        <span>Lowest Rated Partners</span>
-                      </h4>
-                      <div className="rounded-lg border border-rose-100 dark:border-rose-950/30 overflow-hidden">
-                        <table className="w-full text-left text-[10px] border-collapse">
-                          <thead>
-                            <tr className="bg-rose-50/50 dark:bg-rose-950/20 border-b border-rose-100 dark:border-rose-900/30">
-                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Alert Rank</th>
-                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Partner Company Name</th>
-                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase">Survey Type</th>
-                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase text-right">Leaderboard Score</th>
-                              <th className="p-2 font-bold text-rose-700 text-[9px] uppercase text-right">Remarks</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-rose-100/50 dark:divide-rose-900/20 text-slate-700 dark:text-slate-300">
-                            {leastRatedCompanies.map((c, idx) => {
-                              const band = getAnalyticsBand(c.surveyType, c.average);
-                              return (
-                                <tr key={`${c.surveyType}:${c.company}`} className="hover:bg-rose-50/10">
-                                  <td className="p-2 font-bold text-rose-500">ALERT #{idx + 1}</td>
-                                  <td className="p-2 font-medium">{c.company}</td>
-                                  <td className="p-2 text-slate-500">{c.surveyType}</td>
-                                  <td className="p-2 text-right font-black text-rose-500">{formatAnalyticsScore(c.surveyType, c.average)}</td>
-                                  <td className="p-2 text-right">
-                                    <span className="badge" style={{ backgroundColor: `${band.hex}1a`, color: band.hex }}>{getRemarkText(band)}</span>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+
+
                 </div>
               </div>
             )}
@@ -1650,7 +1574,7 @@ export function ExecutiveSummaryReportBuilderPage({
                   {generatedRecommendations.map((rec, idx) => {
                     const isSuccess = rec.type === 'success';
                     const isAlert = rec.type === 'alert';
-                    
+
                     let accentColor = 'border-slate-200 dark:border-slate-800 bg-slate-50/40';
                     let badgeClass = 'text-slate-600 bg-slate-100 dark:text-slate-400 dark:bg-slate-900';
                     if (isSuccess) {

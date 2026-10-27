@@ -72,7 +72,7 @@ test('background data refresh keeps the active page mounted with an in-page load
 
 test('realtime refreshes load only the application record type that changed', () => {
   assert.match(SURVEY_DATA_SOURCE, /runHydration\(true, recordType\)/);
-  assert.match(SURVEY_DATA_SOURCE, /case 'survey':[\s\S]*?loadApplicationRecords<CustomForm>\('survey'\)/);
+  assert.match(SURVEY_DATA_SOURCE, /case 'survey':[\s\S]*?loadApplicationRecords<CustomForm>\('survey', readOptions\)/);
   assert.doesNotMatch(SURVEY_DATA_SOURCE, /refreshChangedRecord[\s\S]*?setTimeout\(\(\) => runHydration\(true\),/);
 });
 

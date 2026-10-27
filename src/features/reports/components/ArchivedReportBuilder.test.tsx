@@ -14,7 +14,7 @@ test('single-item builder blocks downloads without selection or export permissio
   const restricted = renderToStaticMarkup(<ArchivedReportBuilder {...props} canExport={false} />);
   assert.match(restricted, /disabled=""[^>]*>Download report/);
   assert.match(restricted, /Export access restricted/);
-  assert.match(restricted, /No evaluation data/);
+  assert.match(restricted, /No response data/);
   assert.match(restricted, /Company profile/);
   const allowed = renderToStaticMarkup(<ArchivedReportBuilder {...props} canExport={true} />);
   assert.doesNotMatch(allowed, /disabled=""[^>]*>Download report/);

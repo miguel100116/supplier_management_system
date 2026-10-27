@@ -100,7 +100,7 @@ test('staging-only and legacy archives remain visible and downloadable just as i
   assert.equal(report.rowCount, 1);
   assert.equal(report.canExport, true);
   assert.ok(report.tables[0].rows.some(cells => cells[0] === 'Stored submissions' && cells[1] === 1));
-  assert.ok(report.tables[0].rows.some(cells => cells[0] === 'Countable evaluations' && cells[1] === 0));
+  assert.ok(report.tables[0].rows.some(cells => cells[0] === 'Countable responses' && cells[1] === 0));
   assert.equal(report.tables.find(table => table.title === 'Response details')?.rows[0][0], 'RESP-staging');
 });
 
