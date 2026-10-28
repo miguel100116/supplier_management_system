@@ -1,3 +1,5 @@
+import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect';
+import { paperSizePoints, type PaperSize } from '../features/reports/domain/paperSize';
 import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
@@ -114,6 +116,7 @@ export function ExecutiveSummaryReportBuilderPage({
   const [customNotesText, setCustomNotesText] = useState(initialSettings.customNotesText ?? '');
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [paperSize, setPaperSize] = useState<PaperSize>(initialSettings.paperSize ?? 'a4');
   const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const chartWrapperRef = useRef<HTMLDivElement>(null);
@@ -466,7 +469,7 @@ export function ExecutiveSummaryReportBuilderPage({
     setIsExporting(format);
     setExportMenuOpen(false);
     try {
-      const recipe = { kind: 'executive' as const, parameters: { selectedTypes, questionThreshold, showCoverPage, showKpis, showChart, showSurveyTable, showQuestionTable, showCompanyRankings, showRecommendations, showCustomNotes, showDetailedQuestionReport, preparedBy, customNotesText } };
+      const recipe = { kind: 'executive' as const, parameters: { paperSize, selectedTypes, questionThreshold, showCoverPage, showKpis, showChart, showSurveyTable, showQuestionTable, showCompanyRankings, showRecommendations, showCustomNotes, showDetailedQuestionReport, preparedBy, customNotesText } };
 
       const reportTitle = 'Executive Briefing & Performance Report';
 
@@ -571,7 +574,7 @@ export function ExecutiveSummaryReportBuilderPage({
         });
         await saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), reportTitle, 'excel', recipe);
       } else if (format === 'pdf') {
-        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const doc = new jsPDF({ unit: 'pt', format: paperSizePoints(paperSize) });
         const marginLeft = 48;
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
@@ -1229,7 +1232,7 @@ export function ExecutiveSummaryReportBuilderPage({
             <span>Document Preview Mode (Integrated Sheet View)</span>
           </div>
 
-          <div className="flex gap-2 self-end relative" ref={menuRef} id="exec-export-container">
+          <div className="flex flex-wrap items-end gap-2 self-end relative" ref={menuRef} id="exec-export-container"><PaperSizeSelect value={paperSize} onChange={setPaperSize} disabled={isExporting !== null} />
             {canExport ? (
               <>
                 <button

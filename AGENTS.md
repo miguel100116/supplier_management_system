@@ -6,6 +6,8 @@ This file is the authoritative repository-wide operating agreement for every AI 
 
 Before substantial work, read `README.md`, `SYSTEM_TURNOVER.md`, and `docs/engineering/SECOND_BRAIN.md`. Treat the second brain as navigation and project memory, then verify relevant statements against the code because it can become stale.
 
+For focused discovery, follow [token efficiency](docs/engineering/TOKEN_EFFICIENCY.md) and use [agent memory](docs/engineering/AGENT_MEMORY.md) as the short standards and UI-quality checklist. Read relevant sections of the required context documents; these guides do not replace this agreement or its verification gates.
+
 ## Source-of-truth hierarchy
 
 Do not treat chat history, filenames, comments, screenshots, or planning documents as proof that the implementation behaves a certain way. Resolve conflicts using this order:

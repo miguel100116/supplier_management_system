@@ -1,8 +1,10 @@
 import type { SurveyType } from '../../../types/survey';
+import { isPaperSize, PAPER_SIZES, type PaperSize } from './paperSize';
 
 export type ReportKind = 'summary' | 'company' | 'question' | 'executive' | 'raw' | 'archived-survey' | 'archived-responses' | 'archived-company';
 export type ReportFormat = 'pdf' | 'csv' | 'excel' | 'docx';
 export interface ReportParameters {
+  paperSize?: PaperSize;
   archivedItemId?: string;
   archivedItemLabel?: string;
   selectedTypes?: Record<SurveyType, boolean>;
@@ -56,6 +58,7 @@ export function validateReportRecipe(value: unknown): asserts value is ReportRec
       const required = key === 'selectedTypes' ? ['Courier', 'Supplier', 'Subcontractor'] : key === 'graphs' ? ['bar', 'radar', 'trend', 'perQuestion'] : key === 'columnsVisibility' ? ['average', 'responses', 'highest', 'lowest'] : [];
       if (required.some(field => !(field in item))) throw new Error('Incomplete report selection.');
     } else if (key === 'questionThreshold') { if (typeof item !== 'number' || !Number.isFinite(item) || item < 0 || item > 100) throw new Error('Invalid report threshold.'); }
+    else if (key === 'paperSize') { if (!isPaperSize(item)) throw new Error('Invalid paper size.'); }
     else if (key === 'category') { if (typeof item !== 'string' || !['Courier', 'Supplier', 'Subcontractor'].includes(item)) throw new Error('Invalid report category.'); }
     else if (key === 'reportAudience') { if (!['internal', 'external'].includes(String(item))) throw new Error('Invalid report audience.'); }
     else if (key === 'chartMetric') { if (!['responses', 'rating'].includes(String(item))) throw new Error('Invalid report metric.'); }
@@ -71,11 +74,12 @@ export function validateReportRecipe(value: unknown): asserts value is ReportRec
 
 export function describeReportParameters(recipe?: ReportRecipe): string {
   if (!recipe) return 'Legacy export: saved options unavailable';
-  if (recipe.kind.startsWith('archived-')) return `${recipe.parameters.category} | ${recipe.parameters.archivedItemLabel ?? 'Saved archived item'} | Comments: ${recipe.parameters.includeComments ? 'Included' : 'Excluded'}`;
+  if (recipe.kind.startsWith('archived-')) return `${recipe.parameters.category} | ${recipe.parameters.archivedItemLabel ?? 'Saved archived item'} | Comments: ${recipe.parameters.includeComments ? 'Included' : 'Excluded'}${recipe.parameters.paperSize ? ` | Paper: ${PAPER_SIZES[recipe.parameters.paperSize].label}` : ''}`;
   const labels: Record<string, string> = { selectedTypes: 'Categories', selectedCompany: 'Company', selectedComments: 'Selected comments', columnsVisibility: 'Columns', graphs: 'Charts' };
   return Object.entries(recipe.parameters).map(([key, value]) => {
     const label = labels[key] ?? key.replace(/^show/, '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/kpis/i, 'KPIs');
-    const display = key === 'selectedComments' ? Object.values(value).filter(Boolean).length
+    const display = key === 'paperSize' && isPaperSize(value) ? PAPER_SIZES[value].label
+      : key === 'selectedComments' ? Object.values(value).filter(Boolean).length
       : typeof value === 'object' ? Object.entries(value).filter(([, enabled]) => enabled).map(([name]) => name.replace(/([a-z])([A-Z])/g, '$1 $2')).join(', ') || 'none'
       : typeof value === 'boolean' ? value ? 'Included' : 'Excluded' : String(value);
     return `${label.charAt(0).toUpperCase() + label.slice(1)}: ${display}`;

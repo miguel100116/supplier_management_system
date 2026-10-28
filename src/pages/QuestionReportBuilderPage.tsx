@@ -1,3 +1,5 @@
+import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect';
+import { paperSizePoints, type PaperSize } from '../features/reports/domain/paperSize';
 import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
@@ -60,6 +62,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
     lowest: true,
   }));
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [paperSize, setPaperSize] = useState<PaperSize>(initialSettings.paperSize ?? 'a4');
   const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -206,7 +209,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
     setIsExporting(format);
     setOpenMenu(false);
     try {
-      const recipe = { kind: 'question' as const, parameters: { selectedTypes, columnsVisibility } };
+      const recipe = { kind: 'question' as const, parameters: { paperSize, selectedTypes, columnsVisibility } };
 
       const reportTitle = 'Question Performance Report';
 
@@ -284,7 +287,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
         });
         await saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), reportTitle, 'excel', recipe);
       } else if (format === 'pdf') {
-        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const doc = new jsPDF({ unit: 'pt', format: paperSizePoints(paperSize) });
         const marginLeft = 48;
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
@@ -618,7 +621,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                     fixed y-coordinates) rather than centering the whole block,
                     which would spread the blank space evenly instead of
                     concentrating it in the middle like the PDF does. */}
-                <PagedSheet pageLabel="Page 1 · Cover">
+                <PagedSheet paperSize={paperSize} pageLabel="Page 1 · Cover">
                   <div className="flex h-full flex-col items-center px-6 text-center">
                     <div className="pt-[16%]">
                       <img src="/microgenesis_logo.png" alt="Microgenesis" className="mx-auto h-14 w-auto" />
@@ -652,7 +655,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
                   const rightCompanies = companiesList.slice(half);
 
                   return (
-                    <PagedSheet key={type} pageLabel={`Page ${index + 2}`} footerRight={`Page ${index + 1} of ${activeTypes.length}`}>
+                    <PagedSheet paperSize={paperSize} key={type} pageLabel={`Page ${index + 2}`} footerRight={`Page ${index + 1} of ${activeTypes.length}`}>
                       <ReportPageHeader />
 
                       <div className="mt-5 space-y-4">
@@ -751,7 +754,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
         </button>
 
         {canExport ? (
-          <div className="relative" ref={menuRef}>
+          <div className="relative flex flex-wrap items-end gap-2" ref={menuRef}><PaperSizeSelect value={paperSize} onChange={setPaperSize} disabled={isExporting !== null} />
             <button
               type="button"
               disabled={activeTypes.length === 0 || !!isExporting}
@@ -810,13 +813,14 @@ function PagedSheet({
   children,
   pageLabel,
   footerRight,
+  paperSize = 'a4',
 }: {
   children: ReactNode;
   pageLabel: string;
-  footerRight?: string;
+  footerRight?: string; paperSize?: PaperSize;
 }) {
   const PAGE_WIDTH = 640;
-  const PAGE_HEIGHT = Math.round(PAGE_WIDTH * (297 / 210)); // A4 aspect ratio
+  const PAGE_HEIGHT = Math.round(PAGE_WIDTH * paperSizePoints(paperSize)[1] / paperSizePoints(paperSize)[0]); // Selected paper aspect ratio
   return (
     <div className="flex flex-col items-center">
       <div

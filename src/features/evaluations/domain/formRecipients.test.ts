@@ -96,3 +96,15 @@ test('recipients must pass account, department, designation, and survey access r
   assert.deepEqual(getEligibleFormRecipients(form, profiles, {}).map(({ email }) => email), ['eligible@mgenesis.com']);
   assert.deepEqual(getEligibleFormRecipients(form, [profiles[0]], { 'Procurement Group': { surveyTypes: ['Courier'] } }), []);
 });
+
+test('assignment recipients must be able to open forms under both account and department page permissions', () => {
+  const open = { ...form, accessDepartments: [], accessRoles: [] };
+  const director = profile('director@mgenesis.com', 'TASS', 'Director');
+  const executive = profile('executive@mgenesis.com', 'Business Solutions Manager', 'Executive');
+  const pageDenied = { ...director, email: 'page-denied@mgenesis.com', permissions: { pages: [], surveyTypes: ['Supplier' as const] } };
+  assert.deepEqual(getEligibleFormRecipients(open, [director, executive, pageDenied], {}).map(item => item.email), [director.email]);
+  assert.deepEqual(getEligibleFormRecipients(open, [director], { TASS: { pages: ['dashboard'], surveyTypes: ['Supplier'] } }), []);
+  const grantedExecutive = { ...executive, permissions: { pages: ['survey-forms' as const], surveyTypes: ['Supplier' as const] } };
+  assert.deepEqual(getEligibleFormRecipients(open, [grantedExecutive], {}).map(item => item.email), [executive.email]);
+  assert.deepEqual(getEligibleFormRecipients({ ...open, title: 'Test evaluation' }, [director], {}), []);
+});

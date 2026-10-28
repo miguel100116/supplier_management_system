@@ -1,3 +1,5 @@
+import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect';
+import { paperSizePoints, type PaperSize } from '../features/reports/domain/paperSize';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useModalEscape } from '../hooks/useModalEscape';
@@ -81,6 +83,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
   const [graphs, setGraphs] = useState(initialSettings.graphs ?? ({ bar: true, radar: true, trend: true, perQuestion: true }));
   const [includeComments, setIncludeComments] = useState(initialSettings.includeComments ?? false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [paperSize, setPaperSize] = useState<PaperSize>(initialSettings.paperSize ?? 'a4');
   const [isExporting, setIsExporting] = useState<'pdf' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -267,8 +270,8 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
         chartImages,
         selectedCommentIds: new Set(selectedCommentsList.map(getCompanyReportCommentId)),
       });
-      if (format === 'pdf') await exportCompanyReportAsPDF(data, undefined, false, false, { kind: 'company' as const, parameters: { reportAudience, category, selectedCompany, graphs, includeComments, selectedComments } });
-      else await exportCompanyReportAsDocx(data, { kind: 'company' as const, parameters: { reportAudience, category, selectedCompany, graphs, includeComments, selectedComments } });
+      if (format === 'pdf') await exportCompanyReportAsPDF(data, undefined, false, false, { kind: 'company' as const, parameters: { paperSize, reportAudience, category, selectedCompany, graphs, includeComments, selectedComments } });
+      else await exportCompanyReportAsDocx(data, { kind: 'company' as const, parameters: { paperSize, reportAudience, category, selectedCompany, graphs, includeComments, selectedComments } });
     } finally {
       setIsExporting(null);
     }
@@ -440,7 +443,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                     footer around 88-92% down) - NOT vertically centered as one
                     unit, which would spread the blank space evenly top/bottom
                     instead of concentrating it in the middle like the PDF does. */}
-                <PagedSheet pageLabel="Page 1 · Cover">
+                <PagedSheet paperSize={paperSize} pageLabel="Page 1 · Cover">
                   <div className="flex h-full flex-col items-center px-6 text-center">
                     <div className="pt-[16%]">
                       <img src="/microgenesis_logo.png" alt="Microgenesis" className="mx-auto h-14 w-auto" />
@@ -463,7 +466,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                 </PagedSheet>
 
                 {/* Page 2 — Executive summary, bar graph, radar graph */}
-                <PagedSheet pageLabel="Page 2" footerRight={`Page 1 of ${contentPageCount}`}>
+                <PagedSheet paperSize={paperSize} pageLabel="Page 2" footerRight={`Page 1 of ${contentPageCount}`}>
                   <ReportPageHeader company={composite.company} />
                   <h2 className="mt-6 text-xl font-bold text-slate-800 dark:text-slate-100">Executive Summary</h2>
                   <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
@@ -598,7 +601,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
                 {/* Page 3 — Per-question table and comments share one page,
                     same reasoning as above. */}
                 {hasPage3 && (
-                  <PagedSheet pageLabel="Page 3" footerRight={`Page 2 of ${contentPageCount}`}>
+                  <PagedSheet paperSize={paperSize} pageLabel="Page 3" footerRight={`Page 2 of ${contentPageCount}`}>
                     <ReportPageHeader company={composite.company} />
 
                     {graphs.perQuestion && (
@@ -677,7 +680,7 @@ export function CompanyReportBuilderPage({ responses, partnerCompanies, canExpor
         </button>
 
         {canExport ? (
-          <div className="relative" ref={menuRef}>
+          <div className="relative flex flex-wrap items-end gap-2" ref={menuRef}><PaperSizeSelect value={paperSize} onChange={setPaperSize} disabled={isExporting !== null} />
             <button
               type="button"
               disabled={!canRunExport}
@@ -871,13 +874,14 @@ function PagedSheet({
   children,
   pageLabel,
   footerRight,
+  paperSize = 'a4',
 }: {
   children: ReactNode;
   pageLabel: string;
-  footerRight?: string;
+  footerRight?: string; paperSize?: PaperSize;
 }) {
   const PAGE_WIDTH = 640;
-  const PAGE_HEIGHT = Math.round(PAGE_WIDTH * (297 / 210)); // A4 aspect ratio
+  const PAGE_HEIGHT = Math.round(PAGE_WIDTH * paperSizePoints(paperSize)[1] / paperSizePoints(paperSize)[0]); // Selected paper aspect ratio
   return (
     <div className="flex flex-col items-center">
       <div

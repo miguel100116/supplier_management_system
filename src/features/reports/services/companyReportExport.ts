@@ -1,3 +1,4 @@
+import { paperSizePoints, paperSizeTwips } from '../domain/paperSize';
 import { formatAnalyticsRatingRange } from '../../analytics/domain/rankings';
 import { jsPDF } from 'jspdf';
 import autoTableModule from 'jspdf-autotable';
@@ -465,7 +466,7 @@ export async function exportCompanyReportAsPDF(
   asDataUri?: boolean,
   recipe?: ReportRecipe
 ): Promise<string | undefined> {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  const doc = new jsPDF({ unit: 'pt', format: paperSizePoints(recipe?.parameters.paperSize) });
   const marginLeft = 42.5;
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
@@ -903,8 +904,8 @@ export async function exportCompanyReportAsDocx(data: CompanyReportData, recipe?
       },
     },
     sections: [
-      { properties: {}, children: coverChildren },
-      { properties: {}, headers: { default: header }, footers: { default: footer }, children: bodyBlocks },
+      { properties: { page: { size: paperSizeTwips(recipe?.parameters.paperSize) } }, children: coverChildren },
+      { properties: { page: { size: paperSizeTwips(recipe?.parameters.paperSize) } }, headers: { default: header }, footers: { default: footer }, children: bodyBlocks },
     ],
   });
 

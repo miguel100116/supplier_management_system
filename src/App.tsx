@@ -691,6 +691,10 @@ export default function App() {
     return partnerCompanies.filter(c => !c.isArchived && effectiveSurveyTypes.some(t => t === c.type));
   }, [partnerCompanies, effectiveSurveyTypes]);
 
+  const uncategorizedCompanyIds = useMemo(() => isAdmin
+    ? partnerCompanies.filter(company => company.type === 'Uncategorized').map(company => company.id)
+    : [], [isAdmin, partnerCompanies]);
+
   const filteredResponses = useMemo(() => applyFilters(scopedAccessibleResponses, filters), [scopedAccessibleResponses, filters]);
   const officialAnalyticsResponses = useMemo(
     () => scopedAccessibleResponses.filter(isOfficialAnalyticsResponse),
@@ -1097,6 +1101,9 @@ export default function App() {
       />
     ) : (
       <DashboardPage
+        accounts={isAdmin ? accounts : undefined}
+        uncategorizedCompanyIds={uncategorizedCompanyIds}
+        departmentPermissions={departmentPermissions}
         responses={analyticsFilteredResponses}
         allResponses={userAccessibleAllResponses}
         historyResponses={analyticsFilteredResponses}

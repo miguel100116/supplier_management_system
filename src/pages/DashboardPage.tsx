@@ -38,8 +38,12 @@ import { computeCategoryRankSummary } from '../features/partner-companies/domain
 import { formatCompositeScore } from '../data/questionWeights';
 import { selectSurveyResponses } from '../features/evaluations/domain/surveyResponses';
 import { getSurveyStatus } from '../features/evaluations/domain/surveyStatus';
+import { AssignmentCompletionModal, buildDashboardSnapshot, type AssignmentProgress } from '../features/dashboard';
+import type { PersistedProfile } from '../features/account-management/domain/accountProfile';
+import type { DepartmentSurveyPermissions } from '../features/evaluations/domain/formRecipients';
 import { computeCompanyDocumentSummary } from '../features/document-tracker/domain/compliance';
 import { WorkspaceWelcomeBanner } from '../components/WorkspaceWelcomeBanner';
+import { formatLogDateTime } from '../utils/time';
 
 // ----------------------------------------------------
 // TYPES & WIDGET DEFINITIONS
@@ -62,6 +66,10 @@ export interface DashboardWidget {
 
 type AdminDashboardDestination = 'document-register' | 'survey-forms' | 'analytics' | 'partner-companies' | 'import-evaluations' | 'archive' | 'reports' | 'account-management';
 
+export function DashboardCompletion({ progress }: { progress: AssignmentProgress | null }) {
+  return <span className="admin-dashboard-count" title={progress === null ? 'Assignment targets are unavailable for this scope.' : 'Current-round employee/company assignments. Official repeat submissions complete each assignment once; reporting filters do not change assignments.'}>{progress === null ? 'Completion unavailable' : progress.required === 0 ? 'No required assignments' : `${progress.completed} of ${progress.required} completed · ${progress.percentage}%`}</span>;
+}
+
 interface DashboardPageProps {
   responses: SurveyResponse[];
   allResponses: SurveyResponse[];
@@ -78,6 +86,9 @@ interface DashboardPageProps {
   error: string | null;
   surveyTypeFilter: SurveyType[];
   surveys?: any[];
+  accounts?: PersistedProfile[];
+  departmentPermissions?: DepartmentSurveyPermissions;
+  uncategorizedCompanyIds?: string[];
   isAdmin?: boolean;
   userEmail?: string;
   onOpenSurveyResponses?: (surveyId: string) => void;
@@ -221,6 +232,9 @@ export function DashboardPage({
   error,
   surveyTypeFilter = [],
   surveys = [],
+  accounts,
+  departmentPermissions,
+  uncategorizedCompanyIds,
   isAdmin = false,
   userEmail = '',
   onOpenSurveyResponses,
@@ -235,6 +249,7 @@ export function DashboardPage({
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [catalogTab, setCatalogTab] = useState<'All' | 'Analytics' | 'Surveys' | 'Submissions'>('All');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<'expired' | 'missing' | 'expiring'>('expired');
+  const [assignmentSurveyId, setAssignmentSurveyId] = useState<string | null>(null);
   const [showConfigMenu, setShowConfigMenu] = useState<string | null>(null);
   const [headerPortalTarget, setHeaderPortalTarget] = useState<Element | null>(null);
   const [widgetsOpen, setWidgetsOpen] = useState(false);
@@ -522,22 +537,14 @@ export function DashboardPage({
     };
   }, [effectiveHistoryResponses]);
 
-  // 4. Submissions Feed
-  const recentSubmissions = useMemo(() => {
-    const scopedResponses = allResponses.filter((response) => !surveyTypeFilter.length || surveyTypeFilter.includes(response.surveyType));
-    const scoresByResponseId = new Map(submissionScores(scopedResponses).map((submission) => [submission.responseId, submission.score]));
-    const submissionsByResponseId = new Map<string, SurveyResponse>();
-    scopedResponses.forEach((response) => {
-      if (hasAnsweredItem(response) && !submissionsByResponseId.has(response.responseId)) {
-        submissionsByResponseId.set(response.responseId, response);
-      }
-    });
-    return [...submissionsByResponseId.values()]
-      .map((response) => ({ ...response, score: scoresByResponseId.get(response.responseId) ?? null }))
-      .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
-      .slice(0, 5);
-  }, [allResponses, surveyTypeFilter]);
-
+  const dashboard = useMemo(() => buildDashboardSnapshot({
+    reportingResponses: effectiveHistoryResponses, currentResponses: allResponses,
+    surveys, companies: partnerCompanies, accounts, departmentPermissions,
+    surveyTypes: surveyTypeFilter, scope: dataScope,
+    uncategorizedCompanyIds,
+  }), [effectiveHistoryResponses, allResponses, surveys, partnerCompanies, accounts, departmentPermissions, surveyTypeFilter, dataScope, uncategorizedCompanyIds]);
+  const { forms: evaluationCycle, results: performanceByType, recent: recentSubmissions } = dashboard;
+  const selectedAssignment = evaluationCycle.find(item => item.survey.id === assignmentSurveyId);
   const documentReferenceDate = new Date();
   const documentFollowups = partnerCompanies
     .filter((company) => !company.isArchived && (!surveyTypeFilter.length || surveyTypeFilter.includes(company.type as SurveyType)))
@@ -558,30 +565,6 @@ export function DashboardPage({
     if (documentStatusFilter === 'missing') return summary.missingCount > 0;
     return summary.expiringSoonCount > 0;
   });
-
-  const evaluationCycle = useMemo(() => surveys
-    .map((survey: any) => ({
-      survey,
-      status: getSurveyStatus(survey),
-      responses: submissionCount(selectSurveyResponses(survey, surveys, allResponses)),
-    }))
-    .filter(({ survey, status }) => (status === 'Running' || status === 'Paused')
-      && (!surveyTypeFilter.length || surveyTypeFilter.includes(survey.surveyType)))
-    .sort((a, b) => {
-      const order = (status: string) => status === 'Running' ? 0 : status === 'Paused' ? 1 : 2;
-      return order(a.status) - order(b.status)
-        || String(a.survey.deadlineDate || '9999-12-31').localeCompare(String(b.survey.deadlineDate || '9999-12-31'));
-    }), [surveys, allResponses, surveyTypeFilter]);
-
-  const performanceByType = useMemo(() => {
-    const types: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
-    return types
-      .filter((type) => !surveyTypeFilter.length || surveyTypeFilter.includes(type))
-      .map((type) => {
-        const typeResponses = effectiveHistoryResponses.filter((response) => response.surveyType === type);
-        return { type, count: submissionCount(typeResponses), average: averageRating(typeResponses) };
-      });
-  }, [effectiveHistoryResponses, surveyTypeFilter]);
 
   // Catalog filtered widgets
   const filteredCatalog = useMemo(() => {
@@ -697,14 +680,14 @@ export function DashboardPage({
 
             <section className="admin-dashboard-ledger-section" aria-labelledby="admin-dashboard-cycles-title">
               <div className="admin-dashboard-ledger-heading">
-                <div><h2 id="admin-dashboard-cycles-title">Evaluation forms in progress</h2><p>{evaluationCycle.filter(({ status }) => status === 'Running').length} running · {evaluationCycle.filter(({ status }) => status === 'Paused').length} paused</p></div>
+                <div><h2 id="admin-dashboard-cycles-title">Evaluation forms in progress</h2><p>{evaluationCycle.filter(({ status }) => status === 'Running').length} active · {evaluationCycle.filter(({ status }) => status === 'Paused').length} paused</p></div>
                 {onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('survey-forms')}>Manage forms <ArrowRight size={13} /></button>}
               </div>
-              {isLoading || error ? <p className="admin-dashboard-empty">Evaluation form status is temporarily unavailable.</p> : evaluationCycle.length === 0 ? <p className="admin-dashboard-empty">No evaluation forms are currently running or paused.</p> : <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-work-table admin-dashboard-form-table" aria-label="Evaluation forms in progress">
-                <thead><tr><th scope="col">Form</th><th scope="col">Partner type</th><th scope="col">Closes</th><th scope="col">Status</th><th scope="col">Responses</th></tr></thead>
-                <tbody>{evaluationCycle.slice(0, 4).map(({ survey, status, responses: responseCount }) => <tr key={survey.id}>
-                  <th scope="row" title={survey.title}>{onNavigate ? <button type="button" className="admin-dashboard-record-link" aria-label={`Manage evaluation form ${survey.title}`} onClick={() => onNavigate('survey-forms')}>{survey.title}</button> : survey.title}</th><td><DashboardPartnerType type={survey.surveyType} /></td><td>{survey.deadlineDate || 'No close date'}</td><td><span className={`admin-dashboard-cycle-status ${status.toLowerCase()}`}>{status}</span></td>
-                  <td>{onOpenSurveyResponses ? <button type="button" className="admin-dashboard-response-link" disabled={responseCount === 0} aria-label={`Open ${responseCount} responses for ${survey.title} (${survey.surveyType})`} onClick={() => onOpenSurveyResponses(survey.id)}>{responseCount} responses</button> : <span className="admin-dashboard-response-count">{responseCount} responses</span>}</td>
+              {isLoading || error ? <p className="admin-dashboard-empty">Evaluation form status is temporarily unavailable.</p> : evaluationCycle.length === 0 ? <p className="admin-dashboard-empty">No evaluation forms are currently active or paused.</p> : <div className="admin-dashboard-table-scroll" role="region" aria-label="Forms in progress table" tabIndex={0}><table className="admin-dashboard-work-table admin-dashboard-form-table" aria-label="Evaluation forms in progress">
+                <thead><tr><th scope="col">Form</th><th scope="col">Partner type</th><th scope="col">Closes</th><th scope="col">Status</th><th scope="col">Evaluation Progress</th></tr></thead>
+                <tbody>{evaluationCycle.slice(0, 4).map(({ survey, status, progress }) => <tr key={survey.id}>
+                  <th scope="row" title={survey.title}>{onNavigate ? <button type="button" className="admin-dashboard-record-link" aria-label={`Manage evaluation form ${survey.title}`} onClick={() => onNavigate('survey-forms')}>{survey.title}</button> : survey.title}</th><td><DashboardPartnerType type={survey.surveyType} /></td><td>{survey.deadlineDate || 'No close date'}</td><td><span className={`admin-dashboard-cycle-status ${status.toLowerCase()}`}>{status === 'Running' ? 'Active' : status}</span></td>
+                  <td><button type="button" className="admin-dashboard-response-link" aria-label={`View evaluation progress for ${survey.title}`} aria-haspopup="dialog" onClick={() => setAssignmentSurveyId(survey.id)}><DashboardCompletion progress={progress} /></button></td>
                 </tr>)}</tbody>
               </table></div>}
               {!isLoading && !error && evaluationCycle.length > 4 && <p className="admin-dashboard-list-footnote">Showing 4 of {evaluationCycle.length} forms. Open Evaluation Workspace to see all.</p>}
@@ -718,19 +701,19 @@ export function DashboardPage({
                 </div>
               </div>
               {onChangeDataScope && <DashboardDataScopeToggle scope={dataScope} onChange={onChangeDataScope} className="admin-dashboard-document-filters" />}
-              <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-performance-table" aria-label="Average partner evaluation score by type">
-                <thead><tr><th scope="col">Partner type</th><th scope="col">Average rubric score</th><th scope="col">Evaluations</th></tr></thead>
-                <tbody>{performanceByType.map(({ type, count, average }) => <tr key={type}>
-                  <th scope="row" className="admin-dashboard-performance-type">{type}</th><td><span className="admin-dashboard-performance-score"><strong>{count > 0 ? formatNumber(average) : String.fromCharCode(8212)}</strong><small>/ 100</small><i aria-hidden="true"><b style={{ width: `${Math.max(0, Math.min(100, average))}%` }} /></i></span></td><td className="admin-dashboard-performance-count">{count} evaluations</td>
-                </tr>)}{performanceByType.every(({ count }) => count === 0) && <tr><td colSpan={3} className="admin-dashboard-performance-empty">No evaluations are available for this scope.</td></tr>}</tbody>
-              </table></div>
+              {isLoading || error ? <p className="admin-dashboard-empty">Evaluation results are temporarily unavailable.</p> : <div className="admin-dashboard-table-scroll" role="region" aria-label="Evaluation results table" tabIndex={0}><table className="admin-dashboard-performance-table" aria-label="Average partner evaluation score by type">
+                <thead><tr><th scope="col">Partner type</th><th scope="col">Average rubric score</th><th scope="col">Submissions</th><th scope="col">Current-round completion</th></tr></thead>
+                <tbody>{performanceByType.map(({ type, submissions, scoredSubmissions, average, progress, unclassifiedSubmissions }) => <tr key={type}>
+                  <th scope="row" className="admin-dashboard-performance-type">{type}</th><td>{average === null ? <span>No scored evaluations</span> : <span className="admin-dashboard-performance-score"><strong>{formatNumber(average)}</strong><small>/ 100</small><i aria-hidden="true"><b style={{ width: `${Math.max(0, Math.min(100, average))}%` }} /></i></span>}{scoredSubmissions > 0 && <small className="admin-dashboard-metric-detail">Based on {scoredSubmissions} scored submissions</small>}</td><td className="admin-dashboard-performance-count"><span>{submissions} submissions</span>{unclassifiedSubmissions > 0 && <small className="admin-dashboard-metric-detail">{unclassifiedSubmissions} need partner classification</small>}</td><td className="admin-dashboard-performance-count"><DashboardCompletion progress={progress} /></td>
+                </tr>)}{performanceByType.every(({ submissions }) => submissions === 0) && <tr><td colSpan={4} className="admin-dashboard-performance-empty">No official submissions are available for this scope.</td></tr>}</tbody>
+              </table></div>}
             </section>
 
             <section className="admin-dashboard-ledger-section" aria-labelledby="admin-dashboard-activity-title">
-              <div className="admin-dashboard-ledger-heading"><div><h2 id="admin-dashboard-activity-title">Recent submissions</h2><p>Latest completed evaluations in the current period</p></div>{onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>Explore results <ArrowRight size={13} /></button>}</div>
-              {isLoading || error ? <p className="admin-dashboard-empty">Recent submissions are temporarily unavailable.</p> : recentSubmissions.length === 0 ? <p className="admin-dashboard-empty">No evaluations have been submitted in the current period.</p> : <div className="admin-dashboard-table-scroll"><table className="admin-dashboard-work-table admin-dashboard-recent-table" aria-label="Recent evaluation submissions">
-                <thead><tr><th scope="col">Partner</th><th scope="col">Partner type</th><th scope="col">Submitted</th><th scope="col">Rubric score</th></tr></thead>
-                <tbody>{recentSubmissions.slice(0, 4).map((response) => <tr key={response.responseId}><th scope="row">{onOpenSurveyResponses && response.surveyId ? <button type="button" className="admin-dashboard-record-link" onClick={() => onOpenSurveyResponses(response.surveyId!)}>{response.company}</button> : onNavigate ? <button type="button" className="admin-dashboard-record-link" onClick={() => onNavigate('analytics')}>{response.company}</button> : response.company}</th><td><DashboardPartnerType type={response.surveyType} /></td><td>{response.submissionDateInferredFrom ? <><span className="sr-only">Inferred date: </span>{response.submissionDate}</> : response.submissionDate}</td><td className="admin-dashboard-recent-score">{typeof response.score === 'number' ? formatCompositeScore(response.surveyType, response.score).text : 'Unscored'}</td></tr>)}</tbody>
+              <div className="admin-dashboard-ledger-heading"><div><h2 id="admin-dashboard-activity-title">Recent submissions</h2><p>Latest five official submissions · {dataScope === 'all-time' ? 'All-time records' : dataScope === 'custom' ? 'Custom date range' : 'Current period'} · Same filters as Evaluation results</p></div>{onNavigate && <button type="button" className="admin-dashboard-text-link" onClick={() => onNavigate('analytics')}>Explore results <ArrowRight size={13} /></button>}</div>
+              {isLoading || error ? <p className="admin-dashboard-empty">Recent submissions are temporarily unavailable.</p> : recentSubmissions.length === 0 ? <p className="admin-dashboard-empty">No official submissions are available for this scope.</p> : <div className="admin-dashboard-table-scroll" role="region" aria-label="Recent submissions table" tabIndex={0}><table className="admin-dashboard-work-table admin-dashboard-recent-table" aria-label="Recent evaluation submissions">
+                <thead><tr><th scope="col">Partner</th><th scope="col">Partner type</th><th scope="col">Form / respondent</th><th scope="col">Submitted</th><th scope="col">Rubric score</th></tr></thead>
+                <tbody>{recentSubmissions.map((response) => <tr key={response.responseId}><th scope="row">{onOpenSurveyResponses && response.surveyId ? <button type="button" className="admin-dashboard-record-link" onClick={() => onOpenSurveyResponses(response.surveyId!)}>{response.company}</button> : onNavigate ? <button type="button" className="admin-dashboard-record-link" onClick={() => onNavigate('analytics')}>{response.company}</button> : response.company}</th><td><DashboardPartnerType type={response.surveyType} /></td><td>{response.formTitle}<small className="admin-dashboard-metric-detail">{response.respondentEmail || 'Respondent unavailable'}</small></td><td>{response.submissionTimestamp === null ? 'Date unavailable' : formatLogDateTime(new Date(response.submissionTimestamp).toISOString())}{response.submissionDateInferredFrom && <small className="admin-dashboard-metric-detail">Inferred date</small>}</td><td className="admin-dashboard-recent-score">{response.score === null ? 'Unscored' : `${formatNumber(response.score)} / 100`}</td></tr>)}</tbody>
               </table></div>}
             </section>
           </div>
@@ -740,6 +723,13 @@ export function DashboardPage({
           </footer>
         </>
       )}
+
+      {isAdmin && selectedAssignment && <AssignmentCompletionModal
+        title={selectedAssignment.survey.title}
+        progress={isLoading || error ? null : selectedAssignment.progress}
+        employees={isLoading || error ? null : selectedAssignment.employees}
+        onClose={() => setAssignmentSurveyId(null)}
+      />}
 
       {/* ----------------------------------------------------
           TO-DO PROGRESS FOR NON-ADMINS

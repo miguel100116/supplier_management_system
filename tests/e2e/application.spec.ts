@@ -283,6 +283,142 @@ test('Admin module headings match the compact Directory title and subtitle forma
   expect(service.errors).toEqual([]);
 });
 
+test('Dashboard separates official submissions, scores and evaluation progress at desktop and mobile sizes', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.employee@mgenesis.com', role: 'Employee' });
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.executive@mgenesis.com', role: 'Employee', designation: 'Executive' });
+  service.records.push({ record_type: 'partner_company', record_id: 'unclassified-partner', created_at: createdAt, payload: {
+    id: 'unclassified-partner', name: 'Synthetic Unclassified Partner', type: 'Uncategorized', createdAt, branches: [],
+  } });
+  service.records.push({ record_type: 'survey', record_id: 'dashboard-round', created_at: createdAt, payload: {
+    id: 'dashboard-round', title: 'Courier round', surveyType: 'Courier', description: '', createdAt,
+    status: 'Running', questions: [{ questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery' }],
+  } });
+  for (const [id, dataSource] of [['official-one', 'production_submission'], ['official-repeat', 'production_submission'], ['test-only', 'test_submission']] as const) {
+    service.records.push({ record_type: 'survey_response', record_id: `${id}:Q01`, created_at: createdAt, payload: {
+      responseId: id, ...(id === 'official-one' ? {} : { surveyId: 'dashboard-round' }), surveyType: 'Courier',
+      companyId: id === 'official-repeat' ? 'unclassified-partner' : 'synthetic-courier',
+      company: id === 'official-repeat' ? 'Synthetic Unclassified Partner' : 'Synthetic Courier',
+      respondentType: 'Employee', respondentEmail: 'synthetic.employee@mgenesis.com', submissionDate: '2026-10-28T00:00:00Z',
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery', rating: 0, comment: '', dataSource,
+    } });
+  }
+  await page.goto('/login');
+  await signIn(page);
+  const forms = page.getByRole('table', { name: 'Evaluation forms in progress' });
+  const results = page.getByRole('table', { name: 'Average partner evaluation score by type' });
+  await expect(forms.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
+  await expect(forms.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  await expect(results.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  await expect(results.getByText('2 submissions', { exact: true })).toBeVisible();
+  await expect(results.getByText('Based on 2 scored submissions', { exact: true })).toBeVisible();
+  await expect(results.getByText('1 need partner classification', { exact: true })).toBeVisible();
+  const recent = page.getByRole('table', { name: 'Recent evaluation submissions' });
+  await expect(recent.locator('tbody tr')).toHaveCount(2);
+  await expect(recent.getByText('0.00 / 100', { exact: true })).toHaveCount(2);
+  await expect(recent.getByText('synthetic.employee@mgenesis.com', { exact: true })).toHaveCount(2);
+  await expect(recent.getByRole('cell', { name: 'Courier round synthetic.employee@mgenesis.com', exact: true })).toHaveCount(2);
+  await page.screenshot({ path: testInfo.outputPath('dashboard-expected-totals.png'), animations: 'disabled', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.getByRole('button', { name: 'All-Time', exact: true }).click();
+  await expect(results.getByRole('columnheader', { name: 'Current-round completion', exact: true })).toBeVisible();
+  await expect(results.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  await expect(results.getByText('Completion unavailable', { exact: true })).toHaveCount(0);
+  for (const label of await results.locator('.admin-dashboard-count').all()) {
+    const bounds = await label.evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return { text: range.getBoundingClientRect().toJSON(), cell: element.closest('td')!.getBoundingClientRect().toJSON() };
+    });
+    expect(bounds.text.left).toBeGreaterThanOrEqual(bounds.cell.left);
+    expect(bounds.text.right).toBeLessThanOrEqual(bounds.cell.right + 1);
+  }
+  const resultRegion = page.getByRole('region', { name: 'Evaluation results table', exact: true });
+  await resultRegion.focus();
+  await expect(resultRegion).toBeFocused();
+  if (testInfo.project.use.isMobile) {
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => resultRegion.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+    await resultRegion.evaluate(element => { element.scrollLeft = 0; });
+  }
+  await page.screenshot({ path: testInfo.outputPath('dashboard-historical-totals.png'), animations: 'disabled', fullPage: true });
+  await expect(forms.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Evaluation Progress opens assigned employees and dismisses safely without changing evaluations', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  const employeeEmail = 'assigned.employee@mgenesis.com';
+  const pendingEmail = 'pending.employee@mgenesis.com';
+  for (const email of [employeeEmail, pendingEmail]) service.profiles.push({ ...service.profiles[0], email, role: 'Employee' });
+  service.profiles.push({ ...service.profiles[0], email: 'excluded.executive@mgenesis.com', role: 'Employee', designation: 'Executive' });
+  service.records.push({ record_type: 'partner_company', record_id: 'pending-courier', created_at: createdAt,
+    payload: { id: 'pending-courier', name: 'Pending Courier', type: 'Courier', createdAt, branches: [] } });
+  service.records.push({ record_type: 'survey', record_id: 'assignment-form', created_at: createdAt,
+    payload: { id: 'assignment-form', title: 'Assignment details survey', surveyType: 'Courier', description: '', createdAt,
+      status: 'Running', questions: [{ questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery' }] } });
+  service.records.push({ record_type: 'survey_response', record_id: 'assigned-response:Q01', created_at: createdAt, payload: {
+    responseId: 'assigned-response', surveyId: 'assignment-form', companyId: 'synthetic-courier', company: 'Synthetic Courier',
+    surveyType: 'Courier', respondentType: 'Employee', respondentEmail: employeeEmail, submissionDate: '2026-10-28T00:00:00Z',
+    questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery', rating: 0, comment: '', dataSource: 'production_submission',
+  } });
+  await page.goto('/login');
+  await signIn(page);
+  const trigger = page.getByRole('button', { name: 'View evaluation progress for Assignment details survey', exact: true });
+  await expect(trigger).toContainText('1 of 4 completed');
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Evaluation Progress', exact: true });
+  const close = dialog.getByRole('button', { name: 'Close evaluation progress' });
+  await expect(dialog).toBeVisible();
+  await expect(close).toBeFocused();
+  await expect(dialog.getByText('1 of 4 assignments completed · 25%', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('row').filter({ hasText: employeeEmail })).toContainText('1 / 2');
+  await expect(dialog.getByRole('row').filter({ hasText: pendingEmail })).toContainText('0 / 2');
+  await expect(dialog.getByText('excluded.executive@mgenesis.com', { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.locator('summary').last()).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await dialog.getByRole('row').filter({ hasText: employeeEmail }).locator('summary').click();
+  const employeeRow = dialog.getByRole('row').filter({ hasText: employeeEmail });
+  await expect(employeeRow.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+  await expect(employeeRow.getByRole('listitem').filter({ hasText: 'Synthetic Courier' })).toContainText('Completed');
+  await expect(employeeRow.getByRole('listitem').filter({ hasText: 'Pending Courier' })).toContainText('Pending');
+  await dialog.getByRole('heading', { name: 'Evaluation Progress', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(bounds!.width).toBeLessThanOrEqual(viewport.width);
+  expect(bounds!.height).toBeLessThanOrEqual(viewport.height);
+  expect(await dialog.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath('assignment-completion.png'), animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.add('dark'));
+  await page.screenshot({ path: testInfo.outputPath('assignment-completion-dark.png'), animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.remove('dark'));
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.locator('.dashboard-assignment-backdrop').dispatchEvent('pointerdown');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await close.click();
+  await expect(dialog).toHaveCount(0);
+  const submission = service.records.find(record => record.record_type === 'survey_response')!;
+  submission.payload.dataSource = 'test_submission';
+  await page.reload();
+  await expect(trigger).toContainText('0 of 4 completed');
+  await trigger.click();
+  await expect(dialog.getByText('0 of 4 assignments completed · 0%', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('row').filter({ hasText: employeeEmail })).toContainText('0 / 2');
+  await close.click();
+  expect(service.records.filter(record => record.record_type === 'survey_response')).toHaveLength(1);
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
 test('Admin desktop uses the compact workspace scale while mobile retains its normal scale', async ({ page }, testInfo) => {
   const service = await backend(page);
   const survey = { id: 'synthetic-survey', title: 'Courier Satisfaction Survey', surveyType: 'Courier',
@@ -541,6 +677,7 @@ test('Archived report builders select one item, update the document preview and 
     expect(await table.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
   } else expect(optionsBox!.x + optionsBox!.width).toBeLessThan(documentBox!.x);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('combobox', { name: 'Paper size', exact: true }).selectOption('legal');
   await page.screenshot({ path: testInfo.outputPath('archived-survey-builder.png'), fullPage: true, animations: 'disabled' });
   await page.evaluate(() => document.body.classList.add('dark'));
   await page.screenshot({ path: testInfo.outputPath('archived-survey-builder-dark.png'), fullPage: true, animations: 'disabled' });
@@ -553,7 +690,8 @@ test('Archived report builders select one item, update the document preview and 
     if (format === 'pdf') {
       const pdf = bytes.toString('latin1');
       expect(pdf).toMatch(/^%PDF-/);
-      for (const text of ['Archived Survey Report', 'First archived survey', 'MBS Partner Evaluation System', 'Report scope', 'Microgenesis Supplier Management System']) {
+      expect(pdf).toMatch(/\/MediaBox \[0 0 612(?:\.0*)? 1008(?:\.0*)?\]/);
+      for (const text of ['Archived Survey Report', 'First archived survey', 'current rubric', 'Report scope', 'Microgenesis Supplier Management System']) {
         expect(pdf).toContain(text);
       }
       expect(pdf).not.toContain('This report provides a comprehensive summary of survey analytics');
@@ -562,6 +700,7 @@ test('Archived report builders select one item, update the document preview and 
       const archive = XLSX.CFB.read(bytes, { type: 'buffer' });
       const xml = XLSX.CFB.find(archive, '/word/document.xml')!;
       expect(Buffer.from(xml.content as Uint8Array).toString()).toContain('First archived survey');
+      expect(Buffer.from(xml.content as Uint8Array).toString()).toMatch(/w:pgSz[^>]*w:w="12240"[^>]*w:h="20160"/);
     } else {
       const workbook = XLSX.read(bytes);
       const scope = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
@@ -574,6 +713,7 @@ test('Archived report builders select one item, update the document preview and 
   await expect(page.getByText(/Courier \| First archived survey/).first()).toBeVisible();
   await page.getByRole('button', { name: 'Regenerate', exact: true }).first().click();
   await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('archive-a');
+  await expect(page.getByRole('combobox', { name: 'Paper size', exact: true })).toHaveValue('legal');
   await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Category', exact: true }).selectOption('Supplier');
   await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('');

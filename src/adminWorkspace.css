@@ -609,6 +609,7 @@
 .admin-dashboard-scope-button.is-selected { color: #436db6; background: #edf3fd; font-weight: 550; }
 .admin-dashboard-performance-table {
   width: calc(100% - 40px);
+  min-width: 620px;
   margin: 0 20px 8px;
   border-collapse: collapse;
   table-layout: fixed;
@@ -625,10 +626,10 @@
   text-transform: uppercase;
 }
 .admin-dashboard-performance-table thead th:first-child,
-.admin-dashboard-performance-table tbody th { width: 28%; padding-left: 0; }
-.admin-dashboard-performance-table thead th:nth-child(2) { width: 44%; }
+.admin-dashboard-performance-table tbody th { width: 20%; padding-left: 0; }
+.admin-dashboard-performance-table thead th:nth-child(2) { width: 30%; }
 .admin-dashboard-performance-table thead th:last-child,
-.admin-dashboard-performance-table tbody td:last-child { width: 28%; padding-right: 0; text-align: right; }
+.admin-dashboard-performance-table tbody td:last-child { width: 30%; padding-right: 0; text-align: right; }
 .admin-dashboard-performance-table tbody tr { height: 42px; border-bottom: 1px solid var(--border-subtle); color: var(--foreground); font-size: 11px; }
 .admin-dashboard-performance-table tbody tr:last-child { border-bottom: 0; }
 .admin-dashboard-performance-type { font-weight: 600; }
@@ -638,6 +639,10 @@
 .admin-dashboard-performance-score > i { width: 50px; height: 5px; margin-left: 4px; overflow: hidden; border-radius: 4px; background: var(--border-subtle); }
 .admin-dashboard-performance-score > i b { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
 .admin-dashboard-performance-count { color: var(--muted-foreground); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-dashboard-count { white-space: normal; }
+.admin-dashboard-table-scroll:focus-visible { outline: 3px solid #91b7ff; outline-offset: 2px; }
+.admin-dashboard-metric-detail { display: block; margin-top: 3px; color: var(--muted-foreground); font-size: 10px; font-weight: 400; line-height: 1.4; }
+.admin-dashboard-performance-table tbody td { padding-top: 8px; padding-bottom: 8px; }
 .admin-dashboard-performance-empty { padding: 13px 0 !important; color: var(--muted-foreground); font-size: 12px; }
 .admin-dashboard-recent-row {
   display: flex;
@@ -784,7 +789,8 @@
 .admin-dashboard-form-table { min-width: 660px; }
 .admin-dashboard-form-table th:last-child,
 .admin-dashboard-form-table td:last-child { text-align: right; }
-.admin-dashboard-recent-table { min-width: 580px; }
+.admin-dashboard-recent-table { min-width: 780px; }
+.admin-dashboard-recent-table td:nth-child(3) { overflow-wrap: anywhere; }
 .admin-dashboard-recent-table th:last-child,
 .admin-dashboard-recent-table td:last-child { text-align: right; }
 .admin-dashboard-row-action { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 0; border-radius: 5px; background: transparent; color: var(--brand-blue, #2187cd); cursor: pointer; }

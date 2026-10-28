@@ -7,6 +7,8 @@ import { ARCHIVED_REPORT_TITLES, buildArchivedReport, getArchivedReportItems, ty
 import type { ReportParameters } from '../domain/reportHistory';
 import { exportTablesAsCSV, exportTablesAsExcel, exportTablesAsWord } from '../services/exporters';
 import { exportArchivedReportAsPDF } from '../services/archivedReportExport';
+import { PaperSizeSelect } from './PaperSizeSelect';
+import { paperSizePoints, type PaperSize } from '../domain/paperSize';
 
 interface Props {
   kind: ArchivedReportKind;
@@ -21,6 +23,7 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
   const [selectedItemId, setItemId] = useState<string | undefined>(initialSettings.archivedItemId);
   const [includeComments, setIncludeComments] = useState(initialSettings.includeComments ?? false);
   const [format, setFormat] = useState<'pdf' | 'excel' | 'csv' | 'docx'>('pdf');
+  const [paperSize, setPaperSize] = useState<PaperSize>(initialSettings.paperSize ?? 'a4');
   const [error, setError] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
   const title = ARCHIVED_REPORT_TITLES[kind];
@@ -45,7 +48,7 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
     if (!canExport || !report?.canExport || isDownloading) return;
     setIsDownloading(true);
     try {
-      const recipe = { kind, parameters: { category, archivedItemId: itemId, archivedItemLabel: report.itemLabel, includeComments } };
+      const recipe = { kind, parameters: { paperSize, category, archivedItemId: itemId, archivedItemLabel: report.itemLabel, includeComments } };
       if (format === 'docx') await exportTablesAsWord(title, report.tables, 'archived_report', recipe);
       else if (format === 'pdf') await exportArchivedReportAsPDF(title, report.itemLabel, category, report.tables, recipe);
       else if (format === 'excel') await exportTablesAsExcel(report.tables, 'archived_report', recipe);
@@ -84,6 +87,7 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Preview</h3>
           <div className="flex flex-wrap items-end gap-2">
+            {(format === 'pdf' || format === 'docx') && <PaperSizeSelect value={paperSize} onChange={setPaperSize} disabled={isDownloading} />}
             <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">File format<select aria-label="File format" className="field mt-1" value={format} onChange={event => setFormat(event.target.value as typeof format)}><option value="pdf">PDF</option><option value="docx">Word (.docx)</option><option value="excel">Excel</option><option value="csv">CSV</option></select></label>
             <button type="button" className="primary-button" disabled={!canExport || !report?.canExport || isDownloading} onClick={download}>{isDownloading ? 'Downloading…' : 'Download report'}</button>
           </div>
@@ -92,7 +96,7 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
         <div className="max-h-[75vh] min-w-0 overflow-y-auto rounded-lg border border-slate-200 bg-slate-200/70 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-6">
           {!report ? <StateMessage compact title="Select an archived item" message="Choose a category and one archived item on the left to generate its preview." /> : <>
             {!report.count ? <div className="mb-3"><StateMessage compact title={report.rowCount ? 'No countable responses' : 'No response data'} message={report.rowCount ? 'Stored answers are included, but none contain a countable response.' : kind === 'archived-company' ? 'Only this company profile is available for export.' : 'Only this archived survey’s details are available for export.'} /></div> : null}
-            <div aria-label="Archived report preview" className="mx-auto w-full max-w-[640px] rounded-sm bg-white p-4 shadow-xl ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 sm:p-6" style={{ minHeight: 640 * 297 / 210 }}>
+            <div aria-label="Archived report preview" className="mx-auto w-full max-w-[640px] rounded-sm bg-white p-4 shadow-xl ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 sm:p-6" style={{ minHeight: 640 * paperSizePoints(paperSize)[1] / paperSizePoints(paperSize)[0] }}>
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
                 <img src="/microgenesis_logo.png" alt="Microgenesis" className="h-6 w-auto" />
                 <div className="min-w-0"><h3 className="text-sm font-bold text-[#0063a9] dark:text-sky-300">{title}</h3><p className="mt-1 break-words text-xs text-slate-500">{report.itemLabel}</p></div>

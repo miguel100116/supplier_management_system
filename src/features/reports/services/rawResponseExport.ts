@@ -1,3 +1,4 @@
+import { paperSizePoints, type PaperSize } from '../domain/paperSize';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
@@ -270,7 +271,7 @@ const META_WIDTHS: Partial<Record<MetaFieldKind, number>> = {
 };
 
 /**
- * One 8.5x13in (Folio) landscape PDF, one dedicated page block per company (autoTable
+ * One landscape PDF (Long Bond by default), one dedicated page block per company (autoTable
  * spills a company onto a 2nd+ page on its own if it has enough respondents
  * to overflow the first), so page count naturally tracks response volume
  * instead of being hardcoded.
@@ -291,7 +292,7 @@ const META_WIDTHS: Partial<Record<MetaFieldKind, number>> = {
  */
 const REMARKS_LIKE_PATTERN = /remarks|comment/i;
 
-export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string) {
+export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string, paperSize: PaperSize = 'long-bond') {
   const typeResponses = responses.filter((r) => r.surveyType === surveyType);
   const spec = FORM_SPECS[surveyType];
   const allColumns = getResolvedColumns(surveyType, typeResponses);
@@ -324,8 +325,8 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
     isOverallComment: q.isText && i === lastKeptTextIndex,
   }));
 
-  // 8.5 x 13in (Folio/Long) in points, landscape.
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [612, 936] });
+  // Keep landscape orientation for the wide response tables.
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: paperSizePoints(paperSize) });
   const marginLeft = 24;
   const marginRight = 24;
   const headerHeight = 58;
@@ -380,6 +381,10 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
   });
 
   const shortHeaders = [...metaHeaders, ...questionMeta.map((q) => q.label)];
+  const tableWidth = Object.values(columnStyles).reduce((sum, column) => sum + column.cellWidth, 0);
+  if (tableWidth > usableWidth) {
+    for (const column of Object.values(columnStyles)) column.cellWidth *= usableWidth / tableWidth;
+  }
 
   groups.forEach(({ company, rows }) => {
     doc.addPage();
@@ -442,5 +447,5 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
     );
   }
 
-  return saveReportDownload(doc.output('blob'), `Raw Data Export (${surveyType})`, 'pdf', { kind: 'raw', parameters: { category: surveyType } });
+  return saveReportDownload(doc.output('blob'), `Raw Data Export (${surveyType})`, 'pdf', { kind: 'raw', parameters: { category: surveyType, paperSize } });
 }

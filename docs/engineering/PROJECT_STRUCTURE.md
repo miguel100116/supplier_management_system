@@ -22,6 +22,7 @@ src/
     active-companies/
     analytics/
     archives/
+    dashboard/
     document-tracker/
     employee-experience/
     evaluation-imports/
@@ -44,6 +45,7 @@ The modules below previously lived in shared `src/components/`, `src/utils/`, or
 | Account management | `services/adminActivityLog.ts` |
 | Analytics | `components/CompanyAnalysisPanel.tsx`, `CompanyLeaderboardPanel.tsx`, `radarChartLabels.tsx`; `domain/analytics.ts` |
 | Archives | `services/archiveResponseTransfer.ts` and its test |
+| Dashboard | `domain/dashboardSnapshot.ts` and its tests; pure official-data reporting, assignment progress, and recent-submission preparation; `components/AssignmentCompletionModal.tsx` and its scoped stylesheet provide the Admin employee breakdown, exposed through `index.ts` |
 | Document tracker | `domain/compliance.ts`, `documentRequirements.ts`; `services/complianceHistory.ts`, `documentModificationLog.ts` |
 | Evaluation imports | `services/rawEvaluationImport.ts` |
 | Evaluations | `components/CompletionStatusBar.tsx`, `ResponseTable.tsx`, `SurveyPreviewModal.tsx`; `domain/scoring.ts`, `surveyCompletion.ts`, `surveyStatus.ts` and their existing tests |
