@@ -218,10 +218,10 @@ test('Admin module headings match the compact Directory title and subtitle forma
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), title).toBe(false);
     if (route === 'document-tracker') {
-      const action = header.getByRole('button', { name: 'Add Notification', exact: true });
+      const action = header.getByRole('button', { name: 'Document Maintenance', exact: true });
       await action.focus();
       await page.keyboard.press('Enter');
-      await expect(page.getByRole('heading', { name: 'Document Expiry Notifications', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Document maintenance', exact: true })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(action).toBeFocused();
       if (!testInfo.project.use.isMobile) {
