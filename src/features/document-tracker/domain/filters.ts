@@ -30,6 +30,15 @@ export function matchesDocumentFilter(
   return scopedCells.some((cell) => cell.status === status);
 }
 
+/** Multiple selected statuses are combined as OR; the document and advanced filters still combine as AND. */
+export function matchesDocumentFilters(
+  cells: DocumentFilterCell[],
+  documentName: string,
+  statuses: DocumentStatusFilter[],
+): boolean {
+  return statuses.length === 0 || statuses.some((status) => matchesDocumentFilter(cells, documentName, status));
+}
+
 export function countRowsByDocumentStatus(
   rows: DocumentFilterCell[][],
   documentName: string,

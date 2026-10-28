@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { countRowsByDocumentStatus, matchesDocumentFilter } from './filters';
+import { countRowsByDocumentStatus, matchesDocumentFilter, matchesDocumentFilters } from './filters';
 
 const rows = [
   [
@@ -23,6 +23,13 @@ test('needs-attention filtering includes missing and expiring documents but excl
   assert.equal(matchesDocumentFilter(rows[0], 'AFS', 'needs-attention'), false);
   assert.equal(matchesDocumentFilter(rows[1], 'AFS', 'needs-attention'), true);
   assert.equal(matchesDocumentFilter(rows[1], 'GIS', 'needs-attention'), false);
+});
+
+test('multiple status filters match any selected status within the selected document scope', () => {
+  assert.equal(matchesDocumentFilters(rows[0], 'all', ['Expired', 'Missing']), true);
+  assert.equal(matchesDocumentFilters(rows[0], 'AFS', ['Expired', 'Missing']), false);
+  assert.equal(matchesDocumentFilters(rows[1], 'AFS', ['Expired', 'Missing']), true);
+  assert.equal(matchesDocumentFilters(rows[0], 'all', []), true);
 });
 
 test('status counts count matching rows once even when several cells need attention', () => {

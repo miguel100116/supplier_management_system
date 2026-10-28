@@ -12,14 +12,8 @@ import {
   replaceApplicationRecords,
 } from '../../../services/applicationRepository';
 //
-// Defaults encode the client's per-document requirements as given:
-//   - AFS: fiscal-year based (see computeAfsFiscalYearStatus in compliance.ts)
-//     - not a day countdown, so no milestone is configurable for it.
-//   - GIS (Corp), Business Permit, Import Permit, Business Permit/License:
-//     annual renewals - the standard 30-day alert already covers them, no
-//     extra early milestone by default.
-//   - DTI (Sole): client-requested extra 60-day heads-up on top of the
-//     standard 30-day alert, so it never quietly drops under 30 days left.
+// Legacy optional early-warning rules. The standard 60/30/daily reminder
+// schedule now lives in database-backed document maintenance settings.
 
 export type NotificationMode = 'fiscal-year' | 'day-milestones';
 
@@ -44,7 +38,7 @@ export const DEFAULT_NOTIFICATION_RULES: DocNotificationRule[] = [
     mode: 'fiscal-year',
     enabled: true,
     earlyMilestoneDays: [],
-    note: 'Latest available fiscal year (2025). Renews on a fiscal-year basis - notifies once the filed year falls out of range and flips to "For Update", not on a day countdown.',
+    note: 'AFS status retains its existing fiscal-year classification. Expiry reminders use an explicitly stored expiry date.',
   },
   {
     docName: 'GIS (Corp)',
@@ -53,7 +47,7 @@ export const DEFAULT_NOTIFICATION_RULES: DocNotificationRule[] = [
     mode: 'day-milestones',
     enabled: true,
     earlyMilestoneDays: [],
-    note: 'Valid for Calendar Year 2027. Standard 30-day "Expiring Soon" alert.',
+    note: 'Reminder timing is managed in Document Maintenance settings.',
   },
   {
     docName: 'DTI (Sole)',
@@ -61,8 +55,8 @@ export const DEFAULT_NOTIFICATION_RULES: DocNotificationRule[] = [
     origin: 'Local',
     mode: 'day-milestones',
     enabled: true,
-    earlyMilestoneDays: [60],
-    note: 'Validity is 5 years from registration date. Must maintain at least 30 days of validity remaining - client requested an extra heads-up at the 60-day mark, on top of the standard 30-day alert, for follow-ups.',
+    earlyMilestoneDays: [],
+    note: 'Reminder timing is managed in Document Maintenance settings.',
   },
   {
     docName: 'Business Permit',
@@ -71,7 +65,7 @@ export const DEFAULT_NOTIFICATION_RULES: DocNotificationRule[] = [
     mode: 'day-milestones',
     enabled: true,
     earlyMilestoneDays: [],
-    note: 'Annual renewal. Standard 30-day "Expiring Soon" alert.',
+    note: 'Reminder timing is managed in Document Maintenance settings.',
   },
   {
     docName: 'Import Permit',
@@ -80,7 +74,7 @@ export const DEFAULT_NOTIFICATION_RULES: DocNotificationRule[] = [
     mode: 'day-milestones',
     enabled: true,
     earlyMilestoneDays: [],
-    note: 'Annual renewal. Standard 30-day "Expiring Soon" alert.',
+    note: 'Reminder timing is managed in Document Maintenance settings.',
   },
   {
     docName: 'Business Permit/License',
@@ -89,7 +83,7 @@ export const DEFAULT_NOTIFICATION_RULES: DocNotificationRule[] = [
     mode: 'day-milestones',
     enabled: true,
     earlyMilestoneDays: [],
-    note: 'Annual renewal (Foreign supplier). Standard 30-day "Expiring Soon" alert.',
+    note: 'Reminder timing is managed in Document Maintenance settings.',
   },
 ];
 
@@ -105,21 +99,26 @@ export function getNotificationSettings(): DocNotificationRule[] {
     // Merge over the defaults (keyed by docName) rather than trusting the
     // saved list verbatim, so a future new default rule isn't silently
     // dropped just because it didn't exist yet in an older saved blob.
-    return DEFAULT_NOTIFICATION_RULES.map((def) => parsed.find((p) => p.docName === def.docName) ?? def);
+    return DEFAULT_NOTIFICATION_RULES.map((def) => {
+      const savedRule = parsed.find((p) => p.docName === def.docName);
+      // Older browser/DB settings may retain obsolete DTI note text. Preserve
+      // the alert controls while using the current reminder-settings copy.
+      return def.docName === 'DTI (Sole)' && savedRule
+        ? { ...savedRule, note: def.note }
+        : savedRule ?? def;
+    });
   } catch {
     return DEFAULT_NOTIFICATION_RULES;
   }
 }
 
-export function saveNotificationSettings(rules: DocNotificationRule[]) {
+export async function saveNotificationSettings(rules: DocNotificationRule[]): Promise<void> {
+  await replaceApplicationRecords('document_notification_rule', rules, (rule) => rule.docName);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(rules));
-    persistApplicationRecordsInBackground(
-      replaceApplicationRecords('document_notification_rule', rules, (rule) => rule.docName),
-    );
     window.dispatchEvent(new Event(SETTINGS_CHANGED_EVENT));
   } catch {
-    // Best-effort only.
+    // The database is authoritative; browser cache failure does not undo a saved rule.
   }
 }
 

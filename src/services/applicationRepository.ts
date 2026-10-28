@@ -22,6 +22,8 @@ export const APPLICATION_RECORD_TYPES = [
   'feedback_report',
   'feedback_settings',
   'document_notification_rule',
+  'document_maintenance',
+  'document_reminder_delivery',
   'notification_read_state',
   'admin_activity',
   'document_modification',
@@ -372,6 +374,8 @@ export function subscribeToApplicationChanges(client = supabase): () => void {
     'feedback_report',
     'feedback_settings',
     'document_notification_rule',
+    'document_maintenance',
+    'document_reminder_delivery',
     'notification_read_state',
     'admin_activity',
     'document_modification',
@@ -506,7 +510,7 @@ export async function renewPartnerDocument(
   branchId: string,
   documentName: string,
   expectedDocument: ComplianceDocument,
-  nextDocument: Pick<ComplianceDocument, 'provided' | 'expiryDate'>,
+  nextDocument: Pick<ComplianceDocument, 'provided'> & Partial<Pick<ComplianceDocument, 'expiryDate' | 'remarks' | 'description'>>,
 ): Promise<PartnerCompany> {
   requireConfigured();
   const { data, error } = await supabase.rpc('renew_partner_document', {

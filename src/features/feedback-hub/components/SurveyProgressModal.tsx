@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { X, CheckCircle2 } from 'lucide-react';
+import { X, CheckCircle2, Info } from 'lucide-react';
 import { CustomForm, PartnerCompany, SurveyResponse } from '../../../types/survey';
 import { submissionCount, submissionScores } from '../../analytics/domain/analytics';
 import { formatCompositeScore } from '../../../data/questionWeights';
@@ -7,7 +7,7 @@ import { selectSurveyResponses } from '../../evaluations/domain/surveyResponses'
 import { getSurveyCompletionSummary } from '../../evaluations/domain/surveyCompletion';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { SurveyAccount } from '../../../hooks/useSurveyData';
-import { formatLogDateTime } from '../../../utils/time';
+import { formatLogDateTime, parseDDMMYYYY } from '../../../utils/time';
 
 interface SurveyProgressModalProps {
   survey: CustomForm;
@@ -67,6 +67,34 @@ export function SurveyProgressModal({
     ? subScores.reduce((sum, s) => sum + s.score, 0) / subScores.length
     : 0;
 
+  const deadline = parseDDMMYYYY(survey.deadlineDate);
+  const today = new Date();
+  const todayDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const deadlineDay = deadline
+    ? Date.UTC(deadline.getFullYear(), deadline.getMonth(), deadline.getDate())
+    : null;
+  const daysUntilDeadline = deadlineDay === null
+    ? null
+    : Math.round((deadlineDay - todayDay) / 86_400_000);
+  const deadlineUrgency = daysUntilDeadline === null
+    ? 'neutral'
+    : daysUntilDeadline < 0
+      ? 'overdue'
+      : daysUntilDeadline === 0
+        ? 'today'
+        : daysUntilDeadline <= 3
+          ? 'urgent'
+          : daysUntilDeadline <= 14
+            ? 'soon'
+            : 'upcoming';
+  const deadlineStatus = daysUntilDeadline === null
+    ? null
+    : daysUntilDeadline < 0
+      ? `${Math.abs(daysUntilDeadline)} day${daysUntilDeadline === -1 ? '' : 's'} overdue`
+      : daysUntilDeadline === 0
+        ? 'Due today'
+        : `${daysUntilDeadline} day${daysUntilDeadline === 1 ? '' : 's'} remaining`;
+
   return (
     <div className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
       <section className="feedback-modal-panel feedback-progress-panel w-full rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-labelledby="feedback-progress-title" aria-describedby="feedback-progress-description">
@@ -107,10 +135,22 @@ export function SurveyProgressModal({
               <dd>{subScores.length > 0 ? formatCompositeScore(survey.surveyType, partialScore).text : 'N/A'}</dd>
               <dd className="feedback-metric-detail">Based on {numericRatings.length} rated answers</dd>
             </div>
-            <div>
+            <div className="feedback-deadline-metric">
               <dt>Deadline</dt>
-              <dd>{survey.deadlineDate || 'No deadline set'}</dd>
-              <dd className="feedback-metric-detail">{survey.deadlineDate ? 'Open through the deadline day' : 'Remains open until completed'}</dd>
+              <dd className={`feedback-deadline-date is-${deadlineUrgency}`}>{survey.deadlineDate || 'No deadline set'}</dd>
+              <dd className="feedback-metric-detail feedback-deadline-detail">
+                {deadlineStatus ? (
+                  <>
+                    <span className={`feedback-deadline-status is-${deadlineUrgency}`}>{deadlineStatus}</span>
+                    <details className="feedback-deadline-info">
+                      <summary aria-label="Show deadline information">
+                        <Info aria-hidden="true" />
+                      </summary>
+                      <span>Open through the deadline day</span>
+                    </details>
+                  </>
+                ) : survey.deadlineDate ? 'Open through the deadline day' : 'Remains open until completed'}
+              </dd>
             </div>
           </dl>
 

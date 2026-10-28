@@ -71,6 +71,20 @@ const ALL_DEPARTMENTS = [
   'TASS'
 ];
 
+interface PersistedDocumentReminderDelivery {
+  id: string;
+  companyId: string;
+  company: string;
+  surveyType?: SurveyType;
+  branchId?: string;
+  branchCode?: string;
+  documentName: string;
+  expiryDate: string;
+  daysLeft: number;
+  milestone: string;
+  deliveredAt: string;
+}
+
 function notificationReadStateStorageKey(userEmail: string): string {
   return `${NOTIFICATION_READ_STATE_STORAGE_PREFIX}${notificationReadStateUserKey(userEmail)}`;
 }
@@ -365,6 +379,27 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const notificationOwnerRef = useRef<string | null>(currentUserEmail?.trim().toLowerCase() ?? null);
   const notificationPersistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [documentClock, setDocumentClock] = useState(() => new Date());
+  const [documentReminderDeliveries, setDocumentReminderDeliveries] = useState<PersistedDocumentReminderDelivery[]>([]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setDocumentReminderDeliveries([]);
+      return;
+    }
+    const controller = new AbortController();
+    void loadApplicationRecords<PersistedDocumentReminderDelivery>('document_reminder_delivery', { signal: controller.signal })
+      .then(setDocumentReminderDeliveries)
+      .catch(() => { if (!controller.signal.aborted) setDocumentReminderDeliveries([]); });
+    const refreshDeliveries = (event: Event) => {
+      const recordType = (event as CustomEvent<{ recordType?: ApplicationRecordType }>).detail?.recordType;
+      if (recordType !== 'document_reminder_delivery') return;
+      void loadApplicationRecords<PersistedDocumentReminderDelivery>('document_reminder_delivery', { signal: controller.signal })
+        .then(setDocumentReminderDeliveries)
+        .catch(() => { if (!controller.signal.aborted) setDocumentReminderDeliveries([]); });
+    };
+    window.addEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshDeliveries);
+    return () => { controller.abort(); window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshDeliveries); };
+  }, [isAdmin]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setDocumentClock(new Date()), 60_000);
@@ -1868,10 +1903,10 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // Update an existing partner company
   const updatePartnerCompany = async (updatedCompany: PartnerCompany) => {
     const normalizedCompany = normalizePartnerCompany(updatedCompany);
+    await persistRemoteAsync(upsertApplicationRecords('partner_company', [normalizedCompany], (company) => company.id));
     const updated = partnerCompanies.map((company) => company.id === normalizedCompany.id ? normalizedCompany : company);
     setPartnerCompanies(updated);
     safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
-    await persistRemoteAsync(upsertApplicationRecords('partner_company', [normalizedCompany], (company) => company.id));
     return normalizedCompany;
   };
 
@@ -1880,7 +1915,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     branchId: string,
     documentName: string,
     expectedDocument: ComplianceDocument,
-    nextDocument: Pick<ComplianceDocument, 'provided' | 'expiryDate'>,
+    nextDocument: Pick<ComplianceDocument, 'provided'> & Partial<Pick<ComplianceDocument, 'expiryDate' | 'remarks' | 'description'>>,
   ): Promise<PartnerCompany> => {
     const updatedCompany = await renewPartnerDocument(
       companyId,
@@ -2329,7 +2364,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       const summary = computeCompanyDocumentSummary(c, currentDate);
       const groups: Array<{ kind: string; respondentType: string; details: DocumentAlertDetail[] }> = [
         { kind: 'expired', respondentType: 'Document Expired', details: summary.issues.filter((item) => item.status === 'Expired') },
-        { kind: 'expiring-soon', respondentType: 'Document Expiring Soon', details: summary.issues.filter((item) => item.status === 'Expiring Soon') },
+        { kind: 'expiring-soon', respondentType: 'Document Expiring Soon', details: summary.issues.filter((item) => item.status === 'Expiring Soon' && !documentReminderDeliveries.some((delivery) =>
+          delivery.companyId === c.id && delivery.branchId === item.branchId && delivery.documentName === item.documentName && delivery.expiryDate === item.expiryDate && item.daysLeft !== undefined && item.daysLeft <= 30
+        )) },
         { kind: 'for-update', respondentType: 'Document For Update', details: summary.issues.filter((item) => item.status === 'For Update') },
       ];
 
@@ -2352,16 +2389,46 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     });
 
     return list;
-  }, [partnerCompanies, documentClock]);
+  }, [partnerCompanies, documentClock, documentReminderDeliveries]);
 
-  // Extra early heads-up notifications, per document type, configured via
-  // the Document Register's "Add Notification" settings screen (see
-  // src/features/notifications/services/documentNotificationSettings.ts) - on top of the standard
-  // 30-day "Expiring Soon" alert already covered by documentNotifications
-  // above. Defaults to the client's DTI Registration requirement ("Notify
-  // admin at 60-day and 30-day expiration milestones"): the 30-day one is
-  // the standard alert every expiry doc already gets, this covers the extra
-  // 60-day one. Admin can add early milestones for other documents too.
+  const persistedReminderNotifications = useMemo<ResponseNotification[]>(() => {
+    if (!isAdmin) return [];
+    const groups = new Map<string, PersistedDocumentReminderDelivery[]>();
+    documentReminderDeliveries.forEach((delivery) => {
+      const groupKey = `${delivery.companyId}:${delivery.deliveredAt.slice(0, 10)}`;
+      const rows = groups.get(groupKey) ?? [];
+      rows.push(delivery);
+      groups.set(groupKey, rows);
+    });
+    return [...groups.entries()].map(([groupKey, rows]) => {
+      const details: DocumentAlertDetail[] = rows.map((delivery) => ({
+        documentName: delivery.documentName,
+        branchId: delivery.branchId,
+        branchCode: delivery.branchCode,
+        expiryDate: delivery.expiryDate,
+        daysLeft: delivery.daysLeft,
+        status: 'Expiring Soon',
+        milestoneDays: delivery.milestone.startsWith('day-') ? Number(delivery.milestone.slice(4)) : undefined,
+      }));
+      const ids = rows.map((row) => row.id).sort();
+      return {
+        id: `document-reminder:${groupKey}:${ids.join(':')}`,
+        company: rows[0].company,
+        surveyType: rows[0].surveyType ?? 'Supplier',
+        respondentType: 'Document Expiring Soon',
+        submissionDate: rows.map((row) => row.deliveredAt).sort().at(-1) ?? documentClock.toISOString(),
+        questionCount: rows.length,
+        respondentEmail: 'system@mgenesis.com',
+        department: 'Logistics',
+        designation: 'Document Expiry Reminder',
+        documentDetails: details,
+      };
+    });
+  }, [documentReminderDeliveries, documentClock, isAdmin]);
+
+  // Legacy optional advance notices remain configurable through the existing
+  // notification screen. The durable 60/30/daily schedule is delivered from
+  // database-backed document reminder records above.
   const [notificationSettingsVersion, setNotificationSettingsVersion] = useState(0);
   useEffect(() => {
     const handler = () => setNotificationSettingsVersion((v) => v + 1);
@@ -2379,7 +2446,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
     partnerCompanies.forEach((c) => {
       if (c.isArchived) return;
-      const requiredKeys = getRequiredDocumentKeys(c.type, c.supplierOrigin);
+      const requiredKeys = getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification);
 
       rules.forEach((rule) => {
         if (!requiredKeys.includes(rule.docName)) return;
@@ -2394,8 +2461,11 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           const milestone = rule.earlyMilestoneDays
             .filter((days) => days > EXPIRING_SOON_DAYS)
             .sort((a, b) => a - b)
-            .find((days) => daysLeft <= days);
+            .find((days) => daysLeft === days);
           if (milestone === undefined) return [];
+          if (documentReminderDeliveries.some((delivery) => delivery.companyId === c.id
+            && delivery.branchId === branch.id && delivery.documentName === rule.docName
+            && delivery.expiryDate === doc.expiryDate && delivery.milestone === `day-${milestone}`)) return [];
           return [{
             documentName: rule.docName,
             branchId: branch.id,
@@ -2425,15 +2495,15 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     });
 
     return list;
-  }, [partnerCompanies, notificationSettingsVersion, documentClock]);
+  }, [partnerCompanies, notificationSettingsVersion, documentClock, documentReminderDeliveries]);
 
   const combinedNotifications = useMemo(() => {
-    const list = [...documentNotifications, ...earlyMilestoneNotifications, ...notifications];
+    const list = [...documentNotifications, ...earlyMilestoneNotifications, ...persistedReminderNotifications, ...notifications];
     return list.sort((a, b) => b.submissionDate.localeCompare(a.submissionDate));
-  }, [documentNotifications, earlyMilestoneNotifications, notifications]);
+  }, [documentNotifications, earlyMilestoneNotifications, persistedReminderNotifications, notifications]);
 
   useEffect(() => {
-    const systemNotifications = [...documentNotifications, ...earlyMilestoneNotifications];
+    const systemNotifications = [...documentNotifications, ...earlyMilestoneNotifications, ...persistedReminderNotifications];
     const currentIds = new Set(systemNotifications.map((notification) => notification.id));
     const newSystemIds = systemNotifications
       .map((notification) => notification.id)
@@ -2446,7 +2516,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       newSystemIds.forEach((id) => next.add(id));
       return next;
     });
-  }, [documentNotifications, earlyMilestoneNotifications]);
+  }, [documentNotifications, earlyMilestoneNotifications, persistedReminderNotifications]);
 
   const combinedUnreadNotificationIds = useMemo(
     () => new Set(combinedNotifications.filter((notification) => !readNotificationIdsRef.current.has(notification.id)).map((notification) => notification.id)),
