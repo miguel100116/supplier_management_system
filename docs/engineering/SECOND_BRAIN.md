@@ -2,6 +2,10 @@
 
 Last verified: 2026-10-29
 
+### 2026-10-29 - Independent document remarks writes
+
+Document tracker remarks now use a dedicated `update_partner_document_remarks` RPC with the same permission, branch/document validation, optimistic concurrency, required-remark rules, and audit trail; renewal remains limited to its existing provided/expiry fields. The tracker reads persisted remarks from the returned partner record and keeps them in the shared partner cache. Migration `202610290001_partner_document_remarks.sql` must be applied before this UI can use the new RPC in a deployed database. No remote migration was applied. Evidence: `src/pages/DocumentRegisterPage.tsx`, `src/services/applicationRepository.ts`, `src/hooks/useSurveyData.ts`, and `supabase/migrations/202610290001_partner_document_remarks.sql`. TypeScript checks and `git diff --check` passed; tests and browser visual checks were not run.
+
 ### 2026-10-29 - Document maintenance workspace
 
 The document maintenance control opens a centered, content-sized responsive dialog capped at 900px, with separate reminder schedule, validity periods, and category alert views. Only the validity list uses a bounded internal scroll area. All controls are drafts until **Save changes**; Escape, close, and backdrop dismissal ask before discarding. Global schedule chips and custom intervals save with the daily reminder window; validity rules use years and remain pending until an admin confirms them against authority guidance. DTI stays unset and pending verification. Restore defaults stages the 60/30/day-30 schedule, unconfigured validity values, and default category alerts, then requires an explicit save. Settings writes are awaited and errors preserve edits; if the separate maintenance and category-alert writes partially succeed, the interface reports which portion needs retry. No saved expiry date or reminder history is rewritten. Evidence: `src/pages/DocumentRegisterPage.tsx`, `src/features/notifications/services/documentMaintenanceSettings.ts`, and `src/features/notifications/services/documentNotificationSettings.ts`.

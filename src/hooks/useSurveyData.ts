@@ -40,6 +40,7 @@ import {
   mergeApplicationRecordsById,
   replaceApplicationRecords,
   renewPartnerDocument,
+  updatePartnerDocumentRemarks as updatePartnerDocumentRemarksRecord,
   saveNotificationReadState,
   surveyResponseRecordId,
   upsertApplicationRecords,
@@ -1932,6 +1933,22 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     return updatedCompany;
   };
 
+  const updatePartnerDocumentRemarks = async (
+    companyId: string,
+    branchId: string,
+    documentName: string,
+    expectedDocument: ComplianceDocument,
+    remarks: string,
+  ): Promise<PartnerCompany> => {
+    const updatedCompany = await updatePartnerDocumentRemarksRecord(companyId, branchId, documentName, expectedDocument, remarks);
+    setPartnerCompanies((currentCompanies) => {
+      const updated = currentCompanies.map((company) => company.id === companyId ? updatedCompany : company);
+      safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    return updatedCompany;
+  };
+
   // Import the Master List Excel: fuzzy-matches each row's BP Name against
   // existing companies (merging as a branch when matched, creating a new
   // company otherwise). This only parses/merges and returns the result for
@@ -2546,6 +2563,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     addPartnerCompany,
     updatePartnerCompany,
     updatePartnerDocument,
+    updatePartnerDocumentRemarks,
     removePartnerCompany,
     previewMasterListImport,
     rebuildMasterListImportPreview,

@@ -527,6 +527,28 @@ export async function renewPartnerDocument(
   return parseApplicationRecordPayload('partner_company', data, companyId) as PartnerCompany;
 }
 
+export async function updatePartnerDocumentRemarks(
+  companyId: string,
+  branchId: string,
+  documentName: string,
+  expectedDocument: ComplianceDocument,
+  remarks: string,
+): Promise<PartnerCompany> {
+  requireConfigured();
+  const { data, error } = await supabase.rpc('update_partner_document_remarks', {
+    p_company_id: companyId,
+    p_branch_id: branchId,
+    p_document_name: documentName,
+    p_expected_document: expectedDocument,
+    p_remarks: remarks,
+  });
+  if (error) {
+    requestAuthoritativeRefresh('partner_company');
+    throw new Error(`Unable to save document remarks: ${error.message}`);
+  }
+  return parseApplicationRecordPayload('partner_company', data, companyId) as PartnerCompany;
+}
+
 export async function replaceProfiles(profiles: PersistedProfile[]): Promise<void> {
   requireConfigured();
   const rows = profiles.map((profile, index) => {

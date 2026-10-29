@@ -411,7 +411,11 @@ export function SurveyFormsPage({
     });
     return matching.sort((a, b) => {
       if (isAdmin && (a.status === 'Archived') !== (b.status === 'Archived')) return a.status === 'Archived' ? 1 : -1;
-      if (tableSort === 'title-desc') return compareText(b.title, a.title);
+      if (tableSort === 'title-desc' || tableSort === 'title-asc') {
+        const typeOrder = surveyTypeOptions.indexOf(a.surveyType) - surveyTypeOptions.indexOf(b.surveyType);
+        if (typeOrder !== 0) return typeOrder;
+        return tableSort === 'title-desc' ? compareText(b.title, a.title) : compareText(a.title, b.title);
+      }
       if (tableSort === 'deadline-asc') return compareDate(a.deadlineDate, b.deadlineDate);
       if (tableSort === 'deadline-desc') return compareDate(b.deadlineDate, a.deadlineDate);
       if (tableSort === 'created-desc') return compareDate(b.createdAt, a.createdAt);
@@ -848,8 +852,8 @@ export function SurveyFormsPage({
             <div className="mb-5">
               <TableFilterBar
                 sortOptions={[
-                  { value: 'title-asc', label: 'Title: A–Z' },
-                  { value: 'title-desc', label: 'Title: Z–A' },
+                  { value: 'title-asc', label: 'Type, then title: A–Z' },
+                  { value: 'title-desc', label: 'Type, then title: Z–A' },
                   { value: 'deadline-asc', label: 'Deadline: earliest first' },
                   { value: 'deadline-desc', label: 'Deadline: latest first' },
                   { value: 'created-desc', label: 'Created: newest first' },
@@ -1074,6 +1078,7 @@ export function SurveyFormsPage({
                 <div className="space-y-2.5">
                 {surveys
                   .filter((survey) => survey.status !== 'Archived')
+                  .sort((a, b) => surveyTypeOptions.indexOf(a.surveyType) - surveyTypeOptions.indexOf(b.surveyType) || compareText(a.title, b.title))
                   .map((survey) => {
                     return (
                       <button
@@ -1084,7 +1089,7 @@ export function SurveyFormsPage({
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{survey.title}</span>
                           <span className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{survey.surveyType}</span>
+                            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${surveyTypeBadges[survey.surveyType]}`}>{survey.surveyType}</span>
                             <SurveyAccessStatus survey={survey} />
                           </span>
                         </span>

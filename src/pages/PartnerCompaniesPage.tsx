@@ -1949,7 +1949,7 @@ export function PartnerCompaniesPage({
       {/* REGISTER PARTNER MODAL DIALOG */}
       {isRegisterOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className={`relative max-h-[90vh] w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-transparent dark:bg-slate-950 ${registerModalTab === 'upload' ? 'max-w-2xl' : 'max-w-lg'}`}>
+          <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-transparent dark:bg-slate-950">
             {/* Close Button */}
             <button
               onClick={() => setIsRegisterOpen(false)}
@@ -1960,7 +1960,7 @@ export function PartnerCompaniesPage({
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-3 text-[#2187CD]">
+            <div className="flex shrink-0 items-center gap-3 px-6 pt-6 pr-14 text-[#2187CD]">
               <div className="rounded-lg bg-[#2187CD]/10 p-2 text-[#2187CD]">
                 <Building size={20} />
               </div>
@@ -1971,7 +1971,7 @@ export function PartnerCompaniesPage({
             </div>
 
             {/* Manual Entry / Upload Excel tabs */}
-            <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/50 mt-5">
+            <div className="mx-6 mt-5 flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/50">
               <button
                 type="button"
                 onClick={() => setRegisterModalTab('manual')}
@@ -2000,6 +2000,7 @@ export function PartnerCompaniesPage({
               )}
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
             {registerModalTab === 'upload' && onPreviewMasterListImport ? (
               <div className="mt-6 space-y-4">
                 <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -2056,18 +2057,9 @@ export function PartnerCompaniesPage({
                   You can select multiple Excel files. Review each file and choose which companies to skip before applying the update.
                 </p>
 
-                <div className="flex items-center justify-end border-t border-slate-100 dark:border-slate-800 pt-4">
-                  <button
-                    onClick={() => setIsRegisterOpen(false)}
-                    className="secondary-button py-2 px-4 text-xs"
-                    type="button"
-                  >
-                    Cancel
-                  </button>
-                </div>
               </div>
             ) : (
-            <form onSubmit={handleAdd} className="space-y-4 mt-6">
+            <form id="register-partner-company-form" onSubmit={handleAdd} className="mt-6 w-full space-y-4">
               <div>
                 <label htmlFor="modal-reg-name" className="field-label">Company Name <span className="text-rose-600" aria-hidden="true">*</span></label>
                 <input
@@ -2193,24 +2185,28 @@ export function PartnerCompaniesPage({
                 Compliance documents (Business Permit, AFS, SIF, etc.) aren't uploaded here — each BP Code above starts out Missing in the Document Tracker until renewed there, or via a Master List upload.
               </p>
 
-              <div className="flex items-center justify-end gap-3 mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
-                <button
-                  onClick={() => setIsRegisterOpen(false)}
-                  className="secondary-button py-2 px-4 text-xs"
-                  type="button"
-                >
-                  Cancel
-                </button>
+            </form>
+            )}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-800">
+              <button
+                onClick={() => setIsRegisterOpen(false)}
+                className="secondary-button min-h-10 px-4 py-2 text-xs"
+                type="button"
+              >
+                Cancel
+              </button>
+              {registerModalTab === 'manual' && (
                 <button
                   type="submit"
-                  className="bg-[#2187CD] hover:bg-[#2187CD]/90 text-white flex items-center justify-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-lg transition cursor-pointer"
+                  form="register-partner-company-form"
+                  className="flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#2187CD] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#2187CD]/90"
                 >
                   <Plus size={14} />
                   <span>Register Company</span>
                 </button>
-              </div>
-            </form>
-            )}
+              )}
+            </div>
           </div>
         </div>,
         document.body
