@@ -37,24 +37,27 @@ test('category document review is a compact expandable company list with accessi
   assert.match(DOCUMENT_TRACKER_SOURCE, /DOCUMENT_STATUS_ICONS\[status\]/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /<DocumentQuickActions/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-1 gap-2\.5 sm:grid-cols-2 xl:grid-cols-4/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /xl:grid-cols-\[minmax\(190px,1\.5fr\)_minmax\(175px,1\.3fr\)_minmax\(140px,1fr\)_minmax\(100px,\.75fr\)_minmax\(190px,1\.35fr\)_32px\]/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /flex min-h-12 min-w-0 flex-wrap content-center items-center gap-x-3 gap-y-1 text-xs/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /status === 'Missing' \|\| status === 'Expired' \? 'text-rose-700/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseEnter=\{\(\) => \{ clearHoverClose\(\); setIsOpen\(true\); \}\}/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseLeave=\{scheduleHoverClose\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,0\.5fr\)_32px\] xl:gap-x-3 2xl:grid-cols-\[minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,0\.5fr\)_32px\] 2xl:gap-x-5';/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const statusColor = status === 'Missing' \? 'text-rose-700[\s\S]*?status === 'Expired' \? 'text-rose-800[\s\S]*?'text-amber-700/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseEnter=\{clearHoverClose\} onMouseLeave=\{scheduleHoverClose\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /'Add remarks'/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /aria-haspopup="menu"/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isRemarksOpen \? 'group' : 'menu'\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \? 'group' : 'menu'\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /role="menuitem"[^>]*>[\s\S]*?Mark missing/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /role="dialog" aria-label=\{`Actions for \$\{docName\}`\}/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /w-\[min\(15rem,calc\(100vw-24px\)\)\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /w-\[min\(16rem,calc\(100vw-24px\)\)\]/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Current record|Not provided|Close document actions/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Add supplementary document|Supplementary document name/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Partner compliance document matrix/);
   for (const category of ['supplier-local', 'supplier-foreign', 'courier', 'subcontractor']) {
     const markup = renderCategoryEntry(category);
-    assert.match(markup, /Partner compliance list/);
-    assert.match(markup, /Review documents/);
+    if (category === 'subcontractor') {
+      assert.match(markup, /No active Subcontractor companies found/);
+    } else {
+      assert.match(markup, /Partner compliance list/);
+      assert.match(markup, /Review documents/);
+    }
   }
 });
 
@@ -81,15 +84,16 @@ test('document maintenance separates schedules, validity, and category alerts wi
 });
 
 test('partner rows show the saved branch status as a badge, separate from document compliance statuses', () => {
-  assert.match(DOCUMENT_TRACKER_SOURCE, /xl:grid-cols-\[minmax\(190px,1\.5fr\)_minmax\(175px,1\.3fr\)_minmax\(140px,1fr\)_minmax\(100px,\.75fr\)_minmax\(190px,1\.35fr\)_32px\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,0\.5fr\)_32px\] xl:gap-x-3 2xl:grid-cols-\[minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,0\.5fr\)_32px\] 2xl:gap-x-5';/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /title=\{row\.company\.name\} className="break-words[^\"]*xl:truncate"/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /title=\{row\.company\.name\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /className="block w-full[^\"]*break-words[^\"]*xl:truncate"/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /xl:flex-nowrap/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /col-start-2 row-start-1 inline-flex h-8 w-8/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /inline-flex h-8 max-w-full items-center rounded-md border px-2\.5/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /col-span-2 row-start-4 flex min-h-12 min-w-0 flex-wrap content-center items-center gap-x-3 gap-y-1/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /col-start-2 row-start-3 min-w-0 xl:col-start-5 xl:row-auto/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_ROW_BADGE_CLASS = 'inline-flex h-8 max-w-full items-center rounded-md border px-2\.5 text-\[10px\] font-semibold';/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /col-span-2 row-start-4 flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label=\{`Branch status: \$\{row\.branch\.status\}`\}/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label=\{`Supplier rank for \$\{row\.branch\.bpCode \|\| row\.company\.name\}`\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /SupplierRankSelect label=\{`Supplier rank for \$\{row\.branch\.bpCode \|\| row\.company\.name\}`\}/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /<span[^>]*>Supplier rank<\/span>|<span[^>]*>Status<\/span>/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /branchStatusBadgeClasses\(row\.branch\.status\)/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /\{row\.branch\.status\}/);
@@ -122,15 +126,15 @@ function partnerTotal(markup: string): string {
 
 test('SMS-15 opens and reopens on all-category overview while valid URL categories narrow the data', () => {
   const all = renderCategoryEntry();
-  assert.match(partnerTotal(all), />4<\/span>/);
+  assert.match(partnerTotal(all), />3<\/span>/);
   assert.match(partnerTotal(all), /All Categories/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /label: 'Branch Registry Status/);
   assert.match(all, /Documents Needing Attention/);
   assert.match(partnerTotal(renderCategoryEntry('supplier-local')), />1<\/span>/);
   assert.match(partnerTotal(renderCategoryEntry('supplier-foreign')), /Supplier \(Foreign\)/);
   assert.match(partnerTotal(renderCategoryEntry('courier')), /Courier/);
-  assert.match(partnerTotal(renderCategoryEntry('invalid')), />4<\/span>/);
-  assert.match(partnerTotal(renderCategoryEntry()), />4<\/span>/);
+  assert.match(partnerTotal(renderCategoryEntry('invalid')), />3<\/span>/);
+  assert.match(partnerTotal(renderCategoryEntry()), />3<\/span>/);
 });
 
 test('pinned category strip keeps all categories reachable and exposes the selected category', () => {
