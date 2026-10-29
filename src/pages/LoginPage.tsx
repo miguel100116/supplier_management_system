@@ -248,7 +248,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   <img src="/smpesa_icon.png" alt="" className="h-16 w-16 shrink-0 object-contain lg:h-20 lg:w-20" />
                   <h2 className="min-h-[6.5rem] min-w-0 text-4xl font-medium leading-snug tracking-tight text-white lg:min-h-[8rem] lg:text-5xl">
                     <AnimatePresence mode="wait" initial={false}>
-                      <motion.span key={loginAudience} className="block" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={headingTransition}>
+                      <motion.span key={loginAudience} className="block" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={roleTransition}>
                         {loginHeading}
                       </motion.span>
                     </AnimatePresence>
