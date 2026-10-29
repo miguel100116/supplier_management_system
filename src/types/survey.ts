@@ -11,6 +11,7 @@ export type PartnerCompanyType = SurveyType | 'Uncategorized';
 
 // Only meaningful when type === 'Supplier'.
 export type SupplierOrigin = 'Local' | 'Foreign';
+export type BusinessClassification = 'CORP' | 'SOL';
 
 export type AccreditationStatus = 'Accredited' | 'Unaccredited';
 
@@ -25,6 +26,8 @@ export type BranchStatus = 'Pending' | 'Updated' | 'Outdated' | 'Incomplete' | '
 export interface ComplianceDocument {
   provided?: boolean;
   expiryDate?: string;
+  remarks?: string;
+  description?: string;
   // status/daysLeft are derived from expiryDate; they may be present on
   // imported rows as a snapshot, but UI should recompute rather than trust
   // a stale value.
@@ -76,6 +79,9 @@ export interface PartnerCompany {
   name: string;
   type: PartnerCompanyType;
   supplierOrigin?: SupplierOrigin;
+  // Legal entity classification for local partner categories. Absent/invalid legacy
+  // values are treated as unclassified until an administrator confirms it.
+  businessClassification?: BusinessClassification;
   email?: string;
   affiliation?: string;
   createdAt: string;

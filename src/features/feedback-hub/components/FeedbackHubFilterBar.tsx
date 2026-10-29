@@ -167,7 +167,7 @@ export function FeedbackHubFilterBar({
           {activeStatus && activeStatus.value !== defaultStatusValue && <button type="button" onClick={() => onStatusChange?.(defaultStatusValue)} aria-label={`Remove ${statusLabel.toLowerCase()} filter`}>{statusLabel}: {activeStatus.label} <X size={12} aria-hidden="true" /></button>}
           {dateActive && <button type="button" onClick={() => { onDateFromChange?.(''); onDateToChange?.(''); }} aria-label={`Remove ${dateLabel.toLowerCase()} filter`}>{dateLabel}: {dateFrom || 'Any'} – {dateTo || 'Any'} <X size={12} aria-hidden="true" /></button>}
           {activeSort && sortValue !== defaultSortValue && <button type="button" onClick={() => onSortChange?.(defaultSortValue ?? '')} aria-label="Reset sorting">Sort: {activeSort.label} <X size={12} aria-hidden="true" /></button>}
-          <button type="button" className="feedback-reset-filters" onClick={onReset}><RotateCcw size={13} aria-hidden="true" /> Reset</button>
+          <button type="button" className="feedback-reset-filters ml-auto" onClick={onReset}><RotateCcw size={13} aria-hidden="true" /> Reset</button>
         </div>
       )}
     </section>

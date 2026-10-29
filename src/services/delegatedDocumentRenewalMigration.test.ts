@@ -23,7 +23,9 @@ test('delegated renewal is a narrow security-definer operation with optimistic c
 test('delegated UI controls cannot change classification, contacts, branch status, or supplier rank', () => {
   assert.match(partnerPage, /disabled=\{!isAdmin\}[\s\S]*handleClassifyCompany/);
   assert.match(partnerPage, /if \(!selectedCompany \|\| !isAdmin\) return;/);
-  assert.match(documentPage, /updateBranchStatus[\s\S]*if \(!isAdmin\) return;/);
-  assert.match(documentPage, /updateSupplierRank[\s\S]*if \(!isAdmin\) return;/);
+  assert.doesNotMatch(documentPage, /updateBranchStatus/);
+  assert.match(documentPage, /aria-label=\{`Branch status: \$\{row\.branch\.status\}`\}/);
+  assert.doesNotMatch(documentPage, /<select[^>]*aria-label=\{`Branch status:/);
+  assert.match(documentPage, /const updateSupplierRank = \([\s\S]*?if \(!isAdmin\) return;/);
   assert.match(documentPage, /onRenewDocument\([\s\S]*expectedDocument|onRenewDocument\([\s\S]*branch\.documents/);
 });

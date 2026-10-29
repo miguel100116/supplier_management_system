@@ -751,7 +751,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
             {!employeeExperience && surveys.length > 1 ? (
               <div>
-                <label htmlFor="filler-survey" className="field-label">Survey Form to Answer *</label>
+                <label htmlFor="filler-survey" className="field-label">Survey Form to Answer <span className="text-rose-500 font-bold" aria-hidden="true">*</span></label>
                 <select
                   id="filler-survey"
                   className="field text-sm font-semibold"
@@ -806,7 +806,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
                 )}
 
                 {!employeeExperience && <div>
-                  <label htmlFor="filler-company" className="field-label">Select Partner Company to Evaluate *</label>
+                  <label htmlFor="filler-company" className="field-label">Select Partner Company to Evaluate <span className="text-rose-500 font-bold" aria-hidden="true">*</span></label>
                   {matchingCompanies.length > 0 ? (
                     <select
                       id="filler-company"

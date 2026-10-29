@@ -11,10 +11,10 @@ export function resolveDocumentCategory(value: unknown): string {
   return typeof value === 'string' && DOCUMENT_CATEGORIES.some(category => category.key === value) ? value : 'all';
 }
 
-export function companiesForDocumentCategory(companies: PartnerCompany[], value: unknown): PartnerCompany[] {
+export function companiesForDocumentCategory(companies: PartnerCompany[], value: unknown, includeArchived = false): PartnerCompany[] {
   const key = resolveDocumentCategory(value);
   const category = DOCUMENT_CATEGORIES.find(item => item.key === key);
-  return companies.filter(company => !company.isArchived && (!category || (
+  return companies.filter(company => (includeArchived || !company.isArchived) && (!category || (
     company.type === category.type && (category.type !== 'Supplier' || (company.supplierOrigin ?? 'Local') === category.origin)
   )));
 }

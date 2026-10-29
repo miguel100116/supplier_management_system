@@ -361,6 +361,7 @@ export default function App() {
     addPartnerCompany,
     updatePartnerCompany,
     updatePartnerDocument,
+    updatePartnerDocumentRemarks,
     removePartnerCompany,
     previewMasterListImport,
     rebuildMasterListImportPreview,
@@ -1153,9 +1154,11 @@ export default function App() {
           window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
         }}
         partnerCompanies={partnerCompanies}
+        responses={userAccessibleResponses}
         canRenewDocuments={canRenewDocuments}
         onUpdateCompany={updatePartnerCompany}
         onRenewDocument={updatePartnerDocument}
+        onUpdateDocumentRemarks={updatePartnerDocumentRemarks}
         currentUserEmail={account || ''}
         isAdmin={isAdmin}
       />

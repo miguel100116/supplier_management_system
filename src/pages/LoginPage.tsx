@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { isMsalConfigured, loginWithMicrosoft } from '../services/msalAuth';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import {
@@ -114,6 +114,11 @@ function HeroIllustration({ className }: { className?: string }) {
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [loginAudience, setLoginAudience] = useState<LoginRole>('Employee');
   const loginHeading = loginAudience === 'Admin' ? 'Vendor Management System' : 'Vendor Performance Evaluation';
+  const heroDescription = loginAudience === 'Admin'
+    ? 'Manage supplier records, compliance, and evaluation programs across Microgenesis.'
+    : 'Complete evaluations and review performance feedback for your assigned suppliers.';
+  const reduceMotion = useReducedMotion();
+  const roleTransition = reduceMotion ? { duration: 0 } : { duration: 0.4, ease: [0.23, 1, 0.32, 1] as const };
   const msalReady = isMsalConfigured();
   const [isMsSigningIn, setIsMsSigningIn] = useState(false);
   const [msError, setMsError] = useState('');
@@ -200,10 +205,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <div className="relative z-10 flex flex-col items-center text-center">
           <img src="/microgenesis_logo.png" alt="Microgenesis" className="h-11 object-contain brightness-0 invert" />
 
-          <div className="mt-8 flex max-w-xs items-center gap-3 text-left">
+          <div className="mt-8 flex min-h-[3.5rem] max-w-xs items-center gap-3 text-left">
             <img src="/smpesa_icon.png" alt="" className="h-9 w-9 shrink-0 object-contain" />
-            <h1 className="min-w-0 text-xl font-medium leading-snug tracking-tight text-white">
-              {loginHeading}
+            <h1 className="min-h-[3.5rem] min-w-0 text-xl font-medium leading-snug tracking-tight text-white">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span key={loginAudience} className="block" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={roleTransition}>
+                  {loginHeading}
+                </motion.span>
+              </AnimatePresence>
             </h1>
           </div>
           <p className="mt-4 max-w-xs text-xs font-light leading-relaxed text-[#93aec9]">
@@ -237,8 +246,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               >
                 <div className="flex items-center gap-5">
                   <img src="/smpesa_icon.png" alt="" className="h-16 w-16 shrink-0 object-contain lg:h-20 lg:w-20" />
-                  <h2 className="min-w-0 text-4xl font-medium leading-snug tracking-tight text-white lg:text-5xl">
-                    {loginHeading}
+                  <h2 className="min-h-[6.5rem] min-w-0 text-4xl font-medium leading-snug tracking-tight text-white lg:min-h-[8rem] lg:text-5xl">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span key={loginAudience} className="block" initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} transition={roleTransition}>
+                        {loginHeading}
+                      </motion.span>
+                    </AnimatePresence>
                   </h2>
                 </div>
               </motion.div>
@@ -272,7 +285,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   disabled={isMsSigningIn || isPasswordSubmitting}
                   aria-pressed={loginAudience === audience}
                   onClick={() => setLoginAudience(audience)}
-                  className={`flex-1 rounded-md px-2 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] focus-visible:ring-offset-2 ${loginAudience === audience ? 'bg-white text-[#0063a9] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`flex-1 rounded-md px-2 py-2 text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] focus-visible:ring-offset-2 motion-reduce:transition-none ${loginAudience === audience ? 'bg-white text-[#0063a9] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                   {audience} Account
                 </button>

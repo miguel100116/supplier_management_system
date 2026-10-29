@@ -14,6 +14,65 @@ import { COMMON_DOCUMENTS, FOREIGN_SUPPLIER_DOCUMENTS, LOCAL_SUPPLIER_DOCUMENTS 
 // its exact row count has varied between revisions, so findHeaderRowIndex
 // locates it by content. This is only the last-known fallback position.
 const HEADER_ROW_INDEX = 19;
+export const MAX_MASTER_LIST_FILE_BYTES = 25 * 1024 * 1024;
+
+export type MasterListDuplicateReason = 'matching-filename' | 'identical-content' | 'both';
+
+export interface MasterListFileDuplicate {
+  duplicateIndex: number;
+  originalIndex: number;
+  reason: MasterListDuplicateReason;
+}
+
+/** Find repeated files within one Master List selection. The registry does not
+ * retain the uploaded workbook, so cross-session replacement is not offered. */
+export async function findDuplicateMasterListFiles(files: readonly File[]): Promise<MasterListFileDuplicate[]> {
+  const fingerprints: Array<{ name: string; fingerprint: string }> = [];
+  for (const file of files) {
+    const extension = file.name.slice(file.name.lastIndexOf('.')).toLocaleLowerCase();
+    if (extension !== '.xlsx' && extension !== '.xls') {
+      throw new Error(`"${file.name}" must be an Excel workbook (.xlsx or .xls).`);
+    }
+    if (!Number.isInteger(file.size) || file.size <= 0 || file.size > MAX_MASTER_LIST_FILE_BYTES) {
+      throw new Error(`"${file.name}" must be between 1 byte and 25 MB.`);
+    }
+    let rows: RawMasterListRow[];
+    try {
+      rows = parseMasterListWorkbook(await file.arrayBuffer());
+    } catch (error) {
+      throw new Error(`"${file.name}": ${error instanceof Error ? error.message : 'Unable to read this workbook.'}`);
+    }
+    if (rows.length === 0) throw new Error(`"${file.name}" has no partner company rows.`);
+    const fingerprintRows = rows.map(({ cells }) => {
+      const normalized = cells.map((cell) => String(cell ?? '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase());
+      while (normalized.at(-1) === '') normalized.pop();
+      return normalized;
+    });
+    fingerprintRows.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    fingerprints.push({
+      name: file.name.trim().toLocaleLowerCase(),
+      fingerprint: JSON.stringify(fingerprintRows),
+    });
+  }
+
+  const duplicates: MasterListFileDuplicate[] = [];
+  fingerprints.forEach((file, duplicateIndex) => {
+    for (let originalIndex = 0; originalIndex < duplicateIndex; originalIndex++) {
+      const original = fingerprints[originalIndex];
+      const sameName = file.name === original.name;
+      const sameContent = file.fingerprint === original.fingerprint;
+      if (sameName || sameContent) {
+        duplicates.push({
+          duplicateIndex,
+          originalIndex,
+          reason: sameName && sameContent ? 'both' : sameName ? 'matching-filename' : 'identical-content',
+        });
+        break;
+      }
+    }
+  });
+  return duplicates;
+}
 
 // Column indices as laid out in "Masterlist Database" (0-based). Positional
 // indexing is used instead of header-name lookups because the header cells
@@ -346,6 +405,19 @@ function buildDocuments(
   return docs;
 }
 
+/** Merge explicit workbook values while retaining unprovided history and
+ * administrator metadata such as remarks and supplementary documents. */
+export function mergeExistingDocuments(
+  existing: Record<string, ComplianceDocument> | undefined,
+  imported: Record<string, ComplianceDocument>,
+): Record<string, ComplianceDocument> {
+  const merged: Record<string, ComplianceDocument> = { ...(existing ?? {}) };
+  Object.entries(imported).forEach(([name, incoming]) => {
+    merged[name] = { ...(existing?.[name] ?? {}), ...incoming };
+  });
+  return merged;
+}
+
 // --- Merge engine ------------------------------------------------------------
 
 export interface ImportLogEntry {
@@ -421,7 +493,15 @@ export function masterListRowKey(fileId: string, sourceRow: number): string {
 export async function prepareMasterListSourceFiles(files: File[]): Promise<MasterListSourceFile[]> {
   return Promise.all(files.map(async (file, index) => {
     try {
+      const extension = file.name.slice(file.name.lastIndexOf('.')).toLocaleLowerCase();
+      if (extension !== '.xlsx' && extension !== '.xls') {
+        throw new Error('Choose an Excel workbook (.xlsx or .xls).');
+      }
+      if (!Number.isInteger(file.size) || file.size <= 0 || file.size > MAX_MASTER_LIST_FILE_BYTES) {
+        throw new Error('The file must be between 1 byte and 25 MB.');
+      }
       const rows = parseMasterListWorkbook(await file.arrayBuffer());
+      if (rows.length === 0) throw new Error('No partner company rows were found. Check that this is a populated Master List workbook.');
       return { id: `file-${index}`, fileName: file.name, rows };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to read this workbook.';
@@ -565,10 +645,11 @@ export function mergeRowsIntoCompanies(
       );
       const isNewBranch = existingBranchIdx < 0;
       const beforeDocs = isNewBranch ? undefined : match.branches![existingBranchIdx].documents;
-      const docDiffs = isNewBranch ? 0 : countDocumentDiffs(beforeDocs, branch.documents);
+      const mergedDocuments = isNewBranch ? (branch.documents ?? {}) : mergeExistingDocuments(beforeDocs, branch.documents ?? {});
+      const docDiffs = isNewBranch ? 0 : countDocumentDiffs(beforeDocs, mergedDocuments);
 
       if (existingBranchIdx >= 0) {
-        match.branches![existingBranchIdx] = branch;
+        match.branches![existingBranchIdx] = { ...branch, documents: mergedDocuments };
         stats.updatedBranches++;
         log.push({
           sourceRow: row.sourceRow, bpCode: row.bpCode, bpName: row.bpName,

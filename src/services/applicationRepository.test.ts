@@ -202,6 +202,8 @@ const validApplicationRecords: Record<(typeof APPLICATION_RECORD_TYPES)[number],
   compliance_snapshot: { id: 'Supplier', payload: { id: 'Supplier', snapshots: [{ date: now, rate: 95, total: 20 }] } },
   active_company_snapshot: { id: 'supplier-snapshot-1', payload: { id: 'supplier-snapshot-1', surveyType: 'Supplier', uploadedAt: now, uploadedBy: 'admin@mgenesis.com', sourceFileName: 'suppliers.xlsx', companies: ['Supplier One'] } },
   evaluation_import_archive: { id: 'import-archive-1', payload: { id: 'import-archive-1', surveyType: 'Supplier', uploadedAt: now, uploadedBy: 'admin@mgenesis.com', sourceFileName: 'supplier-results.xlsx', storagePath: 'supplier/2026-09-24/import-archive-1.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileSize: 128, importBatchId: 'client-csv:supplier:sha256' } },
+  document_maintenance: { id: 'default', payload: { id: 'default', validityYears: { 'DTI (Sole)': null }, reminderDays: [60, 30], dailyFinalDays: 30 } },
+  document_reminder_delivery: { id: 'reminder-1', payload: { id: 'reminder-1', companyId: 'company-1', company: 'Supplier One', branchId: 'branch-1', branchCode: 'BP-1', documentName: 'Business Permit', expiryDate: now.slice(0, 10), daysLeft: 30, milestone: 'day-30', deliveredAt: now } },
 };
 
 test('uses the submission and question IDs as the stable response-row key', () => {
@@ -239,7 +241,7 @@ test('shows the realtime warning only after three consecutive failures and clear
 
 test('keeps frontend application record types aligned with the latest database constraint', () => {
   const migration = readFileSync(
-    new URL('../../supabase/migrations/202609300001_evaluation_import_archives.sql', import.meta.url),
+    new URL('../../supabase/migrations/202610280001_partner_document_compliance_rules.sql', import.meta.url),
     'utf8',
   );
   const constraint = migration.match(/add constraint application_records_record_type_check check \(record_type in \(([\s\S]*?)\)\);/i);
@@ -365,4 +367,18 @@ test('rejects invalid dates and oversized collections while accepting the suppor
     ...validApplicationRecords.active_company_snapshot.payload as object,
     companies: Array.from({ length: 10_001 }, (_, index) => `Company ${index}`),
   }, 'supplier-snapshot-1'), /invalid stored shape/i);
+});
+
+test('normalizes inconsistent CORP/SOL classification to unclassified and validates document remarks fields', () => {
+  const parsed = parseApplicationRecordPayload('partner_company', {
+    ...validApplicationRecords.partner_company.payload as object,
+    businessClassification: 'CORP/SOL',
+    branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: { 'DTI (Sole)': { provided: false, remarks: 'Awaiting renewal' } } }],
+  }, 'company-1') as { businessClassification?: string; branches: Array<{ documents?: Record<string, { remarks?: string }> }> };
+  assert.equal(parsed.businessClassification, undefined);
+  assert.equal(parsed.branches[0].documents?.['DTI (Sole)']?.remarks, 'Awaiting renewal');
+  assert.throws(() => parseApplicationRecordPayload('partner_company', {
+    ...validApplicationRecords.partner_company.payload as object,
+    branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: { DTI: { remarks: 'x'.repeat(2001) } } }],
+  }, 'company-1'), /too long/);
 });

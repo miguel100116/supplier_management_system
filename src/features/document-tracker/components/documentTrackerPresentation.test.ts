@@ -5,7 +5,6 @@ import type { PartnerCompany } from '../../../types/survey';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { scrollDocumentMatrixWithArrowKey } from './documentMatrixKeyboard';
 
 const DOCUMENT_TRACKER_SOURCE = readFileSync(
   new URL('../../../pages/DocumentRegisterPage.tsx', import.meta.url),
@@ -23,24 +22,82 @@ test('compliance overview does not repeat the category selected in the filter ta
   assert.match(DOCUMENT_TRACKER_SOURCE, /<span>\{cat\.label\}<\/span>/);
 });
 
-test('document matrix arrow keys scroll horizontally and leave other keys alone', () => {
-  const calls: ScrollToOptions[] = [];
-  const surface = { scrollBy: (options: ScrollToOptions) => calls.push(options) };
-
-  assert.equal(scrollDocumentMatrixWithArrowKey(surface, 'ArrowRight'), true);
-  assert.equal(scrollDocumentMatrixWithArrowKey(surface, 'ArrowLeft'), true);
-  assert.equal(scrollDocumentMatrixWithArrowKey(surface, 'ArrowDown'), false);
-  assert.deepEqual(calls, [
-    { left: 160, behavior: 'smooth' },
-    { left: -160, behavior: 'smooth' },
-  ]);
+test('category document review is a compact expandable company list with accessible per-document actions', () => {
+  const listStart = DOCUMENT_TRACKER_SOURCE.indexOf('<div className="space-y-2" aria-label="Partner compliance list">');
+  const listEnd = DOCUMENT_TRACKER_SOURCE.indexOf('<ChartCard', listStart);
+  assert.ok(listStart >= 0 && listEnd > listStart);
+  const listSource = DOCUMENT_TRACKER_SOURCE.slice(listStart, listEnd);
+  assert.doesNotMatch(listSource, /overflow-x-(auto|scroll)/);
+  assert.doesNotMatch(listSource, /<table/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label="Partner compliance list"/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-expanded=\{isExpanded\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Review documents/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Required documents/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Historical & additional/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /DOCUMENT_STATUS_ICONS\[status\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /<DocumentQuickActions/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-1 gap-2\.5 sm:grid-cols-2 xl:grid-cols-4/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,0\.5fr\)_32px\] xl:gap-x-3 2xl:grid-cols-\[minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,0\.5fr\)_32px\] 2xl:gap-x-5';/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const statusColor = status === 'Missing' \? 'text-rose-700[\s\S]*?status === 'Expired' \? 'text-rose-800[\s\S]*?'text-amber-700/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseEnter=\{clearHoverClose\} onMouseLeave=\{scheduleHoverClose\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /'Add remarks'/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-haspopup="menu"/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \? 'group' : 'menu'\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /role="menuitem"[^>]*>[\s\S]*?Mark missing/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /role="dialog" aria-label=\{`Actions for \$\{docName\}`\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /w-\[min\(16rem,calc\(100vw-24px\)\)\]/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Current record|Not provided|Close document actions/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Add supplementary document|Supplementary document name/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Partner compliance document matrix/);
+  for (const category of ['supplier-local', 'supplier-foreign', 'courier', 'subcontractor']) {
+    const markup = renderCategoryEntry(category);
+    if (category === 'subcontractor') {
+      assert.match(markup, /No active Subcontractor companies found/);
+    } else {
+      assert.match(markup, /Partner compliance list/);
+      assert.match(markup, /Review documents/);
+    }
+  }
 });
 
-test('document matrix is keyboard-focusable and preserves arrow keys in form controls', () => {
-  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label="Partner compliance document matrix[^"]*"/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /tabIndex=\{0\}[\s\S]*?onKeyDown=\{handleMatrixKeyDown\}/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /input, select, textarea, \[contenteditable="true"\]/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /onKeyDown=\{handleMatrixKeyDown\}/);
+test('document maintenance separates schedules, validity, and category alerts with guarded saving', () => {
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-labelledby="document-maintenance-title"/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /\['schedule', 'Reminder schedule'\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /\['validity', 'Validity periods'\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /\['category', 'Category alerts'\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label="Document maintenance settings"/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /placeholder="Not set"/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Reminder days before expiry \(comma separated\)/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Pending confirmation|validity verification status|appropriate authority guidance/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Configure the default duration used when a new expiry date is entered/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /await saveDocumentMaintenanceSettings\(savedSettings\)/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /await saveNotificationSettings\(notificationRules\)/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /useModalEscape\(isNotificationSettingsOpen, requestCloseMaintenance/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /keepFocusInside/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Discard unsaved changes\?/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /controller\.signal\.aborted\) return/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /max-w-\[900px\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /max-h-\[calc\(100dvh-16px\)\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /maintenanceTab === 'validity' \? 'max-h-/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /h-\[100dvh\]|max-w-\[1320px\]/);
+});
+
+test('partner rows show the saved branch status as a badge, separate from document compliance statuses', () => {
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,0\.5fr\)_32px\] xl:gap-x-3 2xl:grid-cols-\[minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,0\.5fr\)_32px\] 2xl:gap-x-5';/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /title=\{row\.company\.name\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /className="block w-full[^\"]*break-words[^\"]*xl:truncate"/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /xl:flex-nowrap/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /col-start-2 row-start-3 min-w-0 xl:col-start-5 xl:row-auto/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_ROW_BADGE_CLASS = 'inline-flex h-8 max-w-full items-center rounded-md border px-2\.5 text-\[10px\] font-semibold';/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /col-span-2 row-start-4 flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label=\{`Branch status: \$\{row\.branch\.status\}`\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /SupplierRankSelect label=\{`Supplier rank for \$\{row\.branch\.bpCode \|\| row\.company\.name\}`\}/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /<span[^>]*>Supplier rank<\/span>|<span[^>]*>Status<\/span>/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /branchStatusBadgeClasses\(row\.branch\.status\)/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /\{row\.branch\.status\}/);
+  assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Calculated from required documents, classification, and expiry dates/);
 });
 
 
@@ -69,15 +126,15 @@ function partnerTotal(markup: string): string {
 
 test('SMS-15 opens and reopens on all-category overview while valid URL categories narrow the data', () => {
   const all = renderCategoryEntry();
-  assert.match(partnerTotal(all), />4<\/span>/);
+  assert.match(partnerTotal(all), />3<\/span>/);
   assert.match(partnerTotal(all), /All Categories/);
-  assert.match(all, /Status Breakdown/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /label: 'Branch Registry Status/);
   assert.match(all, /Documents Needing Attention/);
   assert.match(partnerTotal(renderCategoryEntry('supplier-local')), />1<\/span>/);
   assert.match(partnerTotal(renderCategoryEntry('supplier-foreign')), /Supplier \(Foreign\)/);
   assert.match(partnerTotal(renderCategoryEntry('courier')), /Courier/);
-  assert.match(partnerTotal(renderCategoryEntry('invalid')), />4<\/span>/);
-  assert.match(partnerTotal(renderCategoryEntry()), />4<\/span>/);
+  assert.match(partnerTotal(renderCategoryEntry('invalid')), />3<\/span>/);
+  assert.match(partnerTotal(renderCategoryEntry()), />3<\/span>/);
 });
 
 test('pinned category strip keeps all categories reachable and exposes the selected category', () => {

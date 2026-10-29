@@ -19,7 +19,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const tests = discoverTests(process.cwd(), process.argv[2]);
   if (!tests.length) throw new Error('No tests found.');
   console.log(`Running ${tests.length} test files (${process.argv[2] ?? 'all'}).`);
-  const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', ...tests], { stdio: 'inherit' });
+  const result = spawnSync(process.execPath, ['--import', 'tsx', '--test', '--test-concurrency=4', ...tests], { stdio: 'inherit' });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
 }

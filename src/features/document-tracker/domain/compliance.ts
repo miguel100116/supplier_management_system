@@ -45,6 +45,10 @@ export function computeDocumentStatus(
   referenceDate: Date = new Date(),
   docName?: string
 ): { status: DocumentStatus; daysLeft?: number } {
+  if (doc.provided === false) {
+    const daysLeft = doc.expiryDate ? daysUntil(doc.expiryDate, referenceDate) : undefined;
+    return { status: 'Missing', ...(Number.isFinite(daysLeft) ? { daysLeft } : {}) };
+  }
   if (!doc.expiryDate) {
     const expiryDateRequired = Boolean(docName && isExpiryDocument(docName));
     return { status: doc.provided && !expiryDateRequired ? 'Current' : 'Missing' };
@@ -57,6 +61,71 @@ export function computeDocumentStatus(
   if (daysLeft < 0) return { status: 'Expired', daysLeft };
   if (daysLeft <= EXPIRING_SOON_DAYS) return { status: 'Expiring Soon', daysLeft };
   return { status: 'Current', daysLeft };
+}
+
+export type BranchDocumentComplianceStatus = DocumentStatus | 'Needs classification' | 'No branch';
+
+/** Derives one branch's compliance state from its applicable documents and current expiry dates. */
+export function getBranchDocumentComplianceStatus(
+  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification'>,
+  branch: BranchRecord | undefined,
+  referenceDate: Date = new Date(),
+): BranchDocumentComplianceStatus {
+  if (!branch) return 'No branch';
+
+  const classificationRequired = company.type !== 'Uncategorized'
+    && !(company.type === 'Supplier' && company.supplierOrigin === 'Foreign')
+    && !['CORP', 'SOL'].includes(company.businessClassification ?? '');
+  const documentStatuses = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification)
+    .map((docName) => computeDocumentStatus(branch.documents?.[docName] ?? {}, referenceDate, docName).status);
+
+  if (documentStatuses.includes('Expired')) return 'Expired';
+  if (documentStatuses.includes('Missing')) return 'Missing';
+  if (documentStatuses.includes('For Update')) return 'For Update';
+  if (classificationRequired) return 'Needs classification';
+  if (documentStatuses.includes('Expiring Soon')) return 'Expiring Soon';
+  return 'Current';
+}
+
+/** A branch is fully compliant only when every applicable document is current. */
+export function isBranchDocumentCompliant(
+  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification'>,
+  branch: BranchRecord | undefined,
+  referenceDate: Date = new Date(),
+): boolean {
+  return getBranchDocumentComplianceStatus(company, branch, referenceDate) === 'Current';
+}
+
+export interface DocumentAttentionSummary {
+  documentName: string;
+  expiringSoon: number;
+  outdated: number;
+  expired: number;
+}
+
+/** Summarizes required document statuses without folding outdated records into expired. */
+export function summarizeDocumentAttention(
+  entries: Iterable<{ documentName: string; status: DocumentStatus }>
+): DocumentAttentionSummary[] {
+  const summaries = new Map<string, DocumentAttentionSummary>();
+
+  for (const { documentName, status } of entries) {
+    if (status !== 'Expiring Soon' && status !== 'For Update' && status !== 'Expired') continue;
+    const summary = summaries.get(documentName) ?? {
+      documentName,
+      expiringSoon: 0,
+      outdated: 0,
+      expired: 0,
+    };
+    if (status === 'Expiring Soon') summary.expiringSoon++;
+    else if (status === 'For Update') summary.outdated++;
+    else summary.expired++;
+    summaries.set(documentName, summary);
+  }
+
+  return [...summaries.values()].sort((a, b) =>
+    (b.expiringSoon + b.outdated + b.expired) - (a.expiringSoon + a.outdated + a.expired)
+  );
 }
 
 // Company-wide status is never persisted - always rolled up live from the
@@ -73,13 +142,14 @@ export interface CompanyDocumentSummary {
   missingCount: number;
   totalRequired: number;
   issues: DocumentAlertDetail[];
+  classificationRequired: boolean;
 }
 
 export function computeCompanyDocumentSummary(
-  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'branches'>,
+  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification' | 'branches'>,
   referenceDate: Date = new Date()
 ): CompanyDocumentSummary {
-  const requiredKeys = getRequiredDocumentKeys(company.type, company.supplierOrigin);
+  const requiredKeys = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification);
   const branches = company.branches ?? [];
 
   let expiredCount = 0;
@@ -127,6 +197,7 @@ export function computeCompanyDocumentSummary(
     missingCount,
     totalRequired: requiredKeys.length * branchesToCheck.length,
     issues,
+    classificationRequired: company.type !== 'Uncategorized' && !(company.type === 'Supplier' && company.supplierOrigin === 'Foreign') && !['CORP', 'SOL'].includes(company.businessClassification ?? ''),
   };
 }
 

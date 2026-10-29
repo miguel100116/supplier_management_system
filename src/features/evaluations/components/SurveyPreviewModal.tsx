@@ -136,7 +136,7 @@ export function SurveyPreviewModal({ survey, partnerCompanies = [], onClose }: S
                 </div>
               </div>
               <div>
-                <label className="field-label">Select Partner Company to Evaluate *</label>
+                <label className="field-label">Select Partner Company to Evaluate <span className="text-rose-500 font-bold" aria-hidden="true">*</span></label>
                 {sampleCompanies.length > 0 ? (
                   <select className="field text-xs font-semibold" value={company} onChange={(e) => setCompany(e.target.value)}>
                     {sampleCompanies.map((c) => (
