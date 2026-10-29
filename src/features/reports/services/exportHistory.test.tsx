@@ -207,7 +207,8 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   assert.match(pdf, /Latest saved answer/);
   assert.match(pdf, /Selected archive/);
   assert.match(pdf, /current rubric/);
-  assert.doesNotMatch(pdf, /\/Subtype \/Image|MBS Partner Evaluation System/);
+  assert.match(pdf, /Supplier Management System/);
+  assert.doesNotMatch(pdf, /MBS Partner Evaluation System/);
   assert.equal(service.getExportHistory()[0].recipe?.kind, 'archived-survey');
   for (const [paperSize, width, height] of [['a4', 595.28, 841.89], ['letter', 612, 792], ['legal', 612, 1008], ['long-bond', 612, 936]] as const) {
     const sizedRecipe = { kind: 'summary' as const, parameters: { paperSize } };

@@ -2,6 +2,7 @@ import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect'
 import { paperSizePoints, type PaperSize } from '../features/reports/domain/paperSize';
 import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
+import { applyPdfBranding, loadPdfBranding } from '../features/reports/services/pdfBranding';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -298,7 +299,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
         if (logoDataUrl) {
           const coverLogoWidth = 190;
           const coverLogoHeight = coverLogoWidth * LOGO_ASPECT;
-          doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 168, coverLogoWidth, coverLogoHeight);
+          doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 168, coverLogoWidth, coverLogoHeight, undefined, 'FAST');
         }
 
         doc.setDrawColor(...BRAND);
@@ -332,33 +333,6 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
         doc.text('This document is confidential and intended solely for the named recipient.', pageWidth / 2, pageHeight - 62, {
           align: 'center',
         });
-
-        // SECTION CONTENT PAGES
-        const drawHeaderAndFooter = (pdfDoc: typeof doc, pageIndex: number, totalPages: number) => {
-          pdfDoc.setPage(pageIndex);
-          
-          // Header
-          if (logoDataUrl) {
-            pdfDoc.addImage(logoDataUrl, 'PNG', marginLeft, 20, 100, 100 * LOGO_ASPECT);
-          }
-          pdfDoc.setFont('helvetica', 'bold');
-          pdfDoc.setFontSize(9);
-          pdfDoc.setTextColor(70);
-          pdfDoc.text('Question Performance Report', pageWidth - marginLeft, 32, { align: 'right' });
-          pdfDoc.setFont('helvetica', 'normal');
-          pdfDoc.setTextColor(130);
-          pdfDoc.text('MBS Partner Evaluation System', pageWidth - marginLeft, 44, { align: 'right' });
-          
-          pdfDoc.setDrawColor(226, 232, 240);
-          pdfDoc.setLineWidth(0.75);
-          pdfDoc.line(marginLeft, 72, pageWidth - marginLeft, 72);
-
-          // Footer
-          pdfDoc.setFontSize(8);
-          pdfDoc.setTextColor(150);
-          pdfDoc.text('Microgenesis Supplier Management System — Confidential', marginLeft, pageHeight - 20);
-          pdfDoc.text(`Page ${pageIndex - 1} of ${totalPages - 1}`, pageWidth - marginLeft, pageHeight - 20, { align: 'right' });
-        };
 
         // Render each category to PDF dynamically
         activeTypes.forEach((type) => {
@@ -478,12 +452,7 @@ export function QuestionReportBuilderPage({ responses, partnerCompanies, canExpo
           });
         });
 
-        // Draw headers and footers for all pages
-        const pageCount = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
-        for (let i = 2; i <= pageCount; i++) {
-          drawHeaderAndFooter(doc, i, pageCount);
-        }
-
+        applyPdfBranding(doc, await loadPdfBranding(), { title: reportTitle, margin: marginLeft });
         await saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
       }
     } finally {
@@ -842,7 +811,7 @@ function PagedSheet({
   );
 }
 
-/** The small running header (logo + report name) repeated at the top of each content page, mirroring the export - always static text, matching drawHeaderAndFooter in the PDF (it never shows the per-section label). */
+/** The small running header (logo + report name) repeated at the top of each content page, mirroring the export - always static text, matching the shared letterhead in the PDF (it never shows the per-section label). */
 function ReportPageHeader() {
   return (
     <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">

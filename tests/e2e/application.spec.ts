@@ -16,10 +16,12 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     createdAt, branches: [], isArchived: false };
   const records: Array<{ record_type: string; record_id: string; payload: Record<string, unknown>; created_at: string }> = [
     { record_type: 'partner_company', record_id: company.id, payload: company, created_at: createdAt },
+    { record_type: 'document_maintenance', record_id: 'default', created_at: createdAt,
+      payload: { id: 'default', validityYears: {}, reminderDays: [60, 30], dailyFinalDays: 30 } },
   ];
   const unexpected: string[] = [];
   const errors: string[] = [];
-  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false };
+  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false };
   const historyReads: Array<{ select: string; id: string | null }> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
@@ -48,6 +50,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     if (url.pathname === '/rest/v1/application_records') {
       if (request.method() === 'GET') {
         const type = url.searchParams.get('record_type')?.replace(/^eq\./, '');
+        if (type === 'document_reminder_delivery' && failures.reminderReads) return reply({ message: 'Synthetic reminder read failed' }, 500);
         const offset = Number(url.searchParams.get('offset') ?? 0);
         const limit = Number(url.searchParams.get('limit') ?? 1000);
         let matching = records.filter(record => record.record_type === type);
@@ -96,6 +99,23 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   // Let authentication settle before the next navigation can interrupt it.
   await expect(page.getByRole('main').or(page.getByRole('alert')).first()).toBeVisible();
 }
+
+test('Document reminder failures and missing setup stay visible and recover through Retry', async ({ page }) => {
+  const api = await backend(page);
+  const seed = api.records.splice(api.records.findIndex(row => row.record_type === 'document_maintenance'), 1)[0];
+  await page.goto('/');
+  await signIn(page);
+  const warning = page.getByRole('alert').filter({ hasText: 'Document reminders could not be refreshed' });
+  await expect(warning).toContainText('202610280001 and 202610290001');
+  api.records.push(seed);
+  api.failures.reminderReads = true;
+  await warning.getByRole('button', { name: 'Retry reminders' }).click();
+  await expect(warning).toContainText('Synthetic reminder read failed');
+  api.failures.reminderReads = false;
+  await warning.getByRole('button', { name: 'Retry reminders' }).click();
+  await expect(warning).toHaveCount(0);
+  expect(api.errors).toEqual([]);
+});
 
 test('Workspace category and status badges use consistent typography and geometry', async ({ page }, testInfo) => {
   const service = await backend(page);
@@ -691,9 +711,14 @@ test('Archived report builders select one item, update the document preview and 
       const pdf = bytes.toString('latin1');
       expect(pdf).toMatch(/^%PDF-/);
       expect(pdf).toMatch(/\/MediaBox \[0 0 612(?:\.0*)? 1008(?:\.0*)?\]/);
-      for (const text of ['Archived Survey Report', 'First archived survey', 'current rubric', 'Report scope', 'Microgenesis Supplier Management System']) {
+      for (const text of ['Archived Survey Report', 'First archived survey', 'current rubric', 'Report scope', 'Supplier Management System']) {
         expect(pdf).toContain(text);
       }
+      const pageCount = Number(pdf.match(/\/Count (\d+)/)?.[1]);
+      expect(pageCount).toBeGreaterThan(0);
+      expect((pdf.match(/\/I\d+ Do/g) ?? []).length).toBe(pageCount);
+      expect(pdf).not.toContain('SMPESA');
+      expect(pdf).toContain(`/Author (Microgenesis)`);
       expect(pdf).not.toContain('This report provides a comprehensive summary of survey analytics');
     }
     else if (format === 'docx') {
@@ -942,6 +967,46 @@ test('Question Report quick export exposes and downloads Word below the report l
   const document = XLSX.CFB.find(archive, '/word/document.xml');
   expect(document).toBeTruthy();
   expect(Buffer.from(document!.content as Uint8Array).toString('utf8')).toContain('Question Report (All Questions)');
+});
+
+test('detailed and raw PDF downloads share system branding, company metadata and complete page numbering', async ({ page }) => {
+  test.setTimeout(120_000);
+  const service = await backend(page);
+  service.records.push({ record_type: 'survey_response', record_id: 'pdf-evaluation:Q01', created_at: createdAt,
+    payload: { responseId: 'pdf-evaluation', companyId: 'synthetic-courier', company: 'Synthetic Courier', surveyType: 'Courier',
+      respondentType: 'Employee', submissionDate: new Date().toISOString(), questionId: 'Q01', questionNumber: 1,
+      question: 'Reliability?', questionCategory: 'Reliability/Delivery', rating: 12, comment: '', dataSource: 'client_csv' } });
+  await page.goto('/login');
+  await signIn(page);
+  for (const [report, trigger, pdfButton] of [
+    ['Summary Report', 'Export Report', 'Export PDF Document'],
+    ['Executive', 'Export Executive Dossier', 'Export PDF Document'],
+    ['Question Report', 'Export', 'PDF Document'],
+    ['Companies Report', 'Export', 'PDF'],
+    ['Raw Data Export', 'Export As', 'PDF'],
+  ]) {
+    await page.goto('/reports');
+    if (report === 'Executive') await page.getByRole('button', { name: 'Build Executive Report', exact: true }).click();
+    else await page.getByRole('article').filter({ has: page.getByRole('heading', { name: report, exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+    const exportButton = report === 'Raw Data Export'
+      ? page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Courier', exact: true }) }).getByRole('button', { name: trigger, exact: true })
+      : page.getByRole('button', { name: trigger, exact: true });
+    await exportButton.click();
+    const event = page.waitForEvent('download');
+    await page.getByRole('button', { name: pdfButton, exact: true }).click();
+    const download = await event;
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+    const pdf = (await readFile((await download.path())!)).toString('latin1');
+    const pages = Number(pdf.match(/\/Count (\d+)/)?.[1]);
+    expect(pages, report).toBeGreaterThan(0);
+    expect((pdf.match(/\/I\d+ Do/g) ?? []).length, report).toBeGreaterThanOrEqual(pages);
+    expect(pdf, report).not.toContain('SMPESA');
+    expect(pdf, report).toContain('/Author (Microgenesis)');
+    for (let pageNumber = 1; pageNumber <= pages; pageNumber++) expect(pdf, report).toContain(`Page ${pageNumber} of ${pages}`);
+    if (report === 'Executive') expect(pdf).toContain('Strictly Confidential');
+  }
+  expect(service.errors).toEqual([]);
+  expect(service.unexpected).toEqual([]);
 });
 
 test('Word reports export complete descending company rankings and History refresh avoids retained file bulk reads', async ({ page }, testInfo) => {

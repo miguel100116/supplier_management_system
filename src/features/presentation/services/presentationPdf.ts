@@ -1,5 +1,6 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import { Slide, SLIDE_EYEBROWS } from '../domain/presentation';
+import { applyPdfBranding, loadPdfBranding } from '../../reports/services/pdfBranding';
 
 const PAGE_W = 841.89;
 const PAGE_H = 595.28;
@@ -64,7 +65,7 @@ function bar(doc: jsPDF, x: number, y: number, w: number, h: number, fraction: n
   doc.roundedRect(x, y, Math.max(2, w * Math.max(0, Math.min(1, fraction))), h, h / 2, h / 2, 'F');
 }
 
-export function exportSlidesAsPDF(slides: Slide[], deckTitle: string) {
+export async function exportSlidesAsPDF(slides: Slide[], deckTitle: string) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
 
   let pdfMaxRating = 4;
@@ -92,6 +93,7 @@ export function exportSlidesAsPDF(slides: Slide[], deckTitle: string) {
   const filename = `${deckTitle.replace(/[^a-z0-9]+/gi, '_').toLowerCase() || 'presentation'}_${new Date()
     .toISOString()
     .slice(0, 10)}.pdf`;
+  applyPdfBranding(doc, await loadPdfBranding(), { title: deckTitle, margin: MARGIN, compact: true });
   doc.save(filename);
 }
 

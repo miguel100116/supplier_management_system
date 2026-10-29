@@ -1,8 +1,11 @@
 import { loadApplicationRecords, upsertApplicationRecords } from '../../../services/applicationRepository';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const MAINTENANCE_DOCUMENTS = [
   'AFS', 'GIS (Corp)', 'DTI (Sole)', 'Business Permit', 'Import Permit', 'Business Permit/License',
 ] as const;
+
+export const DOCUMENT_DATABASE_SETUP_ERROR = 'Document compliance database setup is incomplete. An administrator must apply migrations 202610280001 and 202610290001 before using document maintenance and remarks.';
 
 export interface DocumentMaintenanceSettings {
   id: 'default';
@@ -43,13 +46,9 @@ export function validateDocumentMaintenanceSettings(value: DocumentMaintenanceSe
   return null;
 }
 
-export async function loadDocumentMaintenanceSettings(signal?: AbortSignal): Promise<DocumentMaintenanceSettings> {
-  const [saved] = await loadApplicationRecords<DocumentMaintenanceSettings>('document_maintenance', { signal });
-  if (!saved) return {
-    ...DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS,
-    validityYears: { ...DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS.validityYears },
-    reminderDays: [...DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS.reminderDays],
-  };
+export async function loadDocumentMaintenanceSettings(signal?: AbortSignal, client?: SupabaseClient): Promise<DocumentMaintenanceSettings> {
+  const [saved] = await loadApplicationRecords<DocumentMaintenanceSettings>('document_maintenance', { signal }, client);
+  if (!saved) throw new Error(DOCUMENT_DATABASE_SETUP_ERROR);
   return {
     id: 'default',
     validityYears: { ...DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS.validityYears, ...saved.validityYears },

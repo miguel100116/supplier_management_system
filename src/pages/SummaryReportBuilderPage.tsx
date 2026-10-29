@@ -2,6 +2,7 @@ import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect'
 import { paperSizePoints, type PaperSize } from '../features/reports/domain/paperSize';
 import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
+import { applyPdfBranding, loadPdfBranding } from '../features/reports/services/pdfBranding';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -289,7 +290,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         if (logoDataUrl) {
           const coverLogoWidth = 190;
           const coverLogoHeight = coverLogoWidth * LOGO_ASPECT;
-          doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 168, coverLogoWidth, coverLogoHeight);
+          doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 168, coverLogoWidth, coverLogoHeight, undefined, 'FAST');
         }
 
         doc.setDrawColor(...BRAND);
@@ -324,39 +325,8 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         doc.text(`Average System-wide Score:  ${formatNumber(summary.averageRating)}%`, marginLeft + 60, 469);
         doc.text(`Generated On:  ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`, marginLeft + 60, 486);
 
-        // Footer on Cover
-        doc.setFontSize(8);
-        doc.setTextColor(140);
-        doc.text('Microgenesis Supplier Management System — Confidential', pageWidth / 2, pageHeight - 30, { align: 'center' });
-
         // REPORT PAGES SETUP
-        let pageIndex = 2;
-        const addHeaderAndFooter = (pdfDoc: jsPDF) => {
-          pdfDoc.addPage();
-
-          // Header
-          if (logoDataUrl) {
-            pdfDoc.addImage(logoDataUrl, 'PNG', marginLeft, 20, 100, 100 * LOGO_ASPECT);
-          }
-          pdfDoc.setFont('helvetica', 'bold');
-          pdfDoc.setFontSize(9);
-          pdfDoc.setTextColor(30);
-          pdfDoc.text('Summary Report', pageWidth - marginLeft, 32, { align: 'right' });
-          pdfDoc.setFont('helvetica', 'normal');
-          pdfDoc.setTextColor(130);
-          pdfDoc.text('MBS Partner Evaluation System', pageWidth - marginLeft, 44, { align: 'right' });
-
-          pdfDoc.setDrawColor(226, 232, 240);
-          pdfDoc.setLineWidth(0.75);
-          pdfDoc.line(marginLeft, 72, pageWidth - marginLeft, 72);
-
-          // Footer
-          pdfDoc.setFontSize(8);
-          pdfDoc.setTextColor(140);
-          pdfDoc.text('Microgenesis Supplier Management System — Confidential', marginLeft, pageHeight - 20);
-          pdfDoc.text(`Page ${pageIndex - 1}`, pageWidth - marginLeft, pageHeight - 20, { align: 'right' });
-          pageIndex++;
-        };
+        const addHeaderAndFooter = (pdfDoc: jsPDF) => { pdfDoc.addPage(); };
 
         // PAGE 2: KEY INSIGHTS & CIRCLE GRAPH
         addHeaderAndFooter(doc);
@@ -550,6 +520,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
           }
         }
 
+        applyPdfBranding(doc, await loadPdfBranding(), { title: reportTitle, margin: marginLeft });
         await saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
       }
     } catch (e) {

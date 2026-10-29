@@ -1,6 +1,7 @@
 import { paperSizePoints, type PaperSize } from '../domain/paperSize';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
+import { applyPdfBranding, loadPdfBranding } from './pdfBranding';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
 import { ExportTable, exportTablesAsCSV, exportTablesAsExcel } from './exporters';
 import { saveReportDownload } from './exportHistory';
@@ -292,7 +293,8 @@ const META_WIDTHS: Partial<Record<MetaFieldKind, number>> = {
  */
 const REMARKS_LIKE_PATTERN = /remarks|comment/i;
 
-export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string, paperSize: PaperSize = 'long-bond') {
+export async function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType: SurveyType, filenameBase: string, paperSize: PaperSize = 'long-bond') {
+  const branding = await loadPdfBranding();
   const typeResponses = responses.filter((r) => r.surveyType === surveyType);
   const spec = FORM_SPECS[surveyType];
   const allColumns = getResolvedColumns(surveyType, typeResponses);
@@ -329,7 +331,7 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: paperSizePoints(paperSize) });
   const marginLeft = 24;
   const marginRight = 24;
-  const headerHeight = 58;
+  const pageSubjects = new Map<number, string>([[1, 'Question Key']]);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const usableWidth = pageWidth - marginLeft - marginRight;
@@ -338,20 +340,21 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
   doc.setFontSize(16);
   doc.setTextColor(0, 99, 169);
   doc.setFont('helvetica', 'bold');
-  doc.text(`${surveyType} Raw Data Export - Question Key`, marginLeft, 34);
+  doc.text(`${surveyType} Raw Data Export - Question Key`, marginLeft, 96);
   doc.setFontSize(9);
   doc.setTextColor(100);
   doc.setFont('helvetica', 'normal');
-  doc.text('Column codes used on every company sheet in this document map to the questions below. Free-text answers are truncated on those sheets to keep the page count down - see the Excel/CSV export for full remarks.', marginLeft, 50, { maxWidth: usableWidth });
+  doc.text('Column codes used on every company sheet in this document map to the questions below. Free-text answers are truncated on those sheets to keep the page count down - see the Excel/CSV export for full remarks.', marginLeft, 112, { maxWidth: usableWidth });
 
-  let legendY = 74;
+  let legendY = 146;
   const legendLineHeight = 10;
   doc.setFontSize(8);
   questionColumns.forEach((q, i) => {
     const lines = doc.splitTextToSize(`Q${i + 1}. ${q.header}`, usableWidth);
-    if (legendY + lines.length * legendLineHeight > pageHeight - 30) {
+    if (legendY + lines.length * legendLineHeight > pageHeight - 48) {
       doc.addPage();
-      legendY = 34;
+      pageSubjects.set(doc.getNumberOfPages(), 'Question Key (continued)');
+      legendY = 100;
     }
     doc.setTextColor(20, 20, 20);
     doc.text(lines, marginLeft, legendY);
@@ -388,6 +391,16 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
 
   groups.forEach(({ company, rows }) => {
     doc.addPage();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    const companyLines = doc.splitTextToSize(company, usableWidth) as string[];
+    const metadataY = 96 + companyLines.length * 14;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    const metadataLines = doc.splitTextToSize(
+      `${surveyType} - Raw Evaluation Submissions - ${rows.length} respondent(s) - Generated ${new Date().toLocaleString()} - see Question Key on page 1`, usableWidth,
+    ) as string[];
+    const headerHeight = metadataY + metadataLines.length * 10 + 10;
 
     const bodyRows = rows.map(({ index, first, byQuestionId }) => {
       const metaValues = printedMetaFields.map((kind) => {
@@ -409,7 +422,7 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
       startY: headerHeight,
       head: [shortHeaders],
       body: bodyRows,
-      margin: { top: headerHeight, left: marginLeft, right: marginRight, bottom: 28 },
+      margin: { top: headerHeight, left: marginLeft, right: marginRight, bottom: 48 },
       styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak', valign: 'middle' },
       headStyles: { fillColor: [0, 99, 169], textColor: 255, fontStyle: 'bold', fontSize: 7, halign: 'center' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -418,34 +431,20 @@ export function exportRawResponsesAsPDF(responses: SurveyResponse[], surveyType:
       // Redrawn on every page this company's table spans, so the company
       // name/subtitle stays visible even if the table overflows to a 2nd page.
       didDrawPage: () => {
-        doc.setFontSize(14);
+        pageSubjects.set(doc.getCurrentPageInfo().pageNumber, company);
+        doc.setFontSize(12);
         doc.setTextColor(0, 99, 169);
         doc.setFont('helvetica', 'bold');
-        doc.text(company, marginLeft, 26);
+        doc.text(companyLines, marginLeft, 96);
 
         doc.setFontSize(8);
         doc.setTextColor(100);
         doc.setFont('helvetica', 'normal');
-        doc.text(
-          `${surveyType} - Raw Evaluation Submissions - ${rows.length} respondent(s) - Generated ${new Date().toLocaleString()} - see Question Key on page 1`,
-          marginLeft,
-          40
-        );
+        doc.text(metadataLines, marginLeft, metadataY);
       },
     });
   });
 
-  const pageCount = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(
-      `Page ${i} of ${pageCount} - Microgenesis Supplier Management System`,
-      marginLeft,
-      pageHeight - 14
-    );
-  }
-
+  applyPdfBranding(doc, branding, { title: `${surveyType} Raw Data Export`, margin: marginLeft, pageSubject: page => pageSubjects.get(page) ?? 'Question Key' });
   return saveReportDownload(doc.output('blob'), `Raw Data Export (${surveyType})`, 'pdf', { kind: 'raw', parameters: { category: surveyType, paperSize } });
 }

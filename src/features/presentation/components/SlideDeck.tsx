@@ -1592,7 +1592,7 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
     setExportMenuOpen(false);
     setIsExporting(format);
     try {
-      if (format === 'pdf') exportSlidesAsPDF(slides, title);
+      if (format === 'pdf') await exportSlidesAsPDF(slides, title);
       else exportSlidesAsPPTX(slides, title);
     } finally {
       setIsExporting(null);

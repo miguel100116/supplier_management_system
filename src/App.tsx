@@ -370,6 +370,8 @@ export default function App() {
     isRefreshing,
     error,
     notifications,
+    documentReminderError,
+    retryDocumentReminders,
     unreadCount,
     unreadNotificationIds,
     markNotificationsRead,
@@ -1545,6 +1547,12 @@ export default function App() {
                 ? 'Supabase data validation warning: '
                 : 'Supabase operation failed: '}
               {accountPersistenceError}
+            </div>
+          )}
+          {documentReminderError && isAdmin && (
+            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              Document reminders could not be refreshed. Previously loaded reminders are retained. {documentReminderError}
+              <button type="button" className="ml-3 underline" onClick={() => void retryDocumentReminders()}>Retry reminders</button>
             </div>
           )}
           {error && activePage !== 'dashboard' && (

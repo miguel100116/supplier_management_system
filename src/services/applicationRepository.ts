@@ -533,9 +533,10 @@ export async function updatePartnerDocumentRemarks(
   documentName: string,
   expectedDocument: ComplianceDocument,
   remarks: string,
+  client = supabase,
 ): Promise<PartnerCompany> {
-  requireConfigured();
-  const { data, error } = await supabase.rpc('update_partner_document_remarks', {
+  requireConfigured(client);
+  const { data, error } = await client.rpc('update_partner_document_remarks', {
     p_company_id: companyId,
     p_branch_id: branchId,
     p_document_name: documentName,
@@ -544,7 +545,9 @@ export async function updatePartnerDocumentRemarks(
   });
   if (error) {
     requestAuthoritativeRefresh('partner_company');
-    throw new Error(`Unable to save document remarks: ${error.message}`);
+    throw new Error(error.code === 'PGRST202'
+      ? 'Document remarks database setup is incomplete. Ask an administrator to apply migration 202610290001 (after 202610280001), then retry.'
+      : `Unable to save document remarks: ${error.message}`);
   }
   return parseApplicationRecordPayload('partner_company', data, companyId) as PartnerCompany;
 }

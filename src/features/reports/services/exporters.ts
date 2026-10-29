@@ -5,6 +5,7 @@ import { autoTable } from 'jspdf-autotable';
 import { saveReportDownload } from './exportHistory';
 import type { ReportRecipe } from '../domain/reportHistory';
 import { paperSizePoints, paperSizeTwips, type PaperSize } from '../domain/paperSize';
+import { applyPdfBranding, loadPdfBranding, PDF_CONTENT_TOP, PDF_CONTENT_BOTTOM } from './pdfBranding';
 
 /** Editable Word tables matching the compact legacy PDF typography and spacing. */
 export async function exportTablesAsWord(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4') {
@@ -80,16 +81,19 @@ export function exportTablesAsExcel(tables: ExportTable[], filenameBase: string,
 }
 
 /** One PDF, one heading + table per section, stacked vertically (auto page-breaks via autoTable). */
-export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, introduction?: string, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4') {
+export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, introduction?: string, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4') {
   const doc = new jsPDF({ unit: 'pt', format: paperSizePoints(paperSize) });
+  const branding = await loadPdfBranding();
   const marginLeft = 40;
-  let cursorY = 48;
+  const contentWidth = doc.internal.pageSize.getWidth() - marginLeft * 2;
+  let cursorY = PDF_CONTENT_TOP;
 
   // Title
   doc.setFontSize(22);
   doc.setTextColor(0, 99, 169);
-  doc.text(reportTitle, marginLeft, cursorY);
-  cursorY += 16;
+  const titleLines = doc.splitTextToSize(reportTitle, contentWidth) as string[];
+  doc.text(titleLines, marginLeft, cursorY);
+  cursorY += titleLines.length * 26;
   
   // Date and Metadata
   doc.setFontSize(10);
@@ -107,7 +111,7 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
     `The data compiled below highlights key performance indicators, comparative analysis across survey categories, ` +
     `and detailed question-level responses. Review the insights carefully to inform continuous improvement initiatives ` +
     `and strategic decision-making.`),
-    500
+    contentWidth
   );
   doc.text(introText, marginLeft, cursorY);
   cursorY += (introText.length * 15) + 20;
@@ -115,7 +119,7 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
   tables.forEach((table) => {
     if (cursorY > doc.internal.pageSize.height - 142) {
       doc.addPage();
-      cursorY = 48;
+      cursorY = PDF_CONTENT_TOP;
     }
     
     // Table Heading
@@ -140,7 +144,7 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
       description = 'Comparison of scores between different survey categories and modules.';
     }
     if (description) {
-      const descLines = doc.splitTextToSize(description, 500);
+      const descLines = doc.splitTextToSize(description, contentWidth);
       doc.text(descLines, marginLeft, cursorY);
       cursorY += (descLines.length * 12) + 5;
     }
@@ -149,7 +153,7 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
       startY: cursorY,
       head: [table.columns],
       body: table.rows.map((row) => row.map(String)),
-      margin: { left: marginLeft, right: marginLeft },
+      margin: { left: marginLeft, right: marginLeft, top: PDF_CONTENT_TOP, bottom: PDF_CONTENT_BOTTOM },
       styles: { fontSize: 9, cellPadding: 6 },
       headStyles: { fillColor: [0, 99, 169], textColor: 255, fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -161,18 +165,6 @@ export function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], fi
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 30;
   });
 
-  // Add footer to all pages
-  const pageCount = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(
-      `Page ${i} of ${pageCount} - Microgenesis Supplier Management System`,
-      marginLeft,
-      doc.internal.pageSize.height - 20
-    );
-  }
-
+  applyPdfBranding(doc, branding, { title: reportTitle, margin: marginLeft });
   return saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
 }

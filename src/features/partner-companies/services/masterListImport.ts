@@ -8,6 +8,7 @@ import {
   SupplierOrigin,
 } from '../../../types/survey';
 import { computeDocumentStatus } from '../../document-tracker/domain/compliance';
+import { companyDocumentRemarksError } from '../../document-tracker/domain/documentValidation';
 import { COMMON_DOCUMENTS, FOREIGN_SUPPLIER_DOCUMENTS, LOCAL_SUPPLIER_DOCUMENTS } from '../../document-tracker/domain/documentRequirements';
 
 // The sheet opens with a legend/summary block before the real header row -
@@ -711,6 +712,21 @@ export function mergeRowsIntoCompanies(
     }
   }
 
+  // A workbook has no remarks column. Record the observable import condition,
+  // without inventing a reason or treating a missing document as provided.
+  const touchedIds = new Set(log.flatMap(entry => entry.matchedCompanyId ? [entry.matchedCompanyId] : []));
+  companies.filter(company => touchedIds.has(company.id)).forEach(company => {
+    company.branches?.forEach(branch => {
+      for (const docName of ['GIS (Corp)', 'SEC (Corp)', 'DTI (Sole)']) {
+        const document = branch.documents?.[docName] ?? {};
+        if (!companyDocumentRemarksError(company, docName, document)) continue;
+        branch.documents = { ...branch.documents, [docName]: {
+          ...document,
+          remarks: 'Master List import: required document or expiry date is missing; pending verification.',
+        } };
+      }
+    });
+  });
   return { companies, log, changes: Array.from(changesById.values()), stats };
 }
 

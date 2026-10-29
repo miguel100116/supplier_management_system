@@ -7,6 +7,7 @@ import type { SurveyResponse } from '../types/survey';
 import {
   loadApplicationRecordsByIds,
   loadApplicationRecords,
+  updatePartnerDocumentRemarks,
   subscribeToApplicationChanges,
   APPLICATION_RECORD_CHANGED_EVENT,
   upsertApplicationRecords,
@@ -19,6 +20,21 @@ import {
 import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 
 const now = '2026-09-24T00:00:00.000Z';
+
+test('missing remarks RPC identifies the migration and never falls back to a broad record write', async () => {
+  const requests: string[] = [];
+  const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async input => {
+      requests.push(new URL(String(input)).pathname);
+      return new Response(JSON.stringify({ code: 'PGRST202', message: 'Could not find the function' }), {
+        status: 404, headers: { 'Content-Type': 'application/json' },
+      });
+    } },
+  });
+  await assert.rejects(updatePartnerDocumentRemarks('c1', 'b1', 'DTI (Sole)', {}, 'Awaiting original', client), /202610290001.*202610280001/);
+  assert.deepEqual(requests, ['/rest/v1/rpc/update_partner_document_remarks']);
+});
 
 test('cursor loading returns every response under a small server row cap and stops on cancellation', async () => {
   const records = Array.from({ length: 1305 }, (_, index) => ({

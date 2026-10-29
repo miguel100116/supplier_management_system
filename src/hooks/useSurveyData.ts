@@ -26,6 +26,8 @@ import { prepareDefaultSurveysForReactivation } from '../features/evaluation-imp
 import { testImportToken } from '../features/evaluation-imports/domain/testImport';
 import { getRequiredDocumentKeys } from '../features/document-tracker/domain/documentRequirements';
 import { getNotificationSettings, NOTIFICATION_SETTINGS_CHANGED_EVENT } from '../features/notifications/services/documentNotificationSettings';
+import { loadDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
+import { createDocumentReminderRefresh } from '../features/notifications/services/documentReminderRefresh';
 import { loadNormalizedPartnerCompanies, normalizeDatabasePartnerCompany } from '../services/normalizedPartnerCompanies';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getSupabaseSessionEmail } from '../services/supabasePasswordAuth';
@@ -381,26 +383,33 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const notificationPersistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [documentClock, setDocumentClock] = useState(() => new Date());
   const [documentReminderDeliveries, setDocumentReminderDeliveries] = useState<PersistedDocumentReminderDelivery[]>([]);
+  const [documentReminderError, setDocumentReminderError] = useState<string | null>(null);
+  const reminderRefreshRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
-    if (!isAdmin) {
-      setDocumentReminderDeliveries([]);
-      return;
-    }
+    setDocumentReminderDeliveries([]);
+    setDocumentReminderError(null);
+    if (!isAdmin || !currentUserEmail) return;
     const controller = new AbortController();
-    void loadApplicationRecords<PersistedDocumentReminderDelivery>('document_reminder_delivery', { signal: controller.signal })
-      .then(setDocumentReminderDeliveries)
-      .catch(() => { if (!controller.signal.aborted) setDocumentReminderDeliveries([]); });
+    const refresh = createDocumentReminderRefresh(async () => {
+      await loadDocumentMaintenanceSettings(controller.signal);
+      const deliveries = await loadApplicationRecords<PersistedDocumentReminderDelivery>('document_reminder_delivery', { signal: controller.signal });
+      if (!controller.signal.aborted) setDocumentReminderDeliveries(deliveries);
+    }, setDocumentReminderError, controller.signal);
+    reminderRefreshRef.current = refresh;
+    void refresh();
     const refreshDeliveries = (event: Event) => {
       const recordType = (event as CustomEvent<{ recordType?: ApplicationRecordType }>).detail?.recordType;
-      if (recordType !== 'document_reminder_delivery') return;
-      void loadApplicationRecords<PersistedDocumentReminderDelivery>('document_reminder_delivery', { signal: controller.signal })
-        .then(setDocumentReminderDeliveries)
-        .catch(() => { if (!controller.signal.aborted) setDocumentReminderDeliveries([]); });
+      if (recordType !== 'document_reminder_delivery' && recordType !== 'document_maintenance') return;
+      void refresh();
     };
     window.addEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshDeliveries);
-    return () => { controller.abort(); window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshDeliveries); };
-  }, [isAdmin]);
+    return () => {
+      controller.abort();
+      reminderRefreshRef.current = async () => {};
+      window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshDeliveries);
+    };
+  }, [isAdmin, currentUserEmail]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setDocumentClock(new Date()), 60_000);
@@ -1979,9 +1988,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // Applies a previously-previewed import result to the live registry.
   const commitMasterListImport = async (result: ImportResult) => {
     const normalized = result.companies.map(normalizePartnerCompany);
+    await persistRemoteAsync(replaceApplicationRecords('partner_company', normalized, (company) => company.id));
     setPartnerCompanies(normalized);
     safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(normalized));
-    await persistRemoteAsync(replaceApplicationRecords('partner_company', normalized, (company) => company.id));
   };
 
   // Remove a partner company
@@ -2572,6 +2581,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     isRefreshing,
     error,
     notifications: combinedNotifications,
+    documentReminderError,
+    retryDocumentReminders: () => reminderRefreshRef.current(),
     unreadCount: combinedUnreadNotificationIds.size,
     unreadNotificationIds: combinedUnreadNotificationIds,
     markNotificationsRead,

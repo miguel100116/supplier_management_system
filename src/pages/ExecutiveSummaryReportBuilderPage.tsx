@@ -2,6 +2,7 @@ import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect'
 import { paperSizePoints, type PaperSize } from '../features/reports/domain/paperSize';
 import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
+import { applyPdfBranding, loadPdfBranding } from '../features/reports/services/pdfBranding';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -586,7 +587,7 @@ export function ExecutiveSummaryReportBuilderPage({
           if (logoDataUrl) {
             const coverLogoWidth = 190;
             const coverLogoHeight = coverLogoWidth * LOGO_ASPECT;
-            doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 160, coverLogoWidth, coverLogoHeight);
+            doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 160, coverLogoWidth, coverLogoHeight, undefined, 'FAST');
           }
 
           doc.setDrawColor(...BRAND);
@@ -623,10 +624,6 @@ export function ExecutiveSummaryReportBuilderPage({
           doc.text(`System Rating: ${formatNumber(summary.averageRating)}% benchmark`, marginLeft + 50, 480);
           doc.text(`Date Issued:   ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`, marginLeft + 50, 497);
 
-          // Footer on Cover
-          doc.setFontSize(8);
-          doc.setTextColor(140);
-          doc.text('Microgenesis Supplier Management System — Strictly Confidential', pageWidth / 2, pageHeight - 35, { align: 'center' });
         }
 
         // REPORT PAGES SETUP
@@ -636,27 +633,6 @@ export function ExecutiveSummaryReportBuilderPage({
             pdfDoc.addPage();
           }
 
-          // Header
-          if (logoDataUrl) {
-            pdfDoc.addImage(logoDataUrl, 'PNG', marginLeft, 20, 100, 100 * LOGO_ASPECT);
-          }
-          pdfDoc.setFont('helvetica', 'bold');
-          pdfDoc.setFontSize(9);
-          pdfDoc.setTextColor(30);
-          pdfDoc.text('Executive Briefing Report', pageWidth - marginLeft, 32, { align: 'right' });
-          pdfDoc.setFont('helvetica', 'normal');
-          pdfDoc.setTextColor(130);
-          pdfDoc.text('MBS Partner Evaluation System', pageWidth - marginLeft, 44, { align: 'right' });
-
-          pdfDoc.setDrawColor(226, 232, 240);
-          pdfDoc.setLineWidth(0.75);
-          pdfDoc.line(marginLeft, 72, pageWidth - marginLeft, 72);
-
-          // Footer
-          pdfDoc.setFontSize(8);
-          pdfDoc.setTextColor(140);
-          pdfDoc.text('Microgenesis Supplier Management System — Strictly Confidential', marginLeft, pageHeight - 20);
-          pdfDoc.text(`Page ${pageIndex}`, pageWidth - marginLeft, pageHeight - 20, { align: 'right' });
           pageIndex++;
         };
 
@@ -769,7 +745,7 @@ export function ExecutiveSummaryReportBuilderPage({
             startY: cursorY,
             head: [tableHeaders],
             body: tableRows,
-            margin: { left: marginLeft, right: marginLeft },
+            margin: { left: marginLeft, right: marginLeft, top: 100, bottom: 60 },
             styles: { fontSize: 8.5, cellPadding: 4.5 },
             headStyles: { fillColor: [0, 99, 169], textColor: 255, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -838,7 +814,7 @@ export function ExecutiveSummaryReportBuilderPage({
             startY: cursorY,
             head: [qHeaders],
             body: qRows,
-            margin: { left: marginLeft, right: marginLeft },
+            margin: { left: marginLeft, right: marginLeft, top: 100, bottom: 60 },
             styles: { fontSize: 7.5, cellPadding: 4 },
             headStyles: { fillColor: [249, 115, 22], textColor: 255, fontStyle: 'bold' }, // amber/orange focus
             alternateRowStyles: { fillColor: [254, 243, 199] }, // light amber rows
@@ -903,7 +879,7 @@ export function ExecutiveSummaryReportBuilderPage({
             startY: cursorY,
             head: [recHeaders],
             body: recRows,
-            margin: { left: marginLeft, right: marginLeft },
+            margin: { left: marginLeft, right: marginLeft, top: 100, bottom: 60 },
             styles: { fontSize: 8, cellPadding: 4.5 },
             headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' }, // indigo theme
             // Mirrors the preview's RETAIN/REVIEW/ACTION badge coloring per recommendation type.
@@ -1028,6 +1004,7 @@ export function ExecutiveSummaryReportBuilderPage({
           });
         }
 
+        applyPdfBranding(doc, await loadPdfBranding(), { title: reportTitle, margin: marginLeft, confidentiality: 'Strictly Confidential' });
         await saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
       }
     } catch (e) {

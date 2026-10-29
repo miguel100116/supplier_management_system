@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createClient } from '@supabase/supabase-js';
+import { loadDocumentMaintenanceSettings } from './documentMaintenanceSettings';
+
+test('missing database seed is an actionable setup failure, not successful default settings', async () => {
+  const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async () => new Response('[]', { headers: { 'Content-Type': 'application/json' } }) },
+  });
+  await assert.rejects(loadDocumentMaintenanceSettings(undefined, client), /202610280001 and 202610290001/);
+});
 import { DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS, DocumentMaintenanceSettings, validateDocumentMaintenanceSettings } from './documentMaintenanceSettings';
 
 test('validity periods are unset until an administrator configures them', () => {

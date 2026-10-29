@@ -23,6 +23,7 @@ import {
 } from 'docx';
 import { saveReportDownload } from './exportHistory';
 import type { ReportRecipe } from '../domain/reportHistory';
+import { applyPdfBranding, loadPdfBranding } from './pdfBranding';
 import {
   CompanyReportData,
   formatCategoryMetricLabel,
@@ -102,35 +103,6 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(parsed >> 16) & 255, (parsed >> 8) & 255, parsed & 255];
 }
 
-function drawPdfHeader(
-  doc: jsPDF,
-  data: CompanyReportData,
-  logoDataUrl: string | null,
-  marginLeft: number,
-  pageWidth: number,
-) {
-  if (logoDataUrl) {
-    const logoWidth = 86;
-    doc.addImage(logoDataUrl, 'PNG', marginLeft, 22, logoWidth, logoWidth * LOGO_ASPECT);
-  }
-
-  const rightEdge = pageWidth - marginLeft;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(30, 41, 59);
-  const companyLines = doc.splitTextToSize(data.company, 245).slice(0, 2) as string[];
-  doc.text(companyLines, rightEdge, 31, { align: 'right', lineHeightFactor: 1.05 });
-  const titleY = 31 + Math.max(1, companyLines.length) * 10;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.2);
-  doc.setTextColor(100, 116, 139);
-  doc.text(data.template.reportTitle, rightEdge, titleY, { align: 'right' });
-
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.7);
-  doc.line(marginLeft, 74, rightEdge, 74);
-}
-
 function drawCoverPage(
   doc: jsPDF,
   data: CompanyReportData,
@@ -147,6 +119,8 @@ function drawCoverPage(
       172,
       coverLogoWidth,
       coverLogoWidth * LOGO_ASPECT,
+      undefined,
+      'FAST',
     );
   }
 
@@ -300,7 +274,6 @@ function drawExecutiveSummaryPage(
   marginLeft: number,
   pageWidth: number,
 ) {
-  drawPdfHeader(doc, data, logoDataUrl, marginLeft, pageWidth);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14.5);
   doc.setTextColor(30, 41, 59);
@@ -352,7 +325,6 @@ async function addSupplementalChartPage(
 ) {
   if (!dataUrl) return;
   doc.addPage();
-  drawPdfHeader(doc, data, logoDataUrl, marginLeft, pageWidth);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14.5);
   doc.setTextColor(30, 41, 59);
@@ -402,7 +374,6 @@ function addQuestionTablePages(
     alternateRowStyles: { fillColor: [247, 249, 252] },
     showHead: 'everyPage',
     willDrawPage: (hookData) => {
-      drawPdfHeader(doc, data, logoDataUrl, marginLeft, pageWidth);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14.5);
       doc.setTextColor(30, 41, 59);
@@ -450,7 +421,6 @@ function addCommentTablePages(
     alternateRowStyles: { fillColor: [247, 249, 252] },
     showHead: 'everyPage',
     willDrawPage: (hookData) => {
-      drawPdfHeader(doc, data, logoDataUrl, marginLeft, pageWidth);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14.5);
       doc.setTextColor(30, 41, 59);
@@ -471,6 +441,7 @@ export async function exportCompanyReportAsPDF(
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const logoDataUrl = data.logoDataUrl || await fetchLogoDataUrl();
+  const branding = await loadPdfBranding();
 
   drawCoverPage(doc, data, logoDataUrl, pageWidth, pageHeight);
 
@@ -510,20 +481,7 @@ export async function exportCompanyReportAsPDF(
     addCommentTablePages(doc, data, logoDataUrl, marginLeft, pageWidth);
   }
 
-  // Footer on every content page (cover page excluded)
-  const pageCount = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
-  for (let i = 2; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.5);
-    doc.line(marginLeft, pageHeight - 34, pageWidth - marginLeft, pageHeight - 34);
-    doc.setFontSize(7.8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139);
-    doc.text('Microgenesis | Supplier Management', marginLeft, pageHeight - 20);
-    doc.text(`Page ${i - 1} of ${pageCount - 1}`, pageWidth - marginLeft, pageHeight - 20, { align: 'right' });
-  }
-
+  applyPdfBranding(doc, branding, { title: data.template.reportTitle, subject: data.company, margin: marginLeft });
   if (asDataUri) {
     // Used for email attachments (see graphMailService.ts) - no object URL/
     // blob lifecycle to manage, just a base64 string ready to embed.

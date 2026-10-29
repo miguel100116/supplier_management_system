@@ -2,7 +2,7 @@ import type { SurveyType } from '../../../types/survey';
 import type { ReportRecipe } from '../domain/reportHistory';
 import { exportTablesAsPDF, type ExportTable } from './exporters';
 
-/** Compact pre-cover-page layout with the latest selected-item tables and recipe. */
+/** Shared branded table layout with the selected-item tables and saved recipe. */
 export async function exportArchivedReportAsPDF(
   title: string,
   itemLabel: string,
