@@ -5,7 +5,7 @@ import { CustomForm, SurveyType, PartnerCompany, SurveyAccessRole } from '../typ
 import { StateMessage } from '../components/StateMessage';
 import { CompletionStatusBar } from '../features/evaluations/components/CompletionStatusBar';
 import { Pagination } from '../components/Pagination';
-import { getAllCompaniesOfType, getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
+import { getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
 import { getReminderFrequency, saveReminderFrequency } from '../features/notifications/services/reminderSettings';
 import { TableFilterBar } from '../components/TableFilterBar';
 import { SurveyFormsToolbar } from '../features/evaluations/components/SurveyFormsToolbar';
@@ -226,8 +226,10 @@ export function SurveyFormsPage({
   const sendConfirmationSurvey = surveys.find((survey) => survey.id === sendConfirmationSurveyId) ?? null;
   const sendCompanySelectionRequired = Boolean(sendConfirmationSurvey && requiresDistributionCompanySelection(sendConfirmationSurvey.surveyType));
   const sendTopCompanies = useMemo(() => sendConfirmationSurvey && requiresDistributionCompanySelection(sendConfirmationSurvey.surveyType)
-    ? getEvaluationLeaderboardTopTwenty(partnerCompanies, responses, sendConfirmationSurvey.surveyType) : [],
-  [sendConfirmationSurvey?.surveyType, partnerCompanies, responses]);
+    ? sendConfirmationSurvey.activeEvaluationCompanyIds !== undefined
+      ? getSurveyEvaluationCompanies({ ...sendConfirmationSurvey, evaluationCompanyIds: undefined }, partnerCompanies)
+      : getEvaluationLeaderboardTopTwenty(partnerCompanies, responses, sendConfirmationSurvey.surveyType) : [],
+  [sendConfirmationSurvey, partnerCompanies, responses]);
   const eligibleRecipients = sendConfirmationSurvey
     ? getEligibleFormRecipients(sendConfirmationSurvey, employeeProfiles, departmentPermissions)
     : [];
@@ -574,7 +576,7 @@ export function SurveyFormsPage({
     }
     if (!isSelectMode && overrideAccess) {
       const survey = surveys.find((candidate) => selectedSurveyIds.has(candidate.id));
-      const activeCompanies = survey ? getAllCompaniesOfType(survey.surveyType, partnerCompanies) : [];
+      const activeCompanies = survey ? getSurveyEvaluationCompanies({ ...survey, evaluationCompanyIds: undefined }, partnerCompanies) : [];
       if (activeCompanies.length > 0 && evaluationCompanyIds.length === 0) {
         alert('Please select at least one active partner company to evaluate.');
         return;
@@ -608,7 +610,7 @@ export function SurveyFormsPage({
             updated.periodCovered = newPeriodCovered;
           }
           const allIdsOfType = getSurveyEvaluationCompanies(
-            { surveyType: survey.surveyType, evaluationCompanyIds: undefined },
+            { ...survey, evaluationCompanyIds: undefined },
             partnerCompanies
           ).map((c) => c.id);
           const isFullSelection =
@@ -1156,7 +1158,7 @@ export function SurveyFormsPage({
       {sendConfirmationSurvey && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="send-form-title">
           <div aria-hidden="true" className="absolute inset-0 bg-slate-950/50" />
-            <section className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><header className="mb-3"><h2 id="send-form-title" className="text-lg font-bold">Confirm form distribution</h2><p className="text-sm text-slate-500">{sendConfirmationSurvey.title} · {sendConfirmationSurvey.surveyType}</p><p className="mt-2 text-sm"><b>{eligibleRecipients.length}</b> eligible employee{eligibleRecipients.length === 1 ? '' : 's'} based on category permissions and this form’s access settings.</p></header><SendFormCompanySelection surveyType={sendConfirmationSurvey.surveyType} companies={sendTopCompanies} selectedIds={sendCompanyIds} busy={isSendingForm || !onUpdateSurvey} onSelect={setSendCompanyIds} />{distributionFeedback?.kind === 'error' && <p role="alert" className="mb-3 text-sm text-rose-600">{distributionFeedback.text}</p>}<div className="max-h-[45vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2">Employee</th><th className="p-2">Department</th><th className="p-2">Designation</th></tr></thead><tbody>{eligibleRecipients.map((recipient) => <tr key={recipient.email} className="border-t border-slate-100 dark:border-slate-800"><td className="p-2">{recipient.email}</td><td className="p-2">{recipient.department}</td><td className="p-2">{recipient.designation}</td></tr>)}</tbody></table>{eligibleRecipients.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No eligible employees match the current access settings.</p>}</div>{sendDeadlineExpired && <p className="mt-3 text-sm text-rose-600">The deadline has passed. Update it in Manage Access before sending.</p>}<footer className="mt-4 flex justify-end gap-2"><button onClick={requestCloseSendConfirmation} disabled={isSendingForm} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button><button onClick={() => { setDistributionFeedback(null); setIsSendApprovalOpen(true); }} disabled={isSendingForm || !onUpdateSurvey || !eligibleRecipients.length || sendDeadlineExpired || (sendCompanySelectionRequired && !sendCompanyIds?.length)} className="rounded-lg bg-[#2187CD] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSendingForm ? 'Sending…' : (sendCompanyIds !== null || sendCompanySelectionRequired) ? 'Confirm & Save Selection' : getSurveyStatus(sendConfirmationSurvey) === 'Running' ? 'Confirm & Resend' : 'Confirm & Make Available'}</button></footer></section>
+            <section className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><header className="mb-3"><h2 id="send-form-title" className="text-lg font-bold">Confirm form distribution</h2><p className="text-sm text-slate-500">{sendConfirmationSurvey.title} · {sendConfirmationSurvey.surveyType}</p><p className="mt-2 text-sm"><b>{eligibleRecipients.length}</b> eligible employee{eligibleRecipients.length === 1 ? '' : 's'} based on category permissions and this form’s access settings.</p></header><SendFormCompanySelection surveyType={sendConfirmationSurvey.surveyType} companies={sendTopCompanies} selectedIds={sendCompanyIds} busy={isSendingForm || !onUpdateSurvey} onSelect={setSendCompanyIds} usesUploadedList={sendConfirmationSurvey.activeEvaluationCompanyIds !== undefined} />{distributionFeedback?.kind === 'error' && <p role="alert" className="mb-3 text-sm text-rose-600">{distributionFeedback.text}</p>}<div className="max-h-[45vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2">Employee</th><th className="p-2">Department</th><th className="p-2">Designation</th></tr></thead><tbody>{eligibleRecipients.map((recipient) => <tr key={recipient.email} className="border-t border-slate-100 dark:border-slate-800"><td className="p-2">{recipient.email}</td><td className="p-2">{recipient.department}</td><td className="p-2">{recipient.designation}</td></tr>)}</tbody></table>{eligibleRecipients.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No eligible employees match the current access settings.</p>}</div>{sendDeadlineExpired && <p className="mt-3 text-sm text-rose-600">The deadline has passed. Update it in Manage Access before sending.</p>}<footer className="mt-4 flex justify-end gap-2"><button onClick={requestCloseSendConfirmation} disabled={isSendingForm} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button><button onClick={() => { setDistributionFeedback(null); setIsSendApprovalOpen(true); }} disabled={isSendingForm || !onUpdateSurvey || !eligibleRecipients.length || sendDeadlineExpired || (sendCompanySelectionRequired && !sendCompanyIds?.length)} className="rounded-lg bg-[#2187CD] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSendingForm ? 'Sending…' : (sendCompanyIds !== null || sendCompanySelectionRequired) ? 'Confirm & Save Selection' : getSurveyStatus(sendConfirmationSurvey) === 'Running' ? 'Confirm & Resend' : 'Confirm & Make Available'}</button></footer></section>
         </div>
       )}
 
@@ -1678,10 +1680,10 @@ export function SurveyFormsPage({
             // preset follows this category's volume-weighted Analytics ranking
             // and fills remaining slots with unscored active companies.
             const pickerCompanies = targetSurvey
-              ? getAllCompaniesOfType(targetSurvey.surveyType, partnerCompanies)
+              ? getSurveyEvaluationCompanies({ ...targetSurvey, evaluationCompanyIds: undefined }, partnerCompanies)
               : [];
             const topTwentyCompanies = targetSurvey
-              ? getEvaluationLeaderboardTopTwenty(partnerCompanies, responses, targetSurvey.surveyType)
+              ? getEvaluationLeaderboardTopTwenty(pickerCompanies, responses, targetSurvey.surveyType)
               : [];
             const topTwentyCompanyIds = new Set(topTwentyCompanies.map((company) => company.id));
             const isExactSelection = (companies: PartnerCompany[]) =>
@@ -1733,8 +1735,9 @@ export function SurveyFormsPage({
 
                   <div className="flex-1 overflow-y-auto p-6 space-y-3">
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Choose which active {targetSurvey ? targetSurvey.surveyType.toLowerCase() : ''} partner companies this survey should evaluate. Archived companies are excluded. Within the Top 20 follows the current volume-weighted Analytics Company Leaderboard; active companies without scores fill any remaining spots. This selection controls which companies employees can rate.
+                      Choose companies from the admin-uploaded Active Companies list. Archived companies are excluded. Within the Top 20 ranks only companies in that uploaded list. This selection controls which companies employees can rate.
                     </p>
+                    {targetSurvey?.activeEvaluationListIssue && <p role="alert" className="text-xs text-amber-700 dark:text-amber-400">{targetSurvey.activeEvaluationListIssue}</p>}
 
                     <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-950/30" aria-label="Company selection presets">
                       <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
@@ -1770,7 +1773,7 @@ export function SurveyFormsPage({
                           }}
                           className="h-4 w-4 rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]"
                         />
-                        <span>Active Partners ({pickerCompanies.length})</span>
+                        <span>Uploaded Active Companies ({pickerCompanies.length})</span>
                       </label>
                     </div>
 

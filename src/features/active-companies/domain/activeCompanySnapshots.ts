@@ -213,5 +213,6 @@ export function snapshotsBySurveyType(
 ): ActiveCompanySnapshot[] {
   return snapshots
     .filter((snapshot) => snapshot.surveyType === surveyType)
-    .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
+    .sort((left, right) => Date.parse(right.uploadedAt) - Date.parse(left.uploadedAt)
+      || (left.id < right.id ? 1 : left.id > right.id ? -1 : 0));
 }

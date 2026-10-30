@@ -21,7 +21,8 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
   ];
   const unexpected: string[] = [];
   const errors: string[] = [];
-  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false };
+  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false, activeListReads: false };
+  const activeLists: { value: Array<{ survey_type: string; companies: string[] }> | null } = { value: null };
   const historyReads: Array<{ select: string; id: string | null }> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
@@ -42,6 +43,15 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     }
     if (url.pathname === '/auth/v1/user') return reply(user);
     if (url.pathname === '/auth/v1/logout') return reply({});
+    if (url.pathname === '/rest/v1/rpc/get_active_evaluation_lists') {
+      if (failures.activeListReads) return reply({ message: 'Synthetic active-list failure' }, 500);
+      // Existing fixtures supply all their synthetic partners as the uploaded
+      // list. Scope regressions below explicitly supply a smaller/empty list.
+      return reply(activeLists.value ?? ['Courier', 'Supplier', 'Subcontractor'].map(type => ({
+        survey_type: type,
+        companies: records.filter(record => record.record_type === 'partner_company' && record.payload.type === type && !record.payload.isArchived).map(record => String(record.payload.name)),
+      })));
+    }
     if (url.pathname === '/rest/v1/app_profiles' && request.method() === 'GET') {
       const requestedEmail = url.searchParams.get('email')?.replace(/^eq\./, '');
       const matches = requestedEmail ? profiles.filter(item => item.email === requestedEmail) : profiles;
@@ -88,7 +98,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     unexpected.push(`${request.method()} ${url.pathname}`);
     return route.abort();
   });
-  return { records, unexpected, errors, failures, profiles, historyReads };
+  return { records, unexpected, errors, failures, profiles, historyReads, activeLists };
 }
 
 async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
@@ -1121,6 +1131,76 @@ test('Word reports export complete descending company rankings and History refre
   await expect(page.getByText(/statement timeout|quarantined during refresh/)).toHaveCount(0);
   expect(service.errors).toEqual([]);
   expect(service.unexpected).toEqual([]);
+});
+
+test('Dashboard retains loaded results when assignment lists fail and recovers completion after retry', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.failures.activeListReads = true;
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.employee@mgenesis.com', role: 'Employee' });
+  service.records.push({ record_type: 'survey', record_id: evaluationForm.id, created_at: createdAt, payload: { ...evaluationForm } });
+  service.records.push({ record_type: 'survey_response', record_id: 'dashboard-retained:Q01', created_at: createdAt,
+    payload: { responseId: 'dashboard-retained', surveyId: evaluationForm.id, companyId: 'synthetic-courier', company: 'Synthetic Courier',
+      surveyType: 'Courier', respondentEmail: email, respondentType: 'Rank & File', department: 'TASS', submissionDate: new Date().toISOString(),
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery', rating: 15, comment: '', dataSource: 'client_csv' } });
+  await page.goto('/login');
+  await signIn(page);
+  await expect(page.getByRole('alert').filter({ hasText: 'Evaluation assignments are unavailable:' })).toBeVisible();
+  await expect(page.getByText(/Dashboard data could not be loaded:/)).toHaveCount(0);
+  const forms = page.getByRole('table', { name: 'Evaluation forms in progress' });
+  const results = page.getByRole('table', { name: 'Average partner evaluation score by type' });
+  const recent = page.getByRole('table', { name: 'Recent evaluation submissions' });
+  await expect(forms.getByText('Completion unavailable', { exact: true })).toBeVisible();
+  await expect(results.getByText('1 submissions', { exact: true })).toBeVisible();
+  await expect(results.getByText('Based on 1 scored submissions', { exact: true })).toBeVisible();
+  await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+  await expect(page.getByText('No required assignments', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('dashboard-assignment-setup-error.png'), fullPage: true, animations: 'disabled' });
+  service.failures.activeListReads = false;
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('supabase-application-record-changed', { detail: { recordType: 'survey' } })));
+  await expect(page.getByRole('alert').filter({ hasText: 'Evaluation assignments are unavailable:' })).toHaveCount(0);
+  await expect(forms.getByText('0 of 1 completed · 0%', { exact: true })).toBeVisible();
+  await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('employee assignments follow the uploaded supplier list instead of all 273 registered suppliers', async ({ page }, testInfo) => {
+  const service = await backend(page, 'Employee');
+  const names = Array.from({ length: 273 }, (_, i) => `Registered Supplier ${i}`);
+  service.records.push(...names.map((name, i) => ({ record_type: 'partner_company', record_id: `supplier-${i}`, created_at: createdAt,
+    payload: { id: `supplier-${i}`, name, type: 'Supplier', createdAt, isArchived: false } })));
+  const form = { ...evaluationForm, id: 'supplier-active', title: 'Supplier Active List Survey', surveyType: 'Supplier' };
+  service.records.push({ record_type: 'survey', record_id: form.id, created_at: createdAt, payload: form });
+  const retainedResponse = { record_type: 'survey_response', record_id: 'retained:Q01', created_at: createdAt,
+    payload: { responseId: 'retained', surveyId: form.id, companyId: 'supplier-272', company: names[272], surveyType: 'Supplier',
+      respondentEmail: email, respondentType: 'Rank & File', department: 'TASS', submissionDate: createdAt, questionId: 'Q01',
+      questionNumber: 1, question: 'Retained answer', questionCategory: 'Quality', rating: 5, comment: '' } };
+  service.records.push(retainedResponse);
+  service.activeLists.value = [{ survey_type: 'Supplier', companies: names.slice(0, 20) }];
+  await page.goto('/login');
+  await signIn(page, 'Employee');
+  await page.getByRole('button', { name: 'Supplier: 20 pending', exact: true }).click();
+  await expect(page.getByLabel('20 pending supplier evaluations', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('employee-active-suppliers.png'), fullPage: true, animations: 'disabled' });
+  await page.getByRole('button', { name: 'View all 20 pending supplier evaluations', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search partner or evaluation title' }).fill(names[272]);
+  await expect(page.getByRole('heading', { name: 'No matching evaluations', exact: true })).toBeVisible();
+  service.activeLists.value = [{ survey_type: 'Supplier', companies: names.slice(20, 22) }];
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('supabase-application-record-changed', { detail: { recordType: 'survey' } })));
+  await expect(page.getByRole('button', { name: 'Supplier: 2 pending', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Search partner or evaluation title' }).fill('');
+  await expect(page.getByRole('heading').getByRole('button', { name: 'Start supplier evaluation for Registered Supplier 20', exact: true })).toBeVisible();
+  service.activeLists.value = [];
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Supplier: 0 pending', exact: true })).toBeVisible();
+  service.failures.activeListReads = true;
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Evaluations are unavailable', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Pending evaluation count unavailable', { exact: true })).toBeVisible();
+  expect(service.records.filter(record => record.record_type === 'survey_response')).toEqual([retainedResponse]);
+  expect(service.records.filter(record => record.record_type === 'partner_company' && record.payload.type === 'Supplier')).toHaveLength(273);
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
 });
 
 test('employee read reminders remain pending, persist on reload and renew after a saved resend', async ({ page }, testInfo) => {

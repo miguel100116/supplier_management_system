@@ -158,7 +158,10 @@ function parseSurvey(value: unknown, recordId: string, label: string): JsonObjec
   optionalStringArray(candidate.accessDepartments, `${label}.accessDepartments`, 100);
   optionalStringArray(candidate.accessRoles, `${label}.accessRoles`, 20);
   optionalStringArray(candidate.evaluationCompanyIds, `${label}.evaluationCompanyIds`, 10_000);
-  return candidate;
+  // Assignment scope is derived from admin uploads at runtime, never trusted
+  // from a persisted survey or written back as a competing source of truth.
+  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persisted } = candidate;
+  return persisted;
 }
 
 function timestampFromResponseId(responseId: string): string | null {

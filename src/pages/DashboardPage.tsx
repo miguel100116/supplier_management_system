@@ -84,6 +84,7 @@ interface DashboardPageProps {
   partnerCompanies: PartnerCompany[];
   isLoading: boolean;
   error: string | null;
+  assignmentError?: string | null;
   surveyTypeFilter: SurveyType[];
   surveys?: any[];
   accounts?: PersistedProfile[];
@@ -230,6 +231,7 @@ export function DashboardPage({
   partnerCompanies = [],
   isLoading,
   error,
+  assignmentError = null,
   surveyTypeFilter = [],
   surveys = [],
   accounts,
@@ -539,10 +541,10 @@ export function DashboardPage({
 
   const dashboard = useMemo(() => buildDashboardSnapshot({
     reportingResponses: effectiveHistoryResponses, currentResponses: allResponses,
-    surveys, companies: partnerCompanies, accounts, departmentPermissions,
+    surveys, companies: partnerCompanies, accounts: assignmentError ? undefined : accounts, departmentPermissions,
     surveyTypes: surveyTypeFilter, scope: dataScope,
     uncategorizedCompanyIds,
-  }), [effectiveHistoryResponses, allResponses, surveys, partnerCompanies, accounts, departmentPermissions, surveyTypeFilter, dataScope, uncategorizedCompanyIds]);
+  }), [effectiveHistoryResponses, allResponses, surveys, partnerCompanies, accounts, departmentPermissions, surveyTypeFilter, dataScope, uncategorizedCompanyIds, assignmentError]);
   const { forms: evaluationCycle, results: performanceByType, recent: recentSubmissions } = dashboard;
   const selectedAssignment = evaluationCycle.find(item => item.survey.id === assignmentSurveyId);
   const documentReferenceDate = new Date();
@@ -631,6 +633,7 @@ export function DashboardPage({
       )}
 
       {error && <p role="alert" className="dashboard-error">Dashboard data could not be loaded: {error}</p>}
+      {!error && assignmentError && <p role="alert" className="dashboard-error">Evaluation assignments are unavailable: {assignmentError}</p>}
       {isLoading && <p role="status" className="dashboard-refresh-status">Loading dashboard data…</p>}
 
       {isAdmin && (

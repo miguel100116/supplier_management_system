@@ -210,12 +210,12 @@ export interface CustomForm {
   status?: 'Running' | 'Paused' | 'Completed' | 'Archived';
   accessDepartments?: string[];
   accessRoles?: SurveyAccessRole[];
-  // IDs of PartnerCompany entries this survey should evaluate. Undefined/empty
-  // means "all companies of this survey's type" (the default, always kept in
-  // sync as companies are added/removed in the Partner Registry). Once an
-  // admin customizes the list via "Modify Companies to Evaluate", only the
-  // still-existing companies among these IDs are used.
+  // Optional per-form subset of the uploaded Active Companies scope.
+  // Undefined/empty uses that uploaded scope; registry additions cannot expand it.
   evaluationCompanyIds?: string[];
+  /** Derived from the latest uploaded Active Companies list; never persisted on a survey. */
+  activeEvaluationCompanyIds?: string[];
+  activeEvaluationListIssue?: string;
   maxRating?: number;
   questions: {
     questionId: string;

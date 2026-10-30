@@ -3,26 +3,27 @@ import { ArchiveSeries, CustomForm, FilterState, KpiSummary, PartnerCompany, Rat
 import { getQuestionMaxPoints, isScoredQuestion } from '../../../data/questionWeights';
 
 /**
- * Resolves the live list of companies a given survey should be evaluated
- * against. Always derived from the current `partnerCompanies` list, so
- * additions/removals in the Partner Registry are reflected automatically:
+ * Resolves evaluation scope against the current registry and the latest
+ * uploaded Active Companies list projected by useSurveyData:
  * - Document compliance status has no bearing on eligibility - a company
  *   with incomplete/expired documents is still evaluable. Document status
  *   is tracked independently (see computeCompanyDocumentSummary) and shown
  *   in the Document Tracker, it just doesn't gate survey eligibility.
- * - If the survey has no custom selection (`evaluationCompanyIds` unset/empty),
- *   every active registered company of that survey type counts. Supplier Top
- *   20 is a survey-specific selection made in the Evaluation Workspace.
+ * - A defined activeEvaluationCompanyIds is an upper bound, including an
+ *   empty list. Registry growth never adds assignments outside that scope.
+ * - A custom evaluationCompanyIds selection can narrow the uploaded scope.
+ *   Callers without a projected scope retain the legacy registry behavior.
  * - If the survey has a custom selection, only active companies whose ID is
  *   present in `evaluationCompanyIds` count. Companies removed or archived
  *   from the registry drop out automatically.
  */
 export function getSurveyEvaluationCompanies(
-  survey: Pick<CustomForm, 'surveyType' | 'evaluationCompanyIds'>,
+  survey: Pick<CustomForm, 'surveyType' | 'evaluationCompanyIds' | 'activeEvaluationCompanyIds'>,
   partnerCompanies: PartnerCompany[],
   currentDateStr: string = new Date().toISOString().slice(0, 10)
 ): PartnerCompany[] {
-  const activeCompaniesOfType = partnerCompanies.filter((c) => c.type === survey.surveyType && !c.isArchived);
+  const uploadedIds = survey.activeEvaluationCompanyIds === undefined ? null : new Set(survey.activeEvaluationCompanyIds);
+  const activeCompaniesOfType = partnerCompanies.filter((c) => c.type === survey.surveyType && !c.isArchived && (!uploadedIds || uploadedIds.has(c.id)));
   if (!survey.evaluationCompanyIds || survey.evaluationCompanyIds.length === 0) {
     return activeCompaniesOfType;
   }

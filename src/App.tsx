@@ -369,6 +369,8 @@ export default function App() {
     isLoading,
     isRefreshing,
     error,
+    dataError,
+    assignmentError,
     notifications,
     documentReminderError,
     retryDocumentReminders,
@@ -1104,6 +1106,7 @@ export default function App() {
       />
     ) : (
       <DashboardPage
+        assignmentError={assignmentError}
         accounts={isAdmin ? accounts : undefined}
         uncategorizedCompanyIds={uncategorizedCompanyIds}
         departmentPermissions={departmentPermissions}
@@ -1114,7 +1117,7 @@ export default function App() {
         onChangeDataScope={setDataScope}
         partnerCompanies={userAccessiblePartnerCompanies}
         isLoading={isLoading}
-        error={error}
+        error={dataError}
         surveyTypeFilter={filters.surveyType}
         surveys={userAccessibleSurveys}
         isAdmin={isAdmin}

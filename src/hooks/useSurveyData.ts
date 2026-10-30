@@ -57,6 +57,8 @@ import {
 } from '../features/notifications/domain/notificationReadState';
 import { createDebouncedTask } from '../utils/debouncedTask';
 import { createCoalescedTaskRunner, createRefreshGuard } from '../utils/coalescedTask';
+import { scopeSurveysToActiveLists, type ActiveEvaluationList } from '../features/active-companies/domain/evaluationScope';
+import { createActiveEvaluationListRefresh, loadActiveEvaluationLists } from '../features/active-companies/services/activeEvaluationLists';
 
 // Versioned browser cache for the authenticated Partner Company registry.
 // A missing cache starts empty until Supabase hydration completes.
@@ -166,8 +168,9 @@ function migrateGeneralCategory(form: CustomForm): CustomForm {
 }
 
 function normalizeCustomForm(form: CustomForm): CustomForm {
+  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persistedForm } = form;
   const normForm = {
-    ...form,
+    ...persistedForm,
     surveyType: normalizeSurveyType(form.surveyType),
     accessDepartments: form.accessDepartments?.length ? form.accessDepartments : ALL_DEPARTMENTS,
     accessRoles: form.accessRoles?.length ? form.accessRoles : [...ALL_SURVEY_ACCESS_ROLES],
@@ -368,8 +371,11 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     responsesRef.current = next;
     setResponsesState(next);
   }, [responseRefreshGuard]);
-  const [surveys, setSurveys] = useState<CustomForm[]>([]);
+  const [storedSurveys, setSurveys] = useState<CustomForm[]>([]);
+  const [activeEvaluationLists, setActiveEvaluationLists] = useState<ActiveEvaluationList[]>([]);
+  const [activeEvaluationError, setActiveEvaluationError] = useState<string | null>(null);
   const [partnerCompanies, setPartnerCompanies] = useState<PartnerCompany[]>([]);
+  const surveys = useMemo(() => scopeSurveysToActiveLists(storedSurveys, partnerCompanies, activeEvaluationLists), [storedSurveys, partnerCompanies, activeEvaluationLists]);
   const [categoryLabels, setCategoryLabels] = useState<Record<SurveyType, string[]>>(() => getStoredCategoryLabels());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1398,6 +1404,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     let cancelled = false;
     const controller = new AbortController();
     const readOptions = { signal: controller.signal };
+    const readActiveEvaluationLists = createActiveEvaluationListRefresh(
+      () => loadActiveEvaluationLists(controller.signal), setActiveEvaluationLists, setActiveEvaluationError, controller.signal,
+    );
     let initialHydration: Promise<void> | undefined;
     const refreshTimers = new Map<ApplicationRecordType, ReturnType<typeof createDebouncedTask>>();
     let activeBackgroundRefreshes = 0;
@@ -1429,6 +1438,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         loadApplicationRecords<PartnerCompany>('partner_company', readOptions),
         loadApplicationRecords<CustomForm>('survey', readOptions),
         loadApplicationRecords<SurveyResponse>('survey_response', readOptions),
+        readActiveEvaluationLists(),
       ]);
       const companies = storedCompanies.length > 0
         ? storedCompanies
@@ -1531,11 +1541,17 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           return;
         }
         case 'survey': {
-          const storedSurveys = await loadApplicationRecords<CustomForm>('survey', readOptions);
+          const [storedSurveys] = await Promise.all([
+            loadApplicationRecords<CustomForm>('survey', readOptions), readActiveEvaluationLists(),
+          ]);
           if (cancelled) return;
           const normalizedSurveys = storedSurveys.map(normalizeCustomForm);
           setSurveys(normalizedSurveys);
           safeSetItem('survey_analytics_surveys_v6', JSON.stringify(normalizedSurveys));
+          return;
+        }
+        case 'active_company_snapshot': {
+          await readActiveEvaluationLists();
           return;
         }
         case 'survey_response': {
@@ -1641,7 +1657,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       const recordType = detail?.recordType;
       if (!recordType || ![
         'partner_company', 'survey', 'survey_response', 'archive_series',
-        'category_labels', 'notification_read_state',
+        'category_labels', 'notification_read_state', 'active_company_snapshot',
       ].includes(recordType)) return;
       if (recordType === 'survey_response') {
         const responseId = detail.responseId ?? responsesRef.current.find((row) => surveyResponseRecordId(row) === detail.recordId)?.responseId;
@@ -1707,7 +1723,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     if (isSupabaseConfigured) await persistRemoteAsync(upsertApplicationRecords('survey', [surveyWithId], (survey) => survey.id));
     const updatedSurveys = [surveyWithId, ...surveys];
     setSurveys(updatedSurveys);
-    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys));
+    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys.map(normalizeCustomForm)));
     return surveyWithId;
   };
 
@@ -1717,7 +1733,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     await persistRemoteAsync(upsertApplicationRecords('survey', [normalizedForm], (survey) => survey.id));
     setSurveys((current) => {
       const updated = current.map((survey) => survey.id === normalizedForm.id ? normalizedForm : survey);
-      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
       return updated;
     });
     return normalizedForm;
@@ -1728,7 +1744,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     const map = new Map(updatedSurveysList.map((s) => [s.id, normalizeCustomForm(s)]));
     const updated = surveys.map((survey) => map.get(survey.id) ?? survey);
     setSurveys(updated);
-    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
     await persistRemoteAsync(replaceApplicationRecords('survey', updated, (survey) => survey.id));
   };
 
@@ -1760,7 +1776,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         if (!s.questions.some((q) => q.questionCategory === oldLabel)) return s;
         return { ...s, questions: s.questions.map((q) => (q.questionCategory === oldLabel ? { ...q, questionCategory: trimmed } : q)) };
       });
-      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
       persistRemote(replaceApplicationRecords('survey', updated, (survey) => survey.id));
       return updated;
     });
@@ -1789,7 +1805,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const deleteSurvey = (surveyId: string) => {
     const updatedSurveys = surveys.filter((s) => s.id !== surveyId);
     setSurveys(updatedSurveys);
-    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys));
+    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys.map(normalizeCustomForm)));
     persistRemote(replaceApplicationRecords('survey', updatedSurveys, (survey) => survey.id));
 
     // Also optionally clean up custom responses submitted specifically to this survey?
@@ -2313,7 +2329,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         const reopenedById = new Map(surveysToReactivate.map((survey) => [survey.id, survey]));
         setSurveys((current) => {
           const updated = current.map((survey) => reopenedById.get(survey.id) ?? survey);
-          safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+          safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
           return updated;
         });
         surveysToReactivate.forEach((survey) => reactivatedSurveyTypes.add(survey.surveyType));
@@ -2579,7 +2595,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     commitMasterListImport,
     isLoading,
     isRefreshing,
-    error,
+    error: error ?? activeEvaluationError,
+    dataError: error,
+    assignmentError: activeEvaluationError,
     notifications: combinedNotifications,
     documentReminderError,
     retryDocumentReminders: () => reminderRefreshRef.current(),

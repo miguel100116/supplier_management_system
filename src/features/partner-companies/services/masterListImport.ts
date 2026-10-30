@@ -1,4 +1,6 @@
 import * as XLSX from 'xlsx';
+import { normalizeCompanyName } from '../domain/companyName';
+export { normalizeCompanyName } from '../domain/companyName';
 import {
   BranchRecord,
   BranchStatus,
@@ -202,21 +204,6 @@ export function parseMasterListWorkbook(data: ArrayBuffer | Uint8Array): RawMast
 }
 
 // --- Name normalization + fuzzy matching -----------------------------------
-
-const LEGAL_SUFFIXES = new Set([
-  'INC', 'INCORPORATED', 'CORP', 'CORPORATION', 'CO', 'COMPANY', 'LTD',
-  'LIMITED', 'LLC', 'OPC', 'PHILS', 'PHILIPPINES', 'PHIL',
-]);
-
-export function normalizeCompanyName(name: string): string {
-  const tokens = name
-    .toUpperCase()
-    .replace(/[.,'"()&/\\-]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter((t) => !LEGAL_SUFFIXES.has(t));
-  return tokens.join(' ').trim();
-}
 
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;

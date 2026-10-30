@@ -110,6 +110,25 @@ test('Dashboard totals count unique eligible employee/company assignments rather
   }
 });
 
+test('assignment setup failure preserves loaded scores, forms and recent submissions without claiming zero completion', () => {
+  const row: SurveyResponse = { responseId: 'saved', surveyId: 'supplier', surveyType: 'Supplier', companyId: 'partner', company: 'Saved Supplier',
+    respondentType: 'Employee', respondentEmail: 'employee@example.com', submissionDate: '2026-10-01', questionId: 'Q39', questionNumber: 1,
+    question: 'Quality', questionCategory: 'Quality', rating: 5, comment: '', dataSource: 'production_submission' };
+  const html = renderToStaticMarkup(createElement(DashboardPage, {
+    responses: [row], allResponses: [row], partnerCompanies: [{ id: 'partner', name: 'Saved Supplier', type: 'Supplier', createdAt: '2026-01-01' }],
+    surveys: [{ id: 'supplier', surveyType: 'Supplier', title: 'Saved form', description: '', createdAt: '2026-01-01', status: 'Running', questions: [], activeEvaluationCompanyIds: [] }],
+    accounts: [{ email: 'employee@example.com', role: 'Employee', department: 'TASS', designation: 'Rank & File' }],
+    isAdmin: true, isLoading: false, error: null, assignmentError: 'Database setup is incomplete.', surveyTypeFilter: [],
+  }));
+  assert.match(html, /Evaluation assignments are unavailable: Database setup is incomplete\./);
+  assert.doesNotMatch(html, /Dashboard data could not be loaded|No required assignments|0 of 0 completed/);
+  assert.match(html, /Saved form/);
+  assert.match(html, />1 submissions</);
+  assert.match(html, /aria-label="Recent evaluation submissions"/);
+  assert.match(html, /Saved Supplier/);
+  assert.match(html, /Completion unavailable/);
+});
+
 test('Employee dashboard period toggle preserves its existing selection behavior', () => {
   const changes: Array<'current' | 'all-time'> = [];
   const control = DashboardDataScopeToggle({ scope: 'current', onChange: (scope) => changes.push(scope) });
