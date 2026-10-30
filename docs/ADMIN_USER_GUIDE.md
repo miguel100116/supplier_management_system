@@ -40,6 +40,8 @@ The Document Tracker gathers partner compliance documents in one place. It helps
 3. Select a document or status to review its details.
 4. If you have renewal access, use the renewal action to enter the new date or status and confirm the change.
 
+In **Supplier (Local)**, administrators can expand a company and click its **Missing**, **Expired**, or **For update** count beside **Required documents:** to show matching required documents. The **Historical & additional** section is hidden while a filter is selected. Click the selected count again to show every required document and history, or another count to switch. The counts, company totals, and saved records stay unchanged. Opening another company resets the filter; **For update** includes outdated AFS records and remains separate from Expired.
+
 If you cannot see a renewal action, ask an administrator to grant the document-renewal permission. Check the due date and branch carefully before confirming an update.
 
 ![Document Tracker](screenshots/admin/document-tracker.png)

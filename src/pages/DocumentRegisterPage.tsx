@@ -10,6 +10,7 @@ import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domai
 import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isBranchDocumentCompliant, isNTBranch, summarizeDocumentAttention } from '../features/document-tracker/domain/compliance';
 import { COMMON_DOCUMENTS, getAvailableDocumentKeys, getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
 import { companyDocumentRemarksError } from '../features/document-tracker/domain/documentValidation';
+import { RequiredDocumentAttention, type RequiredDocumentAttentionStatus } from '../features/document-tracker/components/RequiredDocumentAttention';
 import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../features/document-tracker/services/documentModificationLog';
 import { ComplianceSnapshot, getComplianceHistory, saveComplianceHistory } from '../features/document-tracker/services/complianceHistory';
 import {
@@ -503,6 +504,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isSortPopoverOpen, setIsSortPopoverOpen] = useState(false);
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [requiredDocumentStatus, setRequiredDocumentStatus] = useState<RequiredDocumentAttentionStatus | null>(null);
   const [openDocumentPopoverKey, setOpenDocumentPopoverKey] = useState<string | null>(null);
   const rowExpandHoverTimerRef = useRef<number | null>(null);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
@@ -730,6 +732,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   };
   useEffect(() => () => cancelRowExpandHover(), []);
   useEffect(() => { setOpenDocumentPopoverKey(null); }, [expandedRowKey]);
+  useEffect(() => { setRequiredDocumentStatus(null); }, [categoryKey, expandedRowKey]);
 
   const toggleDocumentStatusFilter = (status: DocumentStatusFilter) => {
     const next = documentStatusFilters.includes(status)
@@ -1430,7 +1433,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   };
 
   return (
-    <div className="admin-documents-page space-y-5">
+    <div className="admin-documents-page grid-cols-1 space-y-5">
       <PageDescription>Monitor partner compliance documents, track expiring or expired items, and send notifications to partners.</PageDescription>
       {mutationError && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-300">
@@ -2009,19 +2012,21 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             const classificationRequired = row.company.type !== 'Uncategorized' && !(row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign') && !row.company.businessClassification;
             const needsAttention = expiredCount + expiringCount + updateCount + missingCount + Number(classificationRequired);
             const isExpanded = expandedRowKey === row.key;
+            const canFilterRequiredDocuments = isAdmin && categoryKey === 'supplier-local';
+            const requiredStatusFilter = canFilterRequiredDocuments ? requiredDocumentStatus : null;
             const typeLabel = row.company.type === 'Supplier'
               ? (row.isNT ? 'Non-Trade' : 'Trade')
               : row.company.type;
             const groups = [
-              { label: 'Required documents', documents: cells },
-              { label: 'Historical & additional', documents: Object.entries(row.branch?.documents ?? {})
+              { label: 'Required documents', isRequired: true, documents: requiredStatusFilter ? cells.filter(cell => cell.status === requiredStatusFilter) : cells },
+              { label: 'Historical & additional', isRequired: false, documents: Object.entries(row.branch?.documents ?? {})
                 .filter(([name]) => !cells.some((cell) => cell.docName === name))
                 .map(([docName, doc]) => ({ docName, doc, branch: row.branch, expiryBased: isExpiryDocument(docName),
                   inactiveClassification: ['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)
                     && ((docName === 'DTI (Sole)' && row.company.businessClassification !== 'SOL')
                       || (docName !== 'DTI (Sole)' && row.company.businessClassification !== 'CORP')),
                   ...computeDocumentStatus(doc, effectiveNow, docName) })) },
-            ].filter((group) => group.documents.length > 0);
+            ].filter((group) => group.isRequired || (!requiredStatusFilter && group.documents.length > 0));
             return (
               <article key={row.key} className="rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.025] dark:border-slate-800 dark:bg-slate-950">
                   <div className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:grid-cols-2 sm:px-4 sm:py-3 xl:min-h-[72px] xl:gap-y-0 ${DOCUMENT_LIST_GRID_COLUMNS}`}>
@@ -2130,18 +2135,13 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                         CORP/SOL is not set. GIS, SEC, and DTI history remains available below; set classification in Partner details to activate the applicable requirements.
                       </p>
                     )}
-                    {(requiredAttention.missing > 0 || requiredAttention.expired > 0 || requiredAttention.forUpdate > 0) && (
-                      <div aria-label="Required document attention summary" className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-                        <span className="font-semibold text-slate-600 dark:text-slate-300">Required documents:</span>
-                        {requiredAttention.missing > 0 && <span className="inline-flex items-center gap-1 text-rose-700 dark:text-rose-300"><XCircle size={12} aria-hidden="true" /><strong className="tabular-nums">{requiredAttention.missing}</strong> missing</span>}
-                        {requiredAttention.expired > 0 && <span className="inline-flex items-center gap-1 text-rose-800 dark:text-rose-200"><AlertTriangle size={12} aria-hidden="true" /><strong className="tabular-nums">{requiredAttention.expired}</strong> expired</span>}
-                        {requiredAttention.forUpdate > 0 && <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300"><RefreshCw size={12} aria-hidden="true" /><strong className="tabular-nums">{requiredAttention.forUpdate}</strong> for update</span>}
-                      </div>
-                    )}
+                    <RequiredDocumentAttention counts={requiredAttention} value={requiredStatusFilter}
+                      onChange={canFilterRequiredDocuments ? (status) => { setRequiredDocumentStatus(status); setOpenDocumentPopoverKey(null); } : undefined} />
                     <div className="grid gap-x-8 gap-y-5 xl:grid-cols-2">
                       {groups.map((group) => (
                         <section key={group.label} aria-label={group.label} className="min-w-0">
-                          <h3 className="mb-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{group.label}<span className="ml-1.5 font-normal text-slate-400">{group.documents.length}</span></h3>
+                          <h3 className="mb-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{group.label}<span className="ml-1.5 font-normal text-slate-400">{group.documents.length}{group.isRequired && requiredStatusFilter ? ` / ${cells.length}` : ''}</span></h3>
+                          {group.documents.length === 0 && <p role="status" className="py-3 text-xs text-slate-500 dark:text-slate-400">No {requiredStatusFilter?.toLowerCase()} required documents.</p>}
                           <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
                             {group.documents.map(({ docName, status, daysLeft, doc, branch, expiryBased, inactiveClassification }) => {
                               const Icon = DOCUMENT_STATUS_ICONS[status];

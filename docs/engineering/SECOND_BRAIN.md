@@ -2,6 +2,12 @@
 
 Last verified: 2026-10-30
 
+### 2026-10-30 - Clickable Supplier Local required-document attention counts
+
+Supplier (Local) Admin expanded-company summaries render Missing, Expired, and For Update counts as keyboard-accessible colored buttons. Selecting one filters only that branch's required document cards, hides the Historical & additional section, and adds an X clear indicator to the selected button; selecting it again shows every required card and history. `aria-pressed` exposes the selection to assistive technology. Switching branch/category clears the selection. A selected filter stays visible at zero matches; other company counts, compliance calculations, renewals, and stored company data are unchanged. Missing/expired use rose/red surfaces, For Update uses amber, and the active selection deepens the semantic surface. Noninteractive register summaries retain their existing presentation. The Documents root uses one constrained grid column because its prior implicit grid track clipped mobile company controls and the category strip.
+
+Evidence: `src/features/document-tracker/components/RequiredDocumentAttention.tsx`, `src/pages/DocumentRegisterPage.tsx`, its component tests and the desktop/mobile interaction journey in `tests/e2e/application.spec.ts`, and [administrator instructions](../ADMIN_USER_GUIDE.md#document-tracker). Verification: all 455 Node tests, TypeScript checks, production build, 52 desktop/mobile browser cases, and the configured npm audit gate passed. The audit reports two moderate advisories in `qs` and `vite`, below the configured high-severity failure threshold. Selected/empty and dark-state desktop/mobile screenshots were inspected; no automated pixel comparison was performed. Local code and in-memory filter state only; no migration or remote business-data change is required. Rollback is a code revert.
+
 ### 2026-10-30 - Uploaded Active Companies bound employee assignments
 
 The owner authorized committing and pushing the reviewed implementation to `second-branch` on 2026-10-30. The installed pre-push hook verifies the clean committed tree before publication. Staging setup is already applied; hosted delivery and the remaining company-classification review are separate follow-ups.
