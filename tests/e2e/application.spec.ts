@@ -694,7 +694,7 @@ test('Archived report builders select one item, update the document preview and 
   const openBuilder = async (title: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
   await page.goto('/login');
   await signIn(page);
-  await page.goto('/reports');
+  await openReadyPage(page, '/reports');
   await expect(page.getByRole('heading', { name: 'Archived reports', exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Data source', exact: true })).toHaveCount(0);
   await openBuilder('Archived Survey Report');
