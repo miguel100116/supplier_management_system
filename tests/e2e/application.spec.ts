@@ -107,7 +107,17 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   await page.getByLabel('Password', { exact: true }).fill('Synthetic-password-123!');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   // Let authentication settle before the next navigation can interrupt it.
-  await expect(page.getByRole('main').or(page.getByRole('alert')).first()).toBeVisible();
+  const authenticationResult = page.getByRole('main').or(page.getByRole('alert')).first();
+  await authenticationResult.waitFor({ state: 'visible' });
+  await expect(authenticationResult).toBeVisible();
+}
+
+async function openReadyPage(page: Page, path: string) {
+  await page.goto(path);
+  const main = page.getByRole('main');
+  await main.waitFor({ state: 'visible' });
+  // Feature assertions start after the route's code and shared data are ready.
+  await main.getByRole('status').filter({ hasText: /Loading page|Refreshing shared data/ }).waitFor({ state: 'hidden' });
 }
 
 test('Document reminder failures and missing setup stay visible and recover through Retry', async ({ page }) => {
@@ -175,7 +185,7 @@ test('Leaderboard rating scale opens from the compact legend info control', asyn
       rating: 15, comment: '', dataSource: 'client_csv' } });
   await page.goto('/login');
   await signIn(page);
-  await page.goto('/analytics');
+  await openReadyPage(page, '/analytics');
   const legend = page.getByRole('group', { name: 'Company leaderboard color legend' });
   const info = legend.locator('summary');
   const scale = legend.locator('details > div');
@@ -233,7 +243,7 @@ test('Admin module headings match the compact Directory title and subtitle forma
     ['present-mode', 'Present', false],
   ] as const;
   for (const [route, title, hasSubtitle] of modules) {
-    await page.goto(`/${route}`);
+    await openReadyPage(page, `/${route}`);
     const header = page.locator('.admin-page-heading');
     await expect(header.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
     if (hasSubtitle) await expect(header.locator('p')).toHaveCount(1);
