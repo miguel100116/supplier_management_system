@@ -8,7 +8,7 @@ Object.assign(globalThis, { React });
 
 test('attention summary stays read-only without a filter callback', () => {
   const html = renderToStaticMarkup(<RequiredDocumentAttention counts={{ missing: 4, expired: 1, forUpdate: 1 }} />);
-  assert.match(html, /Required documents:/);
+  assert.match(html, /Required document attention summary/);
   assert.doesNotMatch(html, /<button|aria-pressed/);
 });
 

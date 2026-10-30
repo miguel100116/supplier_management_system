@@ -26,7 +26,6 @@ export function RequiredDocumentAttention({ counts, value = null, onChange }: Re
 
   return (
     <div aria-label="Required document attention summary" className={`mb-3 flex flex-wrap items-center text-[11px] ${onChange ? 'gap-x-2 gap-y-1.5' : 'gap-x-3 gap-y-1'}`}>
-      <span className={`font-semibold text-slate-600 dark:text-slate-300 ${onChange ? 'w-full sm:w-auto' : ''}`}>Required documents:</span>
       {visibleItems.map(({ status, label, count, Icon, color, surface, selectedSurface }) => {
         const content = <><Icon size={12} aria-hidden="true" /><strong className="tabular-nums">{count}</strong> {label}</>;
         const selected = value === status;

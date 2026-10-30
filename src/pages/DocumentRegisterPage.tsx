@@ -2161,6 +2161,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                                     </div>
                                   </div>
                                   <DocumentQuickActions docName={docName} document={doc} status={status} disabled={!interactive || Boolean(inactiveClassification)} canDeleteRemarks={canDeleteRemarks} expiryBased={expiryBased}
+                                    remarksAtBottom={categoryKey === 'supplier-local'}
                                     popoverKey={`${row.key}::${docName}`} openPopoverKey={openDocumentPopoverKey} onOpenPopover={setOpenDocumentPopoverKey}
                                     requireRemarks={['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)}
                                     onRenew={() => { if (branch) openExpiryStatus(row.company, branch, docName); }}
@@ -2776,6 +2777,7 @@ function DocumentQuickActions({
   canDeleteRemarks,
   expiryBased,
   requireRemarks,
+  remarksAtBottom = false,
   onRenew,
   onStatus,
   onRemarks,
@@ -2791,6 +2793,7 @@ function DocumentQuickActions({
   canDeleteRemarks: boolean;
   expiryBased: boolean;
   requireRemarks: boolean;
+  remarksAtBottom?: boolean;
   onRenew: () => void;
   onStatus: (provided: boolean, remarks: string) => Promise<string | void>;
   onRemarks: (remarks: string) => Promise<string | void>;
@@ -2948,9 +2951,10 @@ function DocumentQuickActions({
     </button>
   );
   return (
-    <div className="flex max-w-[min(18rem,55vw)] shrink-0 items-start gap-0.5" onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose}>
+    <div className={remarksAtBottom ? 'flex shrink-0 flex-col items-end justify-between gap-1 self-stretch' : 'flex max-w-[min(18rem,55vw)] shrink-0 items-start gap-0.5'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose}>
+      {remarksAtBottom && trigger}
       {document.remarks?.trim() && <button ref={remarkTriggerRef} type="button" onClick={() => { anchorRef.current = remarkTriggerRef.current; setRemarks(document.remarks ?? ''); setIsRemarksOpen(false); setIsViewingRemarks(true); setConfirmingRemarkDelete(false); setError(''); setFeedback(''); setIsOpen(true); setPosition(null); }} aria-label={`View admin remarks for ${docName}`} title="View remarks" aria-haspopup="dialog" aria-expanded={isOpen && isViewingRemarks} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#536b80] hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-400 dark:hover:bg-slate-800"><MessageSquareText size={15} aria-hidden="true" /></button>}
-      {trigger}
+      {!remarksAtBottom && trigger}
       {isOpen && createPortal(
         <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
           {isViewingRemarks ? <div className="p-2">
