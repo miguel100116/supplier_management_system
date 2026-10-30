@@ -731,7 +731,7 @@ export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, ar
             )}
           </div>
           {archives.length > 0 && (
-            <nav aria-label="Filter stored source files by import status" className="mt-3 inline-flex rounded-lg bg-slate-100 p-1 dark:bg-slate-900">
+            <nav aria-label="Filter stored source files by import status" className="admin-tab-strip mt-3">
               {([
                 { id: 'active', label: `Active Imports (${activeArchiveCount})` },
                 { id: 'history', label: `Import History (${historyArchiveCount})` },
@@ -747,7 +747,7 @@ export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, ar
             </nav>
           )}
           {archives.length > 0 && (
-            <div className="mt-3 grid w-full grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800" role="group" aria-label="Filter stored source files by category">
+            <div className="admin-tab-strip mt-3" role="group" aria-label="Filter stored source files by category">
               {STORED_SOURCE_FILE_FILTERS.map((filter) => (
                 <button
                   key={filter.id}

@@ -452,7 +452,7 @@ export function ArchivePage({
         </div>
       )}
 
-      <div className="archive-section-tabs" role="group" aria-label="Choose archived record type">
+      <div className="archive-section-tabs admin-tab-strip" role="group" aria-label="Choose archived record type">
         {([
           { key: 'surveys', label: 'Surveys', count: archivedSurveys.length, Icon: ClipboardList },
           { key: 'responses', label: 'Responses', count: groupedArchivedResponses.length, Icon: FileText },

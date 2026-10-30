@@ -68,7 +68,7 @@ export function PartnerRegistryOverview({
       {children}
 
       <div className="admin-directory-filter-group">
-        <nav className="admin-directory-category-strip" aria-label="Partner categories" role="tablist" onKeyDown={handleCategoryKeyDown}>
+        <nav className="admin-directory-category-strip admin-tab-strip" aria-label="Partner categories" role="tablist" onKeyDown={handleCategoryKeyDown}>
           {CATEGORY_OPTIONS.map((option) => (
             <button
               key={option.value}

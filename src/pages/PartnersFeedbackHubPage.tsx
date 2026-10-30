@@ -406,7 +406,7 @@ export function PartnersFeedbackHubPage({
       <PageDescription>Review feedback collected from partners and employees in one place.</PageDescription>
       {/* The three tabs follow the feedback lifecycle; dispatch stays alongside the active work. */}
       <div className="feedback-hub-navigation">
-        <nav aria-label="Feedback Hub workflow" className="feedback-hub-tabs">
+        <nav aria-label="Feedback Hub workflow" className="feedback-hub-tabs admin-tab-strip">
           <button
             aria-pressed={activeTab === 'current-forms'}
             onClick={() => setActiveTab('current-forms')}

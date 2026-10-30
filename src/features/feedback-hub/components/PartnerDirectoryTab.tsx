@@ -110,13 +110,14 @@ export function PartnerDirectoryTab({
           />
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="segmented-control shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="segmented-control admin-tab-strip min-w-0 flex-1">
             {(['All', 'Courier', 'Supplier', 'Subcontractor'] as const).map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setSelectedType(type)}
+                aria-pressed={selectedType === type}
                 className={selectedType === type ? 'segmented-active' : ''}
               >
                 {type}

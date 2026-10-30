@@ -256,6 +256,22 @@ test('Workspace category and status badges use consistent typography and geometr
   await page.goto('/evaluation-workspace');
   const rows = page.locator('.admin-survey-forms-page table tbody tr');
   await expect(rows).toHaveCount(3, { timeout: 10_000 });
+  const toolbar = page.getByRole('toolbar', { name: 'Survey forms controls' });
+  await expect(toolbar.getByRole('group', { name: 'Survey category' })).toHaveCount(0);
+  await expect(page.getByRole('columnheader', { name: 'Category Type' })).toBeVisible();
+  if ((page.viewportSize()?.width ?? 0) > 760) {
+    const searchBox = await toolbar.getByRole('searchbox', { name: 'Search survey forms' }).boundingBox();
+    for (const name of ['Create Form', 'Manage Access', 'Sort forms', 'Filter forms by deadline date']) {
+      const control = await toolbar.getByRole('button', { name }).boundingBox();
+      expect(Math.abs(control!.y - searchBox!.y)).toBeLessThan(3);
+    }
+  } else {
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  }
+  await toolbar.getByRole('searchbox', { name: 'Search survey forms' }).fill('Supplier');
+  await expect(rows).toHaveCount(1);
+  await toolbar.getByRole('searchbox', { name: 'Search survey forms' }).fill('');
+  await expect(rows).toHaveCount(3);
   for (const dark of [false, true]) {
     await page.evaluate(enabled => document.body.classList.toggle('dark', enabled), dark);
     await page.screenshot({ path: testInfo.outputPath(`workspace-badges-${dark ? 'dark' : 'light'}.png`), animations: 'disabled' });
@@ -279,6 +295,72 @@ test('Workspace category and status badges use consistent typography and geometr
     }
   }
   for (const label of ['ACTIVE', 'PAUSED', 'ENDED']) await expect(rows.getByText(label, { exact: true })).toBeVisible();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Responses workspace keeps long submission data readable and filters removable', async ({ page }) => {
+  const service = await backend(page);
+  const title = 'Courier satisfaction evaluation with a long form title';
+  const form = { id: 'default-courier', title, surveyType: 'Courier', status: 'Running',
+    description: 'Synthetic form.', createdAt, questions: [] };
+  service.records.push({ record_type: 'survey', record_id: form.id, payload: form, created_at: createdAt });
+  for (const surveyType of ['Supplier', 'Subcontractor'] as const) {
+    const otherForm = { ...form, id: `responses-layout-${surveyType}`, title: `${surveyType} evaluation`, surveyType };
+    service.records.push({ record_type: 'survey', record_id: otherForm.id, payload: otherForm, created_at: createdAt });
+  }
+  const respondentEmail = 'long.respondent.name.for.operations@example-international-company.com';
+  service.records.push({ record_type: 'survey_response', record_id: 'responses-layout:Q01', created_at: createdAt,
+    payload: { responseId: 'responses-layout', surveyId: form.id, companyId: 'synthetic-courier',
+      company: 'Synthetic Courier International Logistics Corporation', surveyType: 'Courier',
+      respondentEmail, respondentType: 'Rank & File', submissionDate: createdAt,
+      questionId: 'Q01', questionNumber: 1, question: 'Reliability?', questionCategory: 'Delivery',
+      rating: 4, comment: '', dataSource: 'client_csv' } });
+  service.records.push({ record_type: 'survey_response', record_id: 'responses-other:Q01', created_at: createdAt,
+    payload: { responseId: 'responses-other', surveyId: form.id, companyId: 'synthetic-courier',
+      company: 'Synthetic Courier', surveyType: 'Courier', respondentEmail: 'other.respondent@example.com',
+      respondentType: 'Rank & File', submissionDate: createdAt, questionId: 'Q01', questionNumber: 1,
+      question: 'Reliability?', questionCategory: 'Delivery', rating: 3, comment: '', dataSource: 'client_csv' } });
+  await page.goto('/login');
+  await signIn(page);
+  await openReadyPage(page, '/evaluation-workspace');
+  await page.getByRole('button', { name: 'Responses', exact: true }).click();
+  const explorer = page.getByRole('region', { name: 'Response explorer' });
+  const selector = explorer.getByRole('group', { name: 'Available evaluation forms' });
+  await expect(page.locator('.admin-response-explorer-page > section.panel')).toHaveCount(1);
+  await expect(selector.getByRole('button')).toHaveCount(3);
+  const selectorScrolls = await selector.evaluate((element) => element.scrollWidth > element.clientWidth);
+  expect(selectorScrolls).toBe((page.viewportSize()?.width ?? 0) < 760);
+  await expect(selector.getByRole('button', { name: new RegExp(title) })).toBeVisible();
+  await expect(selector.getByRole('button', { name: new RegExp(title) }).getByText('Courier', { exact: true })).toHaveCount(0);
+  await selector.getByRole('button', { name: new RegExp(title) }).click();
+  await expect(page.locator('#response-export-scope')).toHaveCount(0);
+  const table = page.getByRole('table');
+  await expect(table.getByRole('cell', { name: respondentEmail, exact: true })).toBeVisible();
+  await expect(table.getByRole('button', { name: `View answers for ${respondentEmail}` })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow).toBe(false);
+  await selector.getByRole('button', { name: 'Supplier evaluation' }).click();
+  await expect(explorer.getByRole('heading', { name: 'Supplier evaluation' })).toBeVisible();
+  await expect(page.getByText('No responses have been submitted for this survey.')).toBeVisible();
+  await selector.getByRole('button', { name: new RegExp(title) }).click();
+  await expect(table.getByRole('cell', { name: respondentEmail, exact: true })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Search respondent email' }).fill('long.respondent');
+  await expect(table.getByRole('row')).toHaveCount(2);
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export to Excel' }).click();
+  const download = await downloadPromise;
+  const workbook = XLSX.read(await readFile(await download.path()), { type: 'buffer' });
+  const exportedRows = XLSX.utils.sheet_to_json<(string | number)[]>(workbook.Sheets.Responses, { header: 1 });
+  expect(exportedRows).toHaveLength(2);
+  expect(exportedRows[1][0]).toBe(respondentEmail);
+  await page.getByRole('button', { name: 'Remove email search filter' }).click();
+  await page.getByRole('searchbox', { name: 'Search respondent email' }).fill('no-match');
+  await expect(page.getByText('No responses match the selected filters.')).toBeVisible();
+  await page.getByRole('button', { name: 'Remove email search filter' }).click();
+  await expect(table.getByRole('cell', { name: respondentEmail, exact: true })).toBeVisible();
+  await table.getByRole('button', { name: `View answers for ${respondentEmail}` }).click();
+  await expect(page.getByRole('button', { name: 'Back to Responses' })).toBeVisible();
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
 });
@@ -334,6 +416,41 @@ function headerFormat(element: Element) {
   return { title: typography(title), subtitle: subtitle && typography(subtitle),
     gap: subtitle && subtitle.getBoundingClientRect().top - title.getBoundingClientRect().bottom };
 }
+
+test('Admin navigation and category selectors share compact underline states', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  await backend(page);
+  await page.goto('/login');
+  await signIn(page);
+
+  for (const [route, label] of [
+    ['evaluation-workspace', 'Evaluation workspace views'],
+    ['document-tracker', 'Filter document register by category'],
+    ['feedback-hub', 'Feedback Hub workflow'],
+    ['archive-center', 'Choose archived record type'],
+    ['partners', 'Partner categories'],
+    ['analytics', 'Analytics categories'],
+    ['reports', 'Reports'],
+  ] as const) {
+    await openReadyPage(page, `/${route}`);
+    const strip = page.getByRole('main').getByLabel(label, { exact: true });
+    await expect(strip).toBeVisible();
+    const buttons = strip.locator(':scope > button');
+    expect(await buttons.count()).toBeGreaterThan(1);
+    const selected = strip.locator(':scope > button[aria-pressed="true"], :scope > button[aria-selected="true"], :scope > button[aria-current="page"]').first();
+    await expect(selected).toBeVisible();
+    const styles = await selected.evaluate(button => ({
+      background: getComputedStyle(button).backgroundColor,
+      border: getComputedStyle(button).borderBottomColor,
+      fontSize: getComputedStyle(button).fontSize,
+    }));
+    expect(styles.background).toBe('rgba(0, 0, 0, 0)');
+    expect(styles.border).toBe('rgb(0, 99, 169)');
+    expect(styles.fontSize).toBe(test.info().project.use.isMobile ? '12px' : '13px');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    await strip.screenshot({ path: testInfo.outputPath(`tabs-${route}.png`), animations: 'disabled' });
+  }
+});
 
 test('Admin module headings match the compact Directory title and subtitle format', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
@@ -707,10 +824,10 @@ test('Admin directory filtering, archive dismissal and archive persistence work 
   await page.goto('/login');
   await signIn(page);
   await expect(page).toHaveURL(/\/dashboard$/);
-  await page.goto('/partners');
+  await openReadyPage(page, '/partners');
   const directory = page.getByRole('button', { name: 'Open Synthetic Courier partner record', exact: true }).filter({ visible: true });
   const search = page.getByRole('textbox', { name: 'Search partners by name or BP Code' });
-  await expect(directory).toBeVisible();
+  await expect(directory).toBeVisible({ timeout: 15_000 });
   const checkActionSpacing = async (state: string) => {
     if (testInfo.project.use.isMobile) {
       await page.locator('.admin-directory-table-shell').screenshot({ path: testInfo.outputPath(`directory-${state}-mobile.png`) });

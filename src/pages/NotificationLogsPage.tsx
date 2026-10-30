@@ -129,12 +129,13 @@ export function NotificationLogsPage({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="segmented-control">
+            <div className="segmented-control admin-tab-strip">
               {surveyTypeOptions.map((option) => (
                 <button
                   key={option}
                   type="button"
                   className={surveyType === option ? 'segmented-active' : ''}
+                  aria-pressed={surveyType === option}
                   onClick={() => setSurveyType(option)}
                 >
                   {option}

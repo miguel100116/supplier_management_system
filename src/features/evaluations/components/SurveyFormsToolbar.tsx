@@ -1,12 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDownUp, CalendarDays, Check, Plus, Search, Settings2 } from 'lucide-react';
-import type { SurveyType } from '../../../types/survey';
 
 export type SurveyFormSort = 'title-asc' | 'title-desc' | 'deadline-asc' | 'deadline-desc' | 'created-desc';
 
 interface SurveyFormsToolbarProps {
-  surveyType: 'All' | SurveyType;
-  onSurveyTypeChange: (value: 'All' | SurveyType) => void;
   search: string;
   onSearchChange: (value: string) => void;
   sort: SurveyFormSort;
@@ -20,7 +17,6 @@ interface SurveyFormsToolbarProps {
   onManageAccess: () => void;
 }
 
-const categoryOptions: Array<'All' | SurveyType> = ['All', 'Courier', 'Supplier', 'Subcontractor'];
 type OpenFilterPopover = 'sort' | 'date' | null;
 
 export function countActiveFormFilters(sort: SurveyFormSort, from: string, to: string): number {
@@ -28,8 +24,6 @@ export function countActiveFormFilters(sort: SurveyFormSort, from: string, to: s
 }
 
 export function SurveyFormsToolbar({
-  surveyType,
-  onSurveyTypeChange,
   search,
   onSearchChange,
   sort,
@@ -86,21 +80,7 @@ export function SurveyFormsToolbar({
 
   return (
     <div className="survey-forms-toolbar mb-3 flex flex-wrap items-center gap-2" role="toolbar" aria-label="Survey forms controls">
-      <div className="survey-forms-category segmented-control w-full max-w-full sm:w-auto" role="group" aria-label="Survey category">
-        {categoryOptions.map((option) => (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={surveyType === option}
-            className={surveyType === option ? 'segmented-active' : ''}
-            onClick={() => onSurveyTypeChange(option)}
-          >
-            {option}
-          </button>
-        ))}
-      </div>
-
-      <label className="survey-forms-search relative min-w-0 flex-1 basis-24 sm:min-w-[160px]">
+      <label className="survey-forms-search relative min-w-0 flex-1 basis-48 sm:min-w-[160px]">
         <span className="sr-only">Search survey forms</span>
         <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input

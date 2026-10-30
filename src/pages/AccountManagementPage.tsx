@@ -386,7 +386,7 @@ export function AccountManagementPage({
       {/* Main Content */}
       <div className="admin-accounts-list panel">
         <div className="admin-accounts-filters mb-4">
-          <div className="mb-3 inline-flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800" role="group" aria-label="Filter accounts by system role">
+          <div className="admin-tab-strip mb-3" role="group" aria-label="Filter accounts by system role">
               {(['All', 'Admin', 'Employee'] as const).map((tab) => (
                 <button
                   key={tab}

@@ -399,7 +399,7 @@ export function SurveyFormsPage({
     const matching = surveys.filter((survey) => {
       if (survey.status === 'Archived' && !isAdmin) return false;
 
-      if (surveyType !== 'All' && survey.surveyType !== surveyType) return false;
+      if (!isAdmin && surveyType !== 'All' && survey.surveyType !== surveyType) return false;
 
       if (search.trim()) {
         const needle = search.trim().toLowerCase();
@@ -807,8 +807,6 @@ export function SurveyFormsPage({
               </dl>
             </header>
             <SurveyFormsToolbar
-              surveyType={surveyType}
-              onSurveyTypeChange={setSurveyType}
               search={search}
               onSearchChange={setSearch}
               sort={tableSort}
@@ -1386,7 +1384,7 @@ export function SurveyFormsPage({
                 </div>
 
                 <div className="border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800" role="tablist" aria-label="Manage access steps">
+                  <div className="admin-tab-strip" role="tablist" aria-label="Manage access steps">
                     <button role="tab" aria-selected={modifyStep === 1} onClick={() => setModifyStep(1)} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${modifyStep === 1 ? 'bg-[#2187CD] text-white shadow-sm' : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-700'}`}>Access &amp; Status</button>
                     <button role="tab" aria-selected={modifyStep === 2} onClick={() => setModifyStep(2)} className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${modifyStep === 2 ? 'bg-[#2187CD] text-white shadow-sm' : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-700'}`}>Schedule &amp; Notifications</button>
                   </div>
