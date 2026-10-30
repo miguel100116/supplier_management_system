@@ -27,9 +27,10 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRefs = useRef<Partial<Record<Exclude<OpenPopover, null>, HTMLButtonElement>>>({});
-  const hasAnyFilters = Boolean(searchQuery || categoryTab !== 'All' || documentFilter !== 'all' || originFilter !== 'All' || registeredFrom || registeredTo || sortValue !== 'default');
+  const hasAnyFilters = Boolean(searchQuery.trim() || categoryTab !== 'All' || documentFilter !== 'all' || originFilter !== 'All' || registeredFrom || registeredTo || sortValue !== 'default');
   const chips: Array<{ key: string; label: string; remove: () => void }> = [];
-  if (categoryTab === 'Uncategorized') chips.push({ key: 'category', label: 'Category: Uncategorized', remove: () => onCategoryChange('All') });
+  if (searchQuery.trim()) chips.push({ key: 'search', label: `Search: ${searchQuery.trim()}`, remove: onSearchClear });
+  if (categoryTab !== 'All') chips.push({ key: 'category', label: `Category: ${categoryTab}`, remove: () => onCategoryChange('All') });
   if (categoryTab === 'Supplier' && originFilter !== 'All') chips.push({ key: 'origin', label: `Origin: ${originFilter}`, remove: () => onOriginChange('All') });
   if (documentFilter !== 'all') chips.push({ key: 'documents', label: `Documents: ${DOCUMENT_LABELS[documentFilter]}`, remove: () => onDocumentFilterChange('all') });
   if (registeredFrom) chips.push({ key: 'from', label: `Registered from: ${registeredFrom}`, remove: () => onRegisteredFromChange('') });
@@ -113,9 +114,11 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
           {optionList('sort', 'Sort partners by', sortOptions, sortValue, onSortChange)}
           <button type="button" className="admin-directory-popover-reset" onClick={() => onSortChange('default')}>Reset</button>
         </>)}
-        <button type="button" onClick={onReset} className="admin-directory-reset-button">Reset</button>
       </div>
     </div>
-    {chips.length > 0 && <div className="admin-directory-active-filters" aria-label="Active filters">{chips.map((chip) => <button key={chip.key} type="button" onClick={chip.remove} aria-label={`Remove ${chip.label} filter`} className="admin-directory-filter-chip">{chip.label}<X size={12} aria-hidden="true" /></button>)}</div>}
+    {hasAnyFilters && <div className="admin-directory-active-filters" aria-label="Active filters">
+      {chips.map((chip) => <button key={chip.key} type="button" onClick={chip.remove} aria-label={`Remove ${chip.label} filter`} className="admin-directory-filter-chip">{chip.label}<X size={12} aria-hidden="true" /></button>)}
+      <button type="button" onClick={onReset} className="admin-directory-reset-button ml-auto">Reset</button>
+    </div>}
   </div>;
 }

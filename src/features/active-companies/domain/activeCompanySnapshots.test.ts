@@ -75,3 +75,10 @@ test('keeps immutable snapshots ordered newest first for each partner type', () 
   assert.deepEqual(snapshotsBySurveyType([older, supplier, newer], 'Courier').map((snapshot) => snapshot.id), [newer.id, older.id]);
   assert.deepEqual(parseActiveCompanySnapshot(newer), newer);
 });
+
+test('active-list ordering uses actual timestamps and deterministic IDs, matching the employee projection', () => {
+  const first = createActiveCompanySnapshot('Supplier', 'first.csv', ['First'], 'admin@mgenesis.com', '2026-10-30T08:00:00+08:00', 'first');
+  const later = { ...first, id: 'z', uploadedAt: '2026-10-30T01:00:00Z' };
+  const equalTime = { ...later, id: 'a' };
+  assert.deepEqual(snapshotsBySurveyType([first, equalTime, later], 'Supplier').map(item => item.id), ['z', 'a', first.id]);
+});

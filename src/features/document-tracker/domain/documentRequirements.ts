@@ -1,4 +1,4 @@
-import { PartnerCompanyType, SupplierOrigin } from '../../../types/survey';
+import { BusinessClassification, PartnerCompanyType, SupplierOrigin } from '../../../types/survey';
 
 // Single source of truth for which compliance-document keys apply to which
 // partner category. Mirrors the Master List's "DOCUMENTS ONCE ACCREDITED" /
@@ -62,8 +62,23 @@ export function isExpiryDocument(docName: string): boolean {
 // Uncategorized carries just the common once-accredited checklist.
 export function getRequiredDocumentKeys(
   type: PartnerCompanyType,
-  origin: SupplierOrigin | undefined
+  origin: SupplierOrigin | undefined,
+  businessClassification?: BusinessClassification
 ): string[] {
+  if (type === 'Uncategorized') return [...COMMON_DOCUMENTS];
+  const originDocs = type === 'Supplier' && origin === 'Foreign' ? FOREIGN_SUPPLIER_DOCUMENTS : LOCAL_SUPPLIER_DOCUMENTS;
+  const applicable = originDocs.filter((name) => {
+    if (name === 'SEC (Corp)' || name === 'GIS (Corp)') return businessClassification === 'CORP';
+    if (name === 'DTI (Sole)') return businessClassification === 'SOL';
+    return true;
+  });
+  return [...COMMON_DOCUMENTS, ...applicable];
+}
+
+// Used to build category filters and classification controls. It intentionally
+// includes both CORP/SOL alternatives; compliance scoring must use
+// getRequiredDocumentKeys with the company's confirmed classification.
+export function getAvailableDocumentKeys(type: PartnerCompanyType, origin: SupplierOrigin | undefined): string[] {
   if (type === 'Uncategorized') return [...COMMON_DOCUMENTS];
   const originDocs = type === 'Supplier' && origin === 'Foreign' ? FOREIGN_SUPPLIER_DOCUMENTS : LOCAL_SUPPLIER_DOCUMENTS;
   return [...COMMON_DOCUMENTS, ...originDocs];

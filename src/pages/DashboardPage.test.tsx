@@ -10,6 +10,7 @@ import { buildAnalyticsSnapshot } from '../features/analytics/domain/analyticsSn
 import { isOfficialAnalyticsResponse } from '../features/analytics/domain/responseProvenance';
 import { filterCustomAnalyticsResponses } from '../features/analytics/domain/dateRange';
 import type { FilterState, SurveyResponse, SurveyType } from '../types/survey';
+import type { PersistedProfile } from '../features/account-management/domain/accountProfile';
 
 Object.assign(globalThis, { React });
 
@@ -69,13 +70,63 @@ test('Dashboard evaluation summary agrees with Analytics and report KPIs for fil
     for (const type of types) {
       const metrics = getKpiSummary(cohort.filter(r => r.surveyType === type));
       const categoryRow = table.match(new RegExp(`<tr><th[^>]*>${type}</th>[\\s\\S]*?</tr>`))?.[0] ?? '';
-      assert.match(categoryRow, new RegExp(`>${metrics.totalResponses} evaluations<`));
+      assert.match(categoryRow, new RegExp(`>${metrics.totalResponses} submissions<`));
       if (metrics.totalResponses) assert.ok(categoryRow.includes(`<strong>${formatNumber(metrics.averageRating)}</strong>`));
       dashboardCount += metrics.totalResponses;
     }
     assert.equal(dashboardCount, report.totalResponses);
     if (scenario.scope === 'custom') assert.match(html, /Custom date range/);
   }
+});
+
+test('Dashboard totals count unique eligible employee/company assignments rather than submission volume', () => {
+  const surveys = [{ id: 'form-1', title: 'Supplier round', surveyType: 'Supplier', description: '', createdAt: '2026-01-01', status: 'Running', questions: [], accessDepartments: ['TASS'], evaluationCompanyIds: ['supplier-1'] }];
+  const accounts: PersistedProfile[] = [
+    { email: 'one@example.com', role: 'Employee', department: 'TASS', designation: 'Rank & File' },
+    { email: 'two@example.com', role: 'Employee', department: 'TASS', designation: 'Rank & File' },
+    { email: 'admin@example.com', role: 'Admin', department: 'TASS', designation: 'Rank & File' },
+    { email: 'other@example.com', role: 'Employee', department: 'Logistics', designation: 'Rank & File' },
+  ];
+  const partnerCompanies = ['supplier-1', 'supplier-2'].map(id => ({ id, name: id, type: 'Supplier' as const, createdAt: '2026-01-01' }));
+  const row: SurveyResponse = { responseId: 'one', surveyId: 'form-1', surveyType: 'Supplier', company: 'supplier-1', companyId: 'supplier-1', respondentEmail: 'one@example.com', respondentType: 'Employee', submissionDate: '2026-10-01', questionId: 'Q39', questionNumber: 1, question: 'Quality', questionCategory: 'Quality', rating: 0, comment: '', dataSource: 'production_submission' };
+  const render = (scope: 'current' | 'all-time' | 'custom', employees = accounts, rows = [row, { ...row, questionId: 'Q40' }]) => renderToStaticMarkup(createElement(DashboardPage, {
+    responses: rows, historyResponses: rows, allResponses: rows, partnerCompanies, surveys, accounts: employees,
+    isLoading: false, error: null, surveyTypeFilter: ['Supplier'], isAdmin: true, dataScope: scope,
+  }));
+  assert.equal((render('current').match(/>1 of 2 completed · 50%</g) ?? []).length, 2);
+  assert.match(render('current'), />1 submissions</);
+  assert.match(render('current', [], []), /No required assignments/);
+  assert.match(render('current', [], [row]), /No required assignments/, 'Unassigned imports do not complete employee assignments');
+  const repeated = [row, { ...row, responseId: 'repeat' }, { ...row, responseId: 'outside', respondentEmail: 'other@example.com' }];
+  assert.equal((render('current', accounts, repeated).match(/>1 of 2 completed · 50%</g) ?? []).length, 2);
+  assert.match(render('current', accounts, repeated), />3 submissions</);
+  for (const scope of ['all-time', 'custom'] as const) {
+    assert.match(render(scope), />1 submissions</);
+    assert.match(render(scope), /Current-round completion/);
+    assert.doesNotMatch(render(scope), /Historical completion/);
+    assert.equal((render(scope).match(/>1 of 2 completed · 50%</g) ?? []).length, 2);
+    assert.equal((render(scope, accounts, []).match(/>0 of 2 completed · 0%</g) ?? []).length, 2, 'Known zero completion remains visible in historical reporting views');
+    assert.match(render(scope), />1 of 2 completed · 50%</, 'Operational form totals remain current-round');
+  }
+});
+
+test('assignment setup failure preserves loaded scores, forms and recent submissions without claiming zero completion', () => {
+  const row: SurveyResponse = { responseId: 'saved', surveyId: 'supplier', surveyType: 'Supplier', companyId: 'partner', company: 'Saved Supplier',
+    respondentType: 'Employee', respondentEmail: 'employee@example.com', submissionDate: '2026-10-01', questionId: 'Q39', questionNumber: 1,
+    question: 'Quality', questionCategory: 'Quality', rating: 5, comment: '', dataSource: 'production_submission' };
+  const html = renderToStaticMarkup(createElement(DashboardPage, {
+    responses: [row], allResponses: [row], partnerCompanies: [{ id: 'partner', name: 'Saved Supplier', type: 'Supplier', createdAt: '2026-01-01' }],
+    surveys: [{ id: 'supplier', surveyType: 'Supplier', title: 'Saved form', description: '', createdAt: '2026-01-01', status: 'Running', questions: [], activeEvaluationCompanyIds: [] }],
+    accounts: [{ email: 'employee@example.com', role: 'Employee', department: 'TASS', designation: 'Rank & File' }],
+    isAdmin: true, isLoading: false, error: null, assignmentError: 'Database setup is incomplete.', surveyTypeFilter: [],
+  }));
+  assert.match(html, /Evaluation assignments are unavailable: Database setup is incomplete\./);
+  assert.doesNotMatch(html, /Dashboard data could not be loaded|No required assignments|0 of 0 completed/);
+  assert.match(html, /Saved form/);
+  assert.match(html, />1 submissions</);
+  assert.match(html, /aria-label="Recent evaluation submissions"/);
+  assert.match(html, /Saved Supplier/);
+  assert.match(html, /Completion unavailable/);
 });
 
 test('Employee dashboard period toggle preserves its existing selection behavior', () => {
@@ -130,9 +181,10 @@ test('Employee Home keeps its welcome copy and illustration after banner extract
 });
 
 test('Admin dashboard keeps the protected banner and presents its work in an action-first ledger', () => {
+  const submitted: SurveyResponse[] = [{ responseId: 'response-1', surveyId: 'form-1', surveyType: 'Supplier', respondentType: 'Employee', submissionDate: '2026-10-20', company: 'Northstar Logistics', questionId: 'question-1', questionNumber: 1, question: 'How was the service?', questionCategory: 'Service', rating: 5, comment: '', dataSource: 'production_submission' }];
   const html = renderToStaticMarkup(createElement(DashboardPage, {
-    responses: [],
-    allResponses: [{ responseId: 'response-1', surveyId: 'form-1', surveyType: 'Supplier', respondentType: 'Employee', submissionDate: '2026-10-20', company: 'Northstar Logistics', questionId: 'question-1', questionNumber: 1, question: 'How was the service?', questionCategory: 'Service', rating: 5, comment: '' }],
+    responses: submitted,
+    allResponses: submitted,
     partnerCompanies: [{
       id: 'partner-1',
       name: 'Northstar Logistics',
@@ -162,6 +214,7 @@ test('Admin dashboard keeps the protected banner and presents its work in an act
   assert.match(html, /Northstar Logistics/);
   assert.match(html, /Missing/);
   assert.match(html, /Evaluation forms in progress/);
+  assert.match(html, /class="admin-dashboard-cycle-status running">Active<\/span>/);
   assert.match(html, /Recent submissions/);
   assert.match(html, /role="group" aria-label="Choose performance reporting period"/);
   assert.match(html, /aria-pressed="true" class="admin-dashboard-scope-button is-selected">Current Period<\/button>/);
@@ -185,4 +238,16 @@ test('Admin dashboard keeps the protected banner and presents its work in an act
   assert.doesNotMatch(html, /admin-dashboard-bottom-grid/);
   assert.doesNotMatch(html, /Additional dashboard widgets/);
   assert.doesNotMatch(html, /Administrative modules/);
+});
+
+test('Dashboard hides stale results and recent entries during loading or failure', () => {
+  for (const state of [{ isLoading: true, error: null }, { isLoading: false, error: 'Unable to load records' }]) {
+    const html = renderToStaticMarkup(createElement(DashboardPage, {
+      responses: [], allResponses: [], partnerCompanies: [], surveyTypeFilter: [], isAdmin: true, ...state,
+    }));
+    assert.match(html, /Evaluation results are temporarily unavailable/);
+    assert.match(html, /Recent submissions are temporarily unavailable/);
+    assert.doesNotMatch(html, /<table class="admin-dashboard-performance-table"/);
+    assert.doesNotMatch(html, /No official submissions are available for this scope/);
+  }
 });

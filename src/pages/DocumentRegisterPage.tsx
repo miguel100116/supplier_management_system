@@ -1,13 +1,15 @@
 import { DOCUMENT_CATEGORIES, resolveDocumentCategory, companiesForDocumentCategory } from '../features/document-tracker/domain/documentCategories';
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { Pagination } from '../components/Pagination';
-import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, SlidersHorizontal, Trash2, Filter } from 'lucide-react';
+import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, Filter, ChevronRight, MoreHorizontal, FilePlus2, ArrowDownUp, CalendarClock, CircleAlert, MessageSquareText } from 'lucide-react';
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin } from '../types/survey';
-import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isNTBranch } from '../features/document-tracker/domain/compliance';
-import { getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
+import { BranchRecord, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin, SurveyResponse } from '../types/survey';
+import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domain/leaderboardSelection';
+import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isBranchDocumentCompliant, isNTBranch, summarizeDocumentAttention } from '../features/document-tracker/domain/compliance';
+import { COMMON_DOCUMENTS, getAvailableDocumentKeys, getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
+import { companyDocumentRemarksError } from '../features/document-tracker/domain/documentValidation';
 import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../features/document-tracker/services/documentModificationLog';
 import { ComplianceSnapshot, getComplianceHistory, saveComplianceHistory } from '../features/document-tracker/services/complianceHistory';
 import {
@@ -15,21 +17,21 @@ import {
   DEFAULT_NOTIFICATION_RULES,
   getNotificationSettings,
   saveNotificationSettings,
-  restoreDefaultNotificationSettings,
 } from '../features/notifications/services/documentNotificationSettings';
+import { DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS, DocumentMaintenanceSettings, loadDocumentMaintenanceSettings, MAINTENANCE_DOCUMENTS, saveDocumentMaintenanceSettings, validateDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
 import { ChartCard } from '../components/ChartCard';
 import { PageDescription } from '../components/PageDescription';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { BRANCH_STATUS_OPTIONS, branchStatusBadgeClasses } from './PartnerCompaniesPage';
 import {
   countRowsByDocumentStatus,
-  matchesDocumentFilter,
+  matchesDocumentFilters,
   type DocumentStatusFilter,
 } from '../features/document-tracker/domain/filters';
-import { scrollDocumentMatrixWithArrowKey } from '../features/document-tracker/components/documentMatrixKeyboard';
 
 interface DocumentRegisterPageProps {
   partnerCompanies: PartnerCompany[];
+  responses?: SurveyResponse[];
   categoryFromUrl?: string | null;
   onCategoryChange?: (category: string) => void;
   onUpdateCompany: (company: PartnerCompany) => void;
@@ -38,7 +40,14 @@ interface DocumentRegisterPageProps {
     branchId: string,
     documentName: string,
     expectedDocument: ComplianceDocument,
-    nextDocument: Pick<ComplianceDocument, 'provided' | 'expiryDate'>,
+    nextDocument: Pick<ComplianceDocument, 'provided'> & Partial<Pick<ComplianceDocument, 'expiryDate' | 'remarks' | 'description'>>,
+  ) => Promise<PartnerCompany>;
+  onUpdateDocumentRemarks?: (
+    companyId: string,
+    branchId: string,
+    documentName: string,
+    expectedDocument: ComplianceDocument,
+    remarks: string,
   ) => Promise<PartnerCompany>;
   canRenewDocuments?: boolean;
   currentUserEmail?: string;
@@ -47,8 +56,8 @@ interface DocumentRegisterPageProps {
 
 // ---------------------------------------------------------------------------
 // Advanced custom filter rows - field + condition + value triples that are
-// composed by the admin in the Customize Filters panel and applied on top of
-// the quick-chip filter. None of these fields are invented: every key maps
+// composed by the admin in the filter popover and applied alongside quick
+// filters. None of these fields are invented: every key maps
 // directly to a verified property of DisplayRow / PartnerCompany / BranchRecord
 // or to the matrixCellData computed values.
 // ---------------------------------------------------------------------------
@@ -81,7 +90,7 @@ const FILTERABLE_FIELDS: FilterableField[] = [
   },
   {
     key: 'branch.status',
-    label: 'Branch Status',
+    label: 'Registry Status',
     type: 'select',
     // Values from BranchStatus: 'Pending'|'Updated'|'Outdated'|'Incomplete'|'Completed'|'Accredited'|'Inactive'
     options: ['Pending', 'Updated', 'Outdated', 'Incomplete', 'Completed', 'Accredited', 'Inactive'],
@@ -104,13 +113,6 @@ const FILTERABLE_FIELDS: FilterableField[] = [
     type: 'select',
     // Values from AccreditationStatus
     options: ['Accredited', 'Unaccredited'],
-  },
-  {
-    key: 'doc.status',
-    label: 'Any Document Status',
-    type: 'select',
-    // Values from DocumentStatus
-    options: ['Current', 'Expiring Soon', 'Expired', 'Missing', 'For Update'],
   },
   {
     key: 'doc.daysLeft',
@@ -161,8 +163,7 @@ interface FilterRow {
 }
 
 let _filterRowSeq = 0;
-function newFilterRow(): FilterRow {
-  const field = FILTERABLE_FIELDS[0];
+function newFilterRow(field = FILTERABLE_FIELDS[0]): FilterRow {
   return {
     id: `fr-${++_filterRowSeq}`,
     field: field.key,
@@ -172,7 +173,6 @@ function newFilterRow(): FilterRow {
 }
 
 const DOCUMENT_STATUS_FILTER_OPTIONS: Array<{ value: DocumentStatusFilter; label: string }> = [
-  { value: 'all', label: 'All statuses' },
   { value: 'needs-attention', label: 'Needs attention' },
   { value: 'Current', label: 'Current' },
   { value: 'Expiring Soon', label: 'Expiring soon' },
@@ -189,17 +189,27 @@ function describeFilterRow(row: FilterRow): string {
   return `${field?.label ?? row.field} ${condition?.label.toLowerCase() ?? row.condition} ${row.value}`;
 }
 
-// One category tab = one column set, mirroring the Master List's
-// "LOCAL SUPPLIER" / "FOREIGN SUPPLIER" blocks: selecting a category filters
-// both the rows (companies of that category) AND which document columns show,
-// since Couriers/Subcontractors don't carry the Local/Foreign-specific docs.
+function describeDocumentSort(sortKey: DocumentSortKey): string {
+  if (sortKey.startsWith('doc:')) return sortKey.slice(4);
+  switch (sortKey) {
+    case 'company': return 'Company';
+    case 'compliance': return 'Compliance';
+    case 'bpCode': return 'BP Code';
+    case 'ntType': return 'Trade/Non-Trade';
+    case 'branchStatus': return 'Registry status';
+    case 'supplierRank': return 'Supplier rank';
+    default: return sortKey;
+  }
+}
+
+// Category selection filters partners and selects each category's required
+// document checklist from the Master List definitions.
 const CATEGORY_ICONS = { 'supplier-local': MapPin, 'supplier-foreign': Globe, courier: Truck, subcontractor: Layers };
 const CATEGORIES = DOCUMENT_CATEGORIES.map(category => ({ ...category, icon: CATEGORY_ICONS[category.key as keyof typeof CATEGORY_ICONS] }));
 
 // Pseudo-category: aggregates the Compliance Overview (KPIs/charts) across
 // every category at once, same idea as the client's mockup's top summary
-// strip. The detail matrix below still needs one category selected, since
-// Local/Foreign/etc. carry different document columns.
+// strip. Detailed document requirements are shown for the selected category.
 const ALL_KEY = 'all';
 
 // Compliance Overview widgets a user can show/hide - toggled per category
@@ -215,21 +225,18 @@ const OVERVIEW_WIDGETS: { id: string; label: string; kind: 'kpi' | 'chart' | 'ta
   { id: 'kpi-expiring', label: 'Expiring ≤ 30 Days', kind: 'kpi' },
   { id: 'kpi-expired', label: 'Expired / For Update', kind: 'kpi' },
   { id: 'kpi-rate', label: 'Compliance Rate', kind: 'kpi' },
-  { id: 'chart-compliance', label: 'Status Breakdown (donut)', kind: 'chart' },
+  { id: 'chart-compliance', label: 'Branch Registry Status (donut)', kind: 'chart' },
   { id: 'chart-attention', label: 'Documents Needing Attention (bar)', kind: 'chart' },
-  { id: 'chart-trend', label: 'Compliance Rate Trend', kind: 'chart' },
+  { id: 'chart-trend', label: 'Document Compliance Trend', kind: 'chart' },
   { id: 'table-doc-status', label: 'Document Status Summary', kind: 'table' },
   { id: 'table-aging', label: 'Expiry Aging Summary', kind: 'table' },
   { id: 'table-upcoming', label: 'Upcoming Expiries (Next 30 Days)', kind: 'table' },
   { id: 'table-risk', label: 'Documents with Highest Expiry Risk', kind: 'table' },
 ];
-// Explicit ids (not kind-filtered) so adding new "Advanced-only" chart/kpi
-// widgets later doesn't silently leak into Simple.
-const SIMPLE_WIDGET_IDS = ['kpi-total', 'kpi-accreditation', 'kpi-expiring', 'kpi-expired', 'kpi-rate', 'chart-compliance', 'chart-attention'];
 const ADVANCED_WIDGET_IDS = OVERVIEW_WIDGETS.map((w) => w.id);
 // Defaults to everything on - a first-time visitor should see the full
 // mockup-equivalent view, not have to discover the Customize dropdown to
-// find the tables. Simple is still one click away via the preset button.
+// find the tables.
 const DEFAULT_WIDGET_IDS = ADVANCED_WIDGET_IDS;
 const WIDGET_VISIBILITY_STORAGE_KEY = 'document_register_widget_visibility_v1';
 
@@ -246,17 +253,14 @@ const AGING_BUCKETS = [
   { key: 'current', label: '> 90 Days', status: 'Current', match: (d: number) => d > 90 },
 ] as const;
 
-// Validated status trio for CHART MARKS (pie fills, bar fills, dynamic KPI
-// accents) - run through the dataviz six-checks validator against this
-// app's actual white/slate-950 panel surfaces and confirmed to pass every
-// gate (lightness band, chroma floor, CVD separation, normal-vision floor,
-// contrast) in BOTH light and dark with the same three hex values, so no
-// separate dark-mode set is needed for these. Scoped to chart marks only -
-// the existing pastel STATUS_STYLES pill badges used across the rest of
-// the app are untouched.
-const CHART_GOOD = '#059669';
-const CHART_WARNING = '#a16207';
-const CHART_CRITICAL = '#f43f5e';
+// Shared Compliance Overview palette: quiet brand blue, teal greens, amber,
+// and coral. Text uses darker semantic tones below so small labels stay clear.
+const CHART_BRAND = '#397da5';
+const CHART_BRAND_TINT = '#eaf2f7';
+const CHART_GOOD = '#4b8f79';
+const CHART_EXPIRING = '#c3a76e';
+const CHART_WARNING = '#ad8443';
+const CHART_CRITICAL = '#c86e77';
 const CHART_INK = '#172033'; // matches the app's `ink` design token
 
 // Colors for the branch Status donut - one slice per BRANCH_STATUS_OPTIONS
@@ -264,51 +268,48 @@ const CHART_INK = '#172033'; // matches the app's `ink` design token
 // visually distinct from each other regardless of the pill badge colors
 // used elsewhere on the page.
 const STATUS_CHART_COLORS: Record<string, string> = {
-  Pending: '#3b82f6',
-  Updated: '#10b981',
-  Outdated: '#a16207',
-  Incomplete: '#f43f5e',
-  Completed: '#059669',
-  Accredited: '#0d9488',
-  Inactive: '#94a3b8',
-  'Not Set': '#cbd5e1',
+  Pending: CHART_BRAND,
+  Updated: '#548f9a',
+  Outdated: CHART_WARNING,
+  Incomplete: CHART_CRITICAL,
+  Completed: CHART_GOOD,
+  Accredited: '#398b84',
+  Inactive: '#8999aa',
+  'Not Set': '#cbd5df',
 };
-// Compliance Rate = share of branches whose Status reflects a completed
-// accreditation cycle - not a document-expiry rollup. Matches the request
-// to count Completed/Updated/Accredited as "compliant" regardless of category.
-const COMPLIANT_BRANCH_STATUSES = new Set(['Completed', 'Updated', 'Accredited']);
-
+// These persisted lifecycle states imply full compliance, so keep them
+// unavailable until the branch's applicable document checklist is current.
 const STATUS_STYLES: Record<string, string> = {
-  Current: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40',
-  'Expiring Soon': 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40',
-  Expired: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/40',
-  'For Update': 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/40',
-  'For Renewal': 'bg-yellow-50 text-yellow-700 border-yellow-100 dark:bg-yellow-950/30 dark:text-yellow-400 dark:border-yellow-900/40',
-  Missing: 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700',
+  Current: 'bg-[#edf5f1] text-[#397661] border-[#d7e8df] dark:bg-[#20312b] dark:text-[#a6c9b8] dark:border-[#365246]',
+  'Expiring Soon': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
+  Expired: 'bg-[#f8eeee] text-[#a45655] border-[#ecd9d7] dark:bg-[#352322] dark:text-[#dda09a] dark:border-[#69403e]',
+  'For Update': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
+  'For Renewal': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
+  Missing: 'bg-[#f8eeee] text-rose-700 border-[#ecd9d7] dark:bg-[#352322] dark:text-rose-300 dark:border-[#69403e]',
+  'Needs classification': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
+  'No branch': 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700',
 };
 
-// Heatmap treatment for the big detail matrix below: status lives in the
-// CELL FILL (background + border + text color), not a small dot, so a
-// fully-compliant row and a problem row are distinguishable at a glance
-// without reading any text.
-const CELL_FILL: Record<string, string> = {
-  Current: 'bg-emerald-600 border-emerald-700 text-white dark:bg-emerald-600 dark:border-emerald-500 dark:text-white',
-  'Expiring Soon': 'bg-[#a16207] border-amber-800 text-white dark:bg-[#a16207] dark:border-amber-600 dark:text-white',
-  Expired: 'bg-[#f43f5e] border-rose-600 text-white dark:bg-[#f43f5e] dark:border-rose-400 dark:text-white',
-  'For Update': 'bg-[#f43f5e] border-rose-600 text-white dark:bg-[#f43f5e] dark:border-rose-400 dark:text-white',
-  Missing: 'border-dashed border-slate-200 text-slate-300 dark:border-slate-700 dark:text-slate-600',
-};
-
-const CELL_ICON: Record<string, typeof Check | undefined> = {
+const DOCUMENT_STATUS_ICONS: Record<string, typeof Check> = {
   Current: Check,
   'Expiring Soon': Clock,
-  Expired: XCircle,
-  'For Update': XCircle,
+  Expired: AlertTriangle,
+  'For Update': RefreshCw,
+  Missing: XCircle,
+  'Needs classification': CircleAlert,
+  'No branch': CircleAlert,
 };
 
-// Ordering used when a document column header is clicked to sort the matrix
-// by that column - ascending brings compliant rows to the top, descending
-// surfaces the rows needing attention first (Expired/For Update highest).
+const DOCUMENT_STATUS_DOTS: Record<string, string> = {
+  'needs-attention': 'bg-[#c86e77]',
+  Current: 'bg-[#4b8f79]',
+  'Expiring Soon': 'bg-[#c3a76e]',
+  Expired: 'bg-[#c86e77]',
+  Missing: 'bg-[#c86e77]',
+  'For Update': 'bg-[#ad8443]',
+};
+
+// Ordering used by the document-status sort control.
 const DOC_STATUS_SORT_RANK: Record<DocumentStatus, number> = {
   Current: 0,
   Missing: 1,
@@ -317,19 +318,103 @@ const DOC_STATUS_SORT_RANK: Record<DocumentStatus, number> = {
   'For Update': 3,
 };
 
-// Every column in the detail matrix can be sorted by clicking its header.
-// 'company'/'compliance'/'ntType'/'bpCode' are fixed keys; a document column
-// uses `doc:${docName}` so it can't collide with those.
-type MatrixSortKey = 'company' | 'compliance' | 'ntType' | 'bpCode' | string;
+// Document sorts use `doc:${docName}` to keep document status sorting available.
+type DocumentSortKey = 'company' | 'compliance' | 'ntType' | 'bpCode' | string;
 
 // Matches the Master List's own "Supplier Rank" column values exactly, so an
 // edit here round-trips cleanly through a future re-import.
 const SUPPLIER_RANK_OPTIONS = ['Major', 'Regular'];
+const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-[minmax(170px,1fr)_88px_104px_minmax(120px,1fr)_88px_minmax(220px,0.5fr)_32px] xl:gap-x-3 2xl:grid-cols-[minmax(240px,1fr)_88px_104px_minmax(210px,1fr)_88px_minmax(300px,0.5fr)_32px] 2xl:gap-x-5';
+const DOCUMENT_ROW_BADGE_CLASS = 'inline-flex h-8 max-w-full items-center rounded-md border px-2.5 text-[10px] font-semibold';
+
+function documentPartnerTypeBadgeClasses(type: PartnerCompanyType, isNT: boolean): string {
+  if (type !== 'Supplier') return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300';
+  return isNT
+    ? 'border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-900/60 dark:bg-teal-950/20 dark:text-teal-300'
+    : 'border-blue-200 bg-blue-50 text-blue-700 dark:border-sky-900/60 dark:bg-sky-950/20 dark:text-sky-300';
+}
 
 function supplierRankTextClasses(rank?: string): string {
   if (/major/i.test(rank ?? '')) return 'text-amber-600 dark:text-amber-400';
-  if (/regular/i.test(rank ?? '')) return 'text-slate-600 dark:text-slate-300';
+  if (/regular/i.test(rank ?? '')) return 'text-[#346f91] dark:text-sky-300';
   return 'text-slate-300 dark:text-slate-600';
+}
+
+function SupplierRankSelect({ value, label, onChange }: { value: string; label: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [keyboardOpened, setKeyboardOpened] = useState(false);
+  const hoverTimer = useRef<number | null>(null);
+  const closeTimer = useRef<number | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionsRef = useRef<Array<HTMLButtonElement | null>>([]);
+  const cancelTimers = () => {
+    if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+    hoverTimer.current = null;
+    closeTimer.current = null;
+  };
+  useEffect(() => () => cancelTimers(), []);
+  useEffect(() => {
+    if (!open) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setKeyboardOpened(false);
+      }
+    };
+    document.addEventListener('pointerdown', dismissOutside);
+    return () => document.removeEventListener('pointerdown', dismissOutside);
+  }, [open]);
+  useEffect(() => {
+    if (open && keyboardOpened) optionsRef.current[SUPPLIER_RANK_OPTIONS.indexOf(value)]?.focus();
+  }, [open, keyboardOpened, value]);
+
+  const choose = (rank: string) => {
+    onChange(rank);
+    setOpen(false);
+    setKeyboardOpened(false);
+    cancelTimers();
+    triggerRef.current?.focus();
+  };
+  const openFromKeyboard = () => {
+    cancelTimers();
+    setKeyboardOpened(true);
+    setOpen(true);
+  };
+  return <div ref={rootRef} className="relative" onPointerEnter={(event) => {
+    if (event.pointerType === 'touch') return;
+    cancelTimers();
+    hoverTimer.current = window.setTimeout(() => { setKeyboardOpened(false); setOpen(true); }, 2000);
+  }} onPointerLeave={(event) => {
+    if (event.pointerType === 'touch') return;
+    cancelTimers();
+    closeTimer.current = window.setTimeout(() => { setOpen(false); setKeyboardOpened(false); }, 180);
+  }}>
+    <button ref={triggerRef} type="button" aria-label={label} aria-haspopup="listbox" aria-expanded={open}
+      onClick={() => { cancelTimers(); setKeyboardOpened(false); setOpen((current) => !current); }}
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); openFromKeyboard(); }
+      }}
+      className={'inline-flex h-8 w-24 items-center justify-between rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:border-slate-700 dark:bg-slate-950 ' + supplierRankTextClasses(value)}>
+      <span>{value}</span><ChevronDown size={13} className="shrink-0 text-slate-600 dark:text-slate-300" aria-hidden="true" />
+    </button>
+    {open && <div role="listbox" aria-label={label} className="absolute left-0 top-full z-30 mt-1 min-w-full overflow-hidden rounded-md border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900"
+      onPointerEnter={cancelTimers} onKeyDown={(event) => {
+        if (event.key === 'Escape') { event.preventDefault(); setOpen(false); setKeyboardOpened(false); triggerRef.current?.focus(); }
+        const current = optionsRef.current.findIndex((option) => option === document.activeElement);
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          const delta = event.key === 'ArrowDown' ? 1 : -1;
+          optionsRef.current[(current + delta + SUPPLIER_RANK_OPTIONS.length) % SUPPLIER_RANK_OPTIONS.length]?.focus();
+        }
+      }}>
+      {SUPPLIER_RANK_OPTIONS.map((rank, index) => <button key={rank} ref={(node) => { optionsRef.current[index] = node; }} type="button" role="option" aria-selected={value === rank}
+        onClick={() => choose(rank)} className={`flex min-h-8 w-full items-center rounded px-2 text-left text-xs hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800 ${supplierRankTextClasses(rank)} ${value === rank ? 'font-semibold' : 'font-medium'}`}>
+        {rank}
+      </button>)}
+    </div>}
+  </div>;
 }
 
 function formatDaysLabel(daysLeft?: number): string | undefined {
@@ -337,30 +422,12 @@ function formatDaysLabel(daysLeft?: number): string | undefined {
   return daysLeft < 0 ? `${Math.abs(daysLeft)}d ago` : `${daysLeft}d`;
 }
 
-// Label shown next to the icon - only the states that actually need action
-// (Expiring/Expired/For Update) spell anything out; Current and Missing stay
-// icon/fill only so the eye reads color first, not a wall of repeated words.
-function getCellLabel(status: string, daysLeft?: number): string | undefined {
-  switch (status) {
-    case 'Expiring Soon':
-      return formatDaysLabel(daysLeft);
-    case 'Expired': {
-      const days = formatDaysLabel(daysLeft);
-      return days ? `Expired · ${days}` : 'Expired';
-    }
-    case 'For Update':
-      return 'For Update';
-    default:
-      return undefined;
-  }
-}
-
 // Second line, expiry-bearing cells only: short date (+ days, for Current -
 // Expiring/Expired/For Update already show days in the label line above).
 function getCellDateLine(status: string, expiryDate: string | undefined, daysLeft: number | undefined): string | undefined {
   if (!expiryDate) return undefined;
   const shortDate = formatShortDate(expiryDate);
-  if (status === 'Current') {
+  if (status === 'Current' || status === 'Expiring Soon' || status === 'Expired') {
     const days = formatDaysLabel(daysLeft);
     return days ? `${shortDate} · ${days}` : shortDate;
   }
@@ -376,14 +443,15 @@ function formatShortDate(dateString?: string): string {
   }
 }
 
-export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange, partnerCompanies, onUpdateCompany, onRenewDocument, canRenewDocuments, currentUserEmail = '', isAdmin = false }: DocumentRegisterPageProps) {
+export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange, partnerCompanies, responses = [], onUpdateCompany, onRenewDocument, onUpdateDocumentRemarks, canRenewDocuments, currentUserEmail = '', isAdmin = false }: DocumentRegisterPageProps) {
   const isMobile = useIsMobile();
   const [categoryKey, setCategoryKey] = useState(() => resolveDocumentCategory(categoryFromUrl));
   useEffect(() => { setCategoryKey(resolveDocumentCategory(categoryFromUrl)); }, [categoryFromUrl]);
   const selectCategory = (key: string) => { setCategoryKey(key); onCategoryChange?.(key); };
   const [searchQuery, setSearchQuery] = useState('');
-  const [documentFilter, setDocumentFilter] = useState('all');
-  const [documentStatusFilter, setDocumentStatusFilter] = useState<DocumentStatusFilter>('all');
+  const [includeInactiveCompanies, setIncludeInactiveCompanies] = useState(false);
+  const [withinTop20, setWithinTop20] = useState(false);
+  const [documentStatusFilters, setDocumentStatusFilters] = useState<DocumentStatusFilter[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DOCUMENT_ROWS_PER_PAGE);
   const [renewalTarget, setRenewalTarget] = useState<{ company: PartnerCompany; branchId: string; docName: string } | null>(null);
@@ -411,6 +479,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     branch: BranchRecord;
     docName: string;
     confirmingMissing: boolean;
+    missingRemarks: string;
   } | null>(null);
   const [widgetVisibility, setWidgetVisibility] = useState<Record<string, string[]>>({});
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
@@ -420,48 +489,39 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const [customFilterRows, setCustomFilterRows] = useState<FilterRow[]>([]);
   // Draft rows - working copy while the filter panel is open.
   // Committed on Apply; discarded on Cancel.
-  const [draftFilterRows, setDraftFilterRows] = useState<FilterRow[]>([]);
-  // Whether the full inline Customize Filters panel is expanded.
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const filterPopoverRef = useRef<HTMLDivElement>(null);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const moreFiltersCloseTimerRef = useRef<number | null>(null);
+  const sortPopoverRef = useRef<HTMLDivElement>(null);
+  const sortTriggerRef = useRef<HTMLButtonElement>(null);
+  const sortCloseTimerRef = useRef<number | null>(null);
   const [complianceHistory, setComplianceHistory] = useState<Record<string, ComplianceSnapshot[]>>({});
   const [modificationLog, setModificationLog] = useState<DocumentModificationEntry[]>([]);
-  const [sortKey, setSortKey] = useState<MatrixSortKey>('company');
+  const [sortKey, setSortKey] = useState<DocumentSortKey>('company');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  // Frozen header overlay for the detail matrix: position:sticky can't reach
-  // the viewport here because the matrix needs its own horizontal scroll
-  // (overflow-x-auto), and per the CSS spec that forces the element to also
-  // become a vertical scroll container - which caps any sticky descendant's
-  // range to that container instead of the page, regardless of whether it
-  // ever actually scrolls vertically. So instead, a second, fixed-position
-  // copy of the header row is rendered via portal only while the matrix
-  // panel spans the navbar, with its own horizontal scroll mirrored from the
-  // real table so columns stay aligned - see updateStickyHeader below.
-  const matrixPanelRef = useRef<HTMLDivElement>(null);
-  const categoryFilterRef = useRef<HTMLDivElement>(null);
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-  const realTheadRef = useRef<HTMLTableSectionElement>(null);
-  const overlayScrollRef = useRef<HTMLDivElement>(null);
-  const handleMatrixKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.target instanceof Element && event.target.closest(
-      'input, select, textarea, [contenteditable="true"], [role="slider"], [role="listbox"], [role="combobox"], [role="spinbutton"]',
-    )) {
-      return;
-    }
-
-    const scrollSurface = tableScrollRef.current;
-    if (scrollSurface && scrollDocumentMatrixWithArrowKey(scrollSurface, event.key)) {
-      event.preventDefault();
-    }
-  }, []);
-  const isHeaderStuckRef = useRef(false);
-  const [stickyHeader, setStickyHeader] = useState<{ top: number; left: number; width: number; colWidths: number[] } | null>(null);
+  const [isSortPopoverOpen, setIsSortPopoverOpen] = useState(false);
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [openDocumentPopoverKey, setOpenDocumentPopoverKey] = useState<string | null>(null);
+  const rowExpandHoverTimerRef = useRef<number | null>(null);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
-  useModalEscape(isNotificationSettingsOpen, () => setIsNotificationSettingsOpen(false), 50);
+  const maintenanceDialogRef = useRef<HTMLDivElement>(null);
   useModalEscape(Boolean(renewalTarget), () => setRenewalTarget(null), 50);
   useModalEscape(Boolean(flagFlow), () => setFlagFlow(null), 50);
   useModalEscape(Boolean(expiryStatusTarget), () => setExpiryStatusTarget(null), 50);
   const [notificationRules, setNotificationRules] = useState<DocNotificationRule[]>(DEFAULT_NOTIFICATION_RULES);
+  const [savedNotificationRules, setSavedNotificationRules] = useState<DocNotificationRule[]>(DEFAULT_NOTIFICATION_RULES);
+  const [maintenanceSettings, setMaintenanceSettings] = useState<DocumentMaintenanceSettings>(DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS);
+  const [savedMaintenanceSettings, setSavedMaintenanceSettings] = useState<DocumentMaintenanceSettings>(DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS);
+  const [maintenanceMessage, setMaintenanceMessage] = useState('');
+  const [maintenanceLoadState, setMaintenanceLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [maintenanceReloadKey, setMaintenanceReloadKey] = useState(0);
+  const [isSavingMaintenance, setIsSavingMaintenance] = useState(false);
+  const [maintenanceTab, setMaintenanceTab] = useState<'schedule' | 'validity' | 'category'>('schedule');
+  const [reminderIntervalDraft, setReminderIntervalDraft] = useState('');
+  const [showDiscardMaintenance, setShowDiscardMaintenance] = useState(false);
+  const [showRestoreMaintenance, setShowRestoreMaintenance] = useState(false);
   // Portals "Add Notification" into Shell's page-heading row (same slot
   // DashboardPage's header actions use) so it sits on the title line instead
   // of taking up its own row and pushing the category tabs/search further
@@ -498,8 +558,30 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   }, []);
 
   useEffect(() => {
-    setNotificationRules(getNotificationSettings());
+    const savedRules = getNotificationSettings();
+    setNotificationRules(savedRules);
+    setSavedNotificationRules(savedRules);
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const controller = new AbortController();
+    setMaintenanceLoadState('loading');
+    void loadDocumentMaintenanceSettings(controller.signal).then((settings) => {
+      if (controller.signal.aborted) return;
+      setMaintenanceSettings(settings);
+      setSavedMaintenanceSettings(settings);
+      setMaintenanceMessage('');
+      setMaintenanceLoadState('ready');
+    }).catch(() => {
+      // Supabase can reject an aborted fetch with a generic Error. Ignore only
+      // requests canceled by this effect; surface all current-request failures.
+      if (controller.signal.aborted) return;
+      setMaintenanceMessage('Could not load maintenance settings. Retry to try again.');
+      setMaintenanceLoadState('error');
+    });
+    return () => controller.abort();
+  }, [isAdmin, maintenanceReloadKey]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -511,23 +593,13 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // A lingering document-column sort key is reset because Local/Foreign/
-  // Courier/Subcontractor each carry a different set of document columns.
+  // A selected document sort/filter is reset when switching to another
+  // category's requirements.
   useEffect(() => {
     setSortKey('company');
     setSortDirection('asc');
-    setDocumentFilter('all');
-    setDocumentStatusFilter('all');
+    setDocumentStatusFilters([]);
   }, [categoryKey]);
-
-  const handleSortClick = (key: MatrixSortKey) => {
-    if (key === sortKey) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortKey(key);
-      setSortDirection('asc');
-    }
-  };
 
   // Keep the clock stable between meaningful time updates. This prevents
   // every search/filter/modal state change from invalidating the expensive
@@ -542,7 +614,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const isAllView = categoryKey === ALL_KEY;
   const category = CATEGORIES.find((c) => c.key === categoryKey) ?? CATEGORIES[0];
   const viewLabel = isAllView ? 'All Categories' : category.label;
-  const docColumns = useMemo(() => getRequiredDocumentKeys(category.type, category.origin), [category]);
+  const docColumns = useMemo(() => getAvailableDocumentKeys(category.type, category.origin), [category]);
 
   const visibleWidgetIds = widgetVisibility[categoryKey] ?? DEFAULT_WIDGET_IDS;
   const isWidgetVisible = (id: string) => visibleWidgetIds.includes(id);
@@ -563,51 +635,24 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     localStorage.setItem(WIDGET_VISIBILITY_STORAGE_KEY, JSON.stringify(updated));
   };
 
-  const applyPreset = (ids: string[]) => {
-    const updated = { ...widgetVisibility, [categoryKey]: ids };
-    setWidgetVisibility(updated);
-    localStorage.setItem(WIDGET_VISIBILITY_STORAGE_KEY, JSON.stringify(updated));
+  // Filter edits apply immediately; blank advanced conditions are ignored.
+  const addFilterRow = (fieldKey = FILTERABLE_FIELDS[0].key) => {
+    const field = FILTERABLE_FIELDS.find((candidate) => candidate.key === fieldKey) ?? FILTERABLE_FIELDS[0];
+    setCustomFilterRows((current) => [...current, newFilterRow(field)]);
   };
 
-  // --- Custom filter panel helpers ---
-
-  // Open the panel: populate draft from last applied rows so editing
-  // feels like continuing from the previous state.
-  const openFilterPanel = () => {
-    setDraftFilterRows(customFilterRows.map((r) => ({ ...r })));
-    setIsFilterPanelOpen(true);
+  const removeFilterRow = (id: string) => {
+    setCustomFilterRows((current) => current.filter((row) => row.id !== id));
   };
 
-  const closeFilterPanel = () => {
-    setIsFilterPanelOpen(false);
-  };
-
-  const applyFilters = () => {
-    setCustomFilterRows(draftFilterRows.filter((r) => r.value.trim() !== ''));
-    closeFilterPanel();
-  };
-
-  const cancelFilters = () => {
-    // Discard drafts; don't touch applied rows.
-    closeFilterPanel();
-  };
-
-  const addDraftRow = () => {
-    setDraftFilterRows((prev) => [...prev, newFilterRow()]);
-  };
-
-  const removeDraftRow = (id: string) => {
-    setDraftFilterRows((prev) => prev.filter((r) => r.id !== id));
-  };
-
-  const updateDraftRow = (id: string, patch: Partial<FilterRow>) => {
-    setDraftFilterRows((prev) =>
-      prev.map((r) => {
-        if (r.id !== id) return r;
-        const next = { ...r, ...patch };
+  const updateFilterRow = (id: string, patch: Partial<FilterRow>) => {
+    setCustomFilterRows((current) =>
+      current.map((row) => {
+        if (row.id !== id) return row;
+        const next = { ...row, ...patch };
         // When field changes, reset condition to the new field's default
         // and clear value so stale text/number doesn't pass wrong type.
-        if (patch.field !== undefined && patch.field !== r.field) {
+        if (patch.field !== undefined && patch.field !== row.field) {
           const newField = FILTERABLE_FIELDS.find((f) => f.key === patch.field);
           if (newField) {
             next.condition = defaultConditionForField(newField);
@@ -619,25 +664,133 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     );
   };
 
-  const clearDraftRows = () => setDraftFilterRows([]);
-
   const clearAppliedFilters = () => {
     setSearchQuery('');
-    setDocumentFilter('all');
-    setDocumentStatusFilter('all');
+    if (includeInactiveCompanies) setExpandedRowKey(null);
+    setIncludeInactiveCompanies(false);
+    setWithinTop20(false);
+    setDocumentStatusFilters([]);
     setCustomFilterRows([]);
-    setDraftFilterRows([]);
   };
 
   const hasAppliedFilters = Boolean(
-    searchQuery.trim() || documentStatusFilter !== 'all' || customFilterRows.length > 0,
+    searchQuery.trim() || includeInactiveCompanies || withinTop20 || documentStatusFilters.length > 0 || customFilterRows.some((row) => row.value.trim()),
   );
+  const hasActiveTableState = hasAppliedFilters || sortKey !== 'company' || sortDirection !== 'asc';
 
-  // Every non-archived company in the selected category, unfiltered by
-  // search - this is what the Compliance Overview summarizes, so switching
-  // categories updates the KPIs/charts but typing in the search box doesn't.
+  const resetFiltersAndSort = () => {
+    clearAppliedFilters();
+    setSortKey('company');
+    setSortDirection('asc');
+    setIsFilterPopoverOpen(false);
+    setIsMoreFiltersOpen(false);
+    cancelMoreFiltersClose();
+    setIsSortPopoverOpen(false);
+  };
+
+  const cancelSortMenuClose = () => {
+    if (sortCloseTimerRef.current !== null) {
+      window.clearTimeout(sortCloseTimerRef.current);
+      sortCloseTimerRef.current = null;
+    }
+  };
+
+  const scheduleSortMenuClose = () => {
+    cancelSortMenuClose();
+    sortCloseTimerRef.current = window.setTimeout(() => {
+      setIsSortPopoverOpen(false);
+      sortCloseTimerRef.current = null;
+    }, 180);
+  };
+
+  useEffect(() => () => cancelSortMenuClose(), []);
+
+  const cancelMoreFiltersClose = () => {
+    if (moreFiltersCloseTimerRef.current !== null) {
+      window.clearTimeout(moreFiltersCloseTimerRef.current);
+      moreFiltersCloseTimerRef.current = null;
+    }
+  };
+
+  const scheduleMoreFiltersClose = () => {
+    cancelMoreFiltersClose();
+    moreFiltersCloseTimerRef.current = window.setTimeout(() => {
+      setIsMoreFiltersOpen(false);
+      moreFiltersCloseTimerRef.current = null;
+    }, 180);
+  };
+
+  useEffect(() => () => cancelMoreFiltersClose(), []);
+
+  const cancelRowExpandHover = () => {
+    if (rowExpandHoverTimerRef.current !== null) {
+      window.clearTimeout(rowExpandHoverTimerRef.current);
+      rowExpandHoverTimerRef.current = null;
+    }
+  };
+  useEffect(() => () => cancelRowExpandHover(), []);
+  useEffect(() => { setOpenDocumentPopoverKey(null); }, [expandedRowKey]);
+
+  const toggleDocumentStatusFilter = (status: DocumentStatusFilter) => {
+    const next = documentStatusFilters.includes(status)
+      ? documentStatusFilters.filter((item) => item !== status)
+      : [...documentStatusFilters, status];
+    setDocumentStatusFilters(next);
+  };
+
+  useEffect(() => {
+    if (!isFilterPopoverOpen && !isSortPopoverOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (filterPopoverRef.current && !filterPopoverRef.current.contains(target)) {
+        setIsFilterPopoverOpen(false);
+        setIsMoreFiltersOpen(false);
+        cancelMoreFiltersClose();
+      }
+      if (sortPopoverRef.current && !sortPopoverRef.current.contains(target)) setIsSortPopoverOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setIsFilterPopoverOpen(false);
+      setIsMoreFiltersOpen(false);
+      cancelMoreFiltersClose();
+      setIsSortPopoverOpen(false);
+      if (isSortPopoverOpen) sortTriggerRef.current?.focus();
+      else filterTriggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isFilterPopoverOpen, isSortPopoverOpen]);
+
+  // Companies in the selected category. Archived companies and registry
+  // branches explicitly marked Inactive stay excluded unless an admin opts
+  // to include inactive records.
+  // Search stays limited to the detailed rows and doesn't change overview KPIs.
   // "All Categories" skips the type/origin filter entirely.
-  const categoryCompanies = useMemo(() => companiesForDocumentCategory(partnerCompanies, categoryKey), [partnerCompanies, categoryKey]);
+  // Archived companies are excluded from the default registry view. When the
+  // admin opts into inactive records, include archived companies as well; the
+  // filter is read-only and does not restore or mutate archived records.
+  const registryCategoryCompanies = useMemo(
+    () => companiesForDocumentCategory(partnerCompanies, categoryKey, includeInactiveCompanies),
+    [partnerCompanies, categoryKey, includeInactiveCompanies],
+  );
+  const topTwentyCompanyIds = useMemo(
+    () => new Set(category.type === 'Uncategorized' ? [] : getEvaluationLeaderboardTopTwenty(partnerCompanies, responses, category.type).map((company) => company.id)),
+    [partnerCompanies, responses, category.type],
+  );
+  const categoryCompanies = useMemo(
+    () => registryCategoryCompanies.filter((company) => {
+      const branches = company.branches ?? [];
+      const includesInactive = includeInactiveCompanies || branches.length === 0 || branches.some((branch) => branch.status !== 'Inactive');
+      return includesInactive && (!withinTop20 || topTwentyCompanyIds.has(company.id));
+    }),
+    [registryCategoryCompanies, includeInactiveCompanies, withinTop20, topTwentyCompanyIds],
+  );
 
   // Companies with a normal + "-NT" BP Code merge into one PartnerCompany
   // (see masterListImport.ts), which is correct for Partner Companies'
@@ -659,14 +812,18 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       const branches = c.branches ?? [];
       if (branches.length > 1) {
         branches.forEach((b) => {
+          if (!includeInactiveCompanies && b.status === 'Inactive') return;
           list.push({ key: `${c.id}::${b.id}`, company: c, branch: b, isNT: isNTBranch(b), isSplit: true });
         });
       } else {
-        list.push({ key: c.id, company: c, branch: branches[0], isNT: branches[0] ? isNTBranch(branches[0]) : false, isSplit: false });
+        const branch = branches[0];
+        if (includeInactiveCompanies || branch?.status !== 'Inactive') {
+          list.push({ key: c.id, company: c, branch, isNT: branch ? isNTBranch(branch) : false, isSplit: false });
+        }
       }
     });
     return list;
-  }, [categoryCompanies]);
+  }, [categoryCompanies, includeInactiveCompanies]);
 
   // Every doc cell's computed status for every row in this category
   // (unfiltered by search/chip) - the single source of truth the heatmap
@@ -680,29 +837,30 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     doc: ComplianceDocument;
     branch?: BranchRecord;
     expiryBased: boolean;
+    inactiveClassification?: boolean;
   }
   const matrixCellData = useMemo(() => {
     const map = new Map<string, MatrixCell[]>();
     displayRows.forEach((row) => {
       map.set(
         row.key,
-        docColumns.map((docName) => {
+        getRequiredDocumentKeys(row.company.type, row.company.supplierOrigin, row.company.businessClassification).map((docName) => {
           const branch = row.branch;
           const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
           const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName);
-          return { docName, status, daysLeft, doc, branch, expiryBased: isExpiryDocument(docName) };
+          return { docName, status, daysLeft, doc, branch, expiryBased: isExpiryDocument(docName), inactiveClassification: false };
         })
       );
     });
     return map;
-  }, [displayRows, docColumns, effectiveNow]);
+  }, [displayRows, effectiveNow]);
 
   const documentStatusCounts = useMemo(
     () => countRowsByDocumentStatus(
       displayRows.map((row) => matrixCellData.get(row.key) ?? []),
-      documentFilter,
+      'all',
     ),
-    [displayRows, matrixCellData, documentFilter],
+    [displayRows, matrixCellData],
   );
 
   const rows = useMemo(() => {
@@ -714,11 +872,11 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         row.branch?.bpCode?.toLowerCase().includes(q)
       );
     }
-    if (documentStatusFilter !== 'all') {
-      list = list.filter((row) => matchesDocumentFilter(
+    if (documentStatusFilters.length > 0) {
+      list = list.filter((row) => matchesDocumentFilters(
         matrixCellData.get(row.key) ?? [],
-        documentFilter,
-        documentStatusFilter,
+        'all',
+        documentStatusFilters,
       ));
     }
     // Apply every custom filter row that has a non-empty value.
@@ -761,10 +919,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             if (fr.field === 'accreditationStatus') {
               return (row.company.accreditationStatus ?? '') === rawValue;
             }
-            if (fr.field === 'doc.status') {
-              const cells = matrixCellData.get(row.key) ?? [];
-              return cells.some((cell) => cell.status === rawValue);
-            }
             return true;
           }
 
@@ -793,10 +947,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         })
       );
     }
-    // Every column header is clickable to sort (see handleSortClick) - the
-    // comparator below dispatches on which key is active, always falling
-    // back to company name (then NT/non-NT) so ties stay stable and a
-    // company's split branches stay adjacent regardless of sort key.
+    // Sort by the selected company, branch or document field, then use a
+    // stable company/branch fallback to keep split branches together.
     const compareBySortKey = (a: DisplayRow, b: DisplayRow): number => {
       if (sortKey === 'compliance') {
         const aCells = matrixCellData.get(a.key) ?? [];
@@ -833,7 +985,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       const cmp = primary !== 0 ? primary : fallback(a, b);
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [displayRows, searchQuery, documentFilter, documentStatusFilter, customFilterRows, matrixCellData, sortKey, sortDirection]);
+  }, [displayRows, searchQuery, documentStatusFilters, customFilterRows, matrixCellData, sortKey, sortDirection]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const paginatedRows = useMemo(() => {
@@ -843,7 +995,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [categoryKey, searchQuery, documentFilter, documentStatusFilter, customFilterRows, sortKey, sortDirection]);
+  }, [categoryKey, searchQuery, documentStatusFilters, customFilterRows, sortKey, sortDirection, includeInactiveCompanies, withinTop20]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, pageCount));
@@ -864,9 +1016,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     let expiringSoonDocs = 0;
     let expiredDocs = 0;
 
-    // Status Breakdown is per BRANCH (one row per BP Code, same as the
-    // matrix table below) rather than per company, since branch.status is
-    // what's actually being tallied.
+    // Registry status reflects the persisted branch lifecycle label. The
+    // compliance KPI below is calculated independently from required docs.
     const statusCounts: Record<string, number> = {};
     let brandedBranchTotal = 0;
     let compliantBranchTotal = 0;
@@ -875,31 +1026,31 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       brandedBranchTotal++;
       const status = row.branch.status ?? 'Not Set';
       statusCounts[status] = (statusCounts[status] ?? 0) + 1;
-      if (COMPLIANT_BRANCH_STATUSES.has(status)) compliantBranchTotal++;
+      if (isBranchDocumentCompliant(row.company, row.branch, effectiveNow)) compliantBranchTotal++;
     });
 
-    const perDocAttention: Record<string, { expiringSoon: number; expired: number }> = {};
+    const attentionStatuses: { documentName: string; status: DocumentStatus }[] = [];
     // Advanced-view breakdowns - only populated for expiry-bearing docs.
     const perDocStatus: Record<string, { current: number; expiringSoon: number; expiredOrForUpdate: number; total: number }> = {};
     const agingCounts: Record<string, number> = {};
     const upcoming: { company: string; doc: string; expiryDate: string; daysLeft: number }[] = [];
 
     categoryCompanies.forEach((c) => {
-      const summary = computeCompanyDocumentSummary(c, effectiveNow);
+      const visibleBranches = (c.branches ?? []).filter((branch) => includeInactiveCompanies || branch.status !== 'Inactive');
+      const summaryCompany = c.branches?.length ? { ...c, branches: visibleBranches } : c;
+      const summary = computeCompanyDocumentSummary(summaryCompany, effectiveNow);
       if (c.accreditationStatus === 'Accredited') activeAccreditation++;
       expiringSoonDocs += summary.expiringSoonCount;
       expiredDocs += summary.expiredCount + summary.forUpdateCount;
 
-      getRequiredDocumentKeys(c.type, c.supplierOrigin).filter(isExpiryDocument).forEach((docName) => {
-        const branches = c.branches?.length ? c.branches : [undefined];
+      getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification).filter(isExpiryDocument).forEach((docName) => {
+        const branches = visibleBranches.length ? visibleBranches : [undefined];
         branches.forEach((branch) => {
           const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
           const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName);
 
           if (status === 'Expiring Soon' || status === 'Expired' || status === 'For Update') {
-            if (!perDocAttention[docName]) perDocAttention[docName] = { expiringSoon: 0, expired: 0 };
-            if (status === 'Expiring Soon') perDocAttention[docName].expiringSoon++;
-            else perDocAttention[docName].expired++;
+            attentionStatuses.push({ documentName: docName, status });
           }
 
           if (!perDocStatus[docName]) perDocStatus[docName] = { current: 0, expiringSoon: 0, expiredOrForUpdate: 0, total: 0 };
@@ -925,20 +1076,19 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       });
     });
 
-    const total = categoryCompanies.length;
     const complianceRate = brandedBranchTotal > 0 ? Math.round((compliantBranchTotal / brandedBranchTotal) * 100) : 0;
 
     const donutData = [...BRANCH_STATUS_OPTIONS, 'Not Set']
       .map((status) => ({ name: status, value: statusCounts[status] ?? 0, color: STATUS_CHART_COLORS[status] }))
       .filter((d) => d.value > 0);
 
-    const barData = Object.entries(perDocAttention)
-      .map(([docName, counts]) => ({
-        doc: docName,
-        'Expiring Soon': counts.expiringSoon,
-        Expired: counts.expired,
-      }))
-      .sort((a, b) => (b['Expiring Soon'] + b.Expired) - (a['Expiring Soon'] + a.Expired));
+    const barData = summarizeDocumentAttention(attentionStatuses)
+      .map(({ documentName, expiringSoon, outdated, expired }) => ({
+        doc: documentName,
+        'Expiring Soon': expiringSoon,
+        Outdated: outdated,
+        Expired: expired,
+      }));
 
     const docStatusTable = Object.entries(perDocStatus)
       .map(([docName, counts]) => ({ doc: docName, ...counts }))
@@ -953,32 +1103,33 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     const upcomingTable = upcoming.sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 10);
 
     return {
-      total, activeAccreditation, expiringSoonDocs, expiredDocs, complianceRate, statusTotal: brandedBranchTotal,
+      total: categoryCompanies.length, activeAccreditation, expiringSoonDocs, expiredDocs, complianceRate, compliantBranchTotal, statusTotal: brandedBranchTotal,
       donutData, barData, docStatusTable, agingTable, upcomingTable,
     };
-  }, [categoryCompanies, displayRows, effectiveNow]);
+  }, [categoryCompanies, displayRows, effectiveNow, includeInactiveCompanies]);
 
   // Records today's compliance rate for whichever category is currently
   // being viewed - this is what actually builds the trend chart's history
   // over time. Revisiting the same day just overwrites that day's entry
   // (keeps it live if the underlying data changes) instead of duplicating.
   useEffect(() => {
-    if (overview.total === 0) return;
+    if (overview.statusTotal === 0) return;
+    const historyKey = `document-compliance-v2:${categoryKey}`;
     setComplianceHistory((prev) => {
-      const existing = prev[categoryKey] ?? [];
+      const existing = prev[historyKey] ?? [];
       const last = existing[existing.length - 1];
       let nextList: ComplianceSnapshot[];
       if (last && last.date === currentDateStr) {
-        if (last.rate === overview.complianceRate && last.total === overview.total) return prev;
-        nextList = [...existing.slice(0, -1), { date: currentDateStr, rate: overview.complianceRate, total: overview.total }];
+        if (last.rate === overview.complianceRate && last.total === overview.statusTotal) return prev;
+        nextList = [...existing.slice(0, -1), { date: currentDateStr, rate: overview.complianceRate, total: overview.statusTotal }];
       } else {
-        nextList = [...existing, { date: currentDateStr, rate: overview.complianceRate, total: overview.total }].slice(-COMPLIANCE_HISTORY_LIMIT);
+        nextList = [...existing, { date: currentDateStr, rate: overview.complianceRate, total: overview.statusTotal }].slice(-COMPLIANCE_HISTORY_LIMIT);
       }
-      const updated = { ...prev, [categoryKey]: nextList };
-      saveComplianceHistory(updated, categoryKey);
+      const updated = { ...prev, [historyKey]: nextList };
+      saveComplianceHistory(updated, historyKey);
       return updated;
     });
-  }, [categoryKey, currentDateStr, overview.total, overview.complianceRate]);
+  }, [categoryKey, currentDateStr, overview.statusTotal, overview.complianceRate]);
 
   // Opens the renewal date picker directly - called either from a fresh
   // click on an expiry-doc cell's "Renew Document" button in the status
@@ -986,7 +1137,10 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const openRenewal = (company: PartnerCompany, branch: BranchRecord, docName: string) => {
     if (!canRenewDocuments) return;
     const doc = branch.documents?.[docName];
-    setRenewalDate(doc?.expiryDate || currentDateStr);
+    const validityYears = maintenanceSettings.validityYears[docName as keyof DocumentMaintenanceSettings['validityYears']];
+    const suggested = new Date(effectiveNow);
+    if (!doc?.expiryDate && typeof validityYears === 'number') suggested.setFullYear(suggested.getFullYear() + validityYears);
+    setRenewalDate(doc?.expiryDate || (Number.isFinite(suggested.getTime()) ? suggested.toISOString().slice(0, 10) : currentDateStr));
     setRenewalTarget({ company, branchId: branch.id, docName });
   };
 
@@ -1016,28 +1170,65 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   // picker, so a click first shows what's on record before acting on it.
   const openExpiryStatus = (company: PartnerCompany, branch: BranchRecord, docName: string) => {
     if (!canRenewDocuments) return;
-    setExpiryStatusTarget({ company, branch, docName, confirmingMissing: false });
+    setExpiryStatusTarget({ company, branch, docName, confirmingMissing: false, missingRemarks: branch.documents?.[docName]?.remarks ?? '' });
+  };
+
+  const updateDocumentRemarks = async (company: PartnerCompany, branch: BranchRecord, docName: string, remarks: string): Promise<string | void> => {
+    if (!canRenewDocuments) return 'You do not have permission to update documents.';
+    if (!onUpdateDocumentRemarks) return 'Document remarks are unavailable. Refresh and retry.';
+    const currentDocument = branch.documents?.[docName] ?? {};
+    const nextRemarks = remarks.trim();
+    const validationError = companyDocumentRemarksError(company, docName, { provided: currentDocument.provided, remarks: nextRemarks, expiryDate: currentDocument.expiryDate });
+    if (validationError) {
+      setMutationError(validationError);
+      return validationError;
+    }
+    setMutationError('');
+    try {
+      await onUpdateDocumentRemarks(company.id, branch.id, docName, currentDocument, nextRemarks);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save document remarks.';
+      setMutationError(message);
+      return message;
+    }
+  };
+
+  const updateDocumentStatus = async (company: PartnerCompany, branch: BranchRecord, docName: string, provided: boolean, remarks = ''): Promise<string | void> => {
+    if (!canRenewDocuments) return 'You do not have permission to update documents.';
+    const currentDocument = branch.documents?.[docName] ?? {};
+    // Persist a changed remark in its own narrowly scoped request first. This
+    // keeps renewal/status RPCs limited to their existing allowed fields.
+    const remarksToKeep = remarks.trim() || currentDocument.remarks || '';
+    const validationError = companyDocumentRemarksError(company, docName, { provided, expiryDate: currentDocument.expiryDate, remarks: remarksToKeep });
+    if (validationError) {
+      setMutationError(validationError);
+      return validationError;
+    }
+    setMutationError('');
+    try {
+      let expectedDocument = currentDocument;
+      if (remarksToKeep !== (currentDocument.remarks ?? '')) {
+        if (!onUpdateDocumentRemarks) return 'Document remarks are unavailable. Refresh and retry.';
+        const updatedCompany = await onUpdateDocumentRemarks(company.id, branch.id, docName, currentDocument, remarksToKeep);
+        expectedDocument = updatedCompany.branches?.find((candidate) => candidate.id === branch.id)?.documents?.[docName] ?? currentDocument;
+      }
+      await onRenewDocument(company.id, branch.id, docName, expectedDocument, {
+        provided,
+        ...(expectedDocument.expiryDate ? { expiryDate: expectedDocument.expiryDate } : {}),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update the compliance document.';
+      setMutationError(message);
+      return message;
+    }
   };
 
   // Clears a document back to Missing (no expiry, not provided) - called
   // only from the expiry-doc status popup's "Mark as Missing" warning step,
   // once its own Confirm button is clicked.
-  const markDocumentMissing = async (company: PartnerCompany, branch: BranchRecord, docName: string) => {
+  const markDocumentMissing = async (company: PartnerCompany, branch: BranchRecord, docName: string, remarks: string) => {
     if (!canRenewDocuments) return;
-    setMutationError('');
-    try {
-      await onRenewDocument(company.id, branch.id, docName, branch.documents?.[docName] ?? {}, { provided: false });
-    } catch (error) {
-      setMutationError(error instanceof Error ? error.message : 'Unable to mark the document as missing.');
-    }
-  };
-
-  const updateBranchStatus = (company: PartnerCompany, branchId: string, status: BranchStatus) => {
-    if (!isAdmin) return;
-    const updatedBranches = (company.branches ?? []).map((b) =>
-      b.id === branchId ? { ...b, status } : b
-    );
-    onUpdateCompany({ ...company, branches: updatedBranches });
+    await updateDocumentStatus(company, branch, docName, false, remarks);
   };
 
   const updateSupplierRank = (company: PartnerCompany, branch: BranchRecord, supplierRank: string) => {
@@ -1080,15 +1271,12 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     }
   };
 
-  // Every edit here saves immediately (same convention as the Compliance
-  // Overview's Customize panel above) - no separate Save/Cancel step, since
-  // this only ever touches the EXTRA early-milestone alert for one document,
-  // never the standard 30-day/expired alert that's always on regardless.
+  // Category-alert edits remain a draft until the maintenance workspace's
+  // single Save action persists them with the global schedule and validity.
   const updateNotificationRule = (docName: string, updater: (rule: DocNotificationRule) => DocNotificationRule) => {
+    setMaintenanceMessage('');
     setNotificationRules((prev) => {
-      const next = prev.map((r) => (r.docName === docName ? updater(r) : r));
-      saveNotificationSettings(next);
-      return next;
+      return prev.map((r) => (r.docName === docName ? updater(r) : r));
     });
   };
 
@@ -1108,7 +1296,120 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     }));
 
   const handleRestoreDefaultNotifications = () => {
-    setNotificationRules(restoreDefaultNotificationSettings());
+    setNotificationRules(DEFAULT_NOTIFICATION_RULES);
+    setMaintenanceSettings(DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS);
+    setShowRestoreMaintenance(false);
+    setMaintenanceMessage('Defaults are staged. Save changes to apply them; existing expiry dates and reminder history are preserved.');
+  };
+
+  const addReminderInterval = () => {
+    const days = Number(reminderIntervalDraft);
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      setMaintenanceMessage('Enter a whole number from 1 to 365 days.');
+      return;
+    }
+    if (maintenanceSettings.reminderDays.includes(days)) {
+      setMaintenanceMessage(`${days} days is already in the reminder schedule.`);
+      return;
+    }
+    if (maintenanceSettings.reminderDays.length >= 20) {
+      setMaintenanceMessage('The schedule can contain up to 20 reminder intervals.');
+      return;
+    }
+    setMaintenanceSettings((settings) => ({ ...settings, reminderDays: [...settings.reminderDays, days].sort((a, b) => b - a) }));
+    setReminderIntervalDraft('');
+    setMaintenanceMessage('');
+  };
+
+  const hasUnsavedMaintenanceChanges = JSON.stringify(maintenanceSettings) !== JSON.stringify(savedMaintenanceSettings)
+    || JSON.stringify(notificationRules) !== JSON.stringify(savedNotificationRules);
+
+  const discardMaintenanceChanges = () => {
+    setMaintenanceSettings(savedMaintenanceSettings);
+    setNotificationRules(savedNotificationRules);
+    setMaintenanceMessage('');
+    setShowDiscardMaintenance(false);
+    setIsNotificationSettingsOpen(false);
+  };
+
+  const requestCloseMaintenance = () => {
+    if (isSavingMaintenance) return;
+    if (showDiscardMaintenance || showRestoreMaintenance) {
+      setShowDiscardMaintenance(false);
+      setShowRestoreMaintenance(false);
+      return;
+    }
+    if (hasUnsavedMaintenanceChanges) {
+      setShowDiscardMaintenance(true);
+      return;
+    }
+    setIsNotificationSettingsOpen(false);
+  };
+
+  useModalEscape(isNotificationSettingsOpen, requestCloseMaintenance, 50);
+
+  useEffect(() => {
+    if (!isNotificationSettingsOpen) return;
+    const dialog = maintenanceDialogRef.current;
+    if (!dialog) return;
+    const getFocusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    )).filter((element) => element.getClientRects().length > 0);
+    getFocusable()[0]?.focus({ preventScroll: true });
+    const keepFocusInside = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) { event.preventDefault(); dialog.focus(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = window.document.activeElement;
+      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+        event.preventDefault(); first.focus();
+      }
+    };
+    dialog.addEventListener('keydown', keepFocusInside);
+    return () => dialog.removeEventListener('keydown', keepFocusInside);
+  }, [isNotificationSettingsOpen]);
+
+  const handleSaveMaintenanceSettings = async () => {
+    const validationError = validateDocumentMaintenanceSettings(maintenanceSettings);
+    if (validationError) {
+      setMaintenanceMessage(validationError);
+      return;
+    }
+    setIsSavingMaintenance(true);
+    setMaintenanceMessage('');
+    setShowDiscardMaintenance(false);
+    const savedSettings = { ...maintenanceSettings, updatedBy: currentUserEmail || undefined };
+    const maintenanceChanged = JSON.stringify(maintenanceSettings) !== JSON.stringify(savedMaintenanceSettings);
+    const alertsChanged = JSON.stringify(notificationRules) !== JSON.stringify(savedNotificationRules);
+    if (maintenanceChanged) {
+      try {
+        await saveDocumentMaintenanceSettings(savedSettings);
+      } catch {
+        setMaintenanceMessage('We couldn’t save the maintenance settings. Your edits are still here; check your connection and retry.');
+        setIsSavingMaintenance(false);
+        return;
+      }
+      setMaintenanceSettings(savedSettings);
+      setSavedMaintenanceSettings(savedSettings);
+    }
+    if (alertsChanged) {
+      try {
+        await saveNotificationSettings(notificationRules);
+      } catch {
+        setMaintenanceMessage(maintenanceChanged
+          ? 'Validity and reminder settings were saved, but category alerts were not. Your alert edits are still here; retry Save changes.'
+          : 'We couldn’t save category alerts. Your edits are still here; check your connection and retry.');
+        setIsSavingMaintenance(false);
+        return;
+      }
+      setSavedNotificationRules(notificationRules);
+    }
+    setMaintenanceMessage('Changes saved. Existing expiry dates and reminder history were not changed.');
+    setIsSavingMaintenance(false);
   };
 
   const formatDate = (dateString?: string) => {
@@ -1128,114 +1429,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     }
   };
 
-  // Recomputes whether the frozen header overlay should be showing. Column
-  // widths/position are only re-measured on a stuck-state transition (or
-  // when forced) - not on every scroll tick, since they only actually change
-  // on resize or when the matrix's shape changes, not on ordinary scrolling.
-  const updateStickyHeader = useCallback((forceMeasure = false) => {
-    const panel = matrixPanelRef.current;
-    const wrapper = tableScrollRef.current;
-    const thead = realTheadRef.current;
-    if (!panel || !wrapper || !thead) return;
-
-    const panelRect = panel.getBoundingClientRect();
-    const theadHeight = thead.getBoundingClientRect().height;
-    const headerTop = categoryFilterRef.current?.getBoundingClientRect().bottom ?? 80;
-    const shouldStick = panelRect.top <= headerTop && panelRect.bottom > headerTop + theadHeight;
-
-    if (!shouldStick) {
-      if (isHeaderStuckRef.current) {
-        isHeaderStuckRef.current = false;
-        setStickyHeader(null);
-      }
-      return;
-    }
-
-    if (!isHeaderStuckRef.current || forceMeasure) {
-      isHeaderStuckRef.current = true;
-      const wrapperRect = wrapper.getBoundingClientRect();
-      const colWidths = Array.from(thead.querySelectorAll('th')).map((th) => th.getBoundingClientRect().width);
-      setStickyHeader({ top: headerTop, left: wrapperRect.left, width: wrapperRect.width, colWidths });
-      if (overlayScrollRef.current) overlayScrollRef.current.scrollLeft = wrapper.scrollLeft;
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleScroll = () => updateStickyHeader(false);
-    const handleResize = () => updateStickyHeader(true);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleResize);
-    updateStickyHeader(true);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [updateStickyHeader]);
-
-  // The matrix's shape (columns, rows) can change with no scroll/resize
-  // event at all (switching category, filtering, sorting) - force a
-  // re-measure so a currently-frozen header doesn't show stale column widths.
-  useEffect(() => {
-    updateStickyHeader(true);
-  }, [updateStickyHeader, docColumns, rows.length]);
-
-  // Mirrors the real table's horizontal scroll position onto the frozen
-  // overlay in real time (direct DOM write, bypassing React state) so
-  // columns stay aligned while scrolling sideways.
-  useEffect(() => {
-    const wrapper = tableScrollRef.current;
-    if (!wrapper) return;
-    const handleHorizontalScroll = () => {
-      if (overlayScrollRef.current) overlayScrollRef.current.scrollLeft = wrapper.scrollLeft;
-    };
-    wrapper.addEventListener('scroll', handleHorizontalScroll, { passive: true });
-    return () => wrapper.removeEventListener('scroll', handleHorizontalScroll);
-  }, []);
-
-  // Shared between the real (in-flow) header row and the frozen overlay copy,
-  // so the two can never drift apart - `widths` is only passed for the
-  // overlay, pinning each cell to the real column's measured pixel width.
-  const renderHeaderCells = (widths?: number[]) => {
-    const fixedCols: { key: string; label: string; sortKeyValue: MatrixSortKey; extraTh?: string }[] = [
-      { key: 'company', label: 'Company', sortKeyValue: 'company', extraTh: 'sticky left-0 z-10' },
-      { key: 'compliance', label: 'Compliance', sortKeyValue: 'compliance', extraTh: 'min-w-[110px]' },
-      { key: 'bpCode', label: 'BP Code', sortKeyValue: 'bpCode' },
-      { key: 'ntType', label: 'Trade/Non-Trade', sortKeyValue: 'ntType', extraTh: 'min-w-[130px]' },
-      { key: 'branchStatus', label: 'Status', sortKeyValue: 'branchStatus', extraTh: 'min-w-[120px]' },
-      { key: 'supplierRank', label: 'Supplier Rank', sortKeyValue: 'supplierRank', extraTh: 'min-w-[110px]' },
-    ];
-    const widthStyle = (i: number) => (widths ? { width: widths[i], minWidth: widths[i], maxWidth: widths[i] } : undefined);
-
-    return [
-      ...fixedCols.map((col, i) => (
-        <th
-          key={col.key}
-          className={`px-3 py-2.5 bg-slate-50 dark:bg-slate-950/60 ${col.extraTh ?? ''}`}
-          style={widthStyle(i)}
-        >
-          <SortHeaderButton label={col.label} sortKeyValue={col.sortKeyValue} activeKey={sortKey} direction={sortDirection} onClick={handleSortClick} />
-        </th>
-      )),
-      ...docColumns.map((docName, i) => (
-        <th
-          key={docName}
-          className="px-3 py-2.5 min-w-[120px] max-w-[150px] align-bottom bg-slate-50 dark:bg-slate-950/60"
-          style={widthStyle(fixedCols.length + i)}
-          title={docName}
-        >
-          <SortHeaderButton
-            label={docName}
-            sortKeyValue={`doc:${docName}`}
-            activeKey={sortKey}
-            direction={sortDirection}
-            onClick={handleSortClick}
-            labelClassName="line-clamp-2 normal-case font-semibold tracking-normal text-slate-500 dark:text-slate-400"
-          />
-        </th>
-      )),
-    ];
-  };
-
   return (
     <div className="admin-documents-page space-y-5">
       <PageDescription>Monitor partner compliance documents, track expiring or expired items, and send notifications to partners.</PageDescription>
@@ -1244,26 +1437,28 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           {mutationError}
         </div>
       )}
-      {headerPortalTarget && createPortal(
+      {isAdmin && headerPortalTarget && createPortal(
         <button
           type="button"
-          onClick={() => setIsNotificationSettingsOpen(true)}
+          onClick={() => { setMaintenanceTab('schedule'); setMaintenanceMessage(''); setShowDiscardMaintenance(false); setShowRestoreMaintenance(false); setIsNotificationSettingsOpen(true); }}
+          disabled={!isAdmin}
+          title={!isAdmin ? 'Administrator access is required' : undefined}
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-white transition cursor-pointer shadow-sm"
         >
           <BellPlus size={14} />
-          <span>Add Notification</span>
+          <span>Document Maintenance</span>
         </button>,
         headerPortalTarget
       )}
 
-      <div ref={categoryFilterRef} className="document-category-filter sticky top-20 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="document-category-filter sticky top-20 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <div role="group" aria-label="Filter document register by category" className="flex min-w-0 flex-nowrap overflow-x-auto rounded-lg bg-slate-50 p-1 dark:bg-slate-900 w-full sm:w-auto" style={{ scrollbarWidth: 'none' }}>
           <button
             aria-pressed={isAllView}
             onClick={() => selectCategory(ALL_KEY)}
             className={`shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md py-2 px-4 text-xs font-bold transition-all duration-150 cursor-pointer ${
               isAllView
-                ? 'bg-[#eaf5fc] text-[#2187CD] dark:bg-slate-800 dark:text-sky-300'
+                ? 'bg-[#edf4f8] text-[#397da5] dark:bg-slate-800 dark:text-sky-300'
                 : 'text-slate-500 hover:bg-white hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200'
             }`}
           >
@@ -1279,7 +1474,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                 onClick={() => selectCategory(cat.key)}
                 className={`shrink-0 flex items-center gap-1.5 whitespace-nowrap rounded-md py-2 px-4 text-xs font-bold transition-all duration-150 cursor-pointer ${
                   categoryKey === cat.key
-                    ? 'bg-[#eaf5fc] text-[#2187CD] dark:bg-slate-800 dark:text-sky-300'
+                    ? 'bg-[#edf4f8] text-[#397da5] dark:bg-slate-800 dark:text-sky-300'
                     : 'text-slate-500 hover:bg-white hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-200'
                 }`}
               >
@@ -1319,23 +1514,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                       <p className="text-sm font-semibold text-slate-900 dark:text-white">Customize Overview</p>
                       <span className="text-[10px] text-slate-400">{viewLabel}</span>
                     </div>
-                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Quick preset:</span>
-                      <button
-                        type="button"
-                        onClick={() => applyPreset(SIMPLE_WIDGET_IDS)}
-                        className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900/60 cursor-pointer"
-                      >
-                        Simple
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyPreset(ADVANCED_WIDGET_IDS)}
-                        className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900/60 cursor-pointer"
-                      >
-                        Advanced
-                      </button>
-                    </div>
                     <div className="max-h-72 overflow-y-auto p-2">
                       <p className="px-2 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">KPI Cards</p>
                       {OVERVIEW_WIDGETS.filter((w) => w.kind === 'kpi').map((w) => (
@@ -1373,24 +1551,24 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             </div>
 
             <details open={isAllView} className="group">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-600 marker:hidden hover:text-[#2187CD] dark:border-slate-800 dark:text-slate-300 dark:hover:text-sky-300 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs font-semibold text-slate-600 marker:hidden hover:text-[#397da5] dark:border-slate-800 dark:text-slate-300 dark:hover:text-sky-300 [&::-webkit-details-marker]:hidden">
                 <span>Overview metrics and compliance analysis</span>
                 <ChevronDown size={14} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
               </summary>
               <div className="space-y-5 pt-4">
             {(isWidgetVisible('kpi-total') || isWidgetVisible('kpi-accreditation') || isWidgetVisible('kpi-expiring') || isWidgetVisible('kpi-expired') || isWidgetVisible('kpi-rate')) && (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                {isWidgetVisible('kpi-total') && <KpiCard icon={Users} label="Total Partners" value={overview.total} caption={viewLabel} accent="text-[#2187CD]" />}
-                {isWidgetVisible('kpi-accreditation') && <KpiCard icon={ShieldCheck} label="Active Accreditation" value={overview.activeAccreditation} caption="Accredited status" accent="text-[#2187CD]" />}
-                {isWidgetVisible('kpi-expiring') && <KpiCard icon={Clock} label="Expiring ≤ 30 Days" value={overview.expiringSoonDocs} caption="Documents" accent="text-[#a16207]" />}
-                {isWidgetVisible('kpi-expired') && <KpiCard icon={XCircle} label="Expired / For Update" value={overview.expiredDocs} caption="Documents" accent="text-[#f43f5e]" />}
+                {isWidgetVisible('kpi-total') && <KpiCard icon={Users} label="Total Partners" value={overview.total} caption={viewLabel} accent="text-[#346f91]" />}
+                {isWidgetVisible('kpi-accreditation') && <KpiCard icon={ShieldCheck} label="Active Accreditation" value={overview.activeAccreditation} caption="Accredited status" accent="text-[#397661]" />}
+                {isWidgetVisible('kpi-expiring') && <KpiCard icon={Clock} label="Expiring ≤ 30 Days" value={overview.expiringSoonDocs} caption="Documents" accent="text-[#896a35]" />}
+                {isWidgetVisible('kpi-expired') && <KpiCard icon={XCircle} label="Expired / For Update" value={overview.expiredDocs} caption="Documents" accent="text-[#a45655]" />}
                 {isWidgetVisible('kpi-rate') && (
                   <KpiCard
                     icon={Gauge}
-                    label="Compliance Rate"
+                    label="Document compliance"
                     value={`${overview.complianceRate}%`}
-                    caption="Completed, Updated & Accredited"
-                    accent={overview.complianceRate >= 90 ? 'text-[#059669]' : overview.complianceRate >= 70 ? 'text-[#a16207]' : 'text-[#f43f5e]'}
+                    caption={`${overview.compliantBranchTotal} of ${overview.statusTotal} branches have all required documents current`}
+                    accent={overview.complianceRate >= 90 ? 'text-[#397661]' : overview.complianceRate >= 70 ? 'text-[#896a35]' : 'text-[#a45655]'}
                   />
                 )}
               </div>
@@ -1400,7 +1578,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               <div className={chartsGridClass}>
                 {isWidgetVisible('chart-compliance') && (
                   <div className={chartsToShow.length === 2 ? 'lg:col-span-2' : ''}>
-                    <ChartCard title="Status Breakdown" subtitle={viewLabel} contentClassName="min-h-[27rem] sm:h-80 sm:min-h-0">
+                    <ChartCard title="Branch registry status" subtitle={viewLabel} contentClassName="min-h-[27rem] sm:h-80 sm:min-h-0">
                       {overview.donutData.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-xs text-slate-400">
                           No companies in this view yet.
@@ -1409,7 +1587,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                         <div
                           className="flex min-h-[27rem] min-w-0 flex-col items-center justify-center gap-4 sm:h-80 sm:min-h-0 sm:gap-3"
                           role="group"
-                          aria-label={`${viewLabel} branch status breakdown`}
+                          aria-label={`${viewLabel} branch registry status breakdown`}
                         >
                           <div className="relative h-52 w-full min-w-0 max-w-sm shrink-0 -translate-y-2 sm:h-44 sm:-translate-y-4">
                             <ResponsiveContainer width="100%" height="100%">
@@ -1472,7 +1650,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     <ChartCard title="Documents Needing Attention" subtitle="By document type" contentClassName="h-72 sm:h-80">
                       {overview.barData.length === 0 ? (
                         <div className="h-full flex items-center justify-center text-xs text-slate-400">
-                          Nothing expiring or overdue in this view.
+                          No documents need attention in this view.
                         </div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
@@ -1482,8 +1660,11 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                             <YAxis type="category" dataKey="doc" width={isMobile ? 76 : 110} tickFormatter={(value: string) => isMobile && value.length > 12 ? `${value.slice(0, 11)}…` : value} tick={{ fontSize: isMobile ? 9 : 11, fill: CHART_INK, fontWeight: 600 }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} />
                             <Tooltip contentStyle={{ fontSize: '11px', borderRadius: 10, border: '1px solid #e2e8f0' }} cursor={{ fill: 'rgba(148,163,184,0.08)' }} />
                             <Legend wrapperStyle={{ fontSize: '11px' }} iconType="circle" iconSize={8} />
-                            <Bar dataKey="Expiring Soon" stackId="a" fill={CHART_WARNING} radius={[0, 0, 0, 0]} maxBarSize={20} isAnimationActive={false}>
-                              <LabelList dataKey="Expiring Soon" position="right" formatter={(v) => (typeof v === 'number' && v > 0 ? v : '')} style={{ fontSize: 12, fill: CHART_INK, fontWeight: 700 }} />
+                            <Bar dataKey="Expiring Soon" stackId="a" fill={CHART_EXPIRING} radius={[0, 0, 0, 0]} maxBarSize={20} isAnimationActive={false}>
+                              <LabelList dataKey="Expiring Soon" position="insideLeft" offset={4} formatter={(v) => (typeof v === 'number' && v > 0 ? v : '')} style={{ fontSize: isMobile ? 9 : 11, fill: CHART_INK, fontWeight: 700 }} />
+                            </Bar>
+                            <Bar dataKey="Outdated" stackId="a" fill={CHART_WARNING} radius={[0, 0, 0, 0]} maxBarSize={20} isAnimationActive={false}>
+                              <LabelList dataKey="Outdated" position="insideLeft" offset={4} formatter={(v) => (typeof v === 'number' && v > 0 ? v : '')} style={{ fontSize: isMobile ? 9 : 11, fill: CHART_INK, fontWeight: 700 }} />
                             </Bar>
                             <Bar dataKey="Expired" stackId="a" fill={CHART_CRITICAL} radius={[0, 4, 4, 0]} maxBarSize={20} isAnimationActive={false}>
                               <LabelList dataKey="Expired" position="right" formatter={(v) => (typeof v === 'number' && v > 0 ? v : '')} style={{ fontSize: 12, fill: CHART_INK, fontWeight: 700 }} />
@@ -1498,9 +1679,9 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             )}
 
             {isWidgetVisible('chart-trend') && (() => {
-              const history = complianceHistory[categoryKey] ?? [];
+              const history = complianceHistory[`document-compliance-v2:${categoryKey}`] ?? [];
               return (
-                <ChartCard title="Compliance Rate Trend" subtitle={viewLabel} contentClassName="h-56">
+                <ChartCard title="Document compliance trend" subtitle={viewLabel} contentClassName="h-56">
                   {history.length < 2 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center gap-1">
                       <p className="text-xs text-slate-400">
@@ -1513,18 +1694,12 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart data={history} margin={{ top: 20, right: isMobile ? 4 : 16, left: isMobile ? -12 : 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#2187CD" stopOpacity={0.16} />
-                            <stop offset="100%" stopColor="#2187CD" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-100 dark:stroke-slate-800" />
                         <XAxis dataKey="date" minTickGap={isMobile ? 24 : 8} tick={{ fontSize: isMobile ? 9 : 10, fill: '#94a3b8' }} axisLine={{ stroke: '#cbd5e1' }} tickLine={false} tickFormatter={(d: string) => formatDate(d)} />
                         <YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: isMobile ? 9 : 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={isMobile ? 34 : 40} />
-                        <Tooltip contentStyle={{ fontSize: '11px', borderRadius: 10, border: '1px solid #e2e8f0' }} labelFormatter={(d) => formatDate(String(d ?? ''))} formatter={(v) => [`${typeof v === 'number' ? v : 0}%`, 'Compliance Rate']} />
-                        <Area type="monotone" dataKey="rate" stroke="none" fill="url(#trendFill)" isAnimationActive={false} />
-                        <Line type="monotone" dataKey="rate" stroke="#2187CD" strokeWidth={2} dot={{ r: 4, fill: '#2187CD', strokeWidth: 0 }} activeDot={{ r: 6 }} isAnimationActive={false}>
+                        <Tooltip contentStyle={{ fontSize: '11px', borderRadius: 10, border: '1px solid #e2e8f0' }} labelFormatter={(d) => formatDate(String(d ?? ''))} formatter={(v) => [`${typeof v === 'number' ? v : 0}%`, 'Required documents current']} />
+                        <Area type="monotone" dataKey="rate" stroke="none" fill={CHART_BRAND_TINT} fillOpacity={0.75} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="rate" stroke={CHART_BRAND} strokeWidth={2} dot={{ r: 4, fill: CHART_BRAND, strokeWidth: 0 }} activeDot={{ r: 6 }} isAnimationActive={false}>
                           <LabelList dataKey="rate" position="top" formatter={(v) => `${typeof v === 'number' ? v : 0}%`} style={{ fontSize: 11, fontWeight: 700, fill: CHART_INK }} />
                         </Line>
                       </ComposedChart>
@@ -1546,8 +1721,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                           <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
                             <th className="py-2 pr-2">Document</th>
                             <th className="py-2 px-2 text-right">Current</th>
-                            <th className="py-2 px-2 text-right text-[#a16207]">Expiring</th>
-                            <th className="py-2 px-2 text-right text-[#f43f5e]">Expired</th>
+                            <th className="py-2 px-2 text-right text-[#896a35]">Expiring Soon</th>
+                            <th className="py-2 px-2 text-right text-[#a45655]">Expired / For Update</th>
                             <th className="py-2 pl-2 text-right">Total</th>
                           </tr>
                         </thead>
@@ -1555,9 +1730,9 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                           {overview.docStatusTable.map((row) => (
                             <tr key={row.doc} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                               <td className="py-2 pr-2 font-semibold text-slate-700 dark:text-slate-200">{row.doc}</td>
-                              <td className="py-2 px-2 text-right tabular-nums text-[#059669]">{row.current}</td>
-                              <td className="py-2 px-2 text-right tabular-nums text-[#a16207]">{row.expiringSoon}</td>
-                              <td className="py-2 px-2 text-right tabular-nums text-[#f43f5e]">{row.expiredOrForUpdate}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-[#397661]">{row.current}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-[#896a35]">{row.expiringSoon}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-[#a45655]">{row.expiredOrForUpdate}</td>
                               <td className="py-2 pl-2 text-right tabular-nums font-semibold text-slate-700 dark:text-slate-200">{row.total}</td>
                             </tr>
                           ))}
@@ -1614,7 +1789,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                               <td className="py-2 pr-2 text-slate-600 dark:text-slate-300 whitespace-nowrap tabular-nums">{formatDate(row.expiryDate)}</td>
                               <td className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-200 truncate max-w-[140px]">{row.company}</td>
                               <td className="py-2 px-2 text-slate-600 dark:text-slate-300">{row.doc}</td>
-                              <td className="py-2 pl-2 text-right tabular-nums font-bold text-[#a16207]">{row.daysLeft}</td>
+                              <td className="py-2 pl-2 text-right tabular-nums font-bold text-[#896a35]">{row.daysLeft}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1632,8 +1807,9 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                         <thead>
                           <tr className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
                             <th className="py-2 pr-2">Document</th>
-                            <th className="py-2 px-2 text-right text-[#f43f5e]">Expired</th>
-                            <th className="py-2 px-2 text-right text-[#a16207]">Expiring &lt; 30d</th>
+                            <th className="py-2 px-2 text-right text-[#896a35]">Expiring Soon</th>
+                            <th className="py-2 px-2 text-right text-[#896a35]">Outdated</th>
+                            <th className="py-2 px-2 text-right text-[#a45655]">Expired</th>
                             <th className="py-2 pl-2 text-right">Total Risk</th>
                           </tr>
                         </thead>
@@ -1641,9 +1817,10 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                           {overview.barData.map((row) => (
                             <tr key={row.doc} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors">
                               <td className="py-2 pr-2 font-semibold text-slate-700 dark:text-slate-200">{row.doc}</td>
-                              <td className="py-2 px-2 text-right tabular-nums text-[#f43f5e]">{row.Expired}</td>
-                              <td className="py-2 px-2 text-right tabular-nums text-[#a16207]">{row['Expiring Soon']}</td>
-                              <td className="py-2 pl-2 text-right tabular-nums font-bold text-slate-700 dark:text-slate-200">{row.Expired + row['Expiring Soon']}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-[#896a35]">{row['Expiring Soon']}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-[#896a35]">{row.Outdated}</td>
+                              <td className="py-2 px-2 text-right tabular-nums text-[#a45655]">{row.Expired}</td>
+                              <td className="py-2 pl-2 text-right tabular-nums font-bold text-slate-700 dark:text-slate-200">{row.Expired + row.Outdated + row['Expiring Soon']}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1668,305 +1845,137 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           </div>
         </header>
       )}
-      {!isAllView && categoryCompanies.length > 0 && (
-        <div className="space-y-3">
-          {/* Search and document filters; advanced filters remain Admin-only */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="grid w-full flex-1 grid-cols-1 gap-2 sm:grid-cols-[minmax(220px,1fr)_minmax(170px,0.55fr)_minmax(180px,0.55fr)]">
-              <label className="relative min-w-0">
-                <span className="sr-only">Search document tracker</span>
-                <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search company or BP code..."
-                  className="field !mt-0 w-full py-2.5 !pl-9 text-sm"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                    aria-label="Clear document search"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </label>
-
-              <label className="min-w-0">
-                <span className="sr-only">Filter by document</span>
-                <select
-                  value={documentFilter}
-                  onChange={(event) => setDocumentFilter(event.target.value)}
-                  className="field !mt-0 w-full py-2.5 text-sm"
-                >
-                  <option value="all">Any document</option>
-                  {docColumns.map((docName) => (
-                    <option key={docName} value={docName}>{docName}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="min-w-0">
-                <span className="sr-only">Filter by document status</span>
-                <select
-                  value={documentStatusFilter}
-                  onChange={(event) => setDocumentStatusFilter(event.target.value as DocumentStatusFilter)}
-                  className="field !mt-0 w-full py-2.5 text-sm"
-                >
-                  {DOCUMENT_STATUS_FILTER_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label} ({documentStatusCounts[option.value]})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className="ml-auto flex items-center gap-2">
-              <span className="whitespace-nowrap text-xs font-semibold text-slate-400">
-                {rows.length} result{rows.length === 1 ? '' : 's'}
-              </span>
-              {/* Customize Filters button (right, admin-only) */}
-              {isAdmin && (
-              <button
-                type="button"
-                onClick={() => (isFilterPanelOpen ? cancelFilters() : openFilterPanel())}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                  isFilterPanelOpen
-                    ? 'border-[#2187CD] bg-[#2187CD]/5 text-[#2187CD] dark:bg-[#2187CD]/20 dark:text-sky-400'
-                    : customFilterRows.length > 0
-                    ? 'border-[#2187CD]/40 bg-[#2187CD]/5 text-[#2187CD] dark:bg-[#2187CD]/10 dark:border-sky-700 dark:text-sky-400'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:text-white'
-                }`}
-              >
-                <SlidersHorizontal size={12} />
-                <span>Customize Filters</span>
-                {customFilterRows.length > 0 && !isFilterPanelOpen && (
-                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-[#2187CD] text-white text-[10px] font-bold leading-none px-1">
-                    {customFilterRows.length}
-                  </span>
-                )}
-                {isFilterPanelOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              </button>
-              )}
+      {!isAllView && registryCategoryCompanies.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="relative min-w-0 flex-1"><span className="sr-only">Search document tracker</span><Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search company or BP code..." className="field !mt-0 w-full py-2.5 !pl-9 text-sm" />{searchQuery && <button type="button" onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Clear document search"><X size={14} /></button>}</label>
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+              <span className="whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">{rows.length} result{rows.length === 1 ? '' : 's'}</span>
+              <div className="relative" ref={sortPopoverRef}
+                onPointerEnter={(event) => { if (event.pointerType !== 'touch') { cancelSortMenuClose(); setIsSortPopoverOpen(true); } }}
+                onPointerLeave={(event) => { if (event.pointerType !== 'touch') scheduleSortMenuClose(); }}>
+                <button ref={sortTriggerRef} type="button" aria-label="Sort companies" title={`Sort by ${describeDocumentSort(sortKey)}, ${sortDirection === 'asc' ? 'ascending' : 'descending'}`} aria-haspopup="menu" aria-expanded={isSortPopoverOpen} aria-controls="document-sort-popover" onClick={() => { setIsFilterPopoverOpen(false); cancelSortMenuClose(); setIsSortPopoverOpen((open) => !open); }} onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setIsFilterPopoverOpen(false);
+                    setIsSortPopoverOpen(true);
+                    requestAnimationFrame(() => sortPopoverRef.current?.querySelector<HTMLButtonElement>('[data-sort-selected="true"]')?.focus());
+                  }
+                }} className={`inline-flex h-9 w-9 items-center justify-center rounded-md border focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] ${isSortPopoverOpen ? 'border-[#8bbbd7] bg-[#eff6fa] text-[#155f8b]' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200'}`}>
+                  <ArrowDownUp size={16} aria-hidden="true" />
+                </button>
+                {isSortPopoverOpen && <div id="document-sort-popover" role="menu" aria-label="Sort document register" onKeyDown={(event) => {
+                  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
+                  const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
+                  const currentIndex = items.indexOf(event.target as HTMLButtonElement);
+                  if (currentIndex < 0 || items.length === 0) return;
+                  event.preventDefault();
+                  const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (currentIndex + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+                  items[nextIndex].focus();
+                }} className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,32rem)] w-max min-w-48 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900">
+                  <div role="group" aria-label="Sort field">
+                  {[
+                    { value: 'company', label: 'Company' },
+                    { value: 'compliance', label: 'Compliance' },
+                    { value: 'bpCode', label: 'BP Code' },
+                    { value: 'ntType', label: 'Trade/Non-Trade' },
+                    { value: 'branchStatus', label: 'Branch Status' },
+                    { value: 'supplierRank', label: 'Supplier Rank' },
+                    ...docColumns.map((docName) => ({ value: `doc:${docName}`, label: docName })),
+                  ].map((option) => {
+                    const selected = sortKey === option.value;
+                    return <button key={option.value} type="button" role="menuitemradio" aria-checked={selected} data-sort-selected={selected || undefined} onClick={() => { setSortKey(option.value); setIsSortPopoverOpen(false); }} className={`flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] ${selected ? 'font-semibold text-[#155f8b] dark:text-sky-300' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
+                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{selected && <Check size={13} aria-hidden="true" />}</span><span className="truncate">{option.label}</span>
+                    </button>;
+                  })}
+                  </div>
+                  <div role="separator" className="my-1.5 border-t border-slate-100 dark:border-slate-800" />
+                  <div role="group" aria-label="Sort direction">
+                  {(['asc', 'desc'] as const).map((direction) => {
+                    const selected = sortDirection === direction;
+                    return <button key={direction} type="button" role="menuitemradio" aria-checked={selected} data-sort-selected={selected || undefined} onClick={() => { setSortDirection(direction); setIsSortPopoverOpen(false); }} className={`flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] ${selected ? 'font-semibold text-[#155f8b] dark:text-sky-300' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
+                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{selected && <Check size={13} aria-hidden="true" />}</span>{direction === 'asc' ? 'Ascending' : 'Descending'}
+                    </button>;
+                  })}
+                  </div>
+                </div>}
+              </div>
+              <div className="relative" ref={filterPopoverRef}>
+                <button ref={filterTriggerRef} type="button" aria-label="Filter documents" title="Filter documents" aria-haspopup="dialog" aria-expanded={isFilterPopoverOpen} aria-controls="document-filter-popover" onClick={() => { if (isFilterPopoverOpen) { setIsMoreFiltersOpen(false); cancelMoreFiltersClose(); } setIsSortPopoverOpen(false); setIsFilterPopoverOpen(!isFilterPopoverOpen); }} className="admin-directory-icon-trigger">
+                  <Filter size={16} aria-hidden="true" />
+                  {hasAppliedFilters && <span className="admin-directory-active-dot" aria-hidden="true" />}
+                </button>
+                {isFilterPopoverOpen && <div id="document-filter-popover" role="dialog" aria-label="Document filters" className="absolute right-0 top-full z-40 mt-2 max-h-[min(75vh,40rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900">
+                  <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5 dark:border-slate-800"><h3 className="text-sm font-semibold text-slate-900 dark:text-white">Filter documents</h3>{hasAppliedFilters && <button type="button" onClick={clearAppliedFilters} className="text-xs font-medium text-[#176b9a] hover:underline dark:text-sky-300">Clear all</button>}</div>
+                  <div className="space-y-3 p-3">
+                    {isAdmin && <label className={`flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-xs ${withinTop20 ? 'bg-[#eff6fa] text-[#155f8b] dark:bg-sky-950/30 dark:text-sky-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+                      <input type="checkbox" checked={withinTop20} onChange={(event) => { setWithinTop20(event.target.checked); setExpandedRowKey(null); }} className="rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]" />
+                      <span>Within Top 20</span>
+                    </label>}
+                    {isAdmin && <label className={`flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-xs ${includeInactiveCompanies ? 'bg-[#eff6fa] text-[#155f8b] dark:bg-sky-950/30 dark:text-sky-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+                      <input type="checkbox" checked={includeInactiveCompanies} onChange={(event) => { setIncludeInactiveCompanies(event.target.checked); setExpandedRowKey(null); }} className="rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]" />
+                      <span>Include inactive companies</span>
+                    </label>}
+                    <fieldset><legend className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Document status</legend><div className="grid grid-cols-2 gap-1.5">
+                      {DOCUMENT_STATUS_FILTER_OPTIONS.map((option) => <label key={option.value} className={`flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-xs ${documentStatusFilters.includes(option.value) ? 'bg-[#eff6fa] text-[#155f8b] dark:bg-sky-950/30 dark:text-sky-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+                        <input type="checkbox" checked={documentStatusFilters.includes(option.value)} onChange={() => toggleDocumentStatusFilter(option.value)} className="rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]" />
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${DOCUMENT_STATUS_DOTS[option.value]}`} aria-hidden="true" />
+                        <span className="min-w-0 flex-1">{option.label}</span><span className="tabular-nums text-slate-500">{documentStatusCounts[option.value]}</span>
+                      </label>)}
+                    </div></fieldset>
+                    {isAdmin && <div className="border-t border-slate-100 pt-2.5 dark:border-slate-800"
+                      onPointerEnter={(event) => { if (event.pointerType !== 'touch') { cancelMoreFiltersClose(); setIsMoreFiltersOpen(true); } }}
+                      onPointerLeave={(event) => { if (event.pointerType !== 'touch') scheduleMoreFiltersClose(); }}>
+                      <button type="button" aria-expanded={isMoreFiltersOpen} aria-controls="document-more-filters" onClick={() => { cancelMoreFiltersClose(); setIsMoreFiltersOpen((open) => !open); }} className="flex min-h-7 w-full items-center gap-1.5 text-left text-xs font-semibold text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-200">
+                        <ChevronDown size={13} className={`shrink-0 text-slate-400 transition-transform duration-150 ${isMoreFiltersOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                        <span>More filters{customFilterRows.some((row) => row.value.trim()) ? ` (${customFilterRows.filter((row) => row.value.trim()).length} active)` : ''}</span>
+                      </button>
+                      <div className={`grid transition-[grid-template-rows,opacity] duration-150 motion-reduce:transition-none ${isMoreFiltersOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                      <div id="document-more-filters" ref={(node) => {
+                        if (!node) return;
+                        if (isMoreFiltersOpen) node.removeAttribute('inert');
+                        else node.setAttribute('inert', '');
+                      }} aria-hidden={!isMoreFiltersOpen} className="min-h-0 overflow-hidden">
+                      <div className="mt-2.5">
+                      {customFilterRows.length > 0 && <div className="mb-2 flex items-center justify-end"><button type="button" onClick={() => setCustomFilterRows([])} className="text-xs text-[#176b9a] dark:text-sky-300">Clear advanced</button></div>}
+                      {customFilterRows.map((row) => { const field = FILTERABLE_FIELDS.find((candidate) => candidate.key === row.field) ?? FILTERABLE_FIELDS[0]; return <div key={row.id} className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"><div className="flex min-w-0 items-center gap-2"><span className="min-w-0 truncate text-xs font-medium text-slate-700">{field.label}</span><select value={row.condition} onChange={(event) => updateFilterRow(row.id, { condition: event.target.value as FilterCondition })} className="field !mt-0 min-w-0 flex-1 py-2 text-xs" aria-label="Filter condition">{getConditionsForField(field).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select><button type="button" onClick={() => removeFilterRow(row.id)} aria-label="Remove condition" className="h-9 w-9 rounded text-slate-500 hover:bg-slate-100"><X size={15} /></button></div><div className="col-span-2 flex gap-2">{field.type === 'select' ? <select value={row.value} onChange={(event) => updateFilterRow(row.id, { value: event.target.value })} className="field !mt-0 min-w-0 flex-1 py-2 text-xs" aria-label="Filter value"><option value="">Select value</option>{(field.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}</select> : <input type={field.type === 'number' ? 'number' : 'text'} value={row.value} onChange={(event) => updateFilterRow(row.id, { value: event.target.value })} placeholder={field.placeholder ?? 'Enter value…'} className="field !mt-0 min-w-0 flex-1 py-2 text-xs" aria-label="Filter value" />}{field.unit && <span className="self-center text-xs text-slate-500">{field.unit}</span>}</div></div>; })}
+                      <div className="flex flex-wrap gap-1.5">{FILTERABLE_FIELDS.map((field) => <button key={field.key} type="button" onClick={() => addFilterRow(field.key)} className="inline-flex min-h-7 items-center gap-1 rounded border border-slate-200 px-2 text-[11px] text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"><Plus size={12} />{field.label}</button>)}</div>
+                      </div>
+                      </div>
+                      </div>
+                    </div>}
+                  </div></div>}
+              </div>
             </div>
           </div>
-
-          {hasAppliedFilters && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/40">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Applied</span>
-              {searchQuery.trim() && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
-                  title="Remove search filter"
-                >
-                  <span className="truncate">Search: {searchQuery.trim()}</span>
-                  <X size={11} className="shrink-0" />
-                </button>
-              )}
-              {documentStatusFilter !== 'all' && (
-                <button
-                  type="button"
-                  onClick={() => setDocumentStatusFilter('all')}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-[#2187CD] hover:border-blue-300 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
-                  title="Remove document status filter"
-                >
-                  <span className="truncate">
-                    {documentFilter === 'all' ? 'Any document' : documentFilter}: {DOCUMENT_STATUS_FILTER_OPTIONS.find((option) => option.value === documentStatusFilter)?.label}
-                  </span>
-                  <X size={11} className="shrink-0" />
-                </button>
-              )}
-              {customFilterRows.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => setCustomFilterRows((current) => current.filter((candidate) => candidate.id !== row.id))}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:border-violet-300 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-300"
-                  title="Remove advanced filter"
-                >
-                  <span className="truncate">{describeFilterRow(row)}</span>
-                  <X size={11} className="shrink-0" />
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={clearAppliedFilters}
-                className="ml-auto text-xs font-bold text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-
-          {/* ── Inline Customize Filters panel ───────────────────────────── */}
-          {isAdmin && isFilterPanelOpen && (
-            <div className="mt-2 rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
-              {/* Panel header */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                  <Filter size={14} className="text-[#2187CD]" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-900 dark:text-white leading-none">Customize Filters</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Advanced partner and document conditions use AND logic</p>
-                  </div>
-                </div>
-                {draftFilterRows.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearDraftRows}
-                    className="text-xs font-semibold text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 transition cursor-pointer"
-                  >
-                    Clear All
-                  </button>
-                )}
-              </div>
-
-              {/* Divider + filter rows section */}
-              {draftFilterRows.length > 0 && (
-                <div className="px-5 pb-1 pt-3">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Advanced Filters</p>
-                  <div className="space-y-2">
-                    {draftFilterRows.map((fr) => {
-                      const fieldDef = FILTERABLE_FIELDS.find((f) => f.key === fr.field) ?? FILTERABLE_FIELDS[0];
-                      const conditions = getConditionsForField(fieldDef);
-                      return (
-                        <div key={fr.id} className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                          {/* Field selector */}
-                          <select
-                            value={fr.field}
-                            onChange={(e) => updateDraftRow(fr.id, { field: e.target.value })}
-                            className="field text-xs py-1.5 sm:w-44 shrink-0"
-                            aria-label="Filter field"
-                          >
-                            {FILTERABLE_FIELDS.map((f) => (
-                              <option key={f.key} value={f.key}>{f.label}</option>
-                            ))}
-                          </select>
-
-                          {/* Condition selector */}
-                          <select
-                            value={fr.condition}
-                            onChange={(e) => updateDraftRow(fr.id, { condition: e.target.value as FilterCondition })}
-                            className="field text-xs py-1.5 sm:w-44 shrink-0"
-                            aria-label="Filter condition"
-                          >
-                            {conditions.map((c) => (
-                              <option key={c.value} value={c.value}>{c.label}</option>
-                            ))}
-                          </select>
-
-                          {/* Value input — adapts to field type */}
-                          <div className="flex-1 flex items-center gap-1.5 min-w-0">
-                            {fieldDef.type === 'select' ? (
-                              <select
-                                value={fr.value}
-                                onChange={(e) => updateDraftRow(fr.id, { value: e.target.value })}
-                                className="field text-xs py-1.5 flex-1"
-                                aria-label="Filter value"
-                              >
-                                <option value="">— Select value —</option>
-                                {(fieldDef.options ?? []).map((opt) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                            ) : fieldDef.type === 'number' ? (
-                              <>
-                                <input
-                                  type="number"
-                                  value={fr.value}
-                                  onChange={(e) => updateDraftRow(fr.id, { value: e.target.value })}
-                                  placeholder={fieldDef.placeholder ?? '0'}
-                                  className="field text-xs py-1.5 flex-1 min-w-0"
-                                  aria-label="Filter value"
-                                />
-                                {fieldDef.unit && (
-                                  <span className="shrink-0 text-xs text-slate-400 whitespace-nowrap">{fieldDef.unit}</span>
-                                )}
-                              </>
-                            ) : (
-                              <input
-                                type="text"
-                                value={fr.value}
-                                onChange={(e) => updateDraftRow(fr.id, { value: e.target.value })}
-                                placeholder={fieldDef.placeholder ?? 'Enter value…'}
-                                className="field text-xs py-1.5 flex-1 min-w-0"
-                                aria-label="Filter value"
-                              />
-                            )}
-                          </div>
-
-                          {/* Delete row */}
-                          <button
-                            type="button"
-                            onClick={() => removeDraftRow(fr.id)}
-                            title="Remove this filter"
-                            className="shrink-0 self-end sm:self-auto inline-flex items-center justify-center h-8 w-8 rounded-lg border border-rose-100 bg-rose-50 text-rose-400 hover:bg-rose-100 hover:text-rose-600 dark:border-rose-900/40 dark:bg-rose-950/20 dark:text-rose-400 dark:hover:bg-rose-950/40 transition cursor-pointer"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* + Add Filter */}
-              <div className="px-5 py-3">
-                <button
-                  type="button"
-                  onClick={addDraftRow}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 hover:border-[#2187CD]/50 hover:bg-[#2187CD]/5 hover:text-[#2187CD] dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-sky-700 dark:hover:text-sky-400 transition cursor-pointer"
-                >
-                  <Plus size={13} />
-                  Add Filter
-                </button>
-              </div>
-
-              {/* Footer: Cancel + Apply */}
-              <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60">
-                <button
-                  type="button"
-                  onClick={cancelFilters}
-                  className="secondary-button text-xs py-1.5 px-4"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={applyFilters}
-                  className="primary-button text-xs py-1.5 px-4"
-                >
-                  Apply Filters
-                  {draftFilterRows.filter((r) => r.value.trim() !== '').length > 0 && (
-                    <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-white/25 text-white text-[10px] font-bold leading-none px-1">
-                      {draftFilterRows.filter((r) => r.value.trim() !== '').length}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
+          {hasActiveTableState && <div className="admin-directory-active-filters" aria-label="Active filters">
+            {searchQuery.trim() && <button type="button" onClick={() => setSearchQuery('')} aria-label="Remove search filter" title={`Search: ${searchQuery.trim()}`} className="admin-directory-filter-chip"><span className="break-words">Search: {searchQuery.trim()}</span><X size={12} aria-hidden="true" /></button>}
+            {withinTop20 && <button type="button" onClick={() => { setWithinTop20(false); setExpandedRowKey(null); }} aria-label="Remove Within Top 20 filter" className="admin-directory-filter-chip"><span>Within Top 20</span><X size={12} aria-hidden="true" /></button>}
+            {includeInactiveCompanies && <button type="button" onClick={() => { setIncludeInactiveCompanies(false); setExpandedRowKey(null); }} aria-label="Stop including inactive companies" className="admin-directory-filter-chip"><span>Including inactive</span><X size={12} aria-hidden="true" /></button>}
+            {documentStatusFilters.map((status) => {
+              const label = DOCUMENT_STATUS_FILTER_OPTIONS.find((option) => option.value === status)?.label ?? status;
+              return <button key={status} type="button" onClick={() => setDocumentStatusFilters((current) => current.filter((item) => item !== status))} aria-label={`Remove document status filter: ${label}`} className="admin-directory-filter-chip"><span>Document status: {label}</span><X size={12} aria-hidden="true" /></button>;
+            })}
+            {customFilterRows.filter((row) => row.value.trim()).map((row) => <button key={row.id} type="button" onClick={() => removeFilterRow(row.id)} aria-label={`Remove filter: ${describeFilterRow(row)}`} title={describeFilterRow(row)} className="admin-directory-filter-chip"><span className="break-words">{describeFilterRow(row)}</span><X size={12} aria-hidden="true" /></button>)}
+            {(sortKey !== 'company' || sortDirection !== 'asc') && <button type="button" onClick={() => { setSortKey('company'); setSortDirection('asc'); }} aria-label="Remove sort" className="admin-directory-filter-chip"><span>Sort: {describeDocumentSort(sortKey)} ({sortDirection === 'asc' ? 'Ascending' : 'Descending'})</span><X size={12} aria-hidden="true" /></button>}
+            <button type="button" onClick={resetFiltersAndSort} className="admin-directory-reset-button ml-auto">Reset</button>
+          </div>}
         </div>
       )}
 
       {isAllView ? (
         <div className="panel py-20 text-center text-slate-400">
           <LayoutGrid size={48} className="mx-auto mb-3 opacity-30 text-slate-300" />
-          <p className="text-sm font-semibold">Pick a specific category above to view its detailed document matrix.</p>
-          <p className="text-xs mt-1">Local, Foreign, Courier, and Subcontractor each carry different document columns.</p>
+          <p className="text-sm font-semibold">Choose a partner category above to review its company compliance list.</p>
+          <p className="text-xs mt-1">Local, Foreign, Courier, and Subcontractor each have different document requirements.</p>
         </div>
       ) : rows.length === 0 ? (
         <div className="panel py-20 text-center text-slate-400">
           <Package size={48} className="mx-auto mb-3 opacity-30 text-slate-300" />
           <p className="text-sm font-semibold">
-            {hasAppliedFilters ? 'No records match the current filters.' : `No ${category.label} companies found.`}
+            {!includeInactiveCompanies && registryCategoryCompanies.length > 0 && !searchQuery.trim() && documentStatusFilters.length === 0 && !customFilterRows.some((row) => row.value.trim())
+              ? `No active ${category.label} companies found.`
+              : hasAppliedFilters ? 'No records match the current filters.' : `No ${category.label} companies found.`}
           </p>
           {hasAppliedFilters && (
             <button
@@ -1980,196 +1989,207 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           )}
         </div>
       ) : (
-        <div className="panel p-0 overflow-hidden" ref={matrixPanelRef}>
-          <div className="flex justify-end border-b border-slate-100 px-3 py-1.5 text-[10px] text-slate-400 dark:border-slate-800">
-            Focus the table and use ← / → arrow keys to scroll sideways.
+        <div className="space-y-2" aria-label="Partner compliance list">
+          <div role="group" aria-label="Partner compliance column headings" className={`hidden items-center px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 xl:grid ${DOCUMENT_LIST_GRID_COLUMNS}`}>
+            <div className="xl:col-start-1">Company</div>
+            <div className="xl:col-start-2">Type</div>
+            <div className="xl:col-start-3">Supplier rank</div>
+            <div className="xl:col-start-4">Compliance</div>
+            <div className="xl:col-start-5">Branch status</div>
+            <div className="xl:col-start-6">Attention</div>
           </div>
-          <div
-            className="overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2187CD]"
-            ref={tableScrollRef}
-            role="region"
-            aria-label="Partner compliance document matrix. Focus this region and use left and right arrow keys to scroll horizontally."
-            tabIndex={0}
-            onKeyDown={handleMatrixKeyDown}
-          >
-            <table className="w-full border-collapse text-sm">
-              <thead ref={realTheadRef}>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-950/60">
-                  {renderHeaderCells()}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {paginatedRows.map((row) => {
-                  const c = row.company;
-                  const cells = matrixCellData.get(row.key) ?? [];
-                  const compliant = cells.filter((cell) => cell.status === 'Current').length;
-                  const total = cells.length;
-                  const hasExpired = cells.some((cell) => cell.status === 'Expired' || cell.status === 'For Update');
-                  const hasExpiring = cells.some((cell) => cell.status === 'Expiring Soon');
-                  const rollup = hasExpired
-                    ? { text: 'text-[#f43f5e]', bar: 'bg-[#f43f5e]' }
-                    : hasExpiring
-                    ? { text: 'text-[#a16207]', bar: 'bg-[#a16207]' }
-                    : { text: 'text-emerald-600 dark:text-emerald-400', bar: 'bg-emerald-500' };
-
-                  return (
-                    <tr key={row.key} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/20 transition-colors">
-                      <td className="px-3 py-2 font-semibold text-slate-800 dark:text-slate-100 sticky left-0 bg-white dark:bg-slate-950 z-10">
-                        <span>{c.name}</span>
-                      </td>
-                      <td className="px-3 py-2 align-middle">
-                        <div className="flex flex-col gap-1 min-w-[64px]">
-                          <span className={`text-xs font-bold tabular-nums ${rollup.text}`}>{compliant}/{total}</span>
-                          <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div className={`h-full rounded-full ${rollup.bar}`} style={{ width: `${total > 0 ? (compliant / total) * 100 : 0}%` }} />
+          {paginatedRows.map((row) => {
+            const cells = matrixCellData.get(row.key) ?? [];
+            const currentCount = cells.filter((cell) => cell.status === 'Current').length;
+            const expiredCount = cells.filter((cell) => cell.status === 'Expired').length;
+            const expiringCount = cells.filter((cell) => cell.status === 'Expiring Soon').length;
+            const updateCount = cells.filter((cell) => cell.status === 'For Update').length;
+            const missingCount = cells.filter((cell) => cell.status === 'Missing').length;
+            const requiredAttention = { missing: missingCount, expired: expiredCount, forUpdate: updateCount };
+            const classificationRequired = row.company.type !== 'Uncategorized' && !(row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign') && !row.company.businessClassification;
+            const needsAttention = expiredCount + expiringCount + updateCount + missingCount + Number(classificationRequired);
+            const isExpanded = expandedRowKey === row.key;
+            const typeLabel = row.company.type === 'Supplier'
+              ? (row.isNT ? 'Non-Trade' : 'Trade')
+              : row.company.type;
+            const groups = [
+              { label: 'Required documents', documents: cells },
+              { label: 'Historical & additional', documents: Object.entries(row.branch?.documents ?? {})
+                .filter(([name]) => !cells.some((cell) => cell.docName === name))
+                .map(([docName, doc]) => ({ docName, doc, branch: row.branch, expiryBased: isExpiryDocument(docName),
+                  inactiveClassification: ['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)
+                    && ((docName === 'DTI (Sole)' && row.company.businessClassification !== 'SOL')
+                      || (docName !== 'DTI (Sole)' && row.company.businessClassification !== 'CORP')),
+                  ...computeDocumentStatus(doc, effectiveNow, docName) })) },
+            ].filter((group) => group.documents.length > 0);
+            return (
+              <article key={row.key} className="rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.025] dark:border-slate-800 dark:bg-slate-950">
+                  <div className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:grid-cols-2 sm:px-4 sm:py-3 xl:min-h-[72px] xl:gap-y-0 ${DOCUMENT_LIST_GRID_COLUMNS}`}>
+                  <div className="col-start-1 row-start-1 min-w-0 xl:col-auto xl:row-auto">
+                    <button type="button" title={row.company.name} aria-label={`${isExpanded ? 'Hide' : 'Review'} documents for ${row.company.name}${row.branch?.bpCode ? ` (${row.branch.bpCode})` : ''}`} aria-expanded={isExpanded} aria-controls={isExpanded ? 'documents-' + row.key : undefined}
+                      onClick={() => { cancelRowExpandHover(); setExpandedRowKey(isExpanded ? null : row.key); }}
+                      className="block w-full cursor-pointer break-words rounded-sm text-left text-sm !font-bold leading-5 text-[#1c2f4b] hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-100 dark:hover:text-sky-300 xl:truncate">{row.company.name}</button>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400 xl:flex-nowrap">
+                      <span className="whitespace-nowrap font-mono">{row.branch?.bpCode || 'No BP Code'}</span>
+                      {row.isSplit && <span className="whitespace-nowrap">{row.isNT ? 'Non-Trade branch' : 'Trade branch'}</span>}
+                    </div>
+                  </div>
+                  <div className="col-start-1 row-start-2 flex min-w-0 items-center xl:col-start-2 xl:row-auto">
+                    <span className={`${DOCUMENT_ROW_BADGE_CLASS} whitespace-nowrap ${documentPartnerTypeBadgeClasses(row.company.type, row.isNT)}`}>{typeLabel}</span>
+                  </div>
+                  <div className="col-start-2 row-start-2 flex min-w-0 items-center xl:col-start-3 xl:row-auto">
+                    {row.branch && (isAdmin ? (
+                      <SupplierRankSelect label={`Supplier rank for ${row.branch.bpCode || row.company.name}`} value={row.branch.supplierRank || SUPPLIER_RANK_OPTIONS[0]} onChange={(rank) => updateSupplierRank(row.company, row.branch!, rank)} />
+                    ) : <span className={'inline-flex h-8 items-center text-xs font-semibold ' + supplierRankTextClasses(row.branch.supplierRank)}>{row.branch.supplierRank || 'Not set'}</span>)}
+                  </div>
+                  <div className="col-start-1 row-start-3 min-w-0 xl:col-start-4 xl:row-auto">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">{currentCount}/{cells.length} current</span>
+                      <span className="text-slate-400">{cells.length ? Math.round(currentCount / cells.length * 100) : 0}%</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={cells.length ? Math.round(currentCount / cells.length * 100) : 0} aria-label={currentCount + ' of ' + cells.length + ' required documents current'}>
+                      <div className="h-full rounded-full bg-emerald-500" style={{ width: (cells.length ? currentCount / cells.length * 100 : 0) + '%' }} />
+                    </div>
+                  </div>
+                  <div className="col-start-2 row-start-3 min-w-0 xl:col-start-5 xl:row-auto">
+                    {row.branch?.status ? (
+                      <span aria-label={`Branch status: ${row.branch.status}`} className={`${DOCUMENT_ROW_BADGE_CLASS} ${branchStatusBadgeClasses(row.branch.status)}`}>
+                        {row.branch.status}
+                      </span>
+                    ) : (
+                      <span className={`${DOCUMENT_ROW_BADGE_CLASS} border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400`}>
+                        Not set
+                      </span>
+                    )}
+                  </div>
+                  <div className="col-span-2 row-start-4 flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs xl:col-span-1 xl:col-start-6 xl:row-auto" aria-label={needsAttention + ' compliance items need attention'}>
+                    {needsAttention === 0 ? (
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-emerald-700 dark:text-emerald-400"><Check size={14} /> All current</span>
+                    ) : (
+                      <>
+                        {classificationRequired && (
+                          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium text-[#536b80] dark:text-slate-300">
+                            <CircleAlert size={12} strokeWidth={1.8} aria-hidden="true" />
+                            Classification needed
+                          </span>
+                        )}
+                        {(expiredCount > 0 || expiringCount > 0 || updateCount > 0 || missingCount > 0) && (
+                          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                            {expiredCount > 0 && (
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-rose-700 dark:text-rose-300">
+                                <AlertTriangle size={12} strokeWidth={1.8} aria-hidden="true" />
+                                <strong className="font-semibold tabular-nums">{expiredCount}</strong>
+                                <span className="font-normal">expired</span>
+                              </span>
+                            )}
+                            {expiringCount > 0 && (
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-amber-700 dark:text-amber-300">
+                                <Clock size={12} strokeWidth={1.8} aria-hidden="true" />
+                                <strong className="font-semibold tabular-nums">{expiringCount}</strong>
+                                <span className="font-normal">expiring</span>
+                              </span>
+                            )}
+                            {updateCount > 0 && (
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-amber-700 dark:text-amber-300">
+                                <RefreshCw size={12} strokeWidth={1.8} aria-hidden="true" />
+                                <strong className="font-semibold tabular-nums">{updateCount}</strong>
+                                <span className="font-normal">for update</span>
+                              </span>
+                            )}
+                            {missingCount > 0 && (
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-rose-600 dark:text-rose-300">
+                                <XCircle size={12} strokeWidth={1.8} aria-hidden="true" />
+                                <strong className="font-semibold tabular-nums">{missingCount}</strong>
+                                <span className="font-normal">missing</span>
+                              </span>
+                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-xs text-slate-500 dark:text-slate-400">
-                        {row.branch?.bpCode || '—'}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-                          {row.isNT ? 'Non-Trade' : 'Trade'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        {row.branch ? (
-                          <select
-                            value={row.branch.status ?? ''}
-                            onChange={(e) => updateBranchStatus(row.company, row.branch!.id, e.target.value as BranchStatus)}
-                            disabled={!isAdmin}
-                            className={`rounded-md px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider border ${isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'} ${
-                              row.branch.status ? branchStatusBadgeClasses(row.branch.status) : 'bg-slate-50 text-slate-400 border-slate-200 dark:bg-slate-900 dark:text-slate-500 dark:border-slate-700'
-                            }`}
-                          >
-                            <option value="" disabled>Set status</option>
-                            {BRANCH_STATUS_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600">—</span>
                         )}
-                      </td>
-                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                        {row.branch ? (
-                          isAdmin ? (
-                            <div className="relative inline-flex items-center">
-                              <select
-                                value={row.branch.supplierRank ?? ''}
-                                onChange={(e) => updateSupplierRank(row.company, row.branch!, e.target.value)}
-                                className={`appearance-none bg-transparent pr-8 text-xs font-bold cursor-pointer focus:outline-none ${supplierRankTextClasses(row.branch.supplierRank)}`}
-                              >
-                                <option value="" disabled>Set rank</option>
-                                {SUPPLIER_RANK_OPTIONS.map((opt) => (
-                                  <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                              </select>
-                              <ChevronDown size={11} className={`select-chevron pointer-events-none absolute opacity-60 ${supplierRankTextClasses(row.branch.supplierRank)}`} />
-                            </div>
-                          ) : (
-                            <span className={`text-xs font-bold ${supplierRankTextClasses(row.branch.supplierRank)}`}>
-                              {row.branch.supplierRank || '—'}
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-slate-300 dark:text-slate-600">—</span>
-                        )}
-                      </td>
-                      {cells.map(({ docName, status, daysLeft, doc, branch, expiryBased }) => {
-                        const interactive = canRenewDocuments && !!branch;
-                        const Icon = CELL_ICON[status];
-                        const label = getCellLabel(status, daysLeft);
-                        const dateLine = getCellDateLine(status, doc.expiryDate, daysLeft);
-                        return (
-                          <td key={docName} className="p-1">
-                            <button
-                              type="button"
-                              disabled={!interactive}
-                              onClick={() => {
-                                if (!branch) return;
-                                if (expiryBased) openExpiryStatus(c, branch, docName);
-                                else openFlagFlow(c, branch, docName);
-                              }}
-                              title={
-                                doc.expiryDate
-                                  ? `Expires ${formatDate(doc.expiryDate)}${canRenewDocuments ? ' — click to renew' : ''}`
-                                  : canRenewDocuments
-                                  ? (expiryBased ? 'Click to set an expiry date' : `Click to mark ${doc.provided ? 'not provided' : 'provided'}`)
-                                  : docName
-                              }
-                              className={`group relative w-full min-h-[52px] flex flex-col items-center justify-center gap-0.5 rounded-md border px-2 py-1.5 text-center transition ${CELL_FILL[status]} ${
-                                interactive ? 'cursor-pointer hover:brightness-110' : 'cursor-default'
-                              }`}
-                            >
-                              {status === 'Missing' ? (
-                                <span className="text-sm leading-none">—</span>
-                              ) : (
-                                <>
-                                  <span className="flex items-center gap-1">
-                                    {Icon && <Icon size={13} strokeWidth={2.5} />}
-                                    {label && <span className="text-[10px] font-bold leading-none whitespace-nowrap">{label}</span>}
-                                  </span>
-                                  {dateLine && (
-                                    <span className="text-[9px] leading-none opacity-70 font-medium whitespace-nowrap">{dateLine}</span>
-                                  )}
-                                </>
-                              )}
-                              {interactive && (
-                                <RefreshCw size={10} className="absolute top-1 right-1 shrink-0 opacity-0 group-hover:opacity-100 transition" />
-                              )}
-                            </button>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
+                      </>
+                    )}
+                  </div>
+                  <button type="button" aria-label={`${isExpanded ? 'Hide' : 'Review'} documents for ${row.company.name}${row.branch?.bpCode ? ` (${row.branch.bpCode})` : ''}`} title={isExpanded ? 'Hide documents' : 'Review documents'} aria-expanded={isExpanded} aria-controls={isExpanded ? 'documents-' + row.key : undefined}
+                    onPointerEnter={(event) => {
+                      if (event.pointerType === 'touch' || isExpanded) return;
+                      cancelRowExpandHover();
+                      rowExpandHoverTimerRef.current = window.setTimeout(() => {
+                        setExpandedRowKey(row.key);
+                        rowExpandHoverTimerRef.current = null;
+                      }, 1000);
+                    }}
+                    onPointerLeave={cancelRowExpandHover}
+                    onClick={() => { cancelRowExpandHover(); setExpandedRowKey(isExpanded ? null : row.key); }}
+                    className="col-start-2 row-start-1 inline-flex h-8 w-8 items-center justify-center rounded-md text-[#346f91] hover:bg-[#346f91]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#346f91] dark:text-sky-300 dark:hover:bg-sky-400/10 xl:col-start-7 xl:row-auto">
+                    <ChevronRight size={17} className={'transition-transform duration-150 ' + (isExpanded ? 'rotate-90' : '')} aria-hidden="true" />
+                  </button>
+                </div>
+                {isExpanded && (
+                  <div id={'documents-' + row.key} className="rounded-b-lg border-t border-slate-100 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/30">
+                    {classificationRequired && (
+                      <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                        CORP/SOL is not set. GIS, SEC, and DTI history remains available below; set classification in Partner details to activate the applicable requirements.
+                      </p>
+                    )}
+                    {(requiredAttention.missing > 0 || requiredAttention.expired > 0 || requiredAttention.forUpdate > 0) && (
+                      <div aria-label="Required document attention summary" className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">Required documents:</span>
+                        {requiredAttention.missing > 0 && <span className="inline-flex items-center gap-1 text-rose-700 dark:text-rose-300"><XCircle size={12} aria-hidden="true" /><strong className="tabular-nums">{requiredAttention.missing}</strong> missing</span>}
+                        {requiredAttention.expired > 0 && <span className="inline-flex items-center gap-1 text-rose-800 dark:text-rose-200"><AlertTriangle size={12} aria-hidden="true" /><strong className="tabular-nums">{requiredAttention.expired}</strong> expired</span>}
+                        {requiredAttention.forUpdate > 0 && <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300"><RefreshCw size={12} aria-hidden="true" /><strong className="tabular-nums">{requiredAttention.forUpdate}</strong> for update</span>}
+                      </div>
+                    )}
+                    <div className="grid gap-x-8 gap-y-5 xl:grid-cols-2">
+                      {groups.map((group) => (
+                        <section key={group.label} aria-label={group.label} className="min-w-0">
+                          <h3 className="mb-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{group.label}<span className="ml-1.5 font-normal text-slate-400">{group.documents.length}</span></h3>
+                          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                            {group.documents.map(({ docName, status, daysLeft, doc, branch, expiryBased, inactiveClassification }) => {
+                              const Icon = DOCUMENT_STATUS_ICONS[status];
+                              const dateLine = getCellDateLine(status, doc.expiryDate, daysLeft);
+                              const interactive = canRenewDocuments && !!branch;
+                              const statusColor = status === 'Missing' ? 'text-rose-700 dark:text-rose-300' : status === 'Expired' ? 'text-rose-800 dark:text-rose-200' : status === 'For Update' || status === 'Expiring Soon' ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300';
+                              const statusAccent = status === 'Missing' ? 'border-l-2 border-l-rose-300 dark:border-l-rose-800' : status === 'Expired' ? 'border-l-2 border-l-rose-500 dark:border-l-rose-700' : status === 'For Update' ? 'border-l-2 border-l-amber-300 dark:border-l-amber-800' : '';
+                              const canDeleteRemarks = !companyDocumentRemarksError(row.company, docName, { provided: doc.provided, expiryDate: doc.expiryDate, remarks: '' });
+                              return (
+                                <li key={docName} className={`flex min-h-[76px] min-w-0 items-start justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950 ${statusAccent}`}>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="break-words text-xs font-medium text-slate-800 dark:text-slate-200">{docName}</div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
+                                      <span className={`inline-flex items-center gap-1 font-medium ${statusColor}`}><Icon size={11} strokeWidth={2.3} aria-hidden="true" />{status}</span>
+                                      {dateLine && <span className="text-slate-500 dark:text-slate-400">{dateLine}</span>}
+                                      {inactiveClassification && <span className="text-slate-500 dark:text-slate-400">Historical · classification inactive</span>}
+                                    </div>
+                                  </div>
+                                  <DocumentQuickActions docName={docName} document={doc} status={status} disabled={!interactive || Boolean(inactiveClassification)} canDeleteRemarks={canDeleteRemarks} expiryBased={expiryBased}
+                                    popoverKey={`${row.key}::${docName}`} openPopoverKey={openDocumentPopoverKey} onOpenPopover={setOpenDocumentPopoverKey}
+                                    requireRemarks={['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)}
+                                    onRenew={() => { if (branch) openExpiryStatus(row.company, branch, docName); }}
+                                    onStatus={(provided, remarks) => branch ? updateDocumentStatus(row.company, branch, docName, provided, remarks) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
+                                    onRemarks={(remarks) => branch ? updateDocumentRemarks(row.company, branch, docName, remarks) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
+                                    onClearRemarks={() => branch ? updateDocumentRemarks(row.company, branch, docName, '') : Promise.resolve('Branch no longer exists. Refresh and retry.')} />
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </section>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
           <Pagination page={currentPage} pageSize={pageSize} totalItems={rows.length}
             onPageChange={setCurrentPage} onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
             ariaLabel="Document tracker pagination" className="bg-white px-4 dark:bg-slate-950" />
-
-          <div className="flex flex-wrap items-center gap-4 px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Legend:</span>
-            <LegendSwatch swatchClass="bg-emerald-600 border-emerald-700 dark:bg-emerald-600 dark:border-emerald-500" label="Current" />
-            <LegendSwatch swatchClass="bg-[#a16207] border-amber-800 dark:bg-[#a16207] dark:border-amber-600" label="Expiring ≤ 30d" />
-            <LegendSwatch swatchClass="bg-[#f43f5e] border-rose-600 dark:bg-[#f43f5e] dark:border-rose-400" label="Expired / For Update" />
-            <LegendSwatch swatchClass="border-dashed border-slate-300 dark:border-slate-700" label="Missing" />
-          </div>
         </div>
       )}
-      </section>
 
-      {/* Frozen header overlay - see updateStickyHeader/renderHeaderCells above for why
-          this can't just be position:sticky on the real thead. Fully interactive (sort
-          buttons work normally) so freezing the header doesn't cost you the ability to
-          re-sort while scrolled into the middle of the table. */}
-      {stickyHeader && createPortal(
-        <div
-          style={{ position: 'fixed', top: stickyHeader.top, left: stickyHeader.left, width: stickyHeader.width, zIndex: 21 }}
-          className="shadow-md"
-        >
-          <div ref={overlayScrollRef} className="overflow-hidden" onKeyDown={handleMatrixKeyDown}>
-            <table className="border-collapse text-sm" style={{ tableLayout: 'fixed' }}>
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:bg-slate-950/60">
-                  {renderHeaderCells(stickyHeader.colWidths)}
-                </tr>
-              </thead>
-            </table>
-          </div>
-        </div>,
-        document.body
-      )}
+      </section>
 
       <ChartCard
         title="Modification History"
-        subtitle="Every flag toggle and renewal made from this matrix, most recent first"
+        subtitle="Every flag toggle and renewal made from this register, most recent first"
         contentClassName="max-h-80 overflow-y-auto"
         action={<History size={16} className="text-slate-300 dark:text-slate-600" />}
       >
@@ -2341,8 +2361,9 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         const { status } = computeDocumentStatus(doc, effectiveNow, expiryStatusTarget.docName);
         const isMissing = status === 'Missing';
         const isActive = status === 'Current' || status === 'Expiring Soon';
-        const statusText = isMissing ? 'Missing' : isActive ? `Active till ${formatShortDate(doc.expiryDate)}` : 'Expired';
-        const statusStyle = isMissing ? STATUS_STYLES.Missing : isActive ? STATUS_STYLES.Current : STATUS_STYLES.Expired;
+        const missingRemarkRequired = Boolean(companyDocumentRemarksError(expiryStatusTarget.company, expiryStatusTarget.docName, { provided: false, expiryDate: doc.expiryDate, remarks: expiryStatusTarget.missingRemarks }));
+        const statusText = isMissing ? 'Missing' : isActive ? `Active till ${formatShortDate(doc.expiryDate)}` : status === 'For Update' ? 'For Update' : 'Expired';
+        const statusStyle = isMissing ? STATUS_STYLES.Missing : status === 'For Update' ? STATUS_STYLES['For Update'] : isActive ? STATUS_STYLES.Current : STATUS_STYLES.Expired;
 
         return createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
@@ -2370,6 +2391,18 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     </span>
                   </div>
 
+                  {['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(expiryStatusTarget.docName)
+                    && !(expiryStatusTarget.company.type === 'Supplier' && expiryStatusTarget.company.supplierOrigin === 'Foreign')
+                    && ((expiryStatusTarget.docName === 'DTI (Sole)' && expiryStatusTarget.company.businessClassification === 'SOL')
+                      || (expiryStatusTarget.docName !== 'DTI (Sole)' && expiryStatusTarget.company.businessClassification === 'CORP')) && !isMissing && (
+                    <label className="mt-4 block text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                      Remarks <span className="text-rose-600">Required if marked missing</span>
+                      <textarea value={expiryStatusTarget.missingRemarks} maxLength={2000}
+                        onChange={(event) => setExpiryStatusTarget((current) => current ? { ...current, missingRemarks: event.target.value } : current)}
+                        rows={2} placeholder="Why is this document not provided?" className="field mt-1 resize-y py-1.5 text-xs" />
+                    </label>
+                  )}
+
                   <div className="flex flex-col gap-2 mt-5">
                     <button
                       type="button"
@@ -2384,9 +2417,15 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     </button>
                     <button
                       type="button"
-                      disabled={isMissing}
-                      onClick={() => setExpiryStatusTarget((prev) => (prev ? { ...prev, confirmingMissing: true } : prev))}
-                      title={isMissing ? 'Already marked as missing' : undefined}
+                      disabled={isMissing || missingRemarkRequired}
+                      onClick={() => {
+                        if (missingRemarkRequired) return;
+                        void markDocumentMissing(expiryStatusTarget.company, expiryStatusTarget.branch, expiryStatusTarget.docName, expiryStatusTarget.missingRemarks);
+                        setExpiryStatusTarget(null);
+                      }}
+                      title={isMissing ? 'Already marked as missing' : missingRemarkRequired ? 'Add required remarks first' : undefined}
+                      aria-label={`Mark ${expiryStatusTarget.docName} as missing`}
+                      aria-disabled={missingRemarkRequired}
                       className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent px-4 py-2.5 text-xs font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 transition cursor-pointer"
                     >
                       <XCircle size={13} />
@@ -2420,7 +2459,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     </div>
                   </div>
 
-                  <p className="mt-3 text-center text-[11px] text-slate-400">This clears the recorded expiry and updates the compliance record immediately.</p>
+                  <p className="mt-3 text-center text-[11px] text-slate-400">This marks the document as missing and retains its recorded expiry for history.</p>
 
                   <div className="flex items-center gap-2 mt-5">
                     <button onClick={() => setExpiryStatusTarget(null)} className="secondary-button flex-1 py-2 text-xs" type="button">
@@ -2428,7 +2467,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     </button>
                     <button
                       onClick={() => {
-                        markDocumentMissing(expiryStatusTarget.company, expiryStatusTarget.branch, expiryStatusTarget.docName);
+                        markDocumentMissing(expiryStatusTarget.company, expiryStatusTarget.branch, expiryStatusTarget.docName, expiryStatusTarget.missingRemarks);
                         setExpiryStatusTarget(null);
                       }}
                       className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#a16207] hover:bg-amber-800 px-4 py-2 text-xs font-bold text-white transition cursor-pointer"
@@ -2474,6 +2513,14 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             <label htmlFor="doc-register-renewal-date" className="field-label text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
               New Expiry Date
             </label>
+            {(() => {
+              const branch = (renewalTarget.company.branches ?? []).find((item) => item.id === renewalTarget.branchId);
+              const currentExpiry = branch?.documents?.[renewalTarget.docName]?.expiryDate;
+              const years = maintenanceSettings.validityYears[renewalTarget.docName as keyof DocumentMaintenanceSettings['validityYears']];
+              return !currentExpiry && typeof years === 'number' ? (
+                <p className="mb-1 text-[10px] text-slate-400">Suggested from the configured {years}-year period. You can adjust this date.</p>
+              ) : null;
+            })()}
             <input
               id="doc-register-renewal-date"
               type="date"
@@ -2501,86 +2548,448 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         document.body
       )}
 
-      {/* "Add Notification" settings - configures EXTRA early heads-up alerts
-          on top of the standard 30-day/expired alert (always on, not
-          editable here). Every edit auto-saves, same convention as the
-          Compliance Overview's Customize panel above. */}
+      {/* Content-sized maintenance dialog; the validity list gets a bounded
+          scroll area only when the viewport cannot show the full table. */}
       {isNotificationSettingsOpen && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-start justify-between gap-3 px-6 pt-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-[#2187CD]/10 text-[#2187CD] shrink-0">
-                  <BellPlus size={16} />
-                </span>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Document Expiry Notifications</h3>
-                  <p className="text-[11px] text-slate-400">Extra early alerts, on top of the standard 30-day/expired alert</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-2 backdrop-blur-[2px] sm:p-4">
+          <div ref={maintenanceDialogRef} role="dialog" aria-modal="true" aria-labelledby="document-maintenance-title" tabIndex={-1}
+            className="flex max-h-[calc(100dvh-16px)] w-full max-w-[900px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-950 sm:max-h-[min(760px,calc(100dvh-32px))]">
+            <header className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#2187CD]/10 text-[#176fae] dark:text-sky-300"><CalendarClock size={17} /></span>
+                <div className="min-w-0">
+                  <h2 id="document-maintenance-title" className="text-base font-bold text-slate-900 dark:text-white">Document maintenance</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Validity rules and expiry reminders</p>
                 </div>
+                {hasUnsavedMaintenanceChanges && <span className="hidden rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800 sm:inline-flex dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">Unsaved changes</span>}
               </div>
-              <button
-                onClick={() => setIsNotificationSettingsOpen(false)}
-                className="shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer"
-                type="button"
-              >
+              <button type="button" onClick={requestCloseMaintenance} disabled={isSavingMaintenance}
+                aria-label="Close document maintenance" title="Close"
+                className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 sm:h-9 sm:w-9 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">
                 <X size={18} />
               </button>
-            </div>
+            </header>
 
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Local Supplier</p>
-                <div className="space-y-2.5">
-                  {notificationRules.filter((r) => r.origin === 'Local' || r.origin === 'Both').map((rule) => (
-                    <NotificationRuleRow
-                      key={`local-${rule.docName}`}
-                      rule={rule}
-                      onToggle={toggleNotificationRuleEnabled}
-                      onAdd={addNotificationMilestone}
-                      onRemove={removeNotificationMilestone}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Foreign Supplier</p>
-                <div className="space-y-2.5">
-                  {notificationRules.filter((r) => r.origin === 'Foreign' || r.origin === 'Both').map((rule) => (
-                    <NotificationRuleRow
-                      key={`foreign-${rule.docName}`}
-                      rule={rule}
-                      onToggle={toggleNotificationRuleEnabled}
-                      onAdd={addNotificationMilestone}
-                      onRemove={removeNotificationMilestone}
-                    />
-                  ))}
-                </div>
-              </div>
-              <p className="text-[10px] text-slate-400 leading-relaxed">
-                The standard 30-day "Expiring Soon" alert and the Expired alert always apply to every document above and can't be turned off here - these settings only add an earlier heads-up alert.
-              </p>
-            </div>
+            <nav aria-label="Document maintenance settings" className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 px-3 dark:border-slate-800 sm:px-5">
+              {([
+                ['schedule', 'Reminder schedule'],
+                ['validity', 'Validity periods'],
+                ['category', 'Category alerts'],
+              ] as const).map(([tab, label]) => (
+                <button key={tab} type="button" onClick={() => setMaintenanceTab(tab)} disabled={isSavingMaintenance} aria-current={maintenanceTab === tab ? 'page' : undefined}
+                  className={'min-h-11 shrink-0 border-b-2 px-3 text-xs font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:cursor-wait disabled:opacity-60 ' + (maintenanceTab === tab ? 'border-[#2187CD] text-[#176fae] dark:text-sky-300' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100')}>
+                  {label}
+                </button>
+              ))}
+            </nav>
 
-            <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={handleRestoreDefaultNotifications}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-azure hover:underline cursor-pointer"
-              >
-                <RotateCcw size={12} />
-                <span>Restore to Default</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsNotificationSettingsOpen(false)}
-                className="secondary-button py-2 px-4 text-xs"
-              >
-                Done
-              </button>
-            </div>
+            <main aria-busy={isSavingMaintenance} className={'min-h-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5 ' + (maintenanceTab === 'validity' ? 'max-h-[min(56dvh,540px)]' : '')}>
+              <fieldset disabled={isSavingMaintenance} className="contents">
+              {maintenanceLoadState === 'loading' && (
+                <div aria-busy="true" className="mx-auto max-w-4xl space-y-3">
+                  <div className="h-5 w-52 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
+                  <div className="h-28 animate-pulse rounded-md bg-slate-50 dark:bg-slate-900" />
+                  <div className="h-44 animate-pulse rounded-md bg-slate-50 dark:bg-slate-900" />
+                  <p className="text-xs text-slate-500">Loading saved maintenance settings…</p>
+                </div>
+              )}
+              {maintenanceLoadState === 'error' && (
+                <div role="alert" className="mx-auto flex max-w-xl items-start gap-3 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/25 dark:text-rose-300">
+                  <CircleAlert size={17} className="mt-0.5 shrink-0" />
+                  <div className="flex-1"><p className="font-semibold">Maintenance settings could not be loaded.</p><p className="mt-1 text-xs">Your saved settings are unchanged. Retry to load them before editing.</p></div>
+                  <button type="button" onClick={() => setMaintenanceReloadKey((key) => key + 1)} className="rounded px-2 py-1 text-xs font-bold underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-500">Retry</button>
+                </div>
+              )}
+              {maintenanceLoadState === 'ready' && maintenanceTab === 'schedule' && (
+                <section className="mx-auto max-w-4xl" aria-labelledby="global-reminders-heading">
+                  <div className="mb-4">
+                    <h3 id="global-reminders-heading" className="text-lg font-semibold text-slate-900 dark:text-white">Global reminder schedule</h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">Applies to renewable documents with a saved expiry date. Delivery is recorded once per document, expiry date, and interval.</p>
+                  </div>
+                  <div className="grid gap-x-8 gap-y-5 md:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">One-time reminders</h4>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Choose the days before expiry for an additional reminder.</p>
+                      <div className="mt-4 flex flex-wrap gap-2" aria-label="Reminder interval presets">
+                        {[90, 60, 30, 14, 7].map((days) => {
+                          const selected = maintenanceSettings.reminderDays.includes(days);
+                          return <button key={days} type="button" aria-pressed={selected}
+                            onClick={() => setMaintenanceSettings((settings) => {
+                              if (!selected && settings.reminderDays.length >= 20) { setMaintenanceMessage('The schedule can contain up to 20 reminder intervals.'); return settings; }
+                              setMaintenanceMessage('');
+                              return { ...settings, reminderDays: selected ? settings.reminderDays.filter((day) => day !== days) : [...settings.reminderDays, days].sort((a, b) => b - a) };
+                            })}
+                            className={'min-h-11 rounded-md border px-3 text-xs font-semibold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] sm:min-h-9 ' + (selected ? 'border-[#2187CD]/40 bg-[#2187CD]/10 text-[#176fae] dark:text-sky-300' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900')}>
+                            {days} days{selected ? ' · on' : ''}
+                          </button>;
+                        })}
+                      </div>
+                      <div className="mt-4 flex max-w-sm items-end gap-2">
+                        <label htmlFor="custom-reminder-interval" className="min-w-0 flex-1 text-xs font-medium text-slate-700 dark:text-slate-300">Add another interval <span className="font-normal text-slate-500">(1–365 days)</span>
+                          <input id="custom-reminder-interval" type="number" min={1} max={365} step={1} inputMode="numeric" value={reminderIntervalDraft}
+                            onChange={(event) => { setReminderIntervalDraft(event.target.value); setMaintenanceMessage(''); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addReminderInterval(); } }}
+                            className="field mt-1.5 h-11 text-base sm:h-10 sm:text-sm" placeholder="Days before expiry" />
+                        </label>
+                        <button type="button" onClick={addReminderInterval} className="secondary-button h-11 shrink-0 px-3 text-xs sm:h-10">Add interval</button>
+                      </div>
+                      {maintenanceSettings.reminderDays.filter((days) => ![90, 60, 30, 14, 7].includes(days)).length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2" aria-label="Custom reminder intervals">
+                          {maintenanceSettings.reminderDays.filter((days) => ![90, 60, 30, 14, 7].includes(days)).map((days) => (
+                            <span key={days} className="inline-flex min-h-8 items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs font-semibold tabular-nums text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                              {days} days
+                              <button type="button" aria-label={`Remove ${days}-day reminder`} onClick={() => setMaintenanceSettings((settings) => ({ ...settings, reminderDays: settings.reminderDays.filter((day) => day !== days) }))} className="ml-1 rounded p-1 text-slate-500 hover:bg-slate-200 hover:text-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800 dark:hover:text-rose-300"><X size={12} /></button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="border-t border-slate-200 pt-5 md:border-l md:border-t-0 md:pl-8 md:pt-0 dark:border-slate-800">
+                      <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Daily reminders near expiry</h4>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Send a reminder every day during the final part of the expiry window.</p>
+                      <label htmlFor="daily-reminder-window" className="mt-4 block text-xs font-medium text-slate-700 dark:text-slate-300">Start daily reminders
+                        <span className="mt-1.5 flex max-w-xs items-center gap-2">
+                          <input id="daily-reminder-window" type="number" min={1} max={90} step={1} inputMode="numeric" value={maintenanceSettings.dailyFinalDays}
+                            onChange={(event) => { setMaintenanceMessage(''); setMaintenanceSettings((settings) => ({ ...settings, dailyFinalDays: Number(event.target.value) })); }}
+                            className="field h-11 w-24 text-base tabular-nums sm:h-10 sm:text-sm" />
+                          <span className="text-xs text-slate-500">days before expiry</span>
+                        </span>
+                      </label>
+                      <p className="mt-4 rounded-md bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600 dark:bg-slate-900 dark:text-slate-300">If a one-time reminder lands within this daily window, it is delivered once that day.</p>
+                    </div>
+                  </div>
+                </section>
+              )}
+              {maintenanceLoadState === 'ready' && maintenanceTab === 'validity' && (
+                <section className="mx-auto max-w-4xl" aria-labelledby="validity-periods-heading">
+                  <div className="mb-4">
+                    <h3 id="validity-periods-heading" className="text-lg font-semibold text-slate-900 dark:text-white">Document validity periods</h3>
+                    <p className="mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">Configure the default duration used when a new expiry date is entered. Existing partner expiry dates are unchanged.</p>
+                  </div>
+                  <div className="mb-2 grid grid-cols-[minmax(0,1fr)_10rem] gap-3 border-b border-slate-200 pb-2 text-[11px] font-semibold text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                    <span>Document</span><span>Validity period</span>
+                  </div>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {MAINTENANCE_DOCUMENTS.map((docName) => {
+                      const years = maintenanceSettings.validityYears[docName];
+                      return <div key={docName} className="grid grid-cols-[minmax(0,1fr)_10rem] items-center gap-3 py-2.5">
+                        <label htmlFor={`validity-${docName}`} className="min-w-0 text-sm font-medium text-slate-800 dark:text-slate-200">{docName}</label>
+                        <span className="flex items-center gap-2">
+                          <input id={`validity-${docName}`} type="number" min={1} max={50} step={1} inputMode="numeric" placeholder="Not set"
+                            aria-label={`${docName} validity in years`} value={years ?? ''}
+                            onChange={(event) => { setMaintenanceMessage(''); setMaintenanceSettings((settings) => ({ ...settings, validityYears: { ...settings.validityYears, [docName]: event.target.value ? Number(event.target.value) : null } })); }}
+                            className="field h-9 w-24 text-sm tabular-nums" />
+                          <span className="text-xs text-slate-500">years</span>
+                        </span>
+                      </div>;
+                    })}
+                  </div>
+                </section>
+              )}
+              {maintenanceLoadState === 'ready' && maintenanceTab === 'category' && (
+                <section className="mx-auto max-w-5xl" aria-labelledby="category-alerts-heading">
+                  <div className="mb-5">
+                    <h3 id="category-alerts-heading" className="text-lg font-semibold text-slate-900 dark:text-white">Category-specific early alerts</h3>
+                    <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">These optional alerts run in addition to the global schedule. The standard 30-day, daily-window, and expired reminders remain active.</p>
+                  </div>
+                  <div className="grid gap-x-8 md:grid-cols-2">
+                    <div>
+                      <h4 className="border-b border-slate-200 pb-2 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">Local suppliers</h4>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {notificationRules.filter((rule) => rule.origin === 'Local').map((rule) => <NotificationRuleRow key={rule.docName} rule={rule} onToggle={toggleNotificationRuleEnabled} onAdd={addNotificationMilestone} onRemove={removeNotificationMilestone} />)}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="border-b border-slate-200 pb-2 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">Foreign suppliers</h4>
+                      <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {notificationRules.filter((rule) => rule.origin === 'Foreign').map((rule) => <NotificationRuleRow key={rule.docName} rule={rule} onToggle={toggleNotificationRuleEnabled} onAdd={addNotificationMilestone} onRemove={removeNotificationMilestone} />)}
+                      </div>
+                    </div>
+                    {notificationRules.some((rule) => rule.origin === 'Both') && (
+                      <div className="mt-6 md:col-span-2">
+                        <h4 className="border-b border-slate-200 pb-2 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">Both supplier types</h4>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {notificationRules.filter((rule) => rule.origin === 'Both').map((rule) => <NotificationRuleRow key={rule.docName} rule={rule} onToggle={toggleNotificationRuleEnabled} onAdd={addNotificationMilestone} onRemove={removeNotificationMilestone} />)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+              {maintenanceLoadState === 'ready' && maintenanceMessage && (
+                <p role={maintenanceMessage.startsWith('Changes saved') ? 'status' : 'alert'} aria-live="polite" className={'mx-auto mt-6 max-w-4xl text-xs ' + (maintenanceMessage.startsWith('Changes saved') || maintenanceMessage.startsWith('Defaults are staged') ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-300')}>
+                  {maintenanceMessage}
+                </p>
+              )}
+              </fieldset>
+            </main>
+
+            <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950 sm:px-5">
+              {showDiscardMaintenance ? (
+                <div role="alertdialog" aria-label="Discard unsaved maintenance changes" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Discard unsaved changes? They have not been applied.</p>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowDiscardMaintenance(false)} className="secondary-button px-3 py-2 text-xs">Keep editing</button>
+                    <button type="button" onClick={discardMaintenanceChanges} className="rounded-md bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-500">Discard changes</button>
+                  </div>
+                </div>
+              ) : showRestoreMaintenance ? (
+                <div role="alertdialog" aria-label="Restore maintenance defaults" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="max-w-2xl text-xs leading-relaxed text-slate-700 dark:text-slate-300">Restore 60- and 30-day reminders, daily reminders for the final 30 days, unset validity periods, and default category alerts? Save changes to apply. Existing expiry dates and reminder history stay intact.</p>
+                  <div className="flex shrink-0 justify-end gap-2">
+                    <button type="button" onClick={() => setShowRestoreMaintenance(false)} className="secondary-button px-3 py-2 text-xs">Cancel</button>
+                    <button type="button" onClick={handleRestoreDefaultNotifications} className="rounded-md bg-rose-700 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-500">Restore defaults</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <button type="button" onClick={() => setShowRestoreMaintenance(true)} disabled={maintenanceLoadState !== 'ready' || isSavingMaintenance}
+                    className="inline-flex min-h-11 items-center gap-1.5 self-start rounded-md px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 sm:min-h-9 dark:text-slate-300 dark:hover:bg-slate-800">
+                    <RotateCcw size={13} /> Restore defaults
+                  </button>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={requestCloseMaintenance} disabled={isSavingMaintenance} className="secondary-button min-h-11 px-4 text-xs sm:min-h-9">Close</button>
+                    <button type="button" onClick={() => void handleSaveMaintenanceSettings()} disabled={maintenanceLoadState !== 'ready' || !hasUnsavedMaintenanceChanges || isSavingMaintenance}
+                      className="primary-button inline-flex min-h-11 min-w-32 items-center justify-center gap-2 px-4 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-9">
+                      {isSavingMaintenance && <RefreshCw size={13} className="animate-spin" />}
+                      {isSavingMaintenance ? 'Saving changes…' : 'Save changes'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </footer>
           </div>
         </div>,
         document.body
+      )}
+    </div>
+  );
+}
+
+function DocumentQuickActions({
+  docName,
+  document,
+  status,
+  popoverKey,
+  openPopoverKey,
+  onOpenPopover,
+  disabled,
+  canDeleteRemarks,
+  expiryBased,
+  requireRemarks,
+  onRenew,
+  onStatus,
+  onRemarks,
+  onClearRemarks,
+}: {
+  docName: string;
+  document: ComplianceDocument;
+  status: DocumentStatus;
+  popoverKey: string;
+  openPopoverKey: string | null;
+  onOpenPopover: (key: string | null) => void;
+  disabled: boolean;
+  canDeleteRemarks: boolean;
+  expiryBased: boolean;
+  requireRemarks: boolean;
+  onRenew: () => void;
+  onStatus: (provided: boolean, remarks: string) => Promise<string | void>;
+  onRemarks: (remarks: string) => Promise<string | void>;
+  onClearRemarks: () => Promise<string | void>;
+}) {
+  const [remarks, setRemarks] = useState(document.remarks ?? '');
+  const [isRemarksOpen, setIsRemarksOpen] = useState(false);
+  const [isViewingRemarks, setIsViewingRemarks] = useState(false);
+  const [confirmingRemarkDelete, setConfirmingRemarkDelete] = useState(false);
+  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [saving, setSaving] = useState(false);
+  const isOpen = openPopoverKey === popoverKey;
+  const setIsOpen = (open: boolean) => onOpenPopover(open ? popoverKey : openPopoverKey === popoverKey ? null : openPopoverKey);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const remarkTriggerRef = useRef<HTMLButtonElement>(null);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const remarkContentRef = useRef<HTMLParagraphElement>(null);
+  const canEditRemark = !disabled;
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearHoverClose = () => {
+    if (hoverCloseTimer.current) clearTimeout(hoverCloseTimer.current);
+    hoverCloseTimer.current = null;
+  };
+  const scheduleHoverClose = () => {
+    clearHoverClose();
+    hoverCloseTimer.current = setTimeout(() => { setIsOpen(false); setIsRemarksOpen(false); setIsViewingRemarks(false); setConfirmingRemarkDelete(false); }, 180);
+  };
+  useEffect(() => {
+    if (!isRemarksOpen) setRemarks(document.remarks ?? '');
+  }, [document.remarks, isRemarksOpen]);
+
+  useEffect(() => {
+    if (isOpen && isViewingRemarks) remarkContentRef.current?.focus();
+  }, [isOpen, isViewingRemarks]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const positionPanel = () => {
+      const trigger = anchorRef.current ?? triggerRef.current;
+      const panel = panelRef.current;
+      if (!trigger || !panel) return;
+      const triggerRect = trigger.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const left = Math.max(12, Math.min(window.innerWidth - panelRect.width - 12, triggerRect.right - panelRect.width));
+      const below = triggerRect.bottom + 8;
+      const top = below + panelRect.height <= window.innerHeight - 12
+        ? below
+        : Math.max(12, triggerRect.top - panelRect.height - 8);
+      setPosition({ top, left });
+    };
+    positionPanel();
+    window.addEventListener('resize', positionPanel);
+    window.addEventListener('scroll', positionPanel, true);
+    return () => {
+      window.removeEventListener('resize', positionPanel);
+      window.removeEventListener('scroll', positionPanel, true);
+    };
+  }, [isOpen, isRemarksOpen, isViewingRemarks, error, feedback, saving]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const dismissOutside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!triggerRef.current?.contains(target) && !remarkTriggerRef.current?.contains(target) && !panelRef.current?.contains(target)) {
+        setIsOpen(false);
+        setIsRemarksOpen(false);
+        setIsViewingRemarks(false);
+        setConfirmingRemarkDelete(false);
+      }
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setIsOpen(false);
+      setIsRemarksOpen(false);
+      setIsViewingRemarks(false);
+      setConfirmingRemarkDelete(false);
+      (anchorRef.current ?? triggerRef.current)?.focus();
+    };
+    window.document.addEventListener('pointerdown', dismissOutside);
+    window.document.addEventListener('keydown', dismissOnEscape);
+    return () => {
+      clearHoverClose();
+      window.document.removeEventListener('pointerdown', dismissOutside);
+      window.document.removeEventListener('keydown', dismissOnEscape);
+    };
+  }, [isOpen]);
+
+  useEffect(() => () => clearHoverClose(), []);
+
+  const submit = async (provided: boolean) => {
+    if (!provided && requireRemarks && !remarks.trim()) {
+      setIsRemarksOpen(true);
+      setError('Remarks are required when this document is not provided.');
+      return false;
+    }
+    setSaving(true);
+    setError('');
+    setFeedback('');
+    try {
+      const failure = await onStatus(provided, remarks);
+      if (typeof failure === 'string') {
+        setError(failure);
+        return false;
+      }
+      setFeedback('Saved');
+      return true;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveRemarks = async () => {
+    setSaving(true);
+    setError('');
+    setFeedback('');
+    try {
+      const failure = await onRemarks(remarks);
+      if (typeof failure === 'string') {
+        setError(failure);
+        return;
+      }
+      setFeedback('Saved');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteRemark = async () => {
+    setSaving(true);
+    setError('');
+    setFeedback('');
+    try {
+      const failure = await onClearRemarks();
+      if (typeof failure === 'string') {
+        setError(failure);
+        setConfirmingRemarkDelete(false);
+        return;
+      }
+      setIsOpen(false);
+      setIsViewingRemarks(false);
+      setConfirmingRemarkDelete(false);
+      triggerRef.current?.focus();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const trigger = (
+    <button ref={triggerRef} type="button" disabled={disabled} onMouseEnter={() => { clearHoverClose(); anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsOpen(true); }} onClick={() => { anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsOpen(true); setPosition(null); }} aria-haspopup="menu" aria-expanded={isOpen && !isViewingRemarks && !isRemarksOpen} aria-label={`Actions for ${docName}`} title={`Actions for ${docName}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800">
+      <MoreHorizontal size={17} aria-hidden="true" />
+    </button>
+  );
+  return (
+    <div className="flex max-w-[min(18rem,55vw)] shrink-0 items-start gap-0.5" onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose}>
+      {document.remarks?.trim() && <button ref={remarkTriggerRef} type="button" onClick={() => { anchorRef.current = remarkTriggerRef.current; setRemarks(document.remarks ?? ''); setIsRemarksOpen(false); setIsViewingRemarks(true); setConfirmingRemarkDelete(false); setError(''); setFeedback(''); setIsOpen(true); setPosition(null); }} aria-label={`View admin remarks for ${docName}`} title="View remarks" aria-haspopup="dialog" aria-expanded={isOpen && isViewingRemarks} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#536b80] hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-400 dark:hover:bg-slate-800"><MessageSquareText size={15} aria-hidden="true" /></button>}
+      {trigger}
+      {isOpen && createPortal(
+        <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
+          {isViewingRemarks ? <div className="p-2">
+            <div className="mb-1 flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-800 dark:text-slate-100">Admin Remarks</span><button type="button" onClick={() => { setIsOpen(false); setIsViewingRemarks(false); (anchorRef.current ?? triggerRef.current)?.focus(); }} className="rounded px-1.5 py-1 text-[11px] text-slate-500 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800">Close</button></div>
+            <p ref={remarkContentRef} tabIndex={-1} className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-700 [overflow-wrap:anywhere] focus:outline-none dark:text-slate-200">{document.remarks}</p>
+            {error && <p role="alert" className="mt-2 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
+            {confirmingRemarkDelete ? <div className="mt-2 border-t border-slate-100 pt-2 dark:border-slate-800">
+              <p className="text-[11px] text-slate-600 dark:text-slate-300">Delete this saved remark?</p>
+              <div className="mt-1.5 flex justify-end gap-1.5">
+                <button type="button" disabled={saving} onClick={() => setConfirmingRemarkDelete(false)} className="rounded px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+                <button type="button" disabled={saving} onClick={() => void deleteRemark()} className="rounded px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30">{saving ? 'Deleting...' : 'Delete'}</button>
+              </div>
+            </div> : <div className="mt-2 flex justify-end gap-1.5 border-t border-slate-100 pt-2 dark:border-slate-800">
+              {canEditRemark && <button type="button" onClick={() => { setRemarks(document.remarks ?? ''); setIsViewingRemarks(false); setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="rounded px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">Edit</button>}
+              {canEditRemark && <button type="button" disabled={!canDeleteRemarks || saving} title={!canDeleteRemarks ? 'Remarks are required while this document is missing.' : undefined} onClick={() => setConfirmingRemarkDelete(true)} className="rounded px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-rose-300 dark:hover:bg-rose-950/30">Delete</button>}
+            </div>}
+          </div> : isRemarksOpen ? <div className="p-2">
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-200">Admin Remarks{requireRemarks && <span className="ml-1 text-rose-600">Required when missing</span>}
+              <textarea autoFocus value={remarks} maxLength={2000} onChange={(event) => { setRemarks(event.target.value); setFeedback(''); setError(''); }} rows={4} placeholder={requireRemarks ? 'Reason this document is missing' : 'Add an admin remark'} className="field mt-1.5 resize-y py-2 text-xs leading-5" />
+            </label>
+            {error && <p role="alert" className="mt-1.5 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
+            {feedback && <p role="status" className="mt-1.5 text-[11px] text-emerald-700 dark:text-emerald-300">{feedback}</p>}
+            <div className="mt-2 flex justify-end gap-1.5">
+              <button type="button" disabled={saving} onClick={() => { setRemarks(document.remarks ?? ''); setIsRemarksOpen(false); setError(''); setFeedback(''); }} className="rounded px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+              <button type="button" disabled={saving || remarks === (document.remarks ?? '')} onClick={() => void saveRemarks()} className="rounded bg-[#2187CD] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
+            </div>
+          </div> : <>
+            {document.provided === true && status !== 'Missing' && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(false)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><XCircle size={15} aria-hidden="true" />Mark missing</button>}
+            {!expiryBased && document.provided !== true && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(true)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><Check size={15} aria-hidden="true" />Mark provided</button>}
+            <button role="menuitem" type="button" onClick={() => { setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-200 dark:hover:bg-slate-800"><FilePlus2 size={15} aria-hidden="true" />{document.remarks ? 'Edit remarks' : 'Add remarks'}</button>
+            {expiryBased && <>
+              <div role="separator" className="my-1 border-t border-slate-100 dark:border-slate-800" />
+              <button role="menuitem" type="button" disabled={saving} onClick={() => { setIsOpen(false); onRenew(); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><RefreshCw size={15} aria-hidden="true" />{status === 'Missing' ? 'Add document or expiry' : status === 'Expired' || status === 'For Update' ? 'Renew or update expiry' : 'Renew / set expiry'}</button>
+            </>}
+            {error && <p role="alert" className="px-2.5 py-1 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
+            {feedback && <p role="status" className="px-2.5 py-1 text-[11px] text-emerald-700 dark:text-emerald-300">{feedback}</p>}
+          </>}
+        </div>,
+        window.document.body,
       )}
     </div>
   );
@@ -2660,10 +3069,7 @@ function LegendSwatch({ swatchClass, label }: { swatchClass: string; label: stri
   );
 }
 
-// One row per document type in the "Add Notification" settings modal.
-// AFS renews on a fiscal-year basis (mode 'fiscal-year') so it just shows an
-// informational badge - everything else can have its early-alert toggled and
-// its milestone-day chips edited.
+// Compact per-document controls for optional category-level early alerts.
 function NotificationRuleRow({
   rule,
   onToggle,
@@ -2676,41 +3082,37 @@ function NotificationRuleRow({
   onRemove: (docName: string, days: number) => void;
 }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-900/40 p-3.5">
-      <div className="flex items-start justify-between gap-3">
+    <div className="py-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
-          <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{rule.label}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">{rule.note}</p>
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{rule.label}</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{rule.note}</p>
         </div>
         {rule.mode === 'day-milestones' && (
-          <label className="inline-flex items-center gap-1.5 shrink-0 cursor-pointer select-none">
-            <input type="checkbox" checked={rule.enabled} onChange={() => onToggle(rule.docName)} className="rounded border-slate-300" />
-            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Early alert</span>
+          <label className="inline-flex min-h-9 shrink-0 cursor-pointer select-none items-center gap-2 rounded px-2 text-xs font-medium text-slate-600 hover:bg-slate-50 focus-within:outline focus-within:outline-2 focus-within:outline-[#2187CD] dark:text-slate-300 dark:hover:bg-slate-900">
+            <input type="checkbox" checked={rule.enabled} onChange={() => onToggle(rule.docName)} aria-label={`Enable extra early alerts for ${rule.label}`} className="rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]" />
+            Extra early alerts
           </label>
         )}
       </div>
-
       {rule.mode === 'fiscal-year' ? (
-        <span className="mt-2.5 inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+        <span className="mt-2 inline-flex text-[11px] font-medium text-slate-500 dark:text-slate-400">
           Fiscal-year based - no day milestone
         </span>
       ) : (
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {rule.enabled &&
             rule.earlyMilestoneDays.map((days) => (
               <span
                 key={days}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-[#a16207] dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-400"
+                className="inline-flex min-h-7 items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 text-[11px] font-semibold tabular-nums text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300"
               >
                 {days}d before
-                <button type="button" onClick={() => onRemove(rule.docName, days)} className="hover:text-rose-600 cursor-pointer">
+                <button type="button" aria-label={`Remove ${days}-day early alert for ${rule.label}`} onClick={() => onRemove(rule.docName, days)} className="rounded p-1 text-slate-500 hover:text-rose-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:text-rose-300">
                   <X size={10} />
                 </button>
               </span>
             ))}
-          <span className="inline-flex rounded-full border border-dashed border-slate-300 dark:border-slate-700 px-2 py-0.5 text-[10px] text-slate-400">
-            30d / Expired (standard, always on)
-          </span>
           {rule.enabled && <MilestoneAdder onAdd={(days) => onAdd(rule.docName, days)} />}
         </div>
       )}
@@ -2720,32 +3122,36 @@ function NotificationRuleRow({
 
 function MilestoneAdder({ onAdd }: { onAdd: (days: number) => void }) {
   const [value, setValue] = useState('');
+  const [error, setError] = useState('');
   const submit = () => {
     const n = parseInt(value, 10);
-    if (Number.isFinite(n) && n > 30) {
-      onAdd(n);
-      setValue('');
-    }
+    if (!Number.isInteger(n) || n <= 30 || n > 365) { setError('Use 31–365 days.'); return; }
+    onAdd(n);
+    setValue('');
+    setError('');
   };
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex flex-wrap items-center gap-1">
       <input
         type="number"
         min={31}
-        placeholder="days"
+        max={365}
+        aria-label="Additional early alert interval in days"
+        placeholder="Days"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-        className="w-14 rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] dark:border-slate-700 dark:bg-slate-950"
+        onChange={(e) => { setValue(e.target.value); if (error) setError(''); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+        className="h-8 w-20 rounded-md border border-slate-200 bg-white px-2 text-xs tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:border-slate-700 dark:bg-slate-950"
       />
       <button
         type="button"
         onClick={submit}
-        className="inline-flex items-center gap-0.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer"
+        className="inline-flex h-8 items-center gap-1 rounded-md bg-slate-100 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
       >
-        <Plus size={10} />
+        <Plus size={12} />
         <span>Add</span>
       </button>
+      {error && <span role="alert" className="w-full text-[10px] text-rose-700 dark:text-rose-300">{error}</span>}
     </span>
   );
 }

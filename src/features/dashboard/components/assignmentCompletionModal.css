@@ -1,0 +1,23 @@
+.dashboard-assignment-backdrop { z-index: 150; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(15 23 42 / 60%); }
+.dashboard-assignment-modal { display: flex; flex-direction: column; width: min(100%, 700px); max-height: 85dvh; overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-card, #fff); color: var(--foreground); box-shadow: 0 20px 50px rgb(15 23 42 / 20%); }
+.dashboard-assignment-modal header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--border-subtle); }
+.dashboard-assignment-modal h2 { margin: 0; font-size: 16px; font-weight: 650; }
+.dashboard-assignment-modal header p { margin: 4px 0 0; color: var(--muted-foreground); font-size: 12px; overflow-wrap: anywhere; }
+.dashboard-assignment-close { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); cursor: pointer; }
+.dashboard-assignment-close:hover { background: var(--surface-muted); color: var(--foreground); }
+.dashboard-assignment-body { overflow: auto; min-height: 0; padding: 16px 20px 20px; font-size: 12px; }
+.dashboard-assignment-body > p { margin: 0 0 14px; color: var(--muted-foreground); }
+.dashboard-assignment-modal table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.dashboard-assignment-modal th { color: var(--muted-foreground); font-size: 11px; font-weight: 550; }
+.dashboard-assignment-modal th, .dashboard-assignment-modal td { padding: 10px 0; border-bottom: 1px solid var(--border-subtle); text-align: left; vertical-align: top; }
+.dashboard-assignment-modal th:first-child { width: 72%; }
+.dashboard-assignment-modal th:last-child, .dashboard-assignment-modal td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.dashboard-assignment-modal td:first-child { padding-right: 16px; overflow-wrap: anywhere; }
+.dashboard-assignment-modal strong { font-weight: 550; }
+.dashboard-assignment-modal small { display: block; margin-top: 4px; color: var(--muted-foreground); font-size: 11px; }
+.dashboard-assignment-modal details { margin-top: 10px; }
+.dashboard-assignment-modal summary { color: var(--brand, #2187cd); cursor: pointer; font-size: 11px; }
+.dashboard-assignment-modal ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.dashboard-assignment-modal li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; color: var(--muted-foreground); }
+.dashboard-assignment-modal li span:last-child { flex-shrink: 0; }
+.dashboard-assignment-modal :is(button, summary):focus-visible { outline: 3px solid #91b7ff; outline-offset: 2px; }

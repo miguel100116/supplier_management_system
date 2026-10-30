@@ -1,3 +1,5 @@
+import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect';
+import type { PaperSize } from '../features/reports/domain/paperSize';
 import { ExportHistoryPage } from './ExportHistoryPage';
 import type { ReportRecipe } from '../features/reports/domain/reportHistory';
 import { useEffect, useRef, useState } from 'react';
@@ -27,11 +29,11 @@ interface ReportsPageProps {
 
 type ExportFormat = 'pdf' | 'csv' | 'excel' | 'docx';
 
-async function runExport(format: ExportFormat, reportTitle: string, tables: ExportTable[], filenameBase: string) {
-  if (format === 'docx') return exportTablesAsWord(reportTitle, tables, filenameBase);
+async function runExport(format: ExportFormat, reportTitle: string, tables: ExportTable[], filenameBase: string, paperSize: PaperSize = 'a4') {
+  if (format === 'docx') return exportTablesAsWord(reportTitle, tables, filenameBase, undefined, paperSize);
   if (format === 'csv') return exportTablesAsCSV(tables, filenameBase);
   else if (format === 'excel') return exportTablesAsExcel(tables, filenameBase);
-  else return exportTablesAsPDF(reportTitle, tables, filenameBase);
+  else return exportTablesAsPDF(reportTitle, tables, filenameBase, undefined, undefined, paperSize);
 }
 
 export function ReportsPage(props: ReportsPageProps) {
@@ -131,15 +133,15 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
     rows: allQuestionRows.map((row) => [row.question, formatNumber(row.average), row.responses]),
   };
 
-  const handleExecutiveExport = (format: ExportFormat) => {
+  const handleExecutiveExport = (format: ExportFormat, paperSize: PaperSize = 'a4') => {
     const tables = [summaryTable, topCompaniesTable, questionHighlightsTable];
-    runExport(format, 'Executive Summary', tables, 'executive_summary');
+    return runExport(format, 'Executive Summary', tables, 'executive_summary', paperSize);
   };
 
-  const handleCardExport = (format: ExportFormat, card: 'summary' | 'question' | 'survey' | 'companies') => {
-    if (card === 'summary') return runExport(format, 'Summary Report', [summaryTable, surveyReportTable], 'summary_report');
-    else if (card === 'question') return runExport(format, 'Question Report', [questionReportTable], 'question_report');
-    else if (card === 'companies') return runExport(format, 'Companies Performance Report', [topCompaniesTable], 'companies_report');
+  const handleCardExport = (format: ExportFormat, card: 'summary' | 'question' | 'survey' | 'companies', paperSize: PaperSize = 'a4') => {
+    if (card === 'summary') return runExport(format, 'Summary Report', [summaryTable, surveyReportTable], 'summary_report', paperSize);
+    else if (card === 'question') return runExport(format, 'Question Report', [questionReportTable], 'question_report', paperSize);
+    else if (card === 'companies') return runExport(format, 'Companies Performance Report', [topCompaniesTable], 'companies_report', paperSize);
   };
 
   if (showSummaryBuilder) {
@@ -196,6 +198,7 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
     return (
       <RawDataExportPage
         initialCategory={initialRecipe?.parameters.category}
+        initialPaperSize={initialRecipe?.parameters.paperSize}
         responses={rawResponses}
         canExport={canExport}
         onBack={() => setShowRawDataExport(false)}
@@ -217,7 +220,7 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
           description="Evaluation totals, satisfaction, and rating highlights"
           icon={FileBarChart}
           canExport={canExport}
-          onExport={(format) => handleCardExport(format, 'summary')}
+          onExport={(format, paperSize) => handleCardExport(format, 'summary', paperSize)}
           onOpenBuilder={() => setShowSummaryBuilder(true)}
         />
         <ReportCard
@@ -225,7 +228,7 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
           description="Compare company performance and response volume"
           icon={Handshake}
           canExport={canExport}
-          onExport={(format) => handleCardExport(format, 'companies')}
+          onExport={(format, paperSize) => handleCardExport(format, 'companies', paperSize)}
           onOpenBuilder={() => setShowCompanyBuilder(true)}
         />
         <ReportCard
@@ -233,7 +236,7 @@ function ReportGenerator({ initialRecipe, responses: rawResponses, rankingRespon
           description="Review scores and response counts by question"
           icon={Search}
           canExport={canExport}
-          onExport={(format) => handleCardExport(format, 'question')}
+          onExport={(format, paperSize) => handleCardExport(format, 'question', paperSize)}
           onOpenBuilder={() => setShowQuestionBuilder(true)}
         />
         <ReportCard
@@ -316,7 +319,7 @@ function ReportCard({
   icon: typeof FileBarChart;
   canExport?: boolean;
   showExport?: boolean;
-  onExport: (format: ExportFormat) => void | Promise<void>;
+  onExport: (format: ExportFormat, paperSize: PaperSize) => void | Promise<void>;
   onOpenBuilder?: () => void;
 }) {
   return (
@@ -335,7 +338,8 @@ function ReportCard({
 }
 
 /** Compact "Export ▾" trigger that reveals PDF / CSV / Excel choices, used on each report card. */
-function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void | Promise<void> }) {
+function ExportMenu({ onExport }: { onExport: (format: ExportFormat, paperSize: PaperSize) => void | Promise<void> }) {
+  const [paperSize, setPaperSize] = useState<PaperSize>('a4');
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState('');
@@ -354,7 +358,7 @@ function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void | P
 
   const choose = async (format: ExportFormat) => {
     setOpen(false); setExporting(true); setError('');
-    try { await onExport(format); }
+    try { await onExport(format, paperSize); }
     catch { setError('Unable to export this report. Please retry.'); }
     finally { setExporting(false); }
   };
@@ -368,7 +372,8 @@ function ExportMenu({ onExport }: { onExport: (format: ExportFormat) => void | P
       </button>
       {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
       {open ? (
-        <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+        <div className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
+          <div className="p-3 border-b border-slate-100 dark:border-slate-700"><PaperSizeSelect value={paperSize} onChange={setPaperSize} disabled={exporting} /></div>
           <button
             type="button"
             onClick={() => choose('pdf')}

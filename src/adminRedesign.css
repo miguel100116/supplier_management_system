@@ -79,7 +79,7 @@
 }
 
 /* Shared portal geometry; each workflow retains its own width and structure. */
-body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :not(.fixed) {
+body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :not(.fixed):not(.absolute) {
   max-height: min(860px, calc(100dvh - 28px));
   overscroll-behavior: contain;
 }
@@ -602,7 +602,7 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 }
 
 .admin-survey-forms-page > section.panel {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .admin-survey-forms-page > section.panel > header {

@@ -1,5 +1,8 @@
+import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect';
+import { paperSizePoints, type PaperSize } from '../features/reports/domain/paperSize';
 import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { saveReportDownload } from '../features/reports/services/exportHistory';
+import { applyPdfBranding, loadPdfBranding } from '../features/reports/services/pdfBranding';
 import type { ReportParameters } from '../features/reports/domain/reportHistory';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
@@ -77,6 +80,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
   const [chartMetric, setChartMetric] = useState<'responses' | 'rating'>(initialSettings.chartMetric ?? 'responses');
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [paperSize, setPaperSize] = useState<PaperSize>(initialSettings.paperSize ?? 'a4');
   const [isExporting, setIsExporting] = useState<'pdf' | 'csv' | 'excel' | 'docx' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const chartWrapperRef = useRef<HTMLDivElement>(null);
@@ -204,7 +208,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
     setIsExporting(format);
     setExportMenuOpen(false);
     try {
-      const recipe = { kind: 'summary' as const, parameters: { selectedTypes, showKpis, showChart, showTable, showTopCompanies, showQuestions, chartMetric } };
+      const recipe = { kind: 'summary' as const, parameters: { paperSize, selectedTypes, showKpis, showChart, showTable, showTopCompanies, showQuestions, chartMetric } };
 
       const reportTitle = 'Summary Report';
 
@@ -275,7 +279,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         });
         await saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), reportTitle, 'excel', recipe);
       } else if (format === 'pdf') {
-        const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+        const doc = new jsPDF({ unit: 'pt', format: paperSizePoints(paperSize) });
         const marginLeft = 48;
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
@@ -286,7 +290,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         if (logoDataUrl) {
           const coverLogoWidth = 190;
           const coverLogoHeight = coverLogoWidth * LOGO_ASPECT;
-          doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 168, coverLogoWidth, coverLogoHeight);
+          doc.addImage(logoDataUrl, 'PNG', (pageWidth - coverLogoWidth) / 2, 168, coverLogoWidth, coverLogoHeight, undefined, 'FAST');
         }
 
         doc.setDrawColor(...BRAND);
@@ -321,39 +325,8 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
         doc.text(`Average System-wide Score:  ${formatNumber(summary.averageRating)}%`, marginLeft + 60, 469);
         doc.text(`Generated On:  ${new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}`, marginLeft + 60, 486);
 
-        // Footer on Cover
-        doc.setFontSize(8);
-        doc.setTextColor(140);
-        doc.text('Microgenesis Supplier Management System — Confidential', pageWidth / 2, pageHeight - 30, { align: 'center' });
-
         // REPORT PAGES SETUP
-        let pageIndex = 2;
-        const addHeaderAndFooter = (pdfDoc: jsPDF) => {
-          pdfDoc.addPage();
-
-          // Header
-          if (logoDataUrl) {
-            pdfDoc.addImage(logoDataUrl, 'PNG', marginLeft, 20, 100, 100 * LOGO_ASPECT);
-          }
-          pdfDoc.setFont('helvetica', 'bold');
-          pdfDoc.setFontSize(9);
-          pdfDoc.setTextColor(30);
-          pdfDoc.text('Summary Report', pageWidth - marginLeft, 32, { align: 'right' });
-          pdfDoc.setFont('helvetica', 'normal');
-          pdfDoc.setTextColor(130);
-          pdfDoc.text('MBS Partner Evaluation System', pageWidth - marginLeft, 44, { align: 'right' });
-
-          pdfDoc.setDrawColor(226, 232, 240);
-          pdfDoc.setLineWidth(0.75);
-          pdfDoc.line(marginLeft, 72, pageWidth - marginLeft, 72);
-
-          // Footer
-          pdfDoc.setFontSize(8);
-          pdfDoc.setTextColor(140);
-          pdfDoc.text('Microgenesis Supplier Management System — Confidential', marginLeft, pageHeight - 20);
-          pdfDoc.text(`Page ${pageIndex - 1}`, pageWidth - marginLeft, pageHeight - 20, { align: 'right' });
-          pageIndex++;
-        };
+        const addHeaderAndFooter = (pdfDoc: jsPDF) => { pdfDoc.addPage(); };
 
         // PAGE 2: KEY INSIGHTS & CIRCLE GRAPH
         addHeaderAndFooter(doc);
@@ -547,6 +520,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
           }
         }
 
+        applyPdfBranding(doc, await loadPdfBranding(), { title: reportTitle, margin: marginLeft });
         await saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
       }
     } catch (e) {
@@ -704,7 +678,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
             <span>Document Preview Mode (Interactive Sheet Layout)</span>
           </div>
 
-          <div className="flex gap-2 self-end relative" ref={menuRef}>
+          <div className="flex flex-wrap items-end gap-2 self-end relative" ref={menuRef}><PaperSizeSelect value={paperSize} onChange={setPaperSize} disabled={isExporting !== null} />
             {canExport ? (
               <>
                 <button
@@ -766,7 +740,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
                 footer sits near the bottom (matching the PDF's fixed y-coordinates)
                 rather than centering the whole block, which would spread the
                 blank space evenly instead of concentrating it in the middle. */}
-            <SummaryPagedSheet pageLabel="Page 1 · Cover">
+            <SummaryPagedSheet paperSize={paperSize} pageLabel="Page 1 · Cover">
               <div className="flex h-full flex-col items-center px-4 text-center">
                 <div className="pt-[16%]">
                   <img src={LOGO_URL} alt="Microgenesis" className="mx-auto h-14 w-auto" referrerPolicy="no-referrer" />
@@ -791,7 +765,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
             </SummaryPagedSheet>
 
             {/* Page 2 - KPIs, chart, performance table */}
-            <SummaryPagedSheet pageLabel="Page 2" footerPage="Page 1">
+            <SummaryPagedSheet paperSize={paperSize} pageLabel="Page 2" footerPage="Page 1">
               <SummaryPageHeader />
               <h2 className="mt-6 text-lg font-bold text-slate-900 dark:text-white">System-wide Evaluation Overview</h2>
 
@@ -933,7 +907,7 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
 
             {/* Page 3 - Partner Performance & Question Highlights (only exists in the PDF if at least one of these sections is on) */}
             {hasExtraSections && (
-              <SummaryPagedSheet pageLabel="Page 3" footerPage="Page 2">
+              <SummaryPagedSheet paperSize={paperSize} pageLabel="Page 3" footerPage="Page 2">
                 <SummaryPageHeader />
                 <h2 className="mt-6 text-lg font-bold text-slate-900 dark:text-white">Partner Performance &amp; Question Highlights</h2>
 
@@ -1016,10 +990,10 @@ export function SummaryReportBuilderPage({ responses, rankingResponses = respons
   );
 }
 
-/** One A4-proportioned sheet in the print preview, styled like the actual PDF page. */
-function SummaryPagedSheet({ children, pageLabel, footerPage }: { children: ReactNode; pageLabel: string; footerPage?: string }) {
+/** A sheet using the selected paper proportions, styled like the actual PDF page. */
+function SummaryPagedSheet({ children, pageLabel, footerPage, paperSize = 'a4' }: { children: ReactNode; pageLabel: string; footerPage?: string; paperSize?: PaperSize }) {
   const PAGE_WIDTH = 640;
-  const PAGE_HEIGHT = Math.round(PAGE_WIDTH * (297 / 210)); // A4 aspect ratio
+  const PAGE_HEIGHT = Math.round(PAGE_WIDTH * paperSizePoints(paperSize)[1] / paperSizePoints(paperSize)[0]); // Selected paper aspect ratio
   return (
     <div className="flex flex-col items-center">
       <div

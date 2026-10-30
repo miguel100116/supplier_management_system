@@ -361,6 +361,7 @@ export default function App() {
     addPartnerCompany,
     updatePartnerCompany,
     updatePartnerDocument,
+    updatePartnerDocumentRemarks,
     removePartnerCompany,
     previewMasterListImport,
     rebuildMasterListImportPreview,
@@ -368,7 +369,11 @@ export default function App() {
     isLoading,
     isRefreshing,
     error,
+    dataError,
+    assignmentError,
     notifications,
+    documentReminderError,
+    retryDocumentReminders,
     unreadCount,
     unreadNotificationIds,
     markNotificationsRead,
@@ -690,6 +695,10 @@ export default function App() {
     // Active tab.
     return partnerCompanies.filter(c => !c.isArchived && effectiveSurveyTypes.some(t => t === c.type));
   }, [partnerCompanies, effectiveSurveyTypes]);
+
+  const uncategorizedCompanyIds = useMemo(() => isAdmin
+    ? partnerCompanies.filter(company => company.type === 'Uncategorized').map(company => company.id)
+    : [], [isAdmin, partnerCompanies]);
 
   const filteredResponses = useMemo(() => applyFilters(scopedAccessibleResponses, filters), [scopedAccessibleResponses, filters]);
   const officialAnalyticsResponses = useMemo(
@@ -1097,6 +1106,10 @@ export default function App() {
       />
     ) : (
       <DashboardPage
+        assignmentError={assignmentError}
+        accounts={isAdmin ? accounts : undefined}
+        uncategorizedCompanyIds={uncategorizedCompanyIds}
+        departmentPermissions={departmentPermissions}
         responses={analyticsFilteredResponses}
         allResponses={userAccessibleAllResponses}
         historyResponses={analyticsFilteredResponses}
@@ -1104,7 +1117,7 @@ export default function App() {
         onChangeDataScope={setDataScope}
         partnerCompanies={userAccessiblePartnerCompanies}
         isLoading={isLoading}
-        error={error}
+        error={dataError}
         surveyTypeFilter={filters.surveyType}
         surveys={userAccessibleSurveys}
         isAdmin={isAdmin}
@@ -1146,9 +1159,11 @@ export default function App() {
           window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
         }}
         partnerCompanies={partnerCompanies}
+        responses={userAccessibleResponses}
         canRenewDocuments={canRenewDocuments}
         onUpdateCompany={updatePartnerCompany}
         onRenewDocument={updatePartnerDocument}
+        onUpdateDocumentRemarks={updatePartnerDocumentRemarks}
         currentUserEmail={account || ''}
         isAdmin={isAdmin}
       />
@@ -1535,6 +1550,12 @@ export default function App() {
                 ? 'Supabase data validation warning: '
                 : 'Supabase operation failed: '}
               {accountPersistenceError}
+            </div>
+          )}
+          {documentReminderError && isAdmin && (
+            <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              Document reminders could not be refreshed. Previously loaded reminders are retained. {documentReminderError}
+              <button type="button" className="ml-3 underline" onClick={() => void retryDocumentReminders()}>Retry reminders</button>
             </div>
           )}
           {error && activePage !== 'dashboard' && (

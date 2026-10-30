@@ -178,7 +178,7 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   await service.saveReportDownload(new Blob(['csv bytes'], { type: 'text/csv;charset=utf-8' }), 'Raw Data', 'csv', { kind: 'raw', parameters: { category: 'Supplier' } });
   assert.match(service.getExportHistory()[0].filename, /^sms_raw-data_.*\.csv$/);
   assert.equal(service.getExportHistory()[0].fileDataUrl, 'data:text/csv;charset=utf-8;base64,Y3N2IGJ5dGVz');
-  const { exportTablesAsCSV, exportTablesAsWord } = await import('./exporters');
+  const { exportTablesAsCSV, exportTablesAsWord, exportTablesAsPDF } = await import('./exporters');
   await exportTablesAsWord('Editable report', [{ title: 'Company Rankings', columns: ['Company', 'Responses'], rows: [['A < B & C', 3], ['Other company', 2]] }], 'report', recipe);
   const XLSX = await import('xlsx');
   const archive = XLSX.CFB.read(Buffer.from(await downloaded!.arrayBuffer()), { type: 'buffer' });
@@ -188,8 +188,48 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   assert.match(xml, /Editable report/);
   assert.match(xml, /A &lt; B &amp; C/);
   assert.match(xml, /Other company/);
+  assert.match(xml, /Generated on:/);
+  assert.match(xml, /Confidential: For internal distribution only/);
+  assert.match(xml, /w:top="800"/);
+  const styles = XLSX.CFB.find(archive, '/word/styles.xml');
+  assert.ok(styles);
+  assert.match(Buffer.from(styles.content as Uint8Array).toString('utf8'), /w:sz w:val="44"/);
   assert.equal(service.getExportHistory()[0].format, 'docx');
   assert.match(service.getExportHistory()[0].filename, /\.docx$/);
+  const { exportArchivedReportAsPDF } = await import('./archivedReportExport');
+  await exportArchivedReportAsPDF('Archived Survey Report', 'Selected archive', 'Courier', [
+    { title: 'Report scope', columns: ['Field', 'Value'], rows: [['Selected item', 'Selected archive'], ['Category', 'Courier']] },
+    { title: 'Current results', columns: ['Answer'], rows: [['Latest saved answer']] },
+  ], { kind: 'archived-survey', parameters: { category: 'Courier', archivedItemId: 'selected', includeComments: true } });
+  const pdf = Buffer.from(await downloaded!.arrayBuffer()).toString('latin1');
+  assert.match(pdf, /^%PDF-/);
+  assert.match(pdf, /\/Count 1\b/, 'The compact fixture starts its tables on page one, without a cover');
+  assert.match(pdf, /Latest saved answer/);
+  assert.match(pdf, /Selected archive/);
+  assert.match(pdf, /current rubric/);
+  assert.match(pdf, /Supplier Management System/);
+  assert.doesNotMatch(pdf, /MBS Partner Evaluation System/);
+  assert.equal(service.getExportHistory()[0].recipe?.kind, 'archived-survey');
+  for (const [paperSize, width, height] of [['a4', 595.28, 841.89], ['letter', 612, 792], ['legal', 612, 1008], ['long-bond', 612, 936]] as const) {
+    const sizedRecipe = { kind: 'summary' as const, parameters: { paperSize } };
+    validateReportRecipe(sizedRecipe);
+    const tables = [{ title: 'Results', columns: ['Answer'], rows: [['Retained result']] }];
+    await exportTablesAsPDF('Sized report', tables, 'sized', sizedRecipe);
+    const sizedPdf = Buffer.from(await downloaded!.arrayBuffer()).toString('latin1');
+    const mediaBox = sizedPdf.match(/\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/);
+    assert.ok(mediaBox);
+    assert.ok(Math.abs(Number(mediaBox[1]) - width) < 0.02);
+    assert.ok(Math.abs(Number(mediaBox[2]) - height) < 0.02);
+    assert.match(sizedPdf, /Retained result/);
+    await exportTablesAsWord('Sized report', tables, 'sized', sizedRecipe);
+    const sizedArchive = XLSX.CFB.read(Buffer.from(await downloaded!.arrayBuffer()), { type: 'buffer' });
+    const sizedXml = Buffer.from(XLSX.CFB.find(sizedArchive, '/word/document.xml')!.content as Uint8Array).toString();
+    assert.match(sizedXml, new RegExp(`w:w="${Math.round(width * 20)}"`));
+    assert.match(sizedXml, new RegExp(`w:h="${Math.round(height * 20)}"`));
+    assert.equal(service.getExportHistory()[0].recipe?.parameters.paperSize, paperSize);
+  }
+  assert.throws(() => validateReportRecipe({ kind: 'summary', parameters: { paperSize: 'poster' } }), /Invalid paper size/);
+  validateReportRecipe({ kind: 'summary', parameters: {} });
   createUrl.mock.restore();
   const rejectedDownload = mock.method(URL, 'createObjectURL', () => { throw new Error('Synthetic download blocked'); });
   await assert.rejects(exportTablesAsCSV([{ title: 'Archive', columns: ['Value'], rows: [['Saved answer']] }], 'archive'), /Synthetic download blocked/);

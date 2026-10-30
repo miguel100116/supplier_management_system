@@ -16,10 +16,13 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     createdAt, branches: [], isArchived: false };
   const records: Array<{ record_type: string; record_id: string; payload: Record<string, unknown>; created_at: string }> = [
     { record_type: 'partner_company', record_id: company.id, payload: company, created_at: createdAt },
+    { record_type: 'document_maintenance', record_id: 'default', created_at: createdAt,
+      payload: { id: 'default', validityYears: {}, reminderDays: [60, 30], dailyFinalDays: 30 } },
   ];
   const unexpected: string[] = [];
   const errors: string[] = [];
-  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false };
+  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false, activeListReads: false };
+  const activeLists: { value: Array<{ survey_type: string; companies: string[] }> | null } = { value: null };
   const historyReads: Array<{ select: string; id: string | null }> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
@@ -40,6 +43,15 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     }
     if (url.pathname === '/auth/v1/user') return reply(user);
     if (url.pathname === '/auth/v1/logout') return reply({});
+    if (url.pathname === '/rest/v1/rpc/get_active_evaluation_lists') {
+      if (failures.activeListReads) return reply({ message: 'Synthetic active-list failure' }, 500);
+      // Existing fixtures supply all their synthetic partners as the uploaded
+      // list. Scope regressions below explicitly supply a smaller/empty list.
+      return reply(activeLists.value ?? ['Courier', 'Supplier', 'Subcontractor'].map(type => ({
+        survey_type: type,
+        companies: records.filter(record => record.record_type === 'partner_company' && record.payload.type === type && !record.payload.isArchived).map(record => String(record.payload.name)),
+      })));
+    }
     if (url.pathname === '/rest/v1/app_profiles' && request.method() === 'GET') {
       const requestedEmail = url.searchParams.get('email')?.replace(/^eq\./, '');
       const matches = requestedEmail ? profiles.filter(item => item.email === requestedEmail) : profiles;
@@ -48,6 +60,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     if (url.pathname === '/rest/v1/application_records') {
       if (request.method() === 'GET') {
         const type = url.searchParams.get('record_type')?.replace(/^eq\./, '');
+        if (type === 'document_reminder_delivery' && failures.reminderReads) return reply({ message: 'Synthetic reminder read failed' }, 500);
         const offset = Number(url.searchParams.get('offset') ?? 0);
         const limit = Number(url.searchParams.get('limit') ?? 1000);
         let matching = records.filter(record => record.record_type === type);
@@ -85,7 +98,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     unexpected.push(`${request.method()} ${url.pathname}`);
     return route.abort();
   });
-  return { records, unexpected, errors, failures, profiles, historyReads };
+  return { records, unexpected, errors, failures, profiles, historyReads, activeLists };
 }
 
 async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
@@ -94,8 +107,35 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
   await page.getByLabel('Password', { exact: true }).fill('Synthetic-password-123!');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   // Let authentication settle before the next navigation can interrupt it.
-  await expect(page.getByRole('main').or(page.getByRole('alert')).first()).toBeVisible();
+  const authenticationResult = page.getByRole('main').or(page.getByRole('alert')).first();
+  await authenticationResult.waitFor({ state: 'visible' });
+  await expect(authenticationResult).toBeVisible();
 }
+
+async function openReadyPage(page: Page, path: string) {
+  await page.goto(path);
+  const main = page.getByRole('main');
+  await main.waitFor({ state: 'visible' });
+  // Feature assertions start after the route's code and shared data are ready.
+  await main.getByRole('status').filter({ hasText: /Loading page|Refreshing shared data/ }).waitFor({ state: 'hidden' });
+}
+
+test('Document reminder failures and missing setup stay visible and recover through Retry', async ({ page }) => {
+  const api = await backend(page);
+  const seed = api.records.splice(api.records.findIndex(row => row.record_type === 'document_maintenance'), 1)[0];
+  await page.goto('/');
+  await signIn(page);
+  const warning = page.getByRole('alert').filter({ hasText: 'Document reminders could not be refreshed' });
+  await expect(warning).toContainText('202610280001 and 202610290001');
+  api.records.push(seed);
+  api.failures.reminderReads = true;
+  await warning.getByRole('button', { name: 'Retry reminders' }).click();
+  await expect(warning).toContainText('Synthetic reminder read failed');
+  api.failures.reminderReads = false;
+  await warning.getByRole('button', { name: 'Retry reminders' }).click();
+  await expect(warning).toHaveCount(0);
+  expect(api.errors).toEqual([]);
+});
 
 test('Workspace category and status badges use consistent typography and geometry', async ({ page }, testInfo) => {
   const service = await backend(page);
@@ -145,7 +185,7 @@ test('Leaderboard rating scale opens from the compact legend info control', asyn
       rating: 15, comment: '', dataSource: 'client_csv' } });
   await page.goto('/login');
   await signIn(page);
-  await page.goto('/analytics');
+  await openReadyPage(page, '/analytics');
   const legend = page.getByRole('group', { name: 'Company leaderboard color legend' });
   const info = legend.locator('summary');
   const scale = legend.locator('details > div');
@@ -203,7 +243,7 @@ test('Admin module headings match the compact Directory title and subtitle forma
     ['present-mode', 'Present', false],
   ] as const;
   for (const [route, title, hasSubtitle] of modules) {
-    await page.goto(`/${route}`);
+    await openReadyPage(page, `/${route}`);
     const header = page.locator('.admin-page-heading');
     await expect(header.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
     if (hasSubtitle) await expect(header.locator('p')).toHaveCount(1);
@@ -218,10 +258,10 @@ test('Admin module headings match the compact Directory title and subtitle forma
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth), title).toBe(false);
     if (route === 'document-tracker') {
-      const action = header.getByRole('button', { name: 'Add Notification', exact: true });
+      const action = header.getByRole('button', { name: 'Document Maintenance', exact: true });
       await action.focus();
       await page.keyboard.press('Enter');
-      await expect(page.getByRole('heading', { name: 'Document Expiry Notifications', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Document maintenance', exact: true })).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(action).toBeFocused();
       if (!testInfo.project.use.isMobile) {
@@ -279,6 +319,142 @@ test('Admin module headings match the compact Directory title and subtitle forma
   const darkActual = await page.locator('.admin-page-heading').evaluate(headerFormat);
   expect(darkActual).toEqual(darkReference);
   await page.screenshot({ path: testInfo.outputPath('heading-documents-dark.png'), animations: 'disabled' });
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Dashboard separates official submissions, scores and evaluation progress at desktop and mobile sizes', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.employee@mgenesis.com', role: 'Employee' });
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.executive@mgenesis.com', role: 'Employee', designation: 'Executive' });
+  service.records.push({ record_type: 'partner_company', record_id: 'unclassified-partner', created_at: createdAt, payload: {
+    id: 'unclassified-partner', name: 'Synthetic Unclassified Partner', type: 'Uncategorized', createdAt, branches: [],
+  } });
+  service.records.push({ record_type: 'survey', record_id: 'dashboard-round', created_at: createdAt, payload: {
+    id: 'dashboard-round', title: 'Courier round', surveyType: 'Courier', description: '', createdAt,
+    status: 'Running', questions: [{ questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery' }],
+  } });
+  for (const [id, dataSource] of [['official-one', 'production_submission'], ['official-repeat', 'production_submission'], ['test-only', 'test_submission']] as const) {
+    service.records.push({ record_type: 'survey_response', record_id: `${id}:Q01`, created_at: createdAt, payload: {
+      responseId: id, ...(id === 'official-one' ? {} : { surveyId: 'dashboard-round' }), surveyType: 'Courier',
+      companyId: id === 'official-repeat' ? 'unclassified-partner' : 'synthetic-courier',
+      company: id === 'official-repeat' ? 'Synthetic Unclassified Partner' : 'Synthetic Courier',
+      respondentType: 'Employee', respondentEmail: 'synthetic.employee@mgenesis.com', submissionDate: '2026-10-28T00:00:00Z',
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery', rating: 0, comment: '', dataSource,
+    } });
+  }
+  await page.goto('/login');
+  await signIn(page);
+  const forms = page.getByRole('table', { name: 'Evaluation forms in progress' });
+  const results = page.getByRole('table', { name: 'Average partner evaluation score by type' });
+  await expect(forms.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
+  await expect(forms.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  await expect(results.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  await expect(results.getByText('2 submissions', { exact: true })).toBeVisible();
+  await expect(results.getByText('Based on 2 scored submissions', { exact: true })).toBeVisible();
+  await expect(results.getByText('1 need partner classification', { exact: true })).toBeVisible();
+  const recent = page.getByRole('table', { name: 'Recent evaluation submissions' });
+  await expect(recent.locator('tbody tr')).toHaveCount(2);
+  await expect(recent.getByText('0.00 / 100', { exact: true })).toHaveCount(2);
+  await expect(recent.getByText('synthetic.employee@mgenesis.com', { exact: true })).toHaveCount(2);
+  await expect(recent.getByRole('cell', { name: 'Courier round synthetic.employee@mgenesis.com', exact: true })).toHaveCount(2);
+  await page.screenshot({ path: testInfo.outputPath('dashboard-expected-totals.png'), animations: 'disabled', fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.getByRole('button', { name: 'All-Time', exact: true }).click();
+  await expect(results.getByRole('columnheader', { name: 'Current-round completion', exact: true })).toBeVisible();
+  await expect(results.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  await expect(results.getByText('Completion unavailable', { exact: true })).toHaveCount(0);
+  for (const label of await results.locator('.admin-dashboard-count').all()) {
+    const bounds = await label.evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return { text: range.getBoundingClientRect().toJSON(), cell: element.closest('td')!.getBoundingClientRect().toJSON() };
+    });
+    expect(bounds.text.left).toBeGreaterThanOrEqual(bounds.cell.left);
+    expect(bounds.text.right).toBeLessThanOrEqual(bounds.cell.right + 1);
+  }
+  const resultRegion = page.getByRole('region', { name: 'Evaluation results table', exact: true });
+  await resultRegion.focus();
+  await expect(resultRegion).toBeFocused();
+  if (testInfo.project.use.isMobile) {
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => resultRegion.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+    await resultRegion.evaluate(element => { element.scrollLeft = 0; });
+  }
+  await page.screenshot({ path: testInfo.outputPath('dashboard-historical-totals.png'), animations: 'disabled', fullPage: true });
+  await expect(forms.getByText('1 of 1 completed · 100%', { exact: true })).toBeVisible();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Evaluation Progress opens assigned employees and dismisses safely without changing evaluations', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  const employeeEmail = 'assigned.employee@mgenesis.com';
+  const pendingEmail = 'pending.employee@mgenesis.com';
+  for (const email of [employeeEmail, pendingEmail]) service.profiles.push({ ...service.profiles[0], email, role: 'Employee' });
+  service.profiles.push({ ...service.profiles[0], email: 'excluded.executive@mgenesis.com', role: 'Employee', designation: 'Executive' });
+  service.records.push({ record_type: 'partner_company', record_id: 'pending-courier', created_at: createdAt,
+    payload: { id: 'pending-courier', name: 'Pending Courier', type: 'Courier', createdAt, branches: [] } });
+  service.records.push({ record_type: 'survey', record_id: 'assignment-form', created_at: createdAt,
+    payload: { id: 'assignment-form', title: 'Assignment details survey', surveyType: 'Courier', description: '', createdAt,
+      status: 'Running', questions: [{ questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery' }] } });
+  service.records.push({ record_type: 'survey_response', record_id: 'assigned-response:Q01', created_at: createdAt, payload: {
+    responseId: 'assigned-response', surveyId: 'assignment-form', companyId: 'synthetic-courier', company: 'Synthetic Courier',
+    surveyType: 'Courier', respondentType: 'Employee', respondentEmail: employeeEmail, submissionDate: '2026-10-28T00:00:00Z',
+    questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery', rating: 0, comment: '', dataSource: 'production_submission',
+  } });
+  await page.goto('/login');
+  await signIn(page);
+  const trigger = page.getByRole('button', { name: 'View evaluation progress for Assignment details survey', exact: true });
+  await expect(trigger).toContainText('1 of 4 completed');
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Evaluation Progress', exact: true });
+  const close = dialog.getByRole('button', { name: 'Close evaluation progress' });
+  await expect(dialog).toBeVisible();
+  await expect(close).toBeFocused();
+  await expect(dialog.getByText('1 of 4 assignments completed · 25%', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('row').filter({ hasText: employeeEmail })).toContainText('1 / 2');
+  await expect(dialog.getByRole('row').filter({ hasText: pendingEmail })).toContainText('0 / 2');
+  await expect(dialog.getByText('excluded.executive@mgenesis.com', { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.locator('summary').last()).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await dialog.getByRole('row').filter({ hasText: employeeEmail }).locator('summary').click();
+  const employeeRow = dialog.getByRole('row').filter({ hasText: employeeEmail });
+  await expect(employeeRow.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+  await expect(employeeRow.getByRole('listitem').filter({ hasText: 'Synthetic Courier' })).toContainText('Completed');
+  await expect(employeeRow.getByRole('listitem').filter({ hasText: 'Pending Courier' })).toContainText('Pending');
+  await dialog.getByRole('heading', { name: 'Evaluation Progress', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(bounds!.width).toBeLessThanOrEqual(viewport.width);
+  expect(bounds!.height).toBeLessThanOrEqual(viewport.height);
+  expect(await dialog.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath('assignment-completion.png'), animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.add('dark'));
+  await page.screenshot({ path: testInfo.outputPath('assignment-completion-dark.png'), animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.remove('dark'));
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.locator('.dashboard-assignment-backdrop').dispatchEvent('pointerdown');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await close.click();
+  await expect(dialog).toHaveCount(0);
+  const submission = service.records.find(record => record.record_type === 'survey_response')!;
+  submission.payload.dataSource = 'test_submission';
+  await page.reload();
+  await expect(trigger).toContainText('0 of 4 completed');
+  await trigger.click();
+  await expect(dialog.getByText('0 of 4 assignments completed · 0%', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('row').filter({ hasText: employeeEmail })).toContainText('0 / 2');
+  await close.click();
+  expect(service.records.filter(record => record.record_type === 'survey_response')).toHaveLength(1);
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
 });
@@ -518,7 +694,7 @@ test('Archived report builders select one item, update the document preview and 
   const openBuilder = async (title: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
   await page.goto('/login');
   await signIn(page);
-  await page.goto('/reports');
+  await openReadyPage(page, '/reports');
   await expect(page.getByRole('heading', { name: 'Archived reports', exact: true })).toBeVisible();
   await expect(page.getByRole('combobox', { name: 'Data source', exact: true })).toHaveCount(0);
   await openBuilder('Archived Survey Report');
@@ -541,6 +717,7 @@ test('Archived report builders select one item, update the document preview and 
     expect(await table.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
   } else expect(optionsBox!.x + optionsBox!.width).toBeLessThan(documentBox!.x);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('combobox', { name: 'Paper size', exact: true }).selectOption('legal');
   await page.screenshot({ path: testInfo.outputPath('archived-survey-builder.png'), fullPage: true, animations: 'disabled' });
   await page.evaluate(() => document.body.classList.add('dark'));
   await page.screenshot({ path: testInfo.outputPath('archived-survey-builder-dark.png'), fullPage: true, animations: 'disabled' });
@@ -553,15 +730,22 @@ test('Archived report builders select one item, update the document preview and 
     if (format === 'pdf') {
       const pdf = bytes.toString('latin1');
       expect(pdf).toMatch(/^%PDF-/);
-      for (const text of ['Archived Survey Report', 'First archived survey', 'MBS Partner Evaluation System', 'Report scope', 'Microgenesis Supplier Management System']) {
+      expect(pdf).toMatch(/\/MediaBox \[0 0 612(?:\.0*)? 1008(?:\.0*)?\]/);
+      for (const text of ['Archived Survey Report', 'First archived survey', 'current rubric', 'Report scope', 'Supplier Management System']) {
         expect(pdf).toContain(text);
       }
+      const pageCount = Number(pdf.match(/\/Count (\d+)/)?.[1]);
+      expect(pageCount).toBeGreaterThan(0);
+      expect((pdf.match(/\/I\d+ Do/g) ?? []).length).toBe(pageCount);
+      expect(pdf).not.toContain('SMPESA');
+      expect(pdf).toContain(`/Author (Microgenesis)`);
       expect(pdf).not.toContain('This report provides a comprehensive summary of survey analytics');
     }
     else if (format === 'docx') {
       const archive = XLSX.CFB.read(bytes, { type: 'buffer' });
       const xml = XLSX.CFB.find(archive, '/word/document.xml')!;
       expect(Buffer.from(xml.content as Uint8Array).toString()).toContain('First archived survey');
+      expect(Buffer.from(xml.content as Uint8Array).toString()).toMatch(/w:pgSz[^>]*w:w="12240"[^>]*w:h="20160"/);
     } else {
       const workbook = XLSX.read(bytes);
       const scope = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
@@ -574,6 +758,7 @@ test('Archived report builders select one item, update the document preview and 
   await expect(page.getByText(/Courier \| First archived survey/).first()).toBeVisible();
   await page.getByRole('button', { name: 'Regenerate', exact: true }).first().click();
   await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('archive-a');
+  await expect(page.getByRole('combobox', { name: 'Paper size', exact: true })).toHaveValue('legal');
   await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Category', exact: true }).selectOption('Supplier');
   await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('');
@@ -804,6 +989,46 @@ test('Question Report quick export exposes and downloads Word below the report l
   expect(Buffer.from(document!.content as Uint8Array).toString('utf8')).toContain('Question Report (All Questions)');
 });
 
+test('detailed and raw PDF downloads share system branding, company metadata and complete page numbering', async ({ page }) => {
+  test.setTimeout(120_000);
+  const service = await backend(page);
+  service.records.push({ record_type: 'survey_response', record_id: 'pdf-evaluation:Q01', created_at: createdAt,
+    payload: { responseId: 'pdf-evaluation', companyId: 'synthetic-courier', company: 'Synthetic Courier', surveyType: 'Courier',
+      respondentType: 'Employee', submissionDate: new Date().toISOString(), questionId: 'Q01', questionNumber: 1,
+      question: 'Reliability?', questionCategory: 'Reliability/Delivery', rating: 12, comment: '', dataSource: 'client_csv' } });
+  await page.goto('/login');
+  await signIn(page);
+  for (const [report, trigger, pdfButton] of [
+    ['Summary Report', 'Export Report', 'Export PDF Document'],
+    ['Executive', 'Export Executive Dossier', 'Export PDF Document'],
+    ['Question Report', 'Export', 'PDF Document'],
+    ['Companies Report', 'Export', 'PDF'],
+    ['Raw Data Export', 'Export As', 'PDF'],
+  ]) {
+    await page.goto('/reports');
+    if (report === 'Executive') await page.getByRole('button', { name: 'Build Executive Report', exact: true }).click();
+    else await page.getByRole('article').filter({ has: page.getByRole('heading', { name: report, exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+    const exportButton = report === 'Raw Data Export'
+      ? page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Courier', exact: true }) }).getByRole('button', { name: trigger, exact: true })
+      : page.getByRole('button', { name: trigger, exact: true });
+    await exportButton.click();
+    const event = page.waitForEvent('download');
+    await page.getByRole('button', { name: pdfButton, exact: true }).click();
+    const download = await event;
+    expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+    const pdf = (await readFile((await download.path())!)).toString('latin1');
+    const pages = Number(pdf.match(/\/Count (\d+)/)?.[1]);
+    expect(pages, report).toBeGreaterThan(0);
+    expect((pdf.match(/\/I\d+ Do/g) ?? []).length, report).toBeGreaterThanOrEqual(pages);
+    expect(pdf, report).not.toContain('SMPESA');
+    expect(pdf, report).toContain('/Author (Microgenesis)');
+    for (let pageNumber = 1; pageNumber <= pages; pageNumber++) expect(pdf, report).toContain(`Page ${pageNumber} of ${pages}`);
+    if (report === 'Executive') expect(pdf).toContain('Strictly Confidential');
+  }
+  expect(service.errors).toEqual([]);
+  expect(service.unexpected).toEqual([]);
+});
+
 test('Word reports export complete descending company rankings and History refresh avoids retained file bulk reads', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   const service = await backend(page);
@@ -916,6 +1141,76 @@ test('Word reports export complete descending company rankings and History refre
   await expect(page.getByText(/statement timeout|quarantined during refresh/)).toHaveCount(0);
   expect(service.errors).toEqual([]);
   expect(service.unexpected).toEqual([]);
+});
+
+test('Dashboard retains loaded results when assignment lists fail and recovers completion after retry', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.failures.activeListReads = true;
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.employee@mgenesis.com', role: 'Employee' });
+  service.records.push({ record_type: 'survey', record_id: evaluationForm.id, created_at: createdAt, payload: { ...evaluationForm } });
+  service.records.push({ record_type: 'survey_response', record_id: 'dashboard-retained:Q01', created_at: createdAt,
+    payload: { responseId: 'dashboard-retained', surveyId: evaluationForm.id, companyId: 'synthetic-courier', company: 'Synthetic Courier',
+      surveyType: 'Courier', respondentEmail: email, respondentType: 'Rank & File', department: 'TASS', submissionDate: new Date().toISOString(),
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery', rating: 15, comment: '', dataSource: 'client_csv' } });
+  await page.goto('/login');
+  await signIn(page);
+  await expect(page.getByRole('alert').filter({ hasText: 'Evaluation assignments are unavailable:' })).toBeVisible();
+  await expect(page.getByText(/Dashboard data could not be loaded:/)).toHaveCount(0);
+  const forms = page.getByRole('table', { name: 'Evaluation forms in progress' });
+  const results = page.getByRole('table', { name: 'Average partner evaluation score by type' });
+  const recent = page.getByRole('table', { name: 'Recent evaluation submissions' });
+  await expect(forms.getByText('Completion unavailable', { exact: true })).toBeVisible();
+  await expect(results.getByText('1 submissions', { exact: true })).toBeVisible();
+  await expect(results.getByText('Based on 1 scored submissions', { exact: true })).toBeVisible();
+  await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+  await expect(page.getByText('No required assignments', { exact: true })).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('dashboard-assignment-setup-error.png'), fullPage: true, animations: 'disabled' });
+  service.failures.activeListReads = false;
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('supabase-application-record-changed', { detail: { recordType: 'survey' } })));
+  await expect(page.getByRole('alert').filter({ hasText: 'Evaluation assignments are unavailable:' })).toHaveCount(0);
+  await expect(forms.getByText('0 of 1 completed · 0%', { exact: true })).toBeVisible();
+  await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('employee assignments follow the uploaded supplier list instead of all 273 registered suppliers', async ({ page }, testInfo) => {
+  const service = await backend(page, 'Employee');
+  const names = Array.from({ length: 273 }, (_, i) => `Registered Supplier ${i}`);
+  service.records.push(...names.map((name, i) => ({ record_type: 'partner_company', record_id: `supplier-${i}`, created_at: createdAt,
+    payload: { id: `supplier-${i}`, name, type: 'Supplier', createdAt, isArchived: false } })));
+  const form = { ...evaluationForm, id: 'supplier-active', title: 'Supplier Active List Survey', surveyType: 'Supplier' };
+  service.records.push({ record_type: 'survey', record_id: form.id, created_at: createdAt, payload: form });
+  const retainedResponse = { record_type: 'survey_response', record_id: 'retained:Q01', created_at: createdAt,
+    payload: { responseId: 'retained', surveyId: form.id, companyId: 'supplier-272', company: names[272], surveyType: 'Supplier',
+      respondentEmail: email, respondentType: 'Rank & File', department: 'TASS', submissionDate: createdAt, questionId: 'Q01',
+      questionNumber: 1, question: 'Retained answer', questionCategory: 'Quality', rating: 5, comment: '' } };
+  service.records.push(retainedResponse);
+  service.activeLists.value = [{ survey_type: 'Supplier', companies: names.slice(0, 20) }];
+  await page.goto('/login');
+  await signIn(page, 'Employee');
+  await page.getByRole('button', { name: 'Supplier: 20 pending', exact: true }).click();
+  await expect(page.getByLabel('20 pending supplier evaluations', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('employee-active-suppliers.png'), fullPage: true, animations: 'disabled' });
+  await page.getByRole('button', { name: 'View all 20 pending supplier evaluations', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Search partner or evaluation title' }).fill(names[272]);
+  await expect(page.getByRole('heading', { name: 'No matching evaluations', exact: true })).toBeVisible();
+  service.activeLists.value = [{ survey_type: 'Supplier', companies: names.slice(20, 22) }];
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('supabase-application-record-changed', { detail: { recordType: 'survey' } })));
+  await expect(page.getByRole('button', { name: 'Supplier: 2 pending', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Search partner or evaluation title' }).fill('');
+  await expect(page.getByRole('heading').getByRole('button', { name: 'Start supplier evaluation for Registered Supplier 20', exact: true })).toBeVisible();
+  service.activeLists.value = [];
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Supplier: 0 pending', exact: true })).toBeVisible();
+  service.failures.activeListReads = true;
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Evaluations are unavailable', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Pending evaluation count unavailable', { exact: true })).toBeVisible();
+  expect(service.records.filter(record => record.record_type === 'survey_response')).toEqual([retainedResponse]);
+  expect(service.records.filter(record => record.record_type === 'partner_company' && record.payload.type === 'Supplier')).toHaveLength(273);
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
 });
 
 test('employee read reminders remain pending, persist on reload and renew after a saved resend', async ({ page }, testInfo) => {

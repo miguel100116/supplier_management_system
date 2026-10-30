@@ -106,6 +106,12 @@ function parsePartnerCompany(value: unknown, recordId: string, label: string): J
   optionalDate(candidate.registeredAt, `${label}.registeredAt`);
   optionalBoolean(candidate.isArchived, `${label}.isArchived`);
   optionalDate(candidate.archivedAt, `${label}.archivedAt`);
+  // Legacy or malformed classifications are safely treated as unset so they
+  // cannot activate either legal-document requirement set by accident.
+  if (candidate.businessClassification !== undefined && candidate.businessClassification !== null
+    && candidate.businessClassification !== 'CORP' && candidate.businessClassification !== 'SOL') {
+    delete candidate.businessClassification;
+  }
   if (candidate.branches !== undefined) {
     if (!Array.isArray(candidate.branches) || candidate.branches.length > 500) throw new Error(`${label}.branches must be a bounded list.`);
     candidate.branches.forEach((branch, index) => {
@@ -120,6 +126,8 @@ function parsePartnerCompany(value: unknown, recordId: string, label: string): J
           const parsedDocument = object(document, `${label}.documents.${name}`);
           optionalBoolean(parsedDocument.provided, `${label}.documents.${name}.provided`);
           optionalDate(parsedDocument.expiryDate, `${label}.documents.${name}.expiryDate`);
+          optionalText(parsedDocument.remarks, `${label}.documents.${name}.remarks`, 2_000);
+          optionalText(parsedDocument.description, `${label}.documents.${name}.description`, 500);
         });
       }
     });
@@ -150,7 +158,10 @@ function parseSurvey(value: unknown, recordId: string, label: string): JsonObjec
   optionalStringArray(candidate.accessDepartments, `${label}.accessDepartments`, 100);
   optionalStringArray(candidate.accessRoles, `${label}.accessRoles`, 20);
   optionalStringArray(candidate.evaluationCompanyIds, `${label}.evaluationCompanyIds`, 10_000);
-  return candidate;
+  // Assignment scope is derived from admin uploads at runtime, never trusted
+  // from a persisted survey or written back as a competing source of truth.
+  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persisted } = candidate;
+  return persisted;
 }
 
 function timestampFromResponseId(responseId: string): string | null {
@@ -398,6 +409,39 @@ function parseComplianceSnapshot(value: unknown, recordId: string, label: string
   return candidate;
 }
 
+function parseDocumentMaintenance(value: unknown, recordId: string, label: string): JsonObject {
+  const candidate = parseSimpleIdRecord(value, recordId, label);
+  if (recordId !== 'default') throw new Error(`${label} must use the default record ID.`);
+  if (!Array.isArray(candidate.reminderDays) || candidate.reminderDays.length > 20) throw new Error(`${label}.reminderDays must be a bounded list.`);
+  candidate.reminderDays.forEach((day, index) => {
+    if (!Number.isInteger(day) || Number(day) < 1 || Number(day) > 365) throw new Error(`${label}.reminderDays[${index}] must be 1..365.`);
+  });
+  if (!Number.isInteger(candidate.dailyFinalDays) || Number(candidate.dailyFinalDays) < 1 || Number(candidate.dailyFinalDays) > 90) throw new Error(`${label}.dailyFinalDays must be 1..90.`);
+  if (!candidate.validityYears || typeof candidate.validityYears !== 'object' || Array.isArray(candidate.validityYears)) throw new Error(`${label}.validityYears must be an object.`);
+  Object.entries(candidate.validityYears as Record<string, unknown>).forEach(([name, years]) => {
+    if (!['AFS', 'GIS (Corp)', 'DTI (Sole)', 'Business Permit', 'Import Permit', 'Business Permit/License'].includes(name)) throw new Error(`${label} contains an unsupported document.`);
+    if (years !== null && years !== undefined && (!Number.isInteger(years) || Number(years) < 1 || Number(years) > 50)) throw new Error(`${label}.${name} validity must be 1..50 years or unset.`);
+  });
+  optionalText(candidate.updatedBy, `${label}.updatedBy`, 500);
+  if (candidate.updatedAt !== undefined) isoDate(candidate.updatedAt, `${label}.updatedAt`);
+  return candidate;
+}
+
+function parseDocumentReminderDelivery(value: unknown, recordId: string, label: string): JsonObject {
+  const candidate = parseSimpleIdRecord(value, recordId, label);
+  text(candidate.companyId, `${label}.companyId`, { max: 500 });
+  text(candidate.company, `${label}.company`, { max: 500 });
+  text(candidate.branchId, `${label}.branchId`, { allowEmpty: true, max: 500 });
+  text(candidate.documentName, `${label}.documentName`, { max: 500 });
+  isoDate(candidate.expiryDate, `${label}.expiryDate`);
+  isoDate(candidate.deliveredAt, `${label}.deliveredAt`);
+  finiteNumber(candidate.daysLeft, `${label}.daysLeft`);
+  text(candidate.milestone, `${label}.milestone`, { max: 50 });
+  optionalText(candidate.surveyType, `${label}.surveyType`, 100);
+  optionalText(candidate.branchCode, `${label}.branchCode`, 500);
+  return candidate;
+}
+
 export function parseApplicationRecordPayload(
   recordType: string,
   value: unknown,
@@ -424,6 +468,8 @@ export function parseApplicationRecordPayload(
     case 'employee_notification_state': return parseEmployeeNotificationState(value, recordId, label);
     case 'reminder_settings': return parseReminderSettings(value, recordId, label);
     case 'compliance_snapshot': return parseComplianceSnapshot(value, recordId, label);
+    case 'document_maintenance': return parseDocumentMaintenance(value, recordId, label);
+    case 'document_reminder_delivery': return parseDocumentReminderDelivery(value, recordId, label);
     case 'active_company_snapshot': {
       const snapshot = parseActiveCompanySnapshot(value);
       if (snapshot.id !== recordId) throw new Error(`${label}.id does not match its database record ID.`);

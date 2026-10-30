@@ -2,8 +2,8 @@ import type { ActiveCompanySnapshot } from '../domain/activeCompanySnapshots';
 
 // Generated from the distinct company-name column in the three official
 // Microsoft Forms CSV exports retained at the repository root. The focused
-// seed test compares these values with those files so source changes cannot
-// silently leave this temporary display fallback stale.
+// seed test compares these values with those files for migration consistency.
+// Runtime screens and assignments read saved uploads, never this bundled list.
 export const REPOSITORY_ACTIVE_COMPANY_SEED: ActiveCompanySnapshot[] = [
   {
     id: 'courier-repository-seed-2026-09-23',

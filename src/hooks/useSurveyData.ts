@@ -26,6 +26,8 @@ import { prepareDefaultSurveysForReactivation } from '../features/evaluation-imp
 import { testImportToken } from '../features/evaluation-imports/domain/testImport';
 import { getRequiredDocumentKeys } from '../features/document-tracker/domain/documentRequirements';
 import { getNotificationSettings, NOTIFICATION_SETTINGS_CHANGED_EVENT } from '../features/notifications/services/documentNotificationSettings';
+import { loadDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
+import { createDocumentReminderRefresh } from '../features/notifications/services/documentReminderRefresh';
 import { loadNormalizedPartnerCompanies, normalizeDatabasePartnerCompany } from '../services/normalizedPartnerCompanies';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getSupabaseSessionEmail } from '../services/supabasePasswordAuth';
@@ -40,6 +42,7 @@ import {
   mergeApplicationRecordsById,
   replaceApplicationRecords,
   renewPartnerDocument,
+  updatePartnerDocumentRemarks as updatePartnerDocumentRemarksRecord,
   saveNotificationReadState,
   surveyResponseRecordId,
   upsertApplicationRecords,
@@ -54,6 +57,8 @@ import {
 } from '../features/notifications/domain/notificationReadState';
 import { createDebouncedTask } from '../utils/debouncedTask';
 import { createCoalescedTaskRunner, createRefreshGuard } from '../utils/coalescedTask';
+import { scopeSurveysToActiveLists, type ActiveEvaluationList } from '../features/active-companies/domain/evaluationScope';
+import { createActiveEvaluationListRefresh, loadActiveEvaluationLists } from '../features/active-companies/services/activeEvaluationLists';
 
 // Versioned browser cache for the authenticated Partner Company registry.
 // A missing cache starts empty until Supabase hydration completes.
@@ -70,6 +75,20 @@ const ALL_DEPARTMENTS = [
   'Procurement Group',
   'TASS'
 ];
+
+interface PersistedDocumentReminderDelivery {
+  id: string;
+  companyId: string;
+  company: string;
+  surveyType?: SurveyType;
+  branchId?: string;
+  branchCode?: string;
+  documentName: string;
+  expiryDate: string;
+  daysLeft: number;
+  milestone: string;
+  deliveredAt: string;
+}
 
 function notificationReadStateStorageKey(userEmail: string): string {
   return `${NOTIFICATION_READ_STATE_STORAGE_PREFIX}${notificationReadStateUserKey(userEmail)}`;
@@ -149,8 +168,9 @@ function migrateGeneralCategory(form: CustomForm): CustomForm {
 }
 
 function normalizeCustomForm(form: CustomForm): CustomForm {
+  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persistedForm } = form;
   const normForm = {
-    ...form,
+    ...persistedForm,
     surveyType: normalizeSurveyType(form.surveyType),
     accessDepartments: form.accessDepartments?.length ? form.accessDepartments : ALL_DEPARTMENTS,
     accessRoles: form.accessRoles?.length ? form.accessRoles : [...ALL_SURVEY_ACCESS_ROLES],
@@ -351,8 +371,11 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     responsesRef.current = next;
     setResponsesState(next);
   }, [responseRefreshGuard]);
-  const [surveys, setSurveys] = useState<CustomForm[]>([]);
+  const [storedSurveys, setSurveys] = useState<CustomForm[]>([]);
+  const [activeEvaluationLists, setActiveEvaluationLists] = useState<ActiveEvaluationList[]>([]);
+  const [activeEvaluationError, setActiveEvaluationError] = useState<string | null>(null);
   const [partnerCompanies, setPartnerCompanies] = useState<PartnerCompany[]>([]);
+  const surveys = useMemo(() => scopeSurveysToActiveLists(storedSurveys, partnerCompanies, activeEvaluationLists), [storedSurveys, partnerCompanies, activeEvaluationLists]);
   const [categoryLabels, setCategoryLabels] = useState<Record<SurveyType, string[]>>(() => getStoredCategoryLabels());
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -365,6 +388,34 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const notificationOwnerRef = useRef<string | null>(currentUserEmail?.trim().toLowerCase() ?? null);
   const notificationPersistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [documentClock, setDocumentClock] = useState(() => new Date());
+  const [documentReminderDeliveries, setDocumentReminderDeliveries] = useState<PersistedDocumentReminderDelivery[]>([]);
+  const [documentReminderError, setDocumentReminderError] = useState<string | null>(null);
+  const reminderRefreshRef = useRef<() => Promise<void>>(async () => {});
+
+  useEffect(() => {
+    setDocumentReminderDeliveries([]);
+    setDocumentReminderError(null);
+    if (!isAdmin || !currentUserEmail) return;
+    const controller = new AbortController();
+    const refresh = createDocumentReminderRefresh(async () => {
+      await loadDocumentMaintenanceSettings(controller.signal);
+      const deliveries = await loadApplicationRecords<PersistedDocumentReminderDelivery>('document_reminder_delivery', { signal: controller.signal });
+      if (!controller.signal.aborted) setDocumentReminderDeliveries(deliveries);
+    }, setDocumentReminderError, controller.signal);
+    reminderRefreshRef.current = refresh;
+    void refresh();
+    const refreshDeliveries = (event: Event) => {
+      const recordType = (event as CustomEvent<{ recordType?: ApplicationRecordType }>).detail?.recordType;
+      if (recordType !== 'document_reminder_delivery' && recordType !== 'document_maintenance') return;
+      void refresh();
+    };
+    window.addEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshDeliveries);
+    return () => {
+      controller.abort();
+      reminderRefreshRef.current = async () => {};
+      window.removeEventListener(APPLICATION_RECORD_CHANGED_EVENT, refreshDeliveries);
+    };
+  }, [isAdmin, currentUserEmail]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setDocumentClock(new Date()), 60_000);
@@ -1353,6 +1404,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     let cancelled = false;
     const controller = new AbortController();
     const readOptions = { signal: controller.signal };
+    const readActiveEvaluationLists = createActiveEvaluationListRefresh(
+      () => loadActiveEvaluationLists(controller.signal), setActiveEvaluationLists, setActiveEvaluationError, controller.signal,
+    );
     let initialHydration: Promise<void> | undefined;
     const refreshTimers = new Map<ApplicationRecordType, ReturnType<typeof createDebouncedTask>>();
     let activeBackgroundRefreshes = 0;
@@ -1384,6 +1438,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         loadApplicationRecords<PartnerCompany>('partner_company', readOptions),
         loadApplicationRecords<CustomForm>('survey', readOptions),
         loadApplicationRecords<SurveyResponse>('survey_response', readOptions),
+        readActiveEvaluationLists(),
       ]);
       const companies = storedCompanies.length > 0
         ? storedCompanies
@@ -1486,11 +1541,17 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           return;
         }
         case 'survey': {
-          const storedSurveys = await loadApplicationRecords<CustomForm>('survey', readOptions);
+          const [storedSurveys] = await Promise.all([
+            loadApplicationRecords<CustomForm>('survey', readOptions), readActiveEvaluationLists(),
+          ]);
           if (cancelled) return;
           const normalizedSurveys = storedSurveys.map(normalizeCustomForm);
           setSurveys(normalizedSurveys);
           safeSetItem('survey_analytics_surveys_v6', JSON.stringify(normalizedSurveys));
+          return;
+        }
+        case 'active_company_snapshot': {
+          await readActiveEvaluationLists();
           return;
         }
         case 'survey_response': {
@@ -1596,7 +1657,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       const recordType = detail?.recordType;
       if (!recordType || ![
         'partner_company', 'survey', 'survey_response', 'archive_series',
-        'category_labels', 'notification_read_state',
+        'category_labels', 'notification_read_state', 'active_company_snapshot',
       ].includes(recordType)) return;
       if (recordType === 'survey_response') {
         const responseId = detail.responseId ?? responsesRef.current.find((row) => surveyResponseRecordId(row) === detail.recordId)?.responseId;
@@ -1662,7 +1723,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     if (isSupabaseConfigured) await persistRemoteAsync(upsertApplicationRecords('survey', [surveyWithId], (survey) => survey.id));
     const updatedSurveys = [surveyWithId, ...surveys];
     setSurveys(updatedSurveys);
-    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys));
+    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys.map(normalizeCustomForm)));
     return surveyWithId;
   };
 
@@ -1672,7 +1733,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     await persistRemoteAsync(upsertApplicationRecords('survey', [normalizedForm], (survey) => survey.id));
     setSurveys((current) => {
       const updated = current.map((survey) => survey.id === normalizedForm.id ? normalizedForm : survey);
-      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
       return updated;
     });
     return normalizedForm;
@@ -1683,7 +1744,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     const map = new Map(updatedSurveysList.map((s) => [s.id, normalizeCustomForm(s)]));
     const updated = surveys.map((survey) => map.get(survey.id) ?? survey);
     setSurveys(updated);
-    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
     await persistRemoteAsync(replaceApplicationRecords('survey', updated, (survey) => survey.id));
   };
 
@@ -1715,7 +1776,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         if (!s.questions.some((q) => q.questionCategory === oldLabel)) return s;
         return { ...s, questions: s.questions.map((q) => (q.questionCategory === oldLabel ? { ...q, questionCategory: trimmed } : q)) };
       });
-      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+      safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
       persistRemote(replaceApplicationRecords('survey', updated, (survey) => survey.id));
       return updated;
     });
@@ -1744,7 +1805,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const deleteSurvey = (surveyId: string) => {
     const updatedSurveys = surveys.filter((s) => s.id !== surveyId);
     setSurveys(updatedSurveys);
-    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys));
+    safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updatedSurveys.map(normalizeCustomForm)));
     persistRemote(replaceApplicationRecords('survey', updatedSurveys, (survey) => survey.id));
 
     // Also optionally clean up custom responses submitted specifically to this survey?
@@ -1868,10 +1929,10 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // Update an existing partner company
   const updatePartnerCompany = async (updatedCompany: PartnerCompany) => {
     const normalizedCompany = normalizePartnerCompany(updatedCompany);
+    await persistRemoteAsync(upsertApplicationRecords('partner_company', [normalizedCompany], (company) => company.id));
     const updated = partnerCompanies.map((company) => company.id === normalizedCompany.id ? normalizedCompany : company);
     setPartnerCompanies(updated);
     safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
-    await persistRemoteAsync(upsertApplicationRecords('partner_company', [normalizedCompany], (company) => company.id));
     return normalizedCompany;
   };
 
@@ -1880,7 +1941,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     branchId: string,
     documentName: string,
     expectedDocument: ComplianceDocument,
-    nextDocument: Pick<ComplianceDocument, 'provided' | 'expiryDate'>,
+    nextDocument: Pick<ComplianceDocument, 'provided'> & Partial<Pick<ComplianceDocument, 'expiryDate' | 'remarks' | 'description'>>,
   ): Promise<PartnerCompany> => {
     const updatedCompany = await renewPartnerDocument(
       companyId,
@@ -1889,6 +1950,22 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       expectedDocument,
       nextDocument,
     );
+    setPartnerCompanies((currentCompanies) => {
+      const updated = currentCompanies.map((company) => company.id === companyId ? updatedCompany : company);
+      safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    return updatedCompany;
+  };
+
+  const updatePartnerDocumentRemarks = async (
+    companyId: string,
+    branchId: string,
+    documentName: string,
+    expectedDocument: ComplianceDocument,
+    remarks: string,
+  ): Promise<PartnerCompany> => {
+    const updatedCompany = await updatePartnerDocumentRemarksRecord(companyId, branchId, documentName, expectedDocument, remarks);
     setPartnerCompanies((currentCompanies) => {
       const updated = currentCompanies.map((company) => company.id === companyId ? updatedCompany : company);
       safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
@@ -1927,9 +2004,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // Applies a previously-previewed import result to the live registry.
   const commitMasterListImport = async (result: ImportResult) => {
     const normalized = result.companies.map(normalizePartnerCompany);
+    await persistRemoteAsync(replaceApplicationRecords('partner_company', normalized, (company) => company.id));
     setPartnerCompanies(normalized);
     safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(normalized));
-    await persistRemoteAsync(replaceApplicationRecords('partner_company', normalized, (company) => company.id));
   };
 
   // Remove a partner company
@@ -2252,7 +2329,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         const reopenedById = new Map(surveysToReactivate.map((survey) => [survey.id, survey]));
         setSurveys((current) => {
           const updated = current.map((survey) => reopenedById.get(survey.id) ?? survey);
-          safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated));
+          safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
           return updated;
         });
         surveysToReactivate.forEach((survey) => reactivatedSurveyTypes.add(survey.surveyType));
@@ -2329,7 +2406,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       const summary = computeCompanyDocumentSummary(c, currentDate);
       const groups: Array<{ kind: string; respondentType: string; details: DocumentAlertDetail[] }> = [
         { kind: 'expired', respondentType: 'Document Expired', details: summary.issues.filter((item) => item.status === 'Expired') },
-        { kind: 'expiring-soon', respondentType: 'Document Expiring Soon', details: summary.issues.filter((item) => item.status === 'Expiring Soon') },
+        { kind: 'expiring-soon', respondentType: 'Document Expiring Soon', details: summary.issues.filter((item) => item.status === 'Expiring Soon' && !documentReminderDeliveries.some((delivery) =>
+          delivery.companyId === c.id && delivery.branchId === item.branchId && delivery.documentName === item.documentName && delivery.expiryDate === item.expiryDate && item.daysLeft !== undefined && item.daysLeft <= 30
+        )) },
         { kind: 'for-update', respondentType: 'Document For Update', details: summary.issues.filter((item) => item.status === 'For Update') },
       ];
 
@@ -2352,16 +2431,46 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     });
 
     return list;
-  }, [partnerCompanies, documentClock]);
+  }, [partnerCompanies, documentClock, documentReminderDeliveries]);
 
-  // Extra early heads-up notifications, per document type, configured via
-  // the Document Register's "Add Notification" settings screen (see
-  // src/features/notifications/services/documentNotificationSettings.ts) - on top of the standard
-  // 30-day "Expiring Soon" alert already covered by documentNotifications
-  // above. Defaults to the client's DTI Registration requirement ("Notify
-  // admin at 60-day and 30-day expiration milestones"): the 30-day one is
-  // the standard alert every expiry doc already gets, this covers the extra
-  // 60-day one. Admin can add early milestones for other documents too.
+  const persistedReminderNotifications = useMemo<ResponseNotification[]>(() => {
+    if (!isAdmin) return [];
+    const groups = new Map<string, PersistedDocumentReminderDelivery[]>();
+    documentReminderDeliveries.forEach((delivery) => {
+      const groupKey = `${delivery.companyId}:${delivery.deliveredAt.slice(0, 10)}`;
+      const rows = groups.get(groupKey) ?? [];
+      rows.push(delivery);
+      groups.set(groupKey, rows);
+    });
+    return [...groups.entries()].map(([groupKey, rows]) => {
+      const details: DocumentAlertDetail[] = rows.map((delivery) => ({
+        documentName: delivery.documentName,
+        branchId: delivery.branchId,
+        branchCode: delivery.branchCode,
+        expiryDate: delivery.expiryDate,
+        daysLeft: delivery.daysLeft,
+        status: 'Expiring Soon',
+        milestoneDays: delivery.milestone.startsWith('day-') ? Number(delivery.milestone.slice(4)) : undefined,
+      }));
+      const ids = rows.map((row) => row.id).sort();
+      return {
+        id: `document-reminder:${groupKey}:${ids.join(':')}`,
+        company: rows[0].company,
+        surveyType: rows[0].surveyType ?? 'Supplier',
+        respondentType: 'Document Expiring Soon',
+        submissionDate: rows.map((row) => row.deliveredAt).sort().at(-1) ?? documentClock.toISOString(),
+        questionCount: rows.length,
+        respondentEmail: 'system@mgenesis.com',
+        department: 'Logistics',
+        designation: 'Document Expiry Reminder',
+        documentDetails: details,
+      };
+    });
+  }, [documentReminderDeliveries, documentClock, isAdmin]);
+
+  // Legacy optional advance notices remain configurable through the existing
+  // notification screen. The durable 60/30/daily schedule is delivered from
+  // database-backed document reminder records above.
   const [notificationSettingsVersion, setNotificationSettingsVersion] = useState(0);
   useEffect(() => {
     const handler = () => setNotificationSettingsVersion((v) => v + 1);
@@ -2379,7 +2488,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
     partnerCompanies.forEach((c) => {
       if (c.isArchived) return;
-      const requiredKeys = getRequiredDocumentKeys(c.type, c.supplierOrigin);
+      const requiredKeys = getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification);
 
       rules.forEach((rule) => {
         if (!requiredKeys.includes(rule.docName)) return;
@@ -2394,8 +2503,11 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           const milestone = rule.earlyMilestoneDays
             .filter((days) => days > EXPIRING_SOON_DAYS)
             .sort((a, b) => a - b)
-            .find((days) => daysLeft <= days);
+            .find((days) => daysLeft === days);
           if (milestone === undefined) return [];
+          if (documentReminderDeliveries.some((delivery) => delivery.companyId === c.id
+            && delivery.branchId === branch.id && delivery.documentName === rule.docName
+            && delivery.expiryDate === doc.expiryDate && delivery.milestone === `day-${milestone}`)) return [];
           return [{
             documentName: rule.docName,
             branchId: branch.id,
@@ -2425,15 +2537,15 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     });
 
     return list;
-  }, [partnerCompanies, notificationSettingsVersion, documentClock]);
+  }, [partnerCompanies, notificationSettingsVersion, documentClock, documentReminderDeliveries]);
 
   const combinedNotifications = useMemo(() => {
-    const list = [...documentNotifications, ...earlyMilestoneNotifications, ...notifications];
+    const list = [...documentNotifications, ...earlyMilestoneNotifications, ...persistedReminderNotifications, ...notifications];
     return list.sort((a, b) => b.submissionDate.localeCompare(a.submissionDate));
-  }, [documentNotifications, earlyMilestoneNotifications, notifications]);
+  }, [documentNotifications, earlyMilestoneNotifications, persistedReminderNotifications, notifications]);
 
   useEffect(() => {
-    const systemNotifications = [...documentNotifications, ...earlyMilestoneNotifications];
+    const systemNotifications = [...documentNotifications, ...earlyMilestoneNotifications, ...persistedReminderNotifications];
     const currentIds = new Set(systemNotifications.map((notification) => notification.id));
     const newSystemIds = systemNotifications
       .map((notification) => notification.id)
@@ -2446,7 +2558,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       newSystemIds.forEach((id) => next.add(id));
       return next;
     });
-  }, [documentNotifications, earlyMilestoneNotifications]);
+  }, [documentNotifications, earlyMilestoneNotifications, persistedReminderNotifications]);
 
   const combinedUnreadNotificationIds = useMemo(
     () => new Set(combinedNotifications.filter((notification) => !readNotificationIdsRef.current.has(notification.id)).map((notification) => notification.id)),
@@ -2476,14 +2588,19 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     addPartnerCompany,
     updatePartnerCompany,
     updatePartnerDocument,
+    updatePartnerDocumentRemarks,
     removePartnerCompany,
     previewMasterListImport,
     rebuildMasterListImportPreview,
     commitMasterListImport,
     isLoading,
     isRefreshing,
-    error,
+    error: error ?? activeEvaluationError,
+    dataError: error,
+    assignmentError: activeEvaluationError,
     notifications: combinedNotifications,
+    documentReminderError,
+    retryDocumentReminders: () => reminderRefreshRef.current(),
     unreadCount: combinedUnreadNotificationIds.size,
     unreadNotificationIds: combinedUnreadNotificationIds,
     markNotificationsRead,

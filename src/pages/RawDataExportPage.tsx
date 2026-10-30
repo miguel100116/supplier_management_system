@@ -1,3 +1,5 @@
+import { PaperSizeSelect } from '../features/reports/components/PaperSizeSelect';
+import type { PaperSize } from '../features/reports/domain/paperSize';
 import { exportTablesAsWord } from '../features/reports/services/exporters';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ChevronDown, Download, FileSpreadsheet, FileText, FileType, Layers, PackageSearch, Table2, Truck } from 'lucide-react';
@@ -7,7 +9,7 @@ import { buildRawResponseExportTables, exportRawResponsesAsCSV, exportRawRespons
 interface RawDataExportPageProps {
   responses: SurveyResponse[];
   canExport?: boolean;
-  initialCategory?: SurveyType;
+  initialCategory?: SurveyType; initialPaperSize?: PaperSize;
   onBack: () => void;
 }
 
@@ -19,7 +21,8 @@ const CATEGORY_CONFIG: { type: SurveyType; icon: typeof Truck; description: stri
   { type: 'Subcontractor', icon: Layers, description: 'Raw response submissions for subcontractors, one merged sheet sorted by submission date.' },
 ];
 
-export function RawDataExportPage({ responses, canExport = false, onBack, initialCategory }: RawDataExportPageProps) {
+export function RawDataExportPage({ responses, canExport = false, onBack, initialCategory, initialPaperSize = 'long-bond' }: RawDataExportPageProps) {
+  const [paperSize, setPaperSize] = useState<PaperSize>(initialPaperSize);
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -33,7 +36,7 @@ export function RawDataExportPage({ responses, canExport = false, onBack, initia
         </div>
       </div>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <div className="flex justify-end"><PaperSizeSelect value={paperSize} onChange={setPaperSize} disabled={!canExport} /></div><section className="grid gap-4 md:grid-cols-3">
         {CATEGORY_CONFIG.filter(item => !initialCategory || item.type === initialCategory).map(({ type, icon, description }) => {
           const typeResponses = responses.filter((r) => r.surveyType === type);
           const companyCount = new Set(typeResponses.map((r) => r.company)).size;
@@ -48,10 +51,10 @@ export function RawDataExportPage({ responses, canExport = false, onBack, initia
               disabled={typeResponses.length === 0}
               onExport={async (format) => {
                 const filenameBase = `${type.toLowerCase()}_raw_evaluations`;
-                if (format === 'docx') await exportTablesAsWord(`Raw Data Export (${type})`, buildRawResponseExportTables(responses, type), filenameBase, { kind: 'raw', parameters: { category: type } });
+                if (format === 'docx') await exportTablesAsWord(`Raw Data Export (${type})`, buildRawResponseExportTables(responses, type), filenameBase, { kind: 'raw', parameters: { category: type, paperSize } });
                 else if (format === 'csv') await exportRawResponsesAsCSV(responses, type, filenameBase);
                 else if (format === 'excel') await exportRawResponsesAsExcel(responses, type, filenameBase);
-                else await exportRawResponsesAsPDF(responses, type, filenameBase);
+                else await exportRawResponsesAsPDF(responses, type, filenameBase, paperSize);
               }}
             />
           );

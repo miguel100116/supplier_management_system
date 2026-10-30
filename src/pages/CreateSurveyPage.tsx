@@ -186,7 +186,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onRequestExitRea
           <section className="space-y-4 rounded-lg border border-slate-200 p-4 dark:border-slate-800 sm:p-5" aria-labelledby="form-details-heading">
             <div className="border-b border-slate-100 pb-3 dark:border-slate-800"><h3 id="form-details-heading" className="text-sm font-semibold text-slate-700 dark:text-slate-200">Form details</h3><p className="mt-1 text-xs text-slate-400">Set the title and instructions employees will see.</p></div>
             <div>
-              <label htmlFor="survey-title" className="field-label">Survey Title *</label>
+              <label htmlFor="survey-title" className="field-label">Survey Title <span className="text-rose-600" aria-hidden="true">*</span></label>
               <input
                 id="survey-title"
                 type="text"
@@ -213,7 +213,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onRequestExitRea
           <section className="space-y-4 rounded-lg bg-slate-50/80 p-4 dark:bg-slate-900/50" aria-labelledby="form-settings-heading">
             <div><h3 id="form-settings-heading" className="text-sm font-semibold text-slate-700 dark:text-slate-200">Audience &amp; schedule</h3><p className="mt-1 text-xs text-slate-400">Choose who this form is for and when it closes.</p></div>
             <div>
-              <label htmlFor="survey-type" className="field-label">Survey Type (Audience) *</label>
+              <label htmlFor="survey-type" className="field-label">Survey Type (Audience) <span className="text-rose-600" aria-hidden="true">*</span></label>
               <div className="relative mt-1">
                 <select
                   id="survey-type"
@@ -265,7 +265,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onRequestExitRea
 
             <div>
               <label htmlFor="max-rating" className="field-label flex items-center justify-between">
-                <span>Rating Scale Max (N) *</span>
+                <span>Rating Scale Max (N) <span className="text-rose-600" aria-hidden="true">*</span></span>
                 <span className="font-semibold text-[#2187CD] dark:text-sky-300 bg-sky-50 dark:bg-sky-950/40 px-2 py-0.5 rounded text-xs">
                   0 to {maxRating}
                 </span>
@@ -316,7 +316,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onRequestExitRea
                     <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                       {idx + 1}
                     </div>
-                    <span className="text-[11px] font-semibold text-slate-500">Question {idx + 1}</span>
+                    <span className="text-[11px] font-semibold text-slate-500">Question</span>
                   </div>
                   
                   <button
@@ -332,7 +332,7 @@ export function CreateSurveyPage({ onBack, onRequestCloseReady, onRequestExitRea
                 <div className="flex-1 space-y-3">
                   <div className="flex flex-col md:flex-row gap-3">
                     <div className="flex-1">
-                      <label className="text-[11px] font-semibold text-slate-500">Question text *</label>
+                      <label className="text-[11px] font-semibold text-slate-500">Question text <span className="text-rose-600" aria-hidden="true">*</span></label>
                       <input
                         type="text"
                         className="field mt-1"

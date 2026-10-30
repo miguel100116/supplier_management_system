@@ -43,8 +43,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
   },
 ];
 
-const ALL_UPLOADS_OPTION = '__all_uploads__';
-
 function formatSnapshotDate(value: string): string {
   return new Date(value).toLocaleString(undefined, {
     year: 'numeric',
@@ -58,7 +56,6 @@ function formatSnapshotDate(value: string): string {
 export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalProps) {
   useModalEscape(isOpen, onClose, 220);
   const [snapshots, setSnapshots] = useState<ActiveCompanySnapshot[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Partial<Record<SurveyType, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
 
@@ -78,11 +75,6 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
         .then((loaded) => {
           if (cancelled) return;
           setSnapshots(loaded);
-          setSelectedIds({
-            Courier: snapshotsBySurveyType(loaded, 'Courier')[0]?.id,
-            Supplier: snapshotsBySurveyType(loaded, 'Supplier')[0]?.id,
-            Subcontractor: snapshotsBySurveyType(loaded, 'Subcontractor')[0]?.id,
-          });
         })
         .catch((error) => {
           if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Unable to load active companies.');
@@ -121,7 +113,7 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
               Active Companies by Type
             </h2>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              View the latest list or select an earlier upload.
+              Latest active-company lists by partner type.
             </p>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close active companies">
@@ -142,13 +134,8 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
             <div className="admin-active-companies-sections divide-y divide-slate-200 border-y border-slate-200 dark:divide-slate-800 dark:border-slate-800">
               {TYPE_CONFIGS.map(({ type, label, accent, badge }) => {
                 const history = histories[type];
-                const requestedId = selectedIds[type] ?? history[0]?.id;
-                const selected = history.find((snapshot) => snapshot.id === requestedId) ?? history[0];
-                const showAllUploads = requestedId === ALL_UPLOADS_OPTION;
-                const companies = showAllUploads
-                  ? [...new Set(history.flatMap((snapshot) => snapshot.companies))]
-                  : selected?.companies ?? [];
-                const selectedOption = showAllUploads ? ALL_UPLOADS_OPTION : selected?.id ?? '';
+                const latest = history[0];
+                const companies = latest?.companies ?? [];
                 return (
                   <section key={type} className="py-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -159,29 +146,12 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
                             {companies.length}
                           </span>
                         </div>
-                        {selected && (
+                        {latest && (
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Source: {showAllUploads ? `All ${history.length} saved upload${history.length === 1 ? '' : 's'}` : selected.sourceFileName}
+                            Last updated: {formatSnapshotDate(latest.uploadedAt)}
                           </p>
                         )}
                       </div>
-                      {history.length > 0 && (
-                        <label className="flex min-w-0 items-center gap-2 text-xs text-slate-500 dark:text-slate-400 sm:shrink-0">
-                          <span className="shrink-0">Upload view</span>
-                          <select
-                            value={selectedOption}
-                            onChange={(event) => setSelectedIds((current) => ({ ...current, [type]: event.target.value }))}
-                            className="min-w-0 max-w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-[#2187CD] focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                          >
-                            <option value={ALL_UPLOADS_OPTION}>All uploads</option>
-                            {history.map((snapshot, index) => (
-                              <option key={snapshot.id} value={snapshot.id}>
-                                {index === 0 ? 'Latest — ' : ''}{formatSnapshotDate(snapshot.uploadedAt)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
                     </div>
                     {companies.length > 0 ? (
                       <ul className="admin-active-companies-list mt-3 grid grid-cols-1 gap-x-8 md:grid-cols-2">

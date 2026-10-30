@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import type { SurveyType } from '../../../types/survey';
 
 export const ACTIVE_COMPANY_FILE_EXTENSIONS = ['.csv', '.xlsx', '.xls'] as const;
+export const MAX_ACTIVE_COMPANY_FILE_BYTES = 25 * 1024 * 1024;
 
 export interface ActiveCompanySnapshot {
   id: string;
@@ -10,6 +11,36 @@ export interface ActiveCompanySnapshot {
   uploadedBy: string;
   sourceFileName: string;
   companies: string[];
+}
+
+export type ActiveCompanySnapshotDuplicateReason = 'matching-filename' | 'matching-company-list' | 'both';
+
+export interface ActiveCompanySnapshotDuplicate {
+  snapshot: ActiveCompanySnapshot;
+  reason: ActiveCompanySnapshotDuplicateReason;
+}
+
+export function findActiveCompanySnapshotDuplicates(
+  snapshots: readonly ActiveCompanySnapshot[],
+  surveyType: SurveyType,
+  fileName: string,
+  companies: readonly string[],
+): ActiveCompanySnapshotDuplicate[] {
+  const normalizeName = (value: string) => value.trim().normalize('NFKC').replace(/\s+/g, ' ').toLocaleLowerCase();
+  const companyListKey = (values: readonly string[]) => JSON.stringify(values.map(normalizeName).sort());
+  const incomingName = normalizeName(fileName);
+  const incomingCompanies = companyListKey(companies);
+
+  return snapshots.flatMap((snapshot) => {
+    if (snapshot.surveyType !== surveyType) return [];
+    const sameName = normalizeName(snapshot.sourceFileName) === incomingName;
+    const sameCompanyList = companyListKey(snapshot.companies) === incomingCompanies;
+    if (!sameName && !sameCompanyList) return [];
+    return [{
+      snapshot,
+      reason: sameName && sameCompanyList ? 'both' : sameName ? 'matching-filename' : 'matching-company-list',
+    }];
+  });
 }
 
 function normalizeCompanyKey(value: string): string {
@@ -100,6 +131,9 @@ export function parseActiveCompanyWorkbook(
   if (!hasActiveCompanyFileExtension(fileName)) {
     throw new Error('Choose a CSV or Excel file (.csv, .xlsx, or .xls).');
   }
+  if (data.byteLength <= 0 || data.byteLength > MAX_ACTIVE_COMPANY_FILE_BYTES) {
+    throw new Error('The file must be between 1 byte and 25 MB.');
+  }
 
   const workbook = XLSX.read(data, { type: 'array', cellDates: true });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -179,5 +213,6 @@ export function snapshotsBySurveyType(
 ): ActiveCompanySnapshot[] {
   return snapshots
     .filter((snapshot) => snapshot.surveyType === surveyType)
-    .sort((left, right) => right.uploadedAt.localeCompare(left.uploadedAt));
+    .sort((left, right) => Date.parse(right.uploadedAt) - Date.parse(left.uploadedAt)
+      || (left.id < right.id ? 1 : left.id > right.id ? -1 : 0));
 }

@@ -6,16 +6,12 @@ import {
   ActiveCompanySnapshot,
   parseActiveCompanySnapshot,
 } from '../domain/activeCompanySnapshots';
-import { REPOSITORY_ACTIVE_COMPANY_SEED } from '../data/repositoryActiveCompanySeed';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '../../../services/supabaseClient';
 
-export async function loadActiveCompanySnapshots(): Promise<ActiveCompanySnapshot[]> {
-  const values = await loadApplicationRecords<unknown>('active_company_snapshot');
-  const stored = values.map(parseActiveCompanySnapshot);
-  const storedIds = new Set(stored.map((snapshot) => snapshot.id));
-  return [
-    ...stored,
-    ...REPOSITORY_ACTIVE_COMPANY_SEED.filter((snapshot) => !storedIds.has(snapshot.id)),
-  ];
+export async function loadActiveCompanySnapshots(client: SupabaseClient = supabase): Promise<ActiveCompanySnapshot[]> {
+  const values = await loadApplicationRecords<unknown>('active_company_snapshot', undefined, client);
+  return values.map(parseActiveCompanySnapshot);
 }
 
 export async function saveActiveCompanySnapshot(snapshot: ActiveCompanySnapshot): Promise<void> {
