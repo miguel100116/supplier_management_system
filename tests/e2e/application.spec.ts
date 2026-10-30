@@ -134,6 +134,7 @@ test('Supplier Local attention containers filter only the expanded company and t
   documents.AFS = { provided: true, expiryDate: '2000-01-01' };
   documents['Import Permit'] = { provided: true, expiryDate: new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10) };
   documents['DTI (Sole)'] = { provided: true, expiryDate: '2000-01-01' };
+  Object.assign(documents.SIF, { remarks: 'Awaiting the updated supplier form.' });
   for (const [id, name, branchDocuments] of [
     ['local-one', 'First Local Supplier', documents],
     ['local-two', 'Second Local Supplier', { ...currentDocuments, SIF: { provided: false, expiryDate: '2099-12-31' } }],
@@ -178,6 +179,14 @@ test('Supplier Local attention containers filter only the expanded company and t
   await checkScope(4, false);
   await expect(required.getByRole('listitem')).toHaveText([/SIF.*Missing/, /BIR2303.*Missing/, /Articles of Incorporation.*Missing/, /Product Profile.*Missing/]);
   await expect(required.getByRole('heading')).toHaveText('Required documents4 / 15');
+  const sifCard = required.getByRole('listitem').filter({ has: page.getByText('SIF', { exact: true }) });
+  const actionsBox = await sifCard.getByRole('button', { name: 'Actions for SIF', exact: true }).boundingBox();
+  const remarksBox = await sifCard.getByRole('button', { name: 'View admin remarks for SIF', exact: true }).boundingBox();
+  const cardBox = await sifCard.boundingBox();
+  expect(remarksBox!.y).toBeGreaterThanOrEqual(actionsBox!.y + actionsBox!.height);
+  expect(remarksBox!.x).toBe(actionsBox!.x);
+  expect(remarksBox!.y + remarksBox!.height).toBeLessThanOrEqual(cardBox!.y + cardBox!.height);
+  await sifCard.screenshot({ path: testInfo.outputPath('document-remarks-bottom-right.png'), animations: 'disabled' });
   await attention.screenshot({ path: testInfo.outputPath('required-attention-missing.png'), animations: 'disabled' });
   await expired.click();
   await expect(missing).toHaveAttribute('aria-pressed', 'false');
