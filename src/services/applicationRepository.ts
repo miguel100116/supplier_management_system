@@ -447,7 +447,7 @@ export function subscribeToApplicationChanges(client = supabase): () => void {
         }));
       } else if (status === 'SUBSCRIBED') {
         // Reconcile even the first subscription: hydration may race channel setup.
-        for (const recordType of hasSubscribed ? realtimeRecordTypes : ['survey_response', 'survey'] as ApplicationRecordType[]) {
+        for (const recordType of realtimeRecordTypes) {
           window.dispatchEvent(new CustomEvent(APPLICATION_RECORD_CHANGED_EVENT, {
             detail: { recordType, reason: hasSubscribed ? 'reconnect' : 'subscribed' },
           }));

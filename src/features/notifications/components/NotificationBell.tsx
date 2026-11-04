@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bell, ClipboardCheck, FileText, Inbox } from 'lucide-react';
 import { ResponseNotification } from '../../../types/survey';
-import { formatRelativeTime } from '../../../utils/time';
+import { isDocumentNotification, notificationAge } from '../domain/notificationPresentation';
+import { useNotificationClock } from '../hooks/useNotificationClock';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 
 interface NotificationBellProps {
@@ -28,7 +29,7 @@ function formatExpiryDate(date?: string): string {
 
 export function NotificationBell({ notifications, unreadCount, unreadNotificationIds, onOpen, onViewAll, appearance = 'brand' }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [, forceTick] = useState(0);
+  const now = useNotificationClock(isOpen);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,12 +39,6 @@ export function NotificationBell({ notifications, unreadCount, unreadNotificatio
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const interval = setInterval(() => forceTick((tick) => tick + 1), 30000);
-    return () => clearInterval(interval);
-  }, [isOpen]);
 
   useModalEscape(isOpen, () => setIsOpen(false), 0, false);
 
@@ -97,7 +92,7 @@ export function NotificationBell({ notifications, unreadCount, unreadNotificatio
           ) : (
             <ul className="max-h-[min(26rem,65vh)] overflow-y-auto divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
               {notifications.slice(0, 6).map((item) => {
-                const isDocumentAlert = item.designation === 'Document Alert';
+                const isDocumentAlert = isDocumentNotification(item);
                 const isUnread = unreadNotificationIds.has(item.id);
                 const alertClass = item.respondentType === 'Document Expired'
                   ? 'text-rose-600 dark:text-rose-400'
@@ -127,7 +122,7 @@ export function NotificationBell({ notifications, unreadCount, unreadNotificatio
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <p className={`min-w-0 break-words text-sm leading-5 text-slate-800 dark:text-slate-100 ${isUnread ? 'font-semibold' : 'font-medium'}`}>{item.company}</p>
-                          <span className="shrink-0 whitespace-nowrap text-[10px] text-slate-400 dark:text-slate-500">{formatRelativeTime(item.submissionDate)}</span>
+                          <span className="shrink-0 whitespace-nowrap text-[10px] text-slate-400 dark:text-slate-500">{notificationAge(item, now)}</span>
                         </div>
                         <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500 dark:text-slate-400">
                           <span>{item.surveyType}</span><span aria-hidden="true">·</span>

@@ -123,6 +123,8 @@ test('Realtime shares one channel, accepts PK-only DELETE events, reconciles rec
   assert.equal(records.filter.event, '*');
   assert.equal(records.filter.filter, undefined, 'Supabase cannot filter DELETE events');
   statusChanged('SUBSCRIBED');
+  assert.ok(changes.some(change => change.recordType === 'notification_read_state' && change.reason === 'subscribed'));
+  assert.ok(changes.some(change => change.recordType === 'document_reminder_delivery' && change.reason === 'subscribed'));
   records.callback({ new: {}, old: { record_type: 'survey_response', record_id: 'r:q' }, eventType: 'DELETE' });
   assert.deepEqual(changes.at(-1), { recordType: 'survey_response', recordId: 'r:q' });
   statusChanged('CHANNEL_ERROR');

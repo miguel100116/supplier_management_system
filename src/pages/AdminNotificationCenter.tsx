@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { CalendarDays, Check, CheckCheck, ChevronDown, ChevronUp, ClipboardCheck, FileText, RotateCcw, Search } from 'lucide-react';
 import { ResponseNotification, SurveyType } from '../types/survey';
-import { formatLogDate, formatLogTime, formatRelativeTime } from '../utils/time';
+import { formatLogDate, formatLogTime } from '../utils/time';
+import { compareNotificationDates, isDocumentNotification as isDocumentAlert, notificationAge, notificationDate, notificationWithinDateRange } from '../features/notifications/domain/notificationPresentation';
+import { useNotificationClock } from '../features/notifications/hooks/useNotificationClock';
 import { StateMessage } from '../components/StateMessage';
-import { isWithinDateRange } from '../utils/tableFilters';
 
 interface AdminNotificationCenterProps {
   notifications: ResponseNotification[];
@@ -34,10 +35,6 @@ const categoryClasses: Record<SurveyType, string> = {
   Supplier: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300',
   Subcontractor: 'bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300',
 };
-
-function isDocumentAlert(item: ResponseNotification) {
-  return item.designation === 'Document Alert';
-}
 
 function documentAlertLabel(item: ResponseNotification): string {
   if (item.respondentType === 'Document Expired') return 'Expired';
@@ -80,6 +77,7 @@ export function AdminNotificationCenter({
   const [sortField, setSortField] = useState<SortField>('submissionDate');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [expandedDocumentId, setExpandedDocumentId] = useState<string | null>(null);
+  const now = useNotificationClock();
 
   const readCount = Math.max(0, notifications.length - unreadCount);
   const enriched = useMemo(
@@ -93,7 +91,7 @@ export function AdminNotificationCenter({
       if (readFilter === 'unread' && !item.isUnread) return false;
       if (readFilter === 'read' && item.isUnread) return false;
       if (surveyType !== 'All' && item.surveyType !== surveyType) return false;
-      if (!isWithinDateRange(item.submissionDate, dateFrom, dateTo)) return false;
+      if (!notificationWithinDateRange(item.submissionDate, dateFrom, dateTo)) return false;
       if (activityType === 'document' && !isDocumentAlert(item)) return false;
       if (activityType === 'submission' && isDocumentAlert(item)) return false;
       if (!needle) return true;
@@ -107,6 +105,7 @@ export function AdminNotificationCenter({
   const sortedNotifications = useMemo(() => {
     const result = [...filtered];
     result.sort((a, b) => {
+      if (sortField === 'submissionDate') return compareNotificationDates(a.submissionDate, b.submissionDate, sortOrder);
       const left = String(a[sortField] ?? '');
       const right = String(b[sortField] ?? '');
       const compared = left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
@@ -271,7 +270,7 @@ export function AdminNotificationCenter({
                               <span className="font-medium text-slate-700 dark:text-slate-200">{detail.documentName}</span>
                               {detail.branchCode && ` · ${detail.branchCode}`}
                               {` · ${formatDocumentDate(detail.expiryDate)} · ${detail.status}`}
-                              {typeof detail.daysLeft === 'number' && ` (${detail.daysLeft} days)`}
+                              {typeof detail.daysLeft === 'number' && ` (${detail.daysLeft} days${item.designation === 'Document Expiry Reminder' ? ' at delivery' : ''})`}
                               {detail.milestoneDays ? ` · ${detail.milestoneDays}-day reminder` : ''}
                             </p>
                           ))}
@@ -286,9 +285,9 @@ export function AdminNotificationCenter({
                   </div>
 
                   <div className="flex shrink-0 items-center justify-between gap-3 pl-12 sm:justify-end sm:pl-0">
-                    <time dateTime={item.submissionDate} className="flex flex-col text-left text-[11px] text-slate-500 dark:text-slate-400 sm:text-right">
-                      <span className="font-medium text-slate-700 dark:text-slate-200">{formatLogDate(item.submissionDate)} {formatLogTime(item.submissionDate)}</span>
-                      <span className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{formatRelativeTime(item.submissionDate)}</span>
+                    <time dateTime={notificationDate(item.submissionDate) || undefined} className="flex flex-col text-left text-[11px] text-slate-500 dark:text-slate-400 sm:text-right">
+                      <span className="font-medium text-slate-700 dark:text-slate-200">{item.submissionDate ? `${formatLogDate(notificationDate(item.submissionDate))} ${formatLogTime(notificationDate(item.submissionDate))}` : 'No recorded event time'}</span>
+                      <span className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{notificationAge(item, now)}</span>
                     </time>
                     <button
                       type="button"

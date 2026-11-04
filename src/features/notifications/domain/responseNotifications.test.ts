@@ -18,3 +18,16 @@ test('notifications group actual answers once and sort by completion timestamp',
   const notifications = groupResponsesToNotifications([row, { ...row, questionId: 'Q40' }, { ...row, responseId: 'two', submissionDate: '2026-10-24T00:00:00Z' }]);
   assert.deepEqual(notifications.map((item) => [item.id, item.questionCount]), [['two', 1], ['one', 2]]);
 });
+
+test('notification answer counts exclude blank/N/A and metadata, retain zero and deduplicate questions', () => {
+  assert.equal(toNotification([{ ...row, rating: 'N/A', comment: '' }]), null);
+  const notification = toNotification([row, row, { ...row, questionId: 'unanswered', rating: 'N/A' }]);
+  assert.equal(notification?.questionCount, 1);
+});
+
+test('notification history retains more than 15 or 200 submissions in chronological order', () => {
+  const rows = Array.from({length: 220}, (_, i) => ({ ...row, responseId: `r-${i}`, submissionDate: new Date(Date.UTC(2026,0,1,0,i)).toISOString() }));
+  const notifications = groupResponsesToNotifications(rows);
+  assert.equal(notifications.length, 220);
+  assert.equal(notifications[0].id, 'r-219');
+});

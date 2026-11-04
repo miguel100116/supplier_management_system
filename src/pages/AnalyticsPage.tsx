@@ -319,7 +319,19 @@ function AnalyticsHeader({ dataScope, onChangeDataScope }: { dataScope: 'current
   return (
     <header className="space-y-3">
       <PageDescription>Review evaluation results, identify performance gaps, and compare partner companies.</PageDescription>
-      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800"><div role="group" aria-label="Analytics date scope" className="admin-tab-strip">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-[11px] text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-weighted</span></div></div>
+      <div className="grid min-w-0 gap-3 border-b border-slate-200 pb-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center dark:border-slate-800">
+        <div role="group" aria-label="Analytics date scope" className="admin-tab-strip">
+          {(['current', 'all-time', 'custom'] as const).map((scope) => (
+            <button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>
+              {scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}
+            </button>
+          ))}
+        </div>
+        <div role="group" aria-label="Company ranking method" className="flex max-w-full gap-1 whitespace-nowrap text-[13px] leading-tight max-[560px]:text-xs">
+          <span className="inline-flex min-h-10 shrink-0 items-center border-b-2 border-transparent px-3.5 font-medium text-slate-500 max-[560px]:min-h-[38px] max-[560px]:px-[11px] dark:text-slate-400">Company ranking</span>
+          <span className="inline-flex min-h-10 shrink-0 items-center border-b-2 border-[#0063a9] px-3.5 font-semibold text-[#0063a9] max-[560px]:min-h-[38px] max-[560px]:px-[11px] dark:border-sky-300 dark:text-sky-300">Volume-weighted</span>
+        </div>
+      </div>
     </header>
   );
 }
