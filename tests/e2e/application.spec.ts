@@ -117,6 +117,10 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
 
 async function openReadyPage(page: Page, path: string) {
   await page.goto(path);
+  await waitForReadyPage(page);
+}
+
+async function waitForReadyPage(page: Page) {
   const main = page.getByRole('main');
   await main.waitFor({ state: 'visible' });
   // Feature assertions start after the route's code and shared data are ready.
@@ -1423,6 +1427,7 @@ test('History retains saved files across recipe versions without quarantine warn
   service.records.push({ record_type: 'export_history', record_id: 'invalid-options', created_at: createdAt,
     payload: { ...base, id: 'invalid-options', title: 'Saved report with invalid options', filename: 'invalid-options.pdf', recipe: { kind: 'summary', parameters: [] } } });
   await page.reload();
+  await waitForReadyPage(page);
   await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(8);
   const futureEntry = page.getByRole('article').filter({ hasText: 'Future-version saved report' });
   const invalidEntry = page.getByRole('article').filter({ hasText: 'Saved report with invalid options' });
