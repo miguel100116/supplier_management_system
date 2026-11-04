@@ -6,7 +6,7 @@ export function formatRelativeTime(isoDate: string, now: Date = new Date()): str
   if (diffMs < 0) return 'just now';
 
   const seconds = Math.floor(diffMs / 1000);
-  if (seconds < 45) return 'just now';
+  if (seconds < 60) return 'just now';
 
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;

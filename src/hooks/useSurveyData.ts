@@ -1,4 +1,5 @@
 import { toNotification, groupResponsesToNotifications } from '../features/notifications/domain/responseNotifications';
+import { compareNotificationDates } from '../features/notifications/domain/notificationPresentation';
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
 import { surveyQuestions } from '../data/questions';
@@ -64,8 +65,6 @@ import { createActiveEvaluationListRefresh, loadActiveEvaluationLists } from '..
 // A missing cache starts empty until Supabase hydration completes.
 const PARTNER_COMPANIES_STORAGE_KEY = 'survey_analytics_partner_companies_v8';
 
-const NOTIFICATION_HISTORY_LIMIT = 200;
-const INITIAL_NOTIFICATION_SEED = 15;
 const NOTIFICATION_READ_STATE_STORAGE_PREFIX = 'notification_read_state_v1:';
 const ALL_DEPARTMENTS = [
   'Accounts Payable - Trade',
@@ -384,8 +383,6 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const [unreadNotificationIds, setUnreadNotificationIds] = useState<Set<string>>(() => new Set());
   const knownSystemNotificationIdsRef = useRef<Set<string>>(new Set());
   const readNotificationIdsRef = useRef<Set<string>>(new Set());
-  const systemNotificationDetectedAtRef = useRef<Map<string, string>>(new Map());
-  const notificationOwnerRef = useRef<string | null>(currentUserEmail?.trim().toLowerCase() ?? null);
   const notificationPersistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [documentClock, setDocumentClock] = useState(() => new Date());
   const [documentReminderDeliveries, setDocumentReminderDeliveries] = useState<PersistedDocumentReminderDelivery[]>([]);
@@ -421,14 +418,6 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     const timer = window.setInterval(() => setDocumentClock(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
-
-  const detectedAtForNotification = (id: string, currentDate: Date): string => {
-    const existing = systemNotificationDetectedAtRef.current.get(id);
-    if (existing) return existing;
-    const detectedAt = currentDate.toISOString();
-    systemNotificationDetectedAtRef.current.set(id, detectedAt);
-    return detectedAt;
-  };
 
   const persistRemoteAsync = async (operation: Promise<void>): Promise<void> => {
     setError(null);
@@ -1358,7 +1347,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           setResponses(loadedResponses);
 
           const groupedNotifs = groupResponsesToNotifications(loadedResponses);
-          setNotifications(groupedNotifs.slice(0, INITIAL_NOTIFICATION_SEED));
+          setNotifications(groupedNotifs);
         }
       } catch (loadError) {
         if (isMountedRef.current) {
@@ -1382,11 +1371,6 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   // alerts run. The local record is an authenticated browser cache;
   // hydration below reconciles it with the owner's Supabase record.
   useEffect(() => {
-    const owner = currentUserEmail?.trim().toLowerCase() ?? null;
-    if (notificationOwnerRef.current !== owner) {
-      notificationOwnerRef.current = owner;
-      systemNotificationDetectedAtRef.current.clear();
-    }
     knownSystemNotificationIdsRef.current = new Set();
     setUnreadNotificationIds(new Set());
     if (!currentUserEmail) {
@@ -1472,7 +1456,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         });
       };
       scheduleAfterPaint(() => {
-        setNotifications(groupResponsesToNotifications(responsesRef.current).slice(0, INITIAL_NOTIFICATION_SEED));
+        setNotifications(groupResponsesToNotifications(responsesRef.current));
         safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(responsesRef.current)));
       });
 
@@ -1588,7 +1572,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           if (cancelled) return;
           hasHydratedResponses = true;
           setResponses(nextResponses);
-          setNotifications(groupResponsesToNotifications(nextResponses).slice(0, INITIAL_NOTIFICATION_SEED));
+          setNotifications(groupResponsesToNotifications(nextResponses));
           safeSetItem('survey_analytics_responses_v6', JSON.stringify(compressResponses(nextResponses)));
           return;
         }
@@ -1877,7 +1861,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     // Add notification
     const notification = toNotification(newResponses);
     if (notification) {
-      setNotifications((current) => [notification, ...current].slice(0, NOTIFICATION_HISTORY_LIMIT));
+      setNotifications((current) => [notification, ...current.filter((item) => item.id !== notification.id)]
+        .sort((a, b) => compareNotificationDates(a.submissionDate, b.submissionDate)));
       setUnreadNotificationIds((current) => new Set(current).add(notification.id));
     }
 
@@ -2420,7 +2405,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           company: c.name,
           surveyType: c.type as SurveyType,
           respondentType,
-          submissionDate: detectedAtForNotification(id, currentDate),
+          // Computed status has no recorded event time; never substitute page-load time.
+          submissionDate: '',
           questionCount: details.length,
           respondentEmail: 'system@mgenesis.com',
           department: 'Logistics',
@@ -2458,7 +2444,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         company: rows[0].company,
         surveyType: rows[0].surveyType ?? 'Supplier',
         respondentType: 'Document Expiring Soon',
-        submissionDate: rows.map((row) => row.deliveredAt).sort().at(-1) ?? documentClock.toISOString(),
+        submissionDate: rows.map((row) => row.deliveredAt).sort((a, b) => compareNotificationDates(a, b))[0] ?? '',
         questionCount: rows.length,
         respondentEmail: 'system@mgenesis.com',
         department: 'Logistics',
@@ -2526,7 +2512,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           company: c.name,
           surveyType: c.type as SurveyType,
           respondentType: 'Document Expiring Soon',
-          submissionDate: detectedAtForNotification(id, currentDate),
+          submissionDate: '',
           questionCount: details.length,
           respondentEmail: 'system@mgenesis.com',
           department: 'Logistics',
@@ -2541,7 +2527,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
 
   const combinedNotifications = useMemo(() => {
     const list = [...documentNotifications, ...earlyMilestoneNotifications, ...persistedReminderNotifications, ...notifications];
-    return list.sort((a, b) => b.submissionDate.localeCompare(a.submissionDate));
+    return list.sort((a, b) => compareNotificationDates(a.submissionDate, b.submissionDate));
   }, [documentNotifications, earlyMilestoneNotifications, persistedReminderNotifications, notifications]);
 
   useEffect(() => {

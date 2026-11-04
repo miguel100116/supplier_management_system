@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Bell, Inbox, Search } from 'lucide-react';
 import { ResponseNotification, SurveyType } from '../types/survey';
-import { formatLogDate, formatLogTime, formatRelativeTime } from '../utils/time';
+import { formatLogDate, formatLogTime } from '../utils/time';
+import { compareNotificationDates, isDocumentNotification, notificationAge, notificationDate, notificationWithinDateRange } from '../features/notifications/domain/notificationPresentation';
+import { useNotificationClock } from '../features/notifications/hooks/useNotificationClock';
 import { StateMessage } from '../components/StateMessage';
 import { TableFilterBar } from '../components/TableFilterBar';
-import { isWithinDateRange } from '../utils/tableFilters';
 
 interface NotificationLogsPageProps {
   notifications: ResponseNotification[];
@@ -42,6 +43,7 @@ export function NotificationLogsPage({
 
   const [sortField, setSortField] = useState<SortField>('submissionDate');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const now = useNotificationClock();
 
   const enriched = useMemo(
     () => notifications.map((item) => ({ ...item, isNew: unreadNotificationIds.has(item.id) })),
@@ -51,8 +53,8 @@ export function NotificationLogsPage({
   const filtered = useMemo(() => {
     return enriched.filter((item) => {
       if (surveyType !== 'All' && item.surveyType !== surveyType) return false;
-      if (!isWithinDateRange(item.submissionDate, dateFrom, dateTo)) return false;
-      const isDocumentAlert = item.designation === 'Document Alert';
+      if (!notificationWithinDateRange(item.submissionDate, dateFrom, dateTo)) return false;
+      const isDocumentAlert = isDocumentNotification(item);
       if (activityType === 'document' && !isDocumentAlert) return false;
       if (activityType === 'submission' && isDocumentAlert) return false;
 
@@ -69,13 +71,11 @@ export function NotificationLogsPage({
   const sortedAndFiltered = useMemo(() => {
     const result = [...filtered];
     result.sort((a, b) => {
+      if (sortField === 'submissionDate') return compareNotificationDates(a.submissionDate, b.submissionDate, sortOrder);
       let valA = '';
       let valB = '';
 
-      if (sortField === 'submissionDate') {
-        valA = a.submissionDate || '';
-        valB = b.submissionDate || '';
-      } else if (sortField === 'surveyType') {
+      if (sortField === 'surveyType') {
         valA = a.surveyType || '';
         valB = b.surveyType || '';
       } else if (sortField === 'company') {
@@ -108,9 +108,11 @@ export function NotificationLogsPage({
   };
 
   const todayCount = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return notifications.filter((item) => item.submissionDate.slice(0, 10) === today).length;
-  }, [notifications]);
+    return notifications.filter((item) => {
+      const date = notificationDate(item.submissionDate);
+      return date && new Date(date).toDateString() === now.toDateString();
+    }).length;
+  }, [notifications, now]);
 
   return (
     <div className="space-y-5">
@@ -297,10 +299,10 @@ export function NotificationLogsPage({
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
                         <span className="font-semibold text-slate-800 dark:text-slate-100 whitespace-nowrap text-xs">
-                          {formatLogDate(item.submissionDate)} {formatLogTime(item.submissionDate)}
+                          {item.submissionDate ? `${formatLogDate(notificationDate(item.submissionDate))} ${formatLogTime(notificationDate(item.submissionDate))}` : 'No recorded event time'}
                         </span>
                         <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
-                          {formatRelativeTime(item.submissionDate)}
+                          {notificationAge(item, now)}
                         </span>
                       </div>
                     </td>
@@ -322,10 +324,10 @@ export function NotificationLogsPage({
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-[#0063a9] dark:text-blue-400">
-                      {item.designation === 'Document Alert' ? '⚠️ SYSTEM ALERT' : item.respondentEmail || 'Unavailable'}
+                      {isDocumentNotification(item) ? '⚠️ SYSTEM ALERT' : item.respondentEmail || 'Unavailable'}
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-semibold text-xs">
-                      {item.designation === 'Document Alert' ? (
+                      {isDocumentNotification(item) ? (
                         <div>
                           <div>{item.respondentType === 'Document Expired' ? 'Expired Document(s)' : item.respondentType === 'Document For Update' ? 'For Update' : item.documentDetails?.some((detail) => (detail.milestoneDays ?? 0) > 30) ? 'Early Reminder' : 'Expiring Soon'}</div>
                           {item.documentDetails?.slice(0, 3).map((detail) => (
@@ -339,7 +341,7 @@ export function NotificationLogsPage({
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-300 text-xs">
                       <span className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-extrabold ${
-                        item.designation === 'Document Alert'
+                        isDocumentNotification(item)
                           ? (item.respondentType === 'Document Expired'
                             ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400'
                             : item.respondentType === 'Document For Update'

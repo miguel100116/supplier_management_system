@@ -1278,8 +1278,9 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
   padding: 0;
   background: transparent;
   box-shadow: none;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
+.admin-workspace .admin-main .admin-tab-strip::-webkit-scrollbar { display: none; }
 .admin-workspace .admin-main .admin-tab-strip > button {
   display: inline-flex;
   min-width: max-content;
@@ -1288,7 +1289,7 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
   align-items: center;
   justify-content: center;
   gap: 7px;
-  margin: 0 0 -1px;
+  margin: 0;
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;

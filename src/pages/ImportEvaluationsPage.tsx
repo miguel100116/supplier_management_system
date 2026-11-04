@@ -731,7 +731,7 @@ export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, ar
             )}
           </div>
           {archives.length > 0 && (
-            <nav aria-label="Filter stored source files by import status" className="admin-tab-strip mt-3">
+            <nav aria-label="Filter stored source files by import status" className="segmented-control mt-3 w-max max-w-full">
               {([
                 { id: 'active', label: `Active Imports (${activeArchiveCount})` },
                 { id: 'history', label: `Import History (${historyArchiveCount})` },
@@ -740,9 +740,9 @@ export function ImportEvaluationsPage({ currentUserEmail, surveys, responses, ar
                   setArchiveTab(tab.id);
                   setArchivePage(1);
                   setSelectedArchiveIds(new Set());
-                }} className={`inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] ${archiveTab === tab.id
-                  ? 'bg-white font-semibold text-[#005b9f] shadow-sm ring-1 ring-inset ring-slate-200 dark:bg-slate-700 dark:text-blue-200 dark:ring-slate-600'
-                  : 'font-medium text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-700'}`}>{tab.label}</button>
+                }} className={`inline-flex items-center gap-2 !px-3 !py-1.5 !text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] ${archiveTab === tab.id
+                  ? 'segmented-active'
+                  : ''}`}>{tab.label}</button>
               ))}
             </nav>
           )}

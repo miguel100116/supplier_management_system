@@ -4,6 +4,7 @@
   --feedback-muted: var(--muted-foreground);
   --feedback-brand: #2187cd;
   color: var(--foreground);
+  grid-template-columns: minmax(0, 1fr);
 }
 .feedback-hub-page .feedback-hub-navigation {
   display: flex;

@@ -1,20 +1,22 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 
 const email = 'synthetic.admin@mgenesis.com';
 const userId = '00000000-0000-4000-8000-000000000001';
 const createdAt = '2026-01-01T00:00:00.000Z';
+type SyntheticRecord = { record_type: string; record_id: string; payload: Record<string, unknown>; created_at: string };
 
 // Only the external identity/data service is mocked; the built app and Express host run normally.
-async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectPassword = false) {
+async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectPassword = false,
+  shared: { records?: SyntheticRecord[]; onWrite?: (record: SyntheticRecord) => void } = {}) {
   const profile = { email, user_id: userId, role, designation: 'Rank & File', department: 'TASS' };
   const profiles = [profile];
   const user = { id: userId, email, email_confirmed_at: createdAt, aud: 'authenticated',
     role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: createdAt };
   const company = { id: 'synthetic-courier', name: 'Synthetic Courier', type: 'Courier',
     createdAt, branches: [], isArchived: false };
-  const records: Array<{ record_type: string; record_id: string; payload: Record<string, unknown>; created_at: string }> = [
+  const records: SyntheticRecord[] = shared.records ?? [
     { record_type: 'partner_company', record_id: company.id, payload: company, created_at: createdAt },
     { record_type: 'document_maintenance', record_id: 'default', created_at: createdAt,
       payload: { id: 'default', validityYears: {}, reminderDays: [60, 30], dailyFinalDays: 30 } },
@@ -91,6 +93,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
           const saved = { ...row, created_at: row.created_at ?? createdAt };
           if (existing < 0) records.push(saved);
           else records[existing] = saved;
+          shared.onWrite?.(saved);
         }
         return reply([]);
       }
@@ -114,11 +117,69 @@ async function signIn(page: Page, audience: 'Admin' | 'Employee' = 'Admin') {
 
 async function openReadyPage(page: Page, path: string) {
   await page.goto(path);
+  await waitForReadyPage(page);
+}
+
+async function waitForReadyPage(page: Page) {
   const main = page.getByRole('main');
   await main.waitFor({ state: 'visible' });
   // Feature assertions start after the route's code and shared data are ready.
   await main.getByRole('status').filter({ hasText: /Loading page|Refreshing shared data/ }).waitFor({ state: 'hidden' });
 }
+
+test('Stored source files separate segmented status navigation from underlined category filters', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const service = await backend(page);
+  for (const type of ['Courier', 'Supplier', 'Subcontractor']) {
+    const id = `source-${type}`;
+    service.records.push({ record_type: 'survey', record_id: `default-${type.toLowerCase()}`, created_at: createdAt,
+      payload: { id: `default-${type.toLowerCase()}`, title: `${type} evaluation`, description: 'Synthetic form.', surveyType: type, createdAt, status: 'Running', deadlineDate: '31/12/2099', questions: [] } });
+    service.records.push({ record_type: 'evaluation_import_archive', record_id: id, created_at: createdAt,
+      payload: { id, surveyType: type, uploadedAt: createdAt, uploadedBy: email, sourceFileName: `Microgenesis ${type} Evaluation Form.csv`, storagePath: `${type.toLowerCase()}/${id}.csv`, contentType: 'text/csv', fileSize: 100, importBatchId: id } });
+  }
+  service.records.push({ record_type: 'evaluation_import_archive', record_id: 'source-history', created_at: createdAt,
+    payload: { id: 'source-history', surveyType: 'Supplier', uploadedAt: createdAt, uploadedBy: email, sourceFileName: 'Older Supplier.csv', storagePath: 'supplier/history.csv', contentType: 'text/csv', fileSize: 100, importBatchId: 'older', importStatus: 'historical', historicalStatus: 'Archived' } });
+  const sources = structuredClone(service.records.filter(record => record.record_type === 'evaluation_import_archive'));
+  await page.goto('/login');
+  await signIn(page);
+  await openReadyPage(page, '/import-evaluation-responses');
+  const files = page.getByRole('region', { name: 'Stored Source Files', exact: true });
+  const statuses = files.getByRole('navigation', { name: 'Filter stored source files by import status' });
+  const categories = files.getByRole('group', { name: 'Filter stored source files by category' });
+  for (const width of [1440, 768, 393, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    const active = statuses.getByRole('button', { name: 'Active Imports (3)', exact: true });
+    const history = statuses.getByRole('button', { name: 'Import History (1)', exact: true });
+    await active.click();
+    await categories.getByRole('button', { name: 'All categories', exact: true }).click();
+    await expect(files.getByRole('checkbox', { name: /^Select Microgenesis/ })).toHaveCount(3);
+    await expect(active).toHaveAttribute('aria-pressed', 'true');
+    await expect(active).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(active).toHaveCSS('border-bottom-width', '0px');
+    await expect(active).toHaveCSS('font-size', '12px');
+    expect(await statuses.evaluate(element => getComputedStyle(element).borderRadius)).not.toBe('0px');
+    const category = categories.getByRole('button', { name: 'Courier', exact: true });
+    await category.click();
+    await expect(files.getByRole('checkbox', { name: /^Select Microgenesis/ })).toHaveCount(1);
+    await files.getByRole('checkbox', { name: 'Select Microgenesis Courier Evaluation Form.csv', exact: true }).check();
+    expect(await category.evaluate(element => parseFloat(getComputedStyle(element).borderBottomWidth))).toBeGreaterThan(0);
+    await history.scrollIntoViewIfNeeded();
+    await history.click();
+    await expect(history).toHaveAttribute('aria-pressed', 'true');
+    await expect(files.getByText('No files match the selected filter.', { exact: true })).toBeVisible();
+    await categories.getByRole('button', { name: 'Supplier', exact: true }).click();
+    await expect(files.getByText('Older Supplier.csv', { exact: true })).toBeVisible();
+    await active.click();
+    await expect(files.getByRole('checkbox', { name: 'Select Microgenesis Supplier Evaluation Form.csv', exact: true })).not.toBeChecked();
+    await categories.getByRole('button', { name: 'All categories', exact: true }).click();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    await files.locator(':scope > div').first().screenshot({ path: testInfo.outputPath(`stored-source-navigation-${width}.png`), animations: 'disabled' });
+  }
+  await page.locator('html').evaluate(element => element.classList.add('dark'));
+  await files.locator(':scope > div').first().screenshot({ path: testInfo.outputPath('stored-source-navigation-dark.png'), animations: 'disabled' });
+  expect(service.records.filter(record => record.record_type === 'evaluation_import_archive')).toEqual(sources);
+  expect(service.errors).toEqual([]);
+});
 
 test('Supplier Local attention containers filter only the expanded company and toggle back to all', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
@@ -299,7 +360,8 @@ test('Workspace category and status badges use consistent typography and geometr
   expect(service.errors).toEqual([]);
 });
 
-test('Responses workspace keeps long submission data readable and filters removable', async ({ page }) => {
+test('Responses workspace keeps long submission data readable and filters removable', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
   const service = await backend(page);
   const title = 'Courier satisfaction evaluation with a long form title';
   const form = { id: 'default-courier', title, surveyType: 'Courier', status: 'Running',
@@ -331,6 +393,28 @@ test('Responses workspace keeps long submission data readable and filters remova
   await expect(selector.getByRole('button')).toHaveCount(3);
   const selectorScrolls = await selector.evaluate((element) => element.scrollWidth > element.clientWidth);
   expect(selectorScrolls).toBe((page.viewportSize()?.width ?? 0) < 760);
+  const originalViewport = page.viewportSize()!;
+  for (const width of [1440, 1024, 768, 393, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const strip of [page.getByRole('navigation', { name: 'Evaluation workspace views' }), selector]) {
+      const dimensions = await strip.evaluate(element => ({
+        height: element.clientHeight, scrollHeight: element.scrollHeight,
+        scrollbar: getComputedStyle(element).scrollbarWidth,
+      }));
+      expect(dimensions.scrollHeight, `${width}px tab height`).toBe(dimensions.height);
+      expect(dimensions.scrollbar).toBe('none');
+    }
+    for (const tab of await selector.getByRole('button').all()) {
+      await tab.scrollIntoViewIfNeeded();
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-pressed', 'true');
+      await expect(explorer.getByRole('heading', { name: (await tab.textContent())!.trim(), exact: true })).toBeVisible();
+    }
+    await page.getByRole('navigation', { name: 'Evaluation workspace views' }).screenshot({ path: testInfo.outputPath(`workspace-tabs-${width}.png`) });
+    await selector.screenshot({ path: testInfo.outputPath(`survey-tabs-${width}.png`) });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  }
+  await page.setViewportSize(originalViewport);
   await expect(selector.getByRole('button', { name: new RegExp(title) })).toBeVisible();
   await expect(selector.getByRole('button', { name: new RegExp(title) }).getByText('Courier', { exact: true })).toHaveCount(0);
   await selector.getByRole('button', { name: new RegExp(title) }).click();
@@ -417,6 +501,41 @@ function headerFormat(element: Element) {
     gap: subtitle && subtitle.getBoundingClientRect().top - title.getBoundingClientRect().bottom };
 }
 
+test('Feedback navigation has no vertical overflow and keeps tabs and delivery actions accessible', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  service.records.push({ record_type: 'survey', record_id: evaluationForm.id, payload: evaluationForm, created_at: createdAt });
+  service.profiles.push({ ...service.profiles[0], email: 'synthetic.employee@mgenesis.com', role: 'Employee' });
+  await page.goto('/login');
+  await signIn(page);
+  await openReadyPage(page, '/feedback-hub');
+  const navigation = page.getByRole('navigation', { name: 'Feedback Hub workflow' });
+
+  for (const width of [1440, 1024, 768, 393, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const name of ['Current Forms', 'Past Results', 'Sent Reports Log']) {
+      const tab = navigation.getByRole('button', { name: new RegExp(name) });
+      await tab.scrollIntoViewIfNeeded();
+      await tab.focus();
+      await tab.press('Enter');
+      await expect(tab).toHaveAttribute('aria-pressed', 'true');
+      const bounds = await tab.boundingBox();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      const overflow = await navigation.evaluate(element => ({
+        height: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      }));
+      expect(overflow.scrollHeight, `${width}px ${name}`).toBe(overflow.height);
+    }
+    const bulkSend = page.getByRole('button', { name: 'Bulk send', exact: true });
+    await expect(bulkSend).toBeInViewport();
+    await expect(bulkSend).toBeDisabled();
+    await expect(page.getByText('Complete active surveys to enable', { exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    await page.locator('.feedback-hub-navigation').screenshot({ path: testInfo.outputPath(`feedback-navigation-${width}.png`), animations: 'disabled' });
+  }
+});
+
 test('Admin navigation and category selectors share compact underline states', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   await backend(page);
@@ -435,6 +554,9 @@ test('Admin navigation and category selectors share compact underline states', a
     await openReadyPage(page, `/${route}`);
     const strip = page.getByRole('main').getByLabel(label, { exact: true });
     await expect(strip).toBeVisible();
+    const overflow = await strip.evaluate(element => ({ height: element.clientHeight, scrollHeight: element.scrollHeight, scrollbar: getComputedStyle(element).scrollbarWidth }));
+    expect(overflow.scrollHeight, label).toBe(overflow.height);
+    expect(overflow.scrollbar, label).toBe('none');
     const buttons = strip.locator(':scope > button');
     expect(await buttons.count()).toBeGreaterThan(1);
     const selected = strip.locator(':scope > button[aria-pressed="true"], :scope > button[aria-selected="true"], :scope > button[aria-current="page"]').first();
@@ -786,15 +908,205 @@ test('Employee desktop shares the compact scale while mobile and login retain no
   expect(service.errors).toEqual([]);
 });
 
+test('Notification ages advance, document details stay visible, and complete history survives reload', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.clock.install({ time: new Date('2026-11-03T23:59:30Z') });
+  const service = await backend(page);
+  service.records[0].payload.branches = [{ id: 'branch', bpCode: 'SYN', documents: { 'Business Permit': { provided: true, expiryDate: '2026-11-03' } } }];
+  for (let i = 0; i < 22; i++) service.records.push({ record_type: 'survey_response', record_id: `notification-${i}:Q01`, created_at: createdAt,
+    payload: { responseId: `notification-${i}`, company: `Notification partner ${i}`, companyId: 'synthetic-courier', surveyType: 'Courier', respondentType: 'Employee', respondentEmail: email,
+      submissionDate: new Date(Date.parse('2026-11-04T00:00:00Z') - i * 60_000).toISOString(), questionId: 'Q01', questionNumber: 1, question: 'Reliability?', questionCategory: 'Delivery', rating: 0, comment: '' } });
+  service.records.push({ record_type: 'survey_response', record_id: 'blank:Q01', created_at: createdAt,
+    payload: { ...service.records[2].payload, responseId: 'blank', company: 'Blank notification', rating: 'N/A' } });
+  service.records.push({ record_type: 'document_reminder_delivery', record_id: 'synthetic-reminder', created_at: createdAt,
+    payload: { id: 'synthetic-reminder', companyId: 'synthetic-courier', company: 'Delivered reminder partner', surveyType: 'Courier', branchId: 'branch', branchCode: 'SYN', documentName: 'Synthetic permit', expiryDate: '2026-12-31', daysLeft: 60, milestone: 'day-60', deliveredAt: '2026-11-01T00:05:00.179105+00:00' } });
+  await page.goto('/login');
+  await signIn(page);
+  const bell = page.getByRole('button', { name: /^Recent activity/ });
+  await expect(bell).toHaveAttribute('aria-label', 'Recent activity, 24 unread');
+  await page.clock.pauseAt(new Date('2026-11-04T00:01:30Z'));
+  await bell.click();
+  const dropdown = page.getByRole('region', { name: 'Recent activity', exact: true });
+  const recent = dropdown.getByRole('listitem').filter({ hasText: 'Notification partner 0' });
+  await expect(recent).toContainText('1m ago');
+  await page.clock.fastForward(61_000);
+  await expect(recent).toContainText('2m ago');
+  await bell.click();
+  await page.clock.fastForward(61_000);
+  await bell.click();
+  await expect(recent).toContainText('3m ago');
+  await dropdown.getByRole('button', { name: 'View all notifications' }).click();
+  const dialog = page.getByRole('dialog', { name: 'All Notifications', exact: true });
+  await expect(dialog.getByRole('button', { name: 'All (24)', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Notification partner 0' })).toContainText('3m ago');
+  await page.clock.fastForward(61_000);
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Notification partner 0' })).toContainText('4m ago');
+  await page.clock.setSystemTime(new Date('2026-11-04T00:10:30Z'));
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Notification partner 0' })).toContainText('10m ago');
+  await dialog.getByRole('combobox', { name: 'Activity', exact: true }).selectOption('document');
+  await expect(dialog.getByRole('listitem')).toHaveCount(2);
+  await expect(dialog).toContainText('Synthetic permit');
+  await expect(dialog).toContainText('60 days at delivery');
+  await expect(dialog).toContainText('Current status');
+  await expect(dialog).not.toContainText('question answered');
+  await dialog.getByRole('listitem').filter({ hasText: 'Delivered reminder partner' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('notification-document-details.png'), animations: 'disabled' });
+  await page.reload();
+  // Let deferred hydration paint while keeping the age assertions on a controlled clock.
+  await expect.poll(async () => { await page.clock.runFor(100); return bell.getAttribute('aria-label'); }).toBe('Recent activity, 24 unread');
+  await bell.click();
+  await dropdown.getByRole('button', { name: 'View all notifications' }).click();
+  await expect(dialog.getByRole('button', { name: 'All (24)', exact: true })).toBeVisible();
+  await expect(dialog).toContainText('Notification partner 21');
+  await expect(dialog).not.toContainText('Blank notification');
+  await expect(dialog).toContainText('Current status');
+  expect(service.records.filter(record => record.record_type === 'survey_response')).toHaveLength(23);
+  await openReadyPage(page, '/notifications');
+  const logRow = page.getByRole('row').filter({ hasText: 'Notification partner 0' });
+  await expect.poll(async () => { await page.clock.runFor(100); return logRow.count(); }).toBe(1);
+  await expect(logRow).toContainText('10m ago');
+  await page.clock.fastForward(61_000);
+  await expect(logRow).toContainText('11m ago');
+  expect(service.errors).toEqual([]);
+});
+
+test('Realtime delivers submissions and read/unread changes between two sessions and reconciles reconnects', async ({ page, browser }, testInfo) => {
+  test.setTimeout(90_000);
+  const sockets: Array<{ ws: WebSocketRoute; topic: string; joinRef: string; id: number; closed: boolean }> = [];
+  const connect = async (clientPage: Page) => clientPage.routeWebSocket('**/realtime/v1/**', ws => {
+    const connections: typeof sockets = [];
+    ws.onClose(() => connections.forEach(connection => { connection.closed = true; }));
+    ws.onMessage(message => {
+      const [joinRef, ref, topic, event, payload] = JSON.parse(String(message));
+      if (event === 'phx_join') {
+        const filters = (payload.config?.postgres_changes ?? []).map((filter: Record<string, unknown>, i: number) => ({ ...filter, id: i + 1 }));
+        const id = filters.find((filter: Record<string, unknown>) => filter.table === 'application_records')?.id;
+        if (id) { const connection = { ws, topic, joinRef, id, closed: false }; sockets.push(connection); connections.push(connection); }
+        ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', { status: 'ok', response: { postgres_changes: filters } }]));
+      } else if (event === 'heartbeat' || event === 'phx_leave') {
+        ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', { status: 'ok', response: {} }]));
+      }
+    });
+  });
+  const publish = (record: SyntheticRecord) => sockets.filter(socket => !socket.closed).forEach(socket => socket.ws.send(JSON.stringify([
+    socket.joinRef, null, socket.topic, 'postgres_changes', { ids: [socket.id], data: { schema: 'public', table: 'application_records', type: 'UPDATE', commit_timestamp: new Date().toISOString(), columns: [], record, old_record: {}, errors: null } },
+  ])));
+  await connect(page);
+  const service = await backend(page, 'Admin', false, { onWrite: publish });
+  const otherContext = await browser.newContext({ baseURL: 'http://127.0.0.1:4173', viewport: page.viewportSize()!, isMobile: Boolean(testInfo.project.use.isMobile) });
+  try {
+    const other = await otherContext.newPage();
+    await connect(other);
+    await backend(other, 'Admin', false, { records: service.records, onWrite: publish });
+    for (const clientPage of [page, other]) { await clientPage.goto('/login'); await signIn(clientPage); }
+    await expect.poll(() => sockets.filter(socket => !socket.closed).length).toBe(2);
+    const response: SyntheticRecord = { record_type: 'survey_response', record_id: 'realtime-notification:Q01', created_at: createdAt,
+      payload: { responseId: 'realtime-notification', company: 'Realtime partner', surveyType: 'Courier', respondentType: 'Employee', respondentEmail: email, submissionDate: new Date().toISOString(), questionId: 'Q01', questionNumber: 1, question: 'Reliability?', questionCategory: 'Delivery', rating: 0, comment: '' } };
+    service.records.push(response);
+    publish(response);
+    for (const clientPage of [page, other]) {
+      await expect(clientPage.getByRole('button', { name: 'Recent activity, 1 unread', exact: true })).toBeVisible();
+      await clientPage.getByRole('button', { name: /^Recent activity/ }).click();
+      await clientPage.getByRole('button', { name: 'View all notifications' }).click();
+      await expect(clientPage.getByRole('dialog')).toContainText('Realtime partner');
+    }
+    await page.getByRole('button', { name: 'Mark as read: Realtime partner', exact: true }).click();
+    await expect(other.getByRole('button', { name: 'Mark as unread: Realtime partner', exact: true })).toBeVisible();
+    await other.getByRole('button', { name: 'Mark as unread: Realtime partner', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Mark as read: Realtime partner', exact: true })).toBeVisible();
+    const previousConnections = sockets.length;
+    sockets.filter(socket => !socket.closed).forEach(socket => { socket.closed = true; socket.ws.close({ code: 1012, reason: 'Synthetic reconnect' }); });
+    response.payload = { ...response.payload, company: 'Updated during disconnect' };
+    await expect.poll(() => sockets.length).toBeGreaterThan(previousConnections);
+    await expect(page.getByRole('dialog')).toContainText('Updated during disconnect');
+    await expect(other.getByRole('dialog')).toContainText('Updated during disconnect');
+    expect(service.errors).toEqual([]);
+  } finally { await otherContext.close(); }
+});
+
+test('Login defaults to Admin on arrival, refresh and after Employee logout', async ({ page }, testInfo) => {
+  await backend(page, 'Employee');
+  await page.goto('/login');
+  const adminTab = page.getByRole('button', { name: 'Admin Account', exact: true });
+  const employeeTab = page.getByRole('button', { name: 'Employee Account', exact: true });
+  await expect(adminTab).toHaveAttribute('aria-pressed', 'true');
+  await expect(employeeTab).toHaveAttribute('aria-pressed', 'false');
+  await expect(adminTab).toHaveCSS('color', 'rgb(33, 135, 205)');
+  await page.screenshot({ path: testInfo.outputPath('login-admin-default.png'), animations: 'disabled' });
+  await employeeTab.click();
+  await expect(employeeTab).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await expect(adminTab).toHaveAttribute('aria-pressed', 'true');
+  await signIn(page, 'Employee');
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await page.locator('#account-menu-trigger').click();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible();
+  await expect(adminTab).toHaveAttribute('aria-pressed', 'true');
+  await expect(employeeTab).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('Analytics ranking method remains single-line beside date tabs and repositions on mobile', async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  await backend(page);
+  await page.goto('/login');
+  await signIn(page);
+  await openReadyPage(page, '/analytics');
+  const method = page.getByRole('group', { name: 'Company ranking method', exact: true });
+  const scopes = page.getByRole('group', { name: 'Analytics date scope', exact: true });
+  for (const width of [1440, 1024, 768, 393, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const name of ['Current', 'All time', 'Custom']) {
+      const tab = scopes.getByRole('button', { name, exact: true });
+      await tab.click();
+      await expect(tab).toHaveAttribute('aria-pressed', 'true');
+      await expect(method).toBeVisible();
+    }
+    const geometry = await method.evaluate(element => {
+      const style = getComputedStyle(element);
+      const segments = Array.from(element.children).map(child => ({
+        top: child.getBoundingClientRect().top, height: child.getBoundingClientRect().height,
+        whiteSpace: getComputedStyle(child).whiteSpace,
+        underline: getComputedStyle(child).borderBottomStyle,
+        underlineWidth: getComputedStyle(child).borderBottomWidth,
+        underlineColor: getComputedStyle(child).borderBottomColor,
+      }));
+      return { segments, width: element.clientWidth, scrollWidth: element.scrollWidth,
+        background: style.backgroundColor, border: style.borderWidth, padding: style.padding, shadow: style.boxShadow };
+    });
+    expect(geometry.background).toBe('rgba(0, 0, 0, 0)');
+    expect(geometry.border).toBe('0px');
+    expect(geometry.padding).toBe('0px');
+    expect(geometry.shadow).toBe('none');
+    expect(geometry.segments[1].underline).toBe('solid');
+    expect(geometry.segments[1].underlineWidth).toBe(await scopes.getByRole('button', { name: 'Custom', exact: true }).evaluate(element => getComputedStyle(element).borderBottomWidth));
+    expect(geometry.segments[1].underlineColor).not.toBe('rgba(0, 0, 0, 0)');
+    expect(geometry.scrollWidth).toBe(geometry.width);
+    expect(geometry.segments[0].top).toBe(geometry.segments[1].top);
+    expect(geometry.segments[0].height).toBe(geometry.segments[1].height);
+    expect(geometry.segments.every(segment => segment.whiteSpace === 'nowrap')).toBe(true);
+    const methodBounds = (await method.boundingBox())!;
+    const scopeBounds = (await scopes.boundingBox())!;
+    if (width >= 1024) expect(methodBounds.y + methodBounds.height / 2).toBeCloseTo(scopeBounds.y + scopeBounds.height / 2, 0);
+    else expect(methodBounds.y).toBeGreaterThanOrEqual(scopeBounds.y + scopeBounds.height);
+    expect(methodBounds.x + methodBounds.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+    await method.locator('..').screenshot({ path: testInfo.outputPath(`analytics-ranking-method-${width}.png`), animations: 'disabled' });
+  }
+  await page.locator('html').evaluate(element => element.classList.add('dark'));
+  await method.locator('..').screenshot({ path: testInfo.outputPath('analytics-ranking-method-dark.png'), animations: 'disabled' });
+});
+
 test('a forged browser account cannot open a protected deep link', async ({ page }) => {
   const service = await backend(page);
   await page.addInitScript(() => localStorage.setItem('user_account', 'synthetic.admin@mgenesis.com'));
   await page.goto('/partners');
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Employee Account', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Admin Account', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Admin Account', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Employee Account', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Employee Account', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
 });
@@ -1103,7 +1415,7 @@ test('History retains saved files across recipe versions without quarantine warn
     payload: { ...base, id: 'current-history', title: 'Current archived response report', filename: 'current.pdf', recipe: current } });
   await page.goto('/login');
   await signIn(page);
-  await page.goto('/reports?tab=history');
+  await openReadyPage(page, '/reports?tab=history');
   await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(6);
   const currentEntry = page.getByRole('article').filter({ hasText: 'Current archived response report' });
   await expect(currentEntry.getByRole('button', { name: 'Regenerate', exact: true })).toBeEnabled();
@@ -1115,6 +1427,7 @@ test('History retains saved files across recipe versions without quarantine warn
   service.records.push({ record_type: 'export_history', record_id: 'invalid-options', created_at: createdAt,
     payload: { ...base, id: 'invalid-options', title: 'Saved report with invalid options', filename: 'invalid-options.pdf', recipe: { kind: 'summary', parameters: [] } } });
   await page.reload();
+  await waitForReadyPage(page);
   await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(8);
   const futureEntry = page.getByRole('article').filter({ hasText: 'Future-version saved report' });
   const invalidEntry = page.getByRole('article').filter({ hasText: 'Saved report with invalid options' });

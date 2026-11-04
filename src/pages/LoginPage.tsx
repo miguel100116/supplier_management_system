@@ -112,7 +112,7 @@ function HeroIllustration({ className }: { className?: string }) {
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
-  const [loginAudience, setLoginAudience] = useState<LoginRole>('Employee');
+  const [loginAudience, setLoginAudience] = useState<LoginRole>('Admin');
   const loginHeading = loginAudience === 'Admin' ? 'Vendor Management System' : 'Vendor Performance Evaluation';
   const heroDescription = loginAudience === 'Admin'
     ? 'Manage supplier records, compliance, and evaluation programs across Microgenesis.'

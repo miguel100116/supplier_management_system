@@ -44,7 +44,7 @@ test('Admin desktop navigation stays expanded and preserves grouped destinations
 
 test('login audience switch shares responsive headings and validates the selected type before entering the app', () => {
   const source = readFileSync(new URL('../pages/LoginPage.tsx', import.meta.url), 'utf8');
-  assert.match(source, /useState<LoginRole>\('Employee'\)/);
+  assert.match(source, /useState<LoginRole>\('Admin'\)/);
   assert.match(source, /loginAudience === 'Admin' \? 'Vendor Management System' : 'Vendor Performance Evaluation'/);
   assert.equal((source.match(/\{loginHeading\}/g) ?? []).length, 2);
   assert.match(source, /role="group" aria-label="Account sign-in heading"/);
