@@ -43,7 +43,7 @@ export function AnalyticsToolbar({
           {onChangeDataScope && (
             <fieldset className="min-w-0">
               <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Reporting period</legend>
-              <div className="segmented-control w-full xl:w-auto">
+              <div className="segmented-control admin-tab-strip w-full xl:w-auto">
                 {dataScopeOptions.map((option) => (
                   <button
                     key={option.value}

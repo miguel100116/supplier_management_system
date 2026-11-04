@@ -264,7 +264,7 @@ export function CompanyAnalysisPanel({ analysis, surveyTypes, archiveSeries = []
 
           <fieldset className="w-full min-w-0 lg:w-auto lg:shrink-0">
             <legend className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Partner type</legend>
-            <div className="segmented-control w-full max-w-full lg:w-auto">
+            <div className="segmented-control admin-tab-strip w-full max-w-full lg:w-auto">
             {surveyTypes.map((type) => (
               <button
                 key={type}

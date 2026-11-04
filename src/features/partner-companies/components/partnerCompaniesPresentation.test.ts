@@ -31,7 +31,8 @@ test('directory category strip replaces partner status and uses the selected cat
   assert.match(overview, /aria-label="Partner categories" role="tablist"/);
   assert.match(overview, /data-category="Supplier" aria-selected="true" tabindex="0"/);
   assert.doesNotMatch(overview, /Partner status|Incomplete Profile|Expired,|Archived,/);
-  assert.match(ADMIN_REDESIGN_SOURCE, /\.admin-directory-category-strip-tab\[aria-selected="true"\][^{]*\{[^}]*color: #fff; background: #2187cd/);
+  assert.match(overview, /admin-directory-category-strip admin-tab-strip/);
+  assert.match(ADMIN_REDESIGN_SOURCE, /\.admin-tab-strip > button:is\(\[aria-pressed="true"\], \[aria-selected="true"\], \[aria-current="page"\]\)[^{]*\{[^}]*border-bottom-color: #0063a9/);
   assert.doesNotMatch(PARTNER_COMPANIES_SOURCE, /statusTab|setStatusTab/);
 });
 

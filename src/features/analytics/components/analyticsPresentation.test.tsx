@@ -108,8 +108,8 @@ const COMPANY_ANALYSIS_SOURCE = readFileSync(
   'utf8',
 );
 
-test('partner type selector keeps its original buttons responsive without truncating labels', () => {
-  assert.match(COMPANY_ANALYSIS_SOURCE, /segmented-control w-full max-w-full lg:w-auto/);
+test('partner type selector uses compact shared Admin tabs without truncating labels', () => {
+  assert.match(COMPANY_ANALYSIS_SOURCE, /segmented-control admin-tab-strip w-full max-w-full lg:w-auto/);
   assert.match(COMPANY_ANALYSIS_SOURCE, /min-w-max py-2 text-center w-full flex-1/);
   assert.match(COMPANY_ANALYSIS_SOURCE, /\{surveyTypeDisplayLabel\[type\]\}/);
   assert.doesNotMatch(COMPANY_ANALYSIS_SOURCE, /lg:w-\[23rem\]/);

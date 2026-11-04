@@ -22,7 +22,7 @@ export function EvaluationWorkspace({ activePage, onNavigate, children }: {
   return (
     <div className="admin-evaluation-workspace space-y-6">
       <PageDescription>{activePage === 'categories-manager' ? 'Change the displayed scoring category names for each survey type.' : 'Create and manage evaluation forms, assigned companies, deadlines, and access.'}</PageDescription>
-      <nav aria-label="Evaluation workspace views" className="admin-evaluation-tabs flex max-w-full flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
+      <nav aria-label="Evaluation workspace views" className="admin-evaluation-tabs admin-tab-strip flex max-w-full flex-wrap gap-1 border-b border-slate-200 dark:border-slate-800">
           {EVALUATION_WORKSPACE_TABS.map((tab) => (
             <button
               key={tab.key}

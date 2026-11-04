@@ -155,7 +155,9 @@ test('employee Forms keeps its existing context heading and survey actions', () 
 test('SMS-56 keeps the admin controls in one responsive toolbar and exposes sort and date filters', () => {
   const html = renderFormsPage(true);
   assert.match(html, /role="toolbar" aria-label="Survey forms controls"/);
-  assert.match(html, /role="group" aria-label="Survey category"/);
+  assert.doesNotMatch(html, /role="group" aria-label="Survey category"/);
+  assert.match(html, /Category Type/);
+  assert.match(renderFormsPage(false), /segmented-control max-w-full/);
   assert.match(html, /aria-label="Sort forms"[^>]*aria-expanded="false" aria-haspopup="dialog"/);
   assert.match(html, /aria-label="Filter forms by deadline date"[^>]*aria-expanded="false" aria-haspopup="dialog"/);
   assert.match(html, /class="survey-forms-table/);
