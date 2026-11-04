@@ -135,7 +135,7 @@ export function AnalyticsPage({ responses, activeSurveyTypes, permittedSurveyTyp
   const toggleSeries = (id: string) => onChangeSelectedSeriesIds?.(selectedSeriesIds.includes(id) ? selectedSeriesIds.filter((seriesId) => seriesId !== id) : [...selectedSeriesIds, id]);
 
   const categoryTabs = (
-    <div role="group" aria-label="Analytics categories" className="mt-4 flex flex-wrap gap-1 border-b border-slate-100 pb-3 dark:border-slate-800">
+    <div role="group" aria-label="Analytics categories" className="admin-tab-strip mt-4">
       {(['All', ...permittedSurveyTypes] as const).map((type) => (
         <button type="button" key={type} onClick={() => selectType(type)} aria-pressed={selectedType === type} className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${selectedType === type ? 'bg-[#eef7fc] text-[#176FAE] dark:bg-sky-950/30 dark:text-sky-300' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white'}`}>{type === 'All' ? 'All categories' : type}</button>
       ))}
@@ -319,7 +319,7 @@ function AnalyticsHeader({ dataScope, onChangeDataScope }: { dataScope: 'current
   return (
     <header className="space-y-3">
       <PageDescription>Review evaluation results, identify performance gaps, and compare partner companies.</PageDescription>
-      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800"><div role="group" aria-label="Analytics date scope" className="inline-flex w-fit gap-1 rounded-lg bg-slate-50 p-1 dark:bg-slate-900">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-[11px] text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-weighted</span></div></div>
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between dark:border-slate-800"><div role="group" aria-label="Analytics date scope" className="admin-tab-strip">{(['current', 'all-time', 'custom'] as const).map((scope) => (<button key={scope} type="button" aria-pressed={dataScope === scope} onClick={() => onChangeDataScope?.(scope)} className={`rounded-md px-3 py-1.5 text-xs font-semibold ${dataScope === scope ? 'bg-white text-[#176FAE] shadow-sm dark:bg-slate-800 dark:text-sky-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>{scope === 'current' ? 'Current' : scope === 'all-time' ? 'All time' : 'Custom'}</button>))}</div><div className="flex items-center gap-2 text-[11px] text-slate-500"><span>Company ranking</span><span className="font-semibold text-slate-700 dark:text-slate-200">Volume-weighted</span></div></div>
     </header>
   );
 }

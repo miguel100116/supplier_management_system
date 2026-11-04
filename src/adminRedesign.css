@@ -618,8 +618,6 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 .admin-survey-forms-page { --admin-content-gap: 14px; }
 .admin-survey-forms-page > section.panel > header { padding: 14px 16px 12px; }
 .admin-survey-forms-page .survey-forms-toolbar { gap: 8px; }
-.admin-survey-forms-page .survey-forms-category { gap: 2px; padding: 3px; border-radius: 7px; }
-.admin-survey-forms-page .survey-forms-category button { min-height: 30px; padding: 0 10px; border-radius: 5px; font-size: 12px; line-height: 18px; }
 .admin-survey-forms-page .survey-forms-search input { height: 36px; min-height: 36px; border-radius: 6px; font-size: 12px; }
 .admin-survey-forms-page .survey-forms-primary-actions { gap: 6px; }
 .admin-survey-forms-page .survey-forms-toolbar .icon-button { width: 34px; height: 34px; border-radius: 6px; }
@@ -660,42 +658,35 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
     align-items: center;
     gap: 8px;
   }
-  .admin-survey-forms-page .survey-forms-category,
   .admin-survey-forms-page .survey-forms-search { grid-column: 1 / -1; width: 100%; min-width: 0; }
-  .admin-survey-forms-page .survey-forms-category { overflow-x: auto; }
   .admin-survey-forms-page .survey-forms-primary-actions { margin-left: 0; justify-content: flex-start; }
   .admin-survey-forms-page .survey-forms-filters { justify-self: end; }
 }
 
 @media (max-width: 380px) {
-  .admin-survey-forms-page .survey-forms-category button { padding-inline: 8px; font-size: 11px; }
   .admin-survey-forms-page .survey-forms-primary-actions { gap: 4px; }
   .admin-survey-forms-page .survey-forms-primary-actions button { padding-inline: 8px; font-size: 11px; }
 }
 
-/* Response review: keep form selection visible beside the selected form's work. */
-.admin-response-explorer-page {
-  grid-template-columns: minmax(230px, .34fr) minmax(0, 1fr);
-  align-items: start;
-  gap: 0 18px;
-}
-
-.admin-response-explorer-page > section:first-child {
-  position: sticky;
-  top: 96px;
-  max-height: calc(100vh - 120px);
-  overflow: auto;
-}
-
-.admin-response-explorer-page > section:first-child + section {
-  min-width: 0;
-  margin: 0;
-}
-
-.admin-response-explorer-page > section:first-child + section > header {
+/* Response review: one work surface with a horizontally accessible form selector. */
+.admin-response-explorer-page > section > header {
   margin: -20px -20px 0;
   padding: 16px 20px;
 }
+
+.admin-response-form-selector {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid #e2e8f0;
+  scrollbar-width: thin;
+}
+
+.admin-response-form-selector > button {
+  flex: 1 0 220px;
+}
+
+.dark .admin-response-form-selector { border-color: #334155; }
 
 /* Analytics and reports: consistent chart proportions and useful plot space. */
 .admin-analytics-page > section[aria-label="Analytics summary"] {
@@ -883,19 +874,8 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
   .admin-partner-dialog-tabs button { min-height: 38px; padding-inline: 9px; font-size: 11px; }
 }
 
-@media (max-width: 1050px) {
-  .admin-response-explorer-page {
-    grid-template-columns: minmax(190px, .3fr) minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 760px) {
   .admin-workspace .admin-main:not(:has(.dashboard-page)) { padding: 25px 22px 30px; }
-  .admin-response-explorer-page { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-  .admin-response-explorer-page > section:first-child {
-    position: static;
-    max-height: 300px;
-  }
   .admin-directory-page .admin-directory-table-shell > .overflow-x-auto { display: none; }
   .admin-directory-page .admin-directory-mobile-list { display: grid; gap: 8px; padding: 10px; }
   .admin-directory-page .admin-directory-mobile-card {
@@ -1282,3 +1262,63 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
   .admin-active-companies-dialog > footer { padding-inline: 14px; }
 }
 .dark .admin-active-companies-dialog section li:nth-last-child(2) { border-bottom-color: #1e293b; }
+
+/* Shared Admin navigation for section tabs and category selectors. */
+.admin-workspace .admin-main .admin-tab-strip {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 4px;
+  overflow-x: auto;
+  border: 0;
+  border-bottom: 1px solid #dbe3ec;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  scrollbar-width: thin;
+}
+.admin-workspace .admin-main .admin-tab-strip > button {
+  display: inline-flex;
+  min-width: max-content;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 0 -1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 0 14px;
+  color: #64748b;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--workspace-interface-font, inherit);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.admin-workspace .admin-main .admin-tab-strip > button:hover { color: #0063a9; background: transparent; }
+.admin-workspace .admin-main .admin-tab-strip > button:is([aria-pressed="true"], [aria-selected="true"], [aria-current="page"]) {
+  border-bottom-color: #0063a9;
+  color: #0063a9;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+}
+.admin-workspace .admin-main .admin-tab-strip > button:focus-visible { outline: 2px solid #2187cd; outline-offset: -3px; }
+.admin-workspace .admin-main .admin-tab-strip > button > svg { display: none; }
+.admin-workspace .admin-main .admin-response-form-selector.admin-tab-strip > button > span { color: inherit; font-size: inherit; font-weight: inherit; }
+.admin-workspace .admin-main .feedback-hub-tabs.admin-tab-strip { width: auto; flex: 1 1 500px; }
+.dark .admin-workspace .admin-main .admin-tab-strip { border-bottom-color: #334155; }
+.dark .admin-workspace .admin-main .admin-tab-strip > button { color: #aab7c5; }
+.dark .admin-workspace .admin-main .admin-tab-strip > button:hover,
+.dark .admin-workspace .admin-main .admin-tab-strip > button:is([aria-pressed="true"], [aria-selected="true"], [aria-current="page"]) { color: #7cc4ee; }
+@media (max-width: 560px) {
+  .admin-workspace .admin-main .admin-tab-strip > button { min-height: 38px; padding-inline: 11px; font-size: 12px; }
+}

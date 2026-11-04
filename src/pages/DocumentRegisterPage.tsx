@@ -1454,8 +1454,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         headerPortalTarget
       )}
 
-      <div className="document-category-filter sticky top-20 z-20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-        <div role="group" aria-label="Filter document register by category" className="flex min-w-0 flex-nowrap overflow-x-auto rounded-lg bg-slate-50 p-1 dark:bg-slate-900 w-full sm:w-auto" style={{ scrollbarWidth: 'none' }}>
+      <div className="document-category-filter sticky top-20 z-20 bg-white dark:bg-slate-950">
+        <div role="group" aria-label="Filter document register by category" className="admin-tab-strip overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           <button
             aria-pressed={isAllView}
             onClick={() => selectCategory(ALL_KEY)}
