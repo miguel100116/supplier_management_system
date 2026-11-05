@@ -8,7 +8,8 @@ export type PartnerDocumentFilter = 'all' | 'current' | 'expiring' | 'expired' |
 
 interface PartnerCompaniesFilterToolbarProps {
   categoryTab: PartnerCategoryTab; onCategoryChange: (value: PartnerCategoryTab) => void;
-  originFilter: 'All' | SupplierOrigin; onOriginChange: (value: 'All' | SupplierOrigin) => void;
+  originFilter: SupplierOrigin[]; onOriginChange: (value: SupplierOrigin[]) => void;
+  businessTypeFilter: Array<'Trade' | 'Non-Trade'>; onBusinessTypeChange: (value: Array<'Trade' | 'Non-Trade'>) => void;
   searchQuery: string; onSearchChange: (value: string) => void; onSearchClear: () => void;
   sortOptions: TableSortOption<string>[]; sortValue: string; onSortChange: (value: string) => void;
   registeredFrom: string; registeredTo: string; onRegisteredFromChange: (value: string) => void; onRegisteredToChange: (value: string) => void;
@@ -21,17 +22,18 @@ const DOCUMENT_LABELS: Record<PartnerDocumentFilter, string> = {
 };
 
 export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolbarProps) {
-  const { categoryTab, onCategoryChange, originFilter, onOriginChange, searchQuery, onSearchChange, onSearchClear,
+  const { categoryTab, onCategoryChange, originFilter, onOriginChange, businessTypeFilter, onBusinessTypeChange, searchQuery, onSearchChange, onSearchClear,
     sortOptions, sortValue, onSortChange, registeredFrom, registeredTo, onRegisteredFromChange, onRegisteredToChange,
     documentFilter, onDocumentFilterChange, onReset } = props;
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRefs = useRef<Partial<Record<Exclude<OpenPopover, null>, HTMLButtonElement>>>({});
-  const hasAnyFilters = Boolean(searchQuery.trim() || categoryTab !== 'All' || documentFilter !== 'all' || originFilter !== 'All' || registeredFrom || registeredTo || sortValue !== 'default');
+  const hasAnyFilters = Boolean(searchQuery.trim() || categoryTab !== 'All' || documentFilter !== 'all' || originFilter.length !== 2 || businessTypeFilter.length !== 2 || registeredFrom || registeredTo || sortValue !== 'default');
   const chips: Array<{ key: string; label: string; remove: () => void }> = [];
   if (searchQuery.trim()) chips.push({ key: 'search', label: `Search: ${searchQuery.trim()}`, remove: onSearchClear });
   if (categoryTab !== 'All') chips.push({ key: 'category', label: `Category: ${categoryTab}`, remove: () => onCategoryChange('All') });
-  if (categoryTab === 'Supplier' && originFilter !== 'All') chips.push({ key: 'origin', label: `Origin: ${originFilter}`, remove: () => onOriginChange('All') });
+  if (originFilter.length !== 2) chips.push({ key: 'origin', label: `Origin: ${originFilter.join(', ') || 'none'}`, remove: () => onOriginChange(['Local', 'Foreign']) });
+  if (businessTypeFilter.length !== 2) chips.push({ key: 'business-type', label: `Business type: ${businessTypeFilter.join(', ') || 'none'}`, remove: () => onBusinessTypeChange(['Trade', 'Non-Trade']) });
   if (documentFilter !== 'all') chips.push({ key: 'documents', label: `Documents: ${DOCUMENT_LABELS[documentFilter]}`, remove: () => onDocumentFilterChange('all') });
   if (registeredFrom) chips.push({ key: 'from', label: `Registered from: ${registeredFrom}`, remove: () => onRegisteredFromChange('') });
   if (registeredTo) chips.push({ key: 'to', label: `Registered to: ${registeredTo}`, remove: () => onRegisteredToChange('') });
@@ -85,7 +87,7 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
 
   const trigger = (kind: Exclude<OpenPopover, null>, label: string, icon: React.ReactNode, active: boolean, content: React.ReactNode) => (
     <div className={`admin-directory-popover-anchor admin-directory-popover-${kind}`}>
-      <button ref={(element) => { triggerRefs.current[kind] = element ?? undefined; }} type="button" className="admin-directory-icon-trigger" aria-label={label} title={label} aria-expanded={openPopover === kind} aria-haspopup="dialog" onClick={() => setOpenPopover((current) => current === kind ? null : kind)}>
+      <button ref={(element) => { triggerRefs.current[kind] = element ?? undefined; }} type="button" className="admin-directory-icon-trigger" aria-label={label} title={label} aria-expanded={openPopover === kind} aria-haspopup="dialog" onMouseEnter={() => { if (kind === 'origin') setOpenPopover(kind); }} onFocus={() => { if (kind === 'origin') setOpenPopover(kind); }} onClick={() => setOpenPopover((current) => current === kind ? null : kind)}>
         {icon}{active && <span className="admin-directory-active-dot" aria-hidden="true" />}
       </button>
       {openPopover === kind && <div className="admin-directory-compact-popover" role="dialog" aria-label={label}>{content}</div>}
@@ -105,9 +107,12 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
           {optionList('documents', 'Document status', (Object.keys(DOCUMENT_LABELS) as PartnerDocumentFilter[]).map((value) => ({ value, label: DOCUMENT_LABELS[value] })), documentFilter, onDocumentFilterChange)}
           <button type="button" className="admin-directory-popover-reset" onClick={() => onDocumentFilterChange('all')}>Reset</button>
         </>)}
-        {categoryTab === 'Supplier' && trigger('origin', 'Filter by supplier origin', <Building2 size={16} aria-hidden="true" />, originFilter !== 'All', <>
-          <label className="admin-directory-popover-field"><span>Supplier origin</span><select aria-label="Supplier origin" value={originFilter} onChange={(event) => onOriginChange(event.target.value as 'All' | SupplierOrigin)} className="field !mt-0 w-full"><option value="All">All origins</option><option value="Local">Local</option><option value="Foreign">Foreign</option></select></label>
-          <button type="button" className="admin-directory-popover-reset" onClick={() => onOriginChange('All')}>Reset</button>
+        {trigger('origin', 'Filter by supplier origin and business type', <Building2 size={16} aria-hidden="true" />, originFilter.length !== 2 || businessTypeFilter.length !== 2, <>
+          <div className="grid gap-3">
+            <fieldset className="grid gap-1"><legend className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Origin</legend>{(['Local', 'Foreign'] as const).map((value) => <label key={value} className="flex min-h-8 items-center gap-2 rounded px-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800"><input type="checkbox" checked={originFilter.includes(value)} onChange={() => onOriginChange(originFilter.includes(value) ? originFilter.filter((item) => item !== value) : [...originFilter, value])} className="accent-[#2187CD]" />{value}</label>)}<label className="flex min-h-8 items-center gap-2 rounded px-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800"><input type="checkbox" checked={originFilter.length === 2} onChange={() => onOriginChange(originFilter.length === 2 ? [] : ['Local', 'Foreign'])} className="accent-[#2187CD]" />All Origins</label></fieldset>
+            <fieldset className="grid gap-1"><legend className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">Business type</legend>{(['Trade', 'Non-Trade'] as const).map((value) => <label key={value} className="flex min-h-8 items-center gap-2 rounded px-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800"><input type="checkbox" checked={businessTypeFilter.includes(value)} onChange={() => onBusinessTypeChange(businessTypeFilter.includes(value) ? businessTypeFilter.filter((item) => item !== value) : [...businessTypeFilter, value])} className="accent-[#2187CD]" />{value}</label>)}<label className="flex min-h-8 items-center gap-2 rounded px-2 text-xs hover:bg-slate-50 dark:hover:bg-slate-800"><input type="checkbox" checked={businessTypeFilter.length === 2} onChange={() => onBusinessTypeChange(businessTypeFilter.length === 2 ? [] : ['Trade', 'Non-Trade'])} className="accent-[#2187CD]" />All Types</label></fieldset>
+          </div>
+          <button type="button" className="admin-directory-popover-reset" onClick={() => { onOriginChange(['Local', 'Foreign']); onBusinessTypeChange(['Trade', 'Non-Trade']); }}>Reset</button>
         </>)}
         {trigger('dates', 'Filter by registration date', <CalendarDays size={16} aria-hidden="true" />, Boolean(registeredFrom || registeredTo), <><fieldset className="admin-directory-date-popover"><legend>Registration date</legend><label className="admin-directory-popover-field"><span>From</span><input type="date" value={registeredFrom} max={registeredTo || undefined} onChange={(event) => onRegisteredFromChange(event.target.value)} className="field !mt-0 w-full" /></label><label className="admin-directory-popover-field"><span>To</span><input type="date" value={registeredTo} min={registeredFrom || undefined} onChange={(event) => onRegisteredToChange(event.target.value)} className="field !mt-0 w-full" /></label></fieldset><button type="button" className="admin-directory-popover-reset" onClick={() => { onRegisteredFromChange(''); onRegisteredToChange(''); }}>Reset</button></>)}
         {trigger('sort', 'Sort partners', <ArrowDownUp size={16} aria-hidden="true" />, sortValue !== 'default', <>

@@ -57,6 +57,7 @@ import { PartnerCompanyDirectoryCard } from '../features/partner-companies/compo
 import { PartnerRegistryOverview } from '../features/partner-companies/components/PartnerRegistryOverview';
 import { PartnerCategoryRankBreakdown } from '../features/partner-companies/components/PartnerCategoryRankBreakdown';
 import { PartnerDirectoryArchiveButton } from '../features/partner-companies/components/PartnerDirectoryArchiveButton';
+import { matchesDirectoryClassificationFilters } from '../features/partner-companies/domain/directoryClassificationFilters';
 
 const MISSING_FIELD_ICONS: Record<MissingProfileField, typeof MapPin> = {
   address: MapPin,
@@ -199,7 +200,8 @@ export function PartnerCompaniesPage({
   // Affiliation filter
   const [activeTab, setActiveTab] = useState<PartnerCompanyType | 'All'>('All');
   // Local/Foreign sub-filter, only meaningful while activeTab === 'Supplier'
-  const [originFilter, setOriginFilter] = useState<'All' | 'Local' | 'Foreign'>('All');
+  const [originFilter, setOriginFilter] = useState<Array<'Local' | 'Foreign'>>(['Local', 'Foreign']);
+  const [businessTypeFilter, setBusinessTypeFilter] = useState<Array<'Trade' | 'Non-Trade'>>(['Trade', 'Non-Trade']);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   useEffect(() => {
@@ -661,9 +663,7 @@ export function PartnerCompaniesPage({
       baseList = baseList.filter((c) => c.type === activeTab);
     }
 
-    if (activeTab === 'Supplier' && originFilter !== 'All') {
-      baseList = baseList.filter((c) => (c.supplierOrigin ?? 'Local') === originFilter);
-    }
+    baseList = baseList.filter((company) => matchesDirectoryClassificationFilters(company, originFilter, businessTypeFilter, activeTab));
 
     if (debouncedSearchQuery.trim()) {
       const q = debouncedSearchQuery.trim().toLowerCase();
@@ -715,13 +715,13 @@ export function PartnerCompaniesPage({
       });
     }
     return baseList;
-  }, [classifiedCompanies, activeTab, originFilter, debouncedSearchQuery, sortConfig, effectiveNow, registeredFrom, registeredTo, documentFilter]);
+  }, [classifiedCompanies, activeTab, originFilter, businessTypeFilter, debouncedSearchQuery, sortConfig, effectiveNow, registeredFrom, registeredTo, documentFilter]);
 
   // Jump back to page 1 whenever a filter/search/sort narrows or reshuffles
   // the result set - otherwise the user can land on a now-empty page.
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, originFilter, debouncedSearchQuery, sortConfig, registeredFrom, registeredTo, documentFilter]);
+  }, [activeTab, originFilter, businessTypeFilter, debouncedSearchQuery, sortConfig, registeredFrom, registeredTo, documentFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / COMPANIES_PAGE_SIZE));
   // Clamp defensively (e.g. the list shrinks from a delete while on a later
@@ -931,16 +931,18 @@ export function PartnerCompaniesPage({
 
       <PartnerRegistryOverview
         category={activeTab}
-        onCategoryChange={(value) => { setActiveTab(value); if (value !== 'Supplier') setOriginFilter('All'); }}
+        onCategoryChange={setActiveTab}
         isAdmin={isAdmin}
         onOpenActiveCompanies={() => setIsActiveCompaniesOpen(true)}
         onOpenRegister={() => { setErrorMessage(''); setRegisterModalTab('manual'); setIsRegisterOpen(true); }}
         directoryControls={(
       <PartnerCompaniesFilterToolbar
         categoryTab={activeTab}
-        onCategoryChange={(value) => { setActiveTab(value); if (value !== 'Supplier') setOriginFilter('All'); }}
+        onCategoryChange={setActiveTab}
         originFilter={originFilter}
         onOriginChange={setOriginFilter}
+        businessTypeFilter={businessTypeFilter}
+        onBusinessTypeChange={setBusinessTypeFilter}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onSearchClear={() => { setSearchQuery(''); setDebouncedSearchQuery(''); }}
@@ -977,7 +979,8 @@ export function PartnerCompaniesPage({
           setSearchQuery('');
           setDebouncedSearchQuery('');
           setActiveTab('All');
-          setOriginFilter('All');
+          setOriginFilter(['Local', 'Foreign']);
+          setBusinessTypeFilter(['Trade', 'Non-Trade']);
           setRegisteredFrom('');
           setRegisteredTo('');
           setDocumentFilter('all');
@@ -1026,7 +1029,8 @@ export function PartnerCompaniesPage({
         onReset={() => {
           setSearchQuery('');
           setActiveTab('All');
-          setOriginFilter('All');
+          setOriginFilter(['Local', 'Foreign']);
+          setBusinessTypeFilter(['Trade', 'Non-Trade']);
           setRegisteredFrom('');
           setRegisteredTo('');
           setDocumentFilter('all');
@@ -2116,7 +2120,7 @@ export function PartnerCompaniesPage({
                         onClick={() => setNewSupplierOrigin(origin)}
                         className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                           newSupplierOrigin === origin
-                            ? 'bg-emerald-600 text-white shadow-xs'
+                            ? 'bg-[#2187CD] text-white shadow-xs'
                             : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                         }`}
                       >
