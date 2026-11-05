@@ -1,4 +1,5 @@
 import { toNotification, groupResponsesToNotifications } from '../features/notifications/domain/responseNotifications';
+import { registrationBranches, registrationType as inferRegistrationType } from '../features/partner-companies/domain/registration';
 import { compareNotificationDates } from '../features/notifications/domain/notificationPresentation';
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
@@ -29,7 +30,7 @@ import { getRequiredDocumentKeys } from '../features/document-tracker/domain/doc
 import { getNotificationSettings, NOTIFICATION_SETTINGS_CHANGED_EVENT } from '../features/notifications/services/documentNotificationSettings';
 import { loadDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
 import { createDocumentReminderRefresh } from '../features/notifications/services/documentReminderRefresh';
-import { loadNormalizedPartnerCompanies, normalizeDatabasePartnerCompany } from '../services/normalizedPartnerCompanies';
+import { normalizeDatabasePartnerCompany } from '../services/normalizedPartnerCompanies';
 import { isSupabaseConfigured } from '../services/supabaseClient';
 import { getSupabaseSessionEmail } from '../services/supabasePasswordAuth';
 import {
@@ -210,6 +211,7 @@ function normalizePartnerCompany(company: PartnerCompany): PartnerCompany {
     ...company,
     type: normalizedType,
     branches: defaultBranches,
+    registrationType: inferRegistrationType({ branches: defaultBranches }),
   };
 }
 
@@ -1424,9 +1426,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         loadApplicationRecords<SurveyResponse>('survey_response', readOptions),
         readActiveEvaluationLists(),
       ]);
-      const companies = storedCompanies.length > 0
-        ? storedCompanies
-        : await loadNormalizedPartnerCompanies();
+      // An empty shared registry is authoritative, including after deleting the last partner.
+      const companies = storedCompanies;
       if (cancelled) return;
 
       const normalizedCompanies = companies.map(normalizeDatabasePartnerCompany).map(normalizePartnerCompany);
@@ -1517,7 +1518,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       switch (recordType) {
         case 'partner_company': {
           const storedCompanies = await loadApplicationRecords<PartnerCompany>('partner_company', readOptions);
-          const companies = storedCompanies.length > 0 ? storedCompanies : await loadNormalizedPartnerCompanies();
+          const companies = storedCompanies;
           if (cancelled) return;
           const normalizedCompanies = companies.map(normalizeDatabasePartnerCompany).map(normalizePartnerCompany);
           setPartnerCompanies(normalizedCompanies);
@@ -1727,9 +1728,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   const updateSurveysBulk = async (updatedSurveysList: CustomForm[]) => {
     const map = new Map(updatedSurveysList.map((s) => [s.id, normalizeCustomForm(s)]));
     const updated = surveys.map((survey) => map.get(survey.id) ?? survey);
+    await persistRemoteAsync(upsertApplicationRecords('survey', [...map.values()], (survey) => survey.id));
     setSurveys(updated);
     safeSetItem('survey_analytics_surveys_v6', JSON.stringify(updated.map(normalizeCustomForm)));
-    await persistRemoteAsync(replaceApplicationRecords('survey', updated, (survey) => survey.id));
   };
 
   // Renames one of a survey type's 5 categories (Categories Manager). Every
@@ -1877,25 +1878,17 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     registeredAt?: string,
     bpCode?: string,
     ntBpCode?: string,
-    supplierOrigin?: SupplierOrigin
+    supplierOrigin?: SupplierOrigin,
+    registrationType: 'Trade' | 'Non-Trade' | 'Both' = 'Trade'
   ) => {
     const todayStr = new Date().toISOString().slice(0, 10);
     const id = `pc-${Date.now()}`;
-    // Mirrors the Master List's own category string (e.g. "Supplier-Local",
-    // "Courier-NT") so a manually-registered company is picked up by
-    // computeCategoryRankSummary the same way an imported row is - that
-    // summary reads branch.rawCategory, not company.type/supplierOrigin.
-    const rawCategoryBase = type === 'Supplier' ? `Supplier-${supplierOrigin === 'Foreign' ? 'Foreign' : 'Local'}` : type;
-    // A second, Non-Trade BP Code registers as its own branch (mirrors how a
-    // Master List row with a "-NT" BP Code merges in) so it shows up as its
-    // own row in the Document Tracker, distinct from the regular branch.
-    const branches: BranchRecord[] = [{ id: `${id}-branch-1`, bpCode: (bpCode ?? '').trim(), rawCategory: rawCategoryBase }];
-    if (ntBpCode?.trim()) {
-      branches.push({ id: `${id}-branch-2`, bpCode: ntBpCode.trim(), rawCategory: `${rawCategoryBase}-NT` });
-    }
+    // Keep the registry and Document Tracker on the same branch contract.
+    const branches = registrationBranches({ id, type, supplierOrigin }, registrationType, bpCode ?? '', ntBpCode ?? '');
     const newCompany: PartnerCompany = normalizePartnerCompany({
       id,
       name: name.trim(),
+      registrationType,
       type,
       supplierOrigin: type === 'Supplier' ? (supplierOrigin ?? 'Local') : undefined,
       affiliation: affiliation?.trim() || 'General partner',
@@ -1905,9 +1898,9 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       branches,
     });
     const updated = [...partnerCompanies, newCompany];
+    await persistRemoteAsync(upsertApplicationRecords('partner_company', [newCompany], (company) => company.id));
     setPartnerCompanies(updated);
     safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
-    await persistRemoteAsync(upsertApplicationRecords('partner_company', [newCompany], (company) => company.id));
     return newCompany;
   };
 

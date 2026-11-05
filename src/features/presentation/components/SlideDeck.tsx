@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -115,6 +115,12 @@ function slideTitleFor(slide: Slide, index: number): string {
       return 'Spotlight';
     case 'distribution':
       return 'Needs Attention';
+    case 'period-change':
+      return 'What Changed Since the Last Period?';
+    case 'focus':
+      return 'Where Should We Focus?';
+    case 'portfolio-spread':
+      return 'Is This Isolated or Widespread?';
     case 'closing':
       return 'Key Takeaways';
     default:
@@ -133,25 +139,6 @@ function ScoreBadge({ label, hex }: { label: string; hex: string }) {
   );
 }
 
-/** Faint brand-colored dot-grid + radial wash shared by every content slide, so
- * they read as one consistent deck instead of plain white documents. Kept
- * subtle (low opacity) so it never competes with charts or text on top. */
-function SlideBackdrop() {
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -right-24 -top-32 h-80 w-80 rounded-full bg-[#0063a9]/[0.05] blur-3xl" />
-      <div className="absolute -bottom-28 -left-16 h-64 w-64 rounded-full bg-[#0063a9]/[0.04] blur-3xl" />
-      <div
-        className="absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, #0063a9 1px, transparent 1px)',
-          backgroundSize: '26px 26px',
-        }}
-      />
-    </div>
-  );
-}
-
 /** Standard eyebrow + title + accent underline used by every content slide,
  * so typography/spacing never drifts slide to slide. */
 function SlideHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
@@ -160,7 +147,7 @@ function SlideHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: str
       <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0063a9]">{eyebrow}</p>
       <h2 className="mt-1.5 text-2xl font-bold text-slate-900 sm:text-3xl">{title}</h2>
       {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
-      <div className="mt-3 h-1 w-14 rounded-full bg-gradient-to-r from-[#0063a9] to-[#0063a9]/30" />
+      <div className="mt-3 h-px w-20 bg-[#0063a9]" />
     </div>
   );
 }
@@ -200,19 +187,10 @@ function SlideToggle<T extends string>({
 
 function TitleSlide({ slide }: { slide: Extract<Slide, { kind: 'title' }> }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#0063a9] via-[#005793] to-[#00335a] px-10 text-center text-white">
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-[#10243a] px-10 text-center text-white">
       {/* Decorative background flourishes */}
-      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 -right-16 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl" />
-      <div className="pointer-events-none absolute right-10 top-10 h-24 w-24 rounded-full border border-white/20" />
-      <div className="pointer-events-none absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-        }}
-      />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-2 bg-[#0063a9]" />
+      <div className="pointer-events-none absolute right-0 top-0 h-1 w-1/3 bg-[#0063a9]" />
 
       {/* Header row: brand mark + generated-on stamp */}
       <div className="absolute left-6 right-6 top-6 flex items-center justify-between sm:left-10 sm:right-10 sm:top-8">
@@ -233,10 +211,9 @@ function TitleSlide({ slide }: { slide: Extract<Slide, { kind: 'title' }> }) {
         </div>
       </div>
 
-      <Sparkles className="mb-5 text-sky-200" size={32} />
-      <p className="text-xs font-bold uppercase tracking-[0.35em] text-sky-200">{slide.subtitle}</p>
+      <p className="mb-6 text-xs font-bold uppercase tracking-[0.35em] text-sky-200">{slide.subtitle}</p>
       <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight sm:text-5xl">{slide.title}</h1>
-      <div className="mt-5 h-px w-16 bg-gradient-to-r from-transparent via-white/60 to-transparent" />
+      <div className="mt-5 h-px w-16 bg-sky-200/70" />
       <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
         {slide.meta.map((item) => (
           <span key={item} className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs font-semibold tracking-wide backdrop-blur-sm">
@@ -256,20 +233,20 @@ function TitleSlide({ slide }: { slide: Extract<Slide, { kind: 'title' }> }) {
 function AgendaSlide({ slide }: { slide: Extract<Slide, { kind: 'agenda' }> }) {
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
         <SlideHeader eyebrow="What's inside" title="Contents" />
-        <div className="mt-6 flex flex-1 min-h-0 flex-col justify-center gap-2.5">
+        <div className={`mt-6 grid min-h-0 flex-1 content-center gap-2.5 ${slide.items.length > 8 ? 'grid-cols-2' : 'grid-cols-1'}`} style={{ gridAutoRows: slide.items.length > 8 ? 'minmax(64px, auto)' : 'minmax(56px, auto)' }}>
           {slide.items.map((item, index) => (
             <motion.div
               key={item.label}
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
-              className="flex max-h-24 flex-1 items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/60 px-4"
+              className="flex min-h-14 items-center gap-4 border-b border-slate-200 px-3"
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0063a9] text-sm font-bold text-white">
-                {index + 1}
+                {item.number}
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-slate-800 sm:text-base">{item.label}</p>
@@ -328,8 +305,8 @@ function OverviewSlide({
   }, [isSingleSurveyType, slide.standout, responses]);
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-gradient-to-b from-white to-blue-50/60 px-8 py-8 sm:px-14 sm:py-10">
-      <SlideBackdrop />
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
       <SlideHeader eyebrow={SLIDE_EYEBROWS.overview} title="Where things stand" />
 
@@ -350,7 +327,7 @@ function OverviewSlide({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: i * 0.06 }}
-                className="rounded-2xl bg-gradient-to-br from-[#0063a9] to-[#00457a] p-4 shadow-md shadow-blue-900/10"
+                className="border-l-4 border-[#0063a9] bg-[#10243a] p-4 text-white"
               >
                 <div className="flex items-center gap-1.5 text-blue-100">
                   <Icon size={13} className="shrink-0" />
@@ -623,6 +600,7 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
         return {
           company,
           score: Number(avgScore.toFixed(1)),
+          responses: composites.reduce((total, composite) => total + composite.evaluationCount, 0),
           surveyType: mainType,
         };
       })
@@ -634,7 +612,10 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
       stats.sort((a, b) => a.score - b.score);
     }
 
-    return stats.slice(0, limit);
+    return stats.slice(0, limit).map((item) => ({
+      ...item,
+      scoreLabel: `${item.score.toFixed(1)} · n=${item.responses}`,
+    }));
   }, [responses, activeSurveyTypes, performanceMode, limit]);
 
   const topCompaniesAxisDomain = useMemo(
@@ -644,7 +625,7 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-6 sm:px-14 sm:py-8 text-slate-900">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
       {/* Slide Header with Interactive Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3">
@@ -729,9 +710,16 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
                     tick={{ ...CHART_TICK_STRONG, fontSize: 9 }}
                   />
                   <YAxis domain={topCompaniesAxisDomain} tick={{ ...CHART_TICK, fontSize: 9 }} />
-                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} />
+                  <Tooltip
+                    contentStyle={CHART_TOOLTIP_STYLE}
+                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                    formatter={(value, _name, item) => [
+                      `${Number(value ?? 0).toFixed(1)} / 100 · n=${item.payload?.responses ?? 0}`,
+                      'Average rating',
+                    ]}
+                  />
                   <Bar dataKey="score" radius={[6, 6, 0, 0]} barSize={limit === 10 ? 24 : 36}>
-                    <LabelList dataKey="score" position="top" style={{ ...CHART_LABEL_STYLE, fontSize: 9 }} />
+                    <LabelList dataKey="scoreLabel" position="top" style={{ ...CHART_LABEL_STYLE, fontSize: 9 }} />
                     {topCompaniesData.map((entry, idx) => (
                       <Cell key={`cell-${idx}`} fill={surveyTypeColors[entry.surveyType] ?? '#2563eb'} />
                     ))}
@@ -761,7 +749,7 @@ function ComparisonSlide({ slide, responses = [] }: { slide: Extract<Slide, { ki
                   </span>
                   <span className="text-xs font-semibold text-slate-700 truncate flex-1">{item.company}</span>
                   <span className="text-xs font-bold shrink-0 px-2 py-0.5 rounded-md" style={{ backgroundColor: `${surveyTypeColors[item.surveyType] || '#2563eb'}1a`, color: surveyTypeColors[item.surveyType] || '#2563eb' }}>
-                    {item.score.toFixed(1)}
+                    {item.score.toFixed(1)} · n={item.responses}
                   </span>
                 </div>
               ))}
@@ -812,16 +800,20 @@ function SectionsSlide({ slide }: { slide: Extract<Slide, { kind: 'sections' }> 
   const [sortBy, setSortBy] = useState<'score' | 'volume'>('score');
 
   const sorted = useMemo(() => {
-    const copy = [...slide.data];
-    copy.sort((a, b) => (sortBy === 'volume' ? b.responses - a.responses : b.average - a.average));
-    return copy;
+    return [...slide.data]
+      .filter((item) => item.submissions > 0)
+      .sort((a, b) => (sortBy === 'volume' ? b.submissions - a.submissions : b.average - a.average))
+      .map((item) => ({
+        ...item,
+        averageLabel: `${item.average.toFixed(1)} · n=${item.submissions}`,
+      }));
   }, [slide.data, sortBy]);
 
   const barSize = sorted.length > 6 ? 16 : sorted.length > 4 ? 22 : 30;
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
         <div className="flex items-start justify-between gap-4">
           <SlideHeader
@@ -840,29 +832,33 @@ function SectionsSlide({ slide }: { slide: Extract<Slide, { kind: 'sections' }> 
         </div>
         <div className="mt-5 flex-1 min-h-0 rounded-2xl border border-slate-200/90 bg-slate-50/30 p-4">
           {sorted.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sorted} layout="vertical" margin={{ top: 5, right: 44, left: 10, bottom: 5 }}>
-                <CartesianGrid {...CHART_GRID} horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} tick={CHART_TICK} />
-                <YAxis type="category" dataKey="category" width={150} tick={CHART_TICK_STRONG} />
-                <Tooltip
-                  contentStyle={CHART_TOOLTIP_STYLE}
-                  labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                  formatter={(value: any) => [`${Number(value).toFixed(2)} / 100`, 'Average']}
-                />
-                <Bar dataKey="average" radius={[0, 8, 8, 0]} barSize={barSize}>
-                  <LabelList
-                    dataKey="average"
-                    position="right"
-                    formatter={(v: any) => Number(v).toFixed(1)}
-                    style={CHART_LABEL_STYLE}
+            <>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sorted} layout="vertical" margin={{ top: 5, right: 86, left: 10, bottom: 5 }}>
+                  <CartesianGrid {...CHART_GRID} horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} tick={CHART_TICK} />
+                  <YAxis type="category" dataKey="category" width={150} tick={CHART_TICK_STRONG} />
+                  <Tooltip
+                    contentStyle={CHART_TOOLTIP_STYLE}
+                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                    formatter={(value: any) => [`${Number(value).toFixed(2)} / 100`, 'Average']}
                   />
-                  {sorted.map((entry) => (
-                    <Cell key={entry.category} fill={bandColorForScore(entry.average)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+                  <Bar dataKey="average" radius={[0, 8, 8, 0]} barSize={barSize}>
+                    <LabelList dataKey="averageLabel" position="right" style={CHART_LABEL_STYLE} />
+                    {sorted.map((entry) => (
+                      <Cell key={entry.category} fill={bandColorForScore(entry.average)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <ul className="sr-only" aria-label="Category average ratings and countable response totals">
+                {sorted.map((item) => (
+                  <li key={item.category}>
+                    {item.category}: average {item.average.toFixed(1)} out of 100 from {item.submissions} countable responses.
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
               No category data available.
@@ -959,7 +955,7 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
   if (selectedCompany) {
     return (
       <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-5 sm:px-14 sm:py-6 text-slate-900">
-        <SlideBackdrop />
+
         <div className="relative z-10 flex h-full min-h-0 flex-col">
         {/* Top Bar */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-2 bg-white z-10">
@@ -1126,7 +1122,7 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-6 sm:px-14 sm:py-8 text-slate-900">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
       <div className="shrink-0">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0063a9]">{SLIDE_EYEBROWS.leaderboard}</p>
@@ -1189,65 +1185,76 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
 }
 
 function TrendsSlide({ slide }: { slide: Extract<Slide, { kind: 'trends' }> }) {
-  const [metric, setMetric] = useState<'average' | 'responses'>('average');
-  const color = metric === 'average' ? '#0063a9' : '#10b981';
-
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
         <div className="flex items-start justify-between gap-4">
           <SlideHeader
             eyebrow={SLIDE_EYEBROWS.trends}
             title="Trends Over Time"
-            subtitle="Monthly average rating and response volume across the selected window."
-          />
-          <SlideToggle
-            options={[
-              { value: 'average' as const, label: 'Avg Rating' },
-              { value: 'responses' as const, label: 'Volume' },
-            ]}
-            value={metric}
-            onChange={setMetric}
+            subtitle="Monthly average ratings shown alongside countable response volume."
           />
         </div>
         <div className="mt-5 flex-1 min-h-0 rounded-2xl border border-slate-200/90 bg-slate-50/30 p-4">
           {slide.data.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={slide.data} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={color} stopOpacity={0.35} />
-                    <stop offset="95%" stopColor={color} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid {...CHART_GRID} vertical={false} />
-                <XAxis dataKey="month" tick={CHART_TICK} />
-                <YAxis
-                  domain={metric === 'average' ? [0, 100] : [0, 'auto']}
-                  allowDecimals={metric !== 'average'}
-                  tick={CHART_TICK}
-                />
-                <Tooltip
-                  contentStyle={CHART_TOOLTIP_STYLE}
-                  labelStyle={CHART_TOOLTIP_LABEL_STYLE}
-                  formatter={(value: any) => [
-                    metric === 'average' ? `${Number(value).toFixed(2)} / 100` : value,
-                    metric === 'average' ? 'Average rating' : 'Responses',
-                  ]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey={metric}
-                  name={metric === 'average' ? 'Average rating' : 'Responses'}
-                  stroke={color}
-                  strokeWidth={3}
-                  fill="url(#trendFill)"
-                  dot={{ r: 3, strokeWidth: 0, fill: color }}
-                  activeDot={{ r: 5 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="flex h-full min-h-0 flex-col gap-2">
+              <div className="flex min-h-0 flex-[1.25] flex-col">
+                <p className="mb-1 shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">Average rating (out of 100)</p>
+                <div className="min-h-0 flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={slide.data} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0063a9" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#0063a9" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid {...CHART_GRID} vertical={false} />
+                      <XAxis dataKey="month" tick={CHART_TICK} />
+                      <YAxis domain={[0, 100]} tick={CHART_TICK} />
+                      <Tooltip
+                        contentStyle={CHART_TOOLTIP_STYLE}
+                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                        formatter={(value) => [
+                          value === null || value === undefined ? 'No scored ratings' : `${Number(value).toFixed(2)} / 100`,
+                          'Average rating',
+                        ]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="average"
+                        name="Average rating"
+                        stroke="#0063a9"
+                        strokeWidth={3}
+                        fill="url(#trendFill)"
+                        dot={{ r: 3, strokeWidth: 0, fill: '#0063a9' }}
+                        activeDot={{ r: 5 }}
+                        connectNulls={false}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col border-t border-slate-200 pt-2">
+                <p className="mb-1 shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400">Countable responses by month</p>
+                <div className="min-h-0 flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={slide.data} margin={{ top: 8, right: 20, left: -10, bottom: 0 }}>
+                      <CartesianGrid {...CHART_GRID} vertical={false} />
+                      <XAxis dataKey="month" tick={CHART_TICK} />
+                      <YAxis allowDecimals={false} tick={CHART_TICK} />
+                      <Tooltip
+                        contentStyle={CHART_TOOLTIP_STYLE}
+                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                        formatter={(value) => [Number(value ?? 0), 'Countable responses']}
+                      />
+                      <Bar dataKey="responses" name="Countable responses" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">
               Not enough monthly data to chart a trend.
@@ -1268,7 +1275,7 @@ function QuestionsSlide({ slide }: { slide: Extract<Slide, { kind: 'questions' }
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
         <SlideHeader eyebrow={SLIDE_EYEBROWS.questions} title="Top & Bottom Questions" />
         <div className="mt-5 grid flex-1 min-h-0 gap-5 sm:grid-cols-2">
@@ -1308,7 +1315,7 @@ function QuestionsSlide({ slide }: { slide: Extract<Slide, { kind: 'questions' }
 function SpotlightSlide({ slide }: { slide: Extract<Slide, { kind: 'spotlight' }> }) {
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
       <SlideHeader eyebrow={SLIDE_EYEBROWS.spotlight} title="Company Spotlight" />
       <div className="mt-5 grid flex-1 min-h-0 gap-5 lg:grid-cols-[1fr,1.1fr]">
@@ -1358,7 +1365,7 @@ function NeedsAttentionSlide({ slide }: { slide: Extract<Slide, { kind: 'distrib
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
-      <SlideBackdrop />
+
       <div className="relative z-10 flex h-full min-h-0 flex-col">
         <div className="flex items-start justify-between gap-4">
           <SlideHeader
@@ -1433,21 +1440,93 @@ function NeedsAttentionSlide({ slide }: { slide: Extract<Slide, { kind: 'distrib
 
 function ClosingSlide({ slide }: { slide: Extract<Slide, { kind: 'closing' }> }) {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#172033] via-[#0f1a2e] to-[#0063a9] px-10 py-10 text-center text-white">
-      <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
+    <div className="relative flex h-full w-full flex-col items-center justify-center overflow-hidden border-t-4 border-[#0063a9] bg-[#10243a] px-10 py-10 text-center text-white">
       <Trophy className="mb-4 text-sky-200" size={30} />
       <h2 className="text-2xl font-bold sm:text-3xl">Key Takeaways</h2>
-      <ul className="mx-auto mt-6 max-w-2xl space-y-3 text-left">
-        {slide.takeaways.map((point) => (
-          <li key={point} className="flex items-start gap-3 rounded-xl border border-white/15 bg-white/5 px-4 py-3 backdrop-blur-sm">
-            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300" />
-            <span className="text-sm text-blue-50">{point}</span>
+      <ul className="mx-auto mt-6 max-w-3xl space-y-0 text-left">
+        {slide.takeaways.map((point, index) => (
+          <li key={point} className="grid grid-cols-[40px_1fr] items-start gap-3 border-t border-white/20 py-3">
+            <span className="pt-0.5 text-xs font-bold tabular-nums text-sky-200">0{index + 1}</span>
+            <span className="text-sm leading-relaxed text-blue-50">{point}</span>
           </li>
         ))}
       </ul>
       <p className="mt-8 text-xs font-semibold uppercase tracking-[0.3em] text-sky-200">Thank you</p>
     </div>
+  );
+}
+
+function PeriodChangeSlide({ slide }: { slide: Extract<Slide, { kind: 'period-change' }> }) {
+  const insight = slide.insight;
+  const movement = insight.delta ?? 0;
+  const trendColor = movement > 0 ? 'text-emerald-700' : movement < 0 ? 'text-rose-700' : 'text-slate-600';
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-10 py-8 sm:px-14">
+
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+        <SlideHeader eyebrow={SLIDE_EYEBROWS['period-change']} title="What changed since the last period?" subtitle={insight.available ? 'Equal-duration comparison using the same response scoring rules.' : 'Current performance snapshot from the selected evaluation records.'} />
+        {!insight.available ? (
+          <>
+            <p className="mt-4 border-l-2 border-[#0063a9] px-4 py-2 text-xs leading-relaxed text-slate-600">{insight.contextMessage}</p>
+            <div className="mt-3 flex items-end justify-between border-b border-slate-200 pb-3">
+              <div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Current window · {insight.currentPeriod}</p><p className="mt-1 text-3xl font-semibold text-slate-800">{insight.currentScore?.toFixed(2) ?? '—'}<span className="ml-2 text-xs font-normal text-slate-500">/ 100</span></p><p className="text-xs text-slate-500">{insight.currentResponses} scored responses</p></div>
+              {insight.currentSnapshot.strongest && <div className="max-w-[45%] text-right"><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Highest current result</p><p className="mt-1 truncate text-sm font-semibold text-slate-800">{insight.currentSnapshot.strongest.label}</p><p className="text-xs text-slate-500">{insight.currentSnapshot.strongest.surveyType} · {insight.currentSnapshot.strongest.score.toFixed(1)} / 100 · {insight.currentSnapshot.strongest.responses} scored responses</p></div>}
+            </div>
+            <div className="mt-4 grid min-h-0 flex-1 grid-cols-2 gap-8">
+              <section><h3 className="border-b border-slate-200 pb-2 text-xs font-bold uppercase tracking-wider text-slate-600">Lowest category results</h3>{insight.currentSnapshot.weakestCategories.length ? insight.currentSnapshot.weakestCategories.map((metric) => <div key={metric.key} className="border-b border-slate-100 py-2"><div className="flex justify-between gap-3 text-xs"><span className="truncate font-semibold text-slate-800">{metric.label} · {metric.surveyType}</span><span className="shrink-0 font-bold text-slate-700">{metric.score.toFixed(1)} / 100</span></div><div className="mt-1 flex justify-between text-[10px] text-slate-500"><span>{metric.responses} scored responses</span><span>Current result</span></div></div>) : <p className="py-3 text-xs text-slate-500">No scored category results in this window.</p>}</section>
+              <section><h3 className="border-b border-slate-200 pb-2 text-xs font-bold uppercase tracking-wider text-slate-600">Lowest partner results</h3>{insight.currentSnapshot.lowestPartners.length ? insight.currentSnapshot.lowestPartners.map((metric) => <div key={metric.key} className="border-b border-slate-100 py-2"><div className="flex justify-between gap-3 text-xs"><span className="truncate font-semibold text-slate-800">{metric.label}</span><span className="shrink-0 font-bold text-slate-700">{metric.score.toFixed(1)} / 100</span></div><div className="mt-1 flex justify-between text-[10px] text-slate-500"><span>{metric.surveyType}</span><span>{metric.responses} scored responses</span></div></div>) : <p className="py-3 text-xs text-slate-500">No scored partner results in this window.</p>}</section>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-end gap-5 border-b border-slate-200 pb-4">
+              <div><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Previous · {insight.previousPeriod}</p><p className="mt-1 text-3xl font-semibold text-slate-800">{insight.previousScore?.toFixed(2)}</p><p className="text-xs text-slate-500">{insight.previousResponses} scored responses</p><div className="mt-2 h-1.5 bg-slate-100"><div className="h-full bg-slate-400" style={{ width: `${Math.max(0, Math.min(100, insight.previousScore ?? 0))}%` }} /></div></div>
+              <div className={`pb-1 text-right ${trendColor}`}><p className="text-[10px] font-bold uppercase tracking-wider">{movement > 0 ? 'Increased' : movement < 0 ? 'Declined' : 'Unchanged'}</p><p className="text-xl font-bold">{movement > 0 ? '+' : ''}{movement.toFixed(2)} pts</p></div>
+              <div className="text-right"><p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Current · {insight.currentPeriod}</p><p className="mt-1 text-3xl font-semibold text-slate-800">{insight.currentScore?.toFixed(2)}</p><p className="text-xs text-slate-500">{insight.currentResponses} scored responses</p><div className="mt-2 h-1.5 bg-slate-100"><div className="ml-auto h-full bg-[#0063a9]" style={{ width: `${Math.max(0, Math.min(100, insight.currentScore ?? 0))}%` }} /></div></div>
+            </div>
+            <div className="mt-4 grid min-h-0 flex-1 grid-cols-2 gap-8">
+              {([{title:'Largest improvements',items:insight.improvements,color:'text-emerald-700'},{title:'Largest declines',items:insight.declines,color:'text-rose-700'}] as const).map((group) => (
+                <section key={group.title} className="min-w-0">
+                  <h3 className={`border-b border-slate-200 pb-2 text-xs font-bold uppercase tracking-wider ${group.color}`}>{group.title}</h3>
+                  {group.items.length ? group.items.map((item) => <div key={item.key} className="grid grid-cols-[1fr_auto] gap-3 border-b border-slate-100 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{item.label}</p><p className="text-[10px] text-slate-500">{item.surveyType} · {item.kind} · {item.previousResponses} → {item.currentResponses} scored responses</p></div><p className={`whitespace-nowrap text-sm font-bold ${group.color}`}>{item.delta > 0 ? '+' : ''}{item.delta.toFixed(2)}</p></div>) : <p className="py-3 text-xs text-slate-500">No matched {group.title.toLowerCase()} found.</p>}
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FocusSlide({ slide }: { slide: Extract<Slide, { kind: 'focus' }> }) {
+  const priorities = slide.insight.priorities;
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-10 py-8 sm:px-14">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+        <SlideHeader eyebrow={SLIDE_EYEBROWS.focus} title="Where should we focus?" subtitle="Priorities are triggered by the system’s existing Unsatisfactory band or a matched category decline." />
+        {!priorities.length ? <p className="mt-8 border-l-4 border-slate-300 bg-slate-50 px-5 py-4 text-sm text-slate-600">{slide.insight.reason}</p> : <div className="mt-4 grid min-h-0 flex-1 grid-rows-3 gap-2">
+          {priorities.map((priority,index) => <article key={`${priority.surveyType}:${priority.question}`} className="grid min-h-0 grid-cols-[44px_minmax(0,1fr)_minmax(260px,0.85fr)] gap-4 border-t border-slate-200 py-2.5">
+            <div className="pt-1 text-2xl font-light text-[#0063a9]">0{index+1}</div>
+            <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{priority.surveyType} · {priority.category}</p><p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-900">{priority.question}</p><p className="mt-1 text-xs text-slate-600">{priority.questionScore.toFixed(1)} / 100 · {priority.responses} responses · {priority.affectedPartners} affected partners</p>{priority.categoryDelta !== undefined && <p className="text-[10px] text-rose-700">Category change: {priority.categoryDelta > 0 ? '+' : ''}{priority.categoryDelta.toFixed(2)} points</p>}</div>
+            <div className="border-l border-slate-200 pl-4"><p className="text-[10px] font-bold uppercase tracking-wider text-[#0063a9]">Suggested discussion points</p><ul className="mt-1 space-y-1 text-[11px] leading-snug text-slate-600">{priority.discussionPoints.map(point=><li key={point}>• {point}</li>)}</ul></div>
+          </article>)}
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+function PortfolioSpreadSlide({ slide }: { slide: Extract<Slide, { kind: 'portfolio-spread' }> }) {
+  const insight = slide.insight;
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-10 py-8 sm:px-14"><div className="relative z-10 flex min-h-0 flex-1 flex-col">
+      <SlideHeader eyebrow={SLIDE_EYEBROWS['portfolio-spread']} title="Is this isolated or widespread?" subtitle={`${insight.totalPartners} evaluated partners · ${insight.unsatisfactoryPartners} in the existing Unsatisfactory band (${insight.unsatisfactoryPercentage.toFixed(1)}%).`} />
+      {!insight.totalPartners ? <p className="mt-8 border-l-4 border-slate-300 bg-slate-50 px-5 py-4 text-sm text-slate-600">No evaluated partners have scoreable submissions in this reporting window.</p> : <div className="mt-5 grid min-h-0 flex-1 grid-cols-[0.8fr_1.2fr] gap-10">
+        <section><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Partner score distribution</h3><div className="mt-3 space-y-3">{insight.bands.map(band=><div key={band.label}><div className="flex justify-between text-xs"><span className="font-semibold text-slate-700">{band.label}</span><span className="tabular-nums text-slate-600">{band.count} · {band.percentage.toFixed(1)}%</span></div><div className="mt-1 h-2 bg-slate-100"><div className="h-full" style={{width:`${band.percentage}%`,backgroundColor:band.color}}/></div></div>)}</div></section>
+        <section className="min-w-0"><h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Category reach by partner</h3><div className="mt-2 max-h-full overflow-hidden">{insight.categories.slice(0,8).map(category=><div key={`${category.surveyType}:${category.category}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-slate-100 py-2"><div className="min-w-0"><p className="truncate text-xs font-semibold text-slate-800">{category.category} <span className="font-normal text-slate-500">· {category.surveyType}</span></p><div className="mt-1 h-1.5 bg-slate-100"><div className="h-full bg-[#0063a9]" style={{width:`${category.affectedPercentage}%`}}/></div></div><p className="whitespace-nowrap text-right text-[10px] text-slate-600">{category.unsatisfactoryPartners}/{category.evaluatedPartners}<br/>{category.affectedPercentage.toFixed(1)}% · avg {category.average.toFixed(1)}</p></div>)}</div></section>
+      </div>}
+    </div></div>
   );
 }
 
@@ -1473,6 +1552,12 @@ function SlideContent({ slide, responses = [] }: { slide: Slide; responses?: Sur
       return <SpotlightSlide slide={slide} />;
     case 'distribution':
       return <NeedsAttentionSlide slide={slide} />;
+    case 'period-change':
+      return <PeriodChangeSlide slide={slide} />;
+    case 'focus':
+      return <FocusSlide slide={slide} />;
+    case 'portfolio-spread':
+      return <PortfolioSpreadSlide slide={slide} />;
 
     case 'closing':
       return <ClosingSlide slide={slide} />;
@@ -1481,12 +1566,34 @@ function SlideContent({ slide, responses = [] }: { slide: Slide; responses?: Sur
   }
 }
 
+export function PresentationSlideCanvas({
+  slide,
+  responses = [],
+  reportingPeriod,
+}: {
+  slide: Slide;
+  responses?: SurveyResponse[];
+  reportingPeriod?: string;
+}) {
+  return (
+    <div className="relative h-full w-full">
+      <SlideContent slide={slide} responses={responses} />
+      {slide.kind !== 'title' && reportingPeriod ? (
+        <div className="pointer-events-none absolute bottom-2 right-5 z-20 text-[9px] font-medium text-slate-400">
+          Reporting period: {reportingPeriod}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Deck shell: thumbnails, controls, fullscreen, PDF/PPTX export        */
 /* ------------------------------------------------------------------ */
 
 export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckProps) {
   const [index, setIndex] = useState(0);
+  const reportingPeriod = slides.find((slide) => slide.kind === 'title')?.meta[0];
   const [direction, setDirection] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isExporting, setIsExporting] = useState<'pdf' | 'pptx' | null>(null);
@@ -1648,7 +1755,7 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
 
       <div
         ref={shellRef}
-        className="flex min-h-[420px] flex-col rounded-2xl border border-slate-200 bg-slate-950 p-3 dark:border-slate-800 sm:p-5"
+        className="flex min-h-[420px] flex-col rounded-2xl bg-slate-950 p-3 sm:p-5"
         style={frameHeight ? { height: frameHeight } : undefined}
       >
         {/* Progress bar */}
@@ -1677,7 +1784,11 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
                     transition={{ duration: 0.35, ease: 'easeOut' }}
                     className="absolute inset-0"
                   >
-                    <SlideContent slide={slides[index]} responses={responses} />
+                    <PresentationSlideCanvas
+                      slide={slides[index]}
+                      responses={responses}
+                      reportingPeriod={reportingPeriod}
+                    />
                   </motion.div>
                 </AnimatePresence>
               </div>

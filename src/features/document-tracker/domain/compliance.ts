@@ -206,7 +206,8 @@ export function computeCompanyDocumentSummary(
 // same company, distinct accreditation branch with its own document set.
 // Requiring the hyphen avoids false-positives from company/category names
 // that merely end in the letters "NT".
-export function isNTBranch(branch: Pick<BranchRecord, 'bpCode' | 'rawCategory'>): boolean {
+export function isNTBranch(branch: Pick<BranchRecord, 'bpCode' | 'rawCategory' | 'businessType'>): boolean {
+  if (branch.businessType) return branch.businessType === 'Non-Trade';
   return /-NT$/i.test((branch.bpCode ?? '').trim()) || /-NT$/i.test((branch.rawCategory ?? '').trim());
 }
 

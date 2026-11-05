@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import type { User } from '@supabase/supabase-js';
 import { normalizeCompanyEmail, validateSupabasePassword } from './supabasePasswordAuth';
-import { signInForRole } from './authBridge';
+import { signInVerifiedAccount } from './authBridge';
 import { supabase } from './supabaseClient';
 
 const email = 'person@mgenesis.com';
@@ -23,19 +23,19 @@ function mockLogin(t: TestContext, profile: unknown) {
 }
 
 for (const actualRole of ['Admin', 'Employee'] as const) {
-  test(`${actualRole} signs in only through its matching account selection`, async (t) => {
+  test(`${actualRole} signs in using its verified stored role`, async (t) => {
     const { signOut, getUser } = mockLogin(t, { email, user_id: user.id, role: actualRole });
-    assert.equal(await signInForRole(actualRole, async () => {
+    assert.equal(await signInVerifiedAccount(async () => {
       assert.equal(getUser.mock.callCount(), 0);
       return { email };
     }), email);
     assert.equal(signOut.mock.callCount(), 0);
   });
-
-  test(`${actualRole} is rejected and signed out when the other account type is selected`, async (t) => {
+  test(`${actualRole} uses its own entrance and is rejected by the opposite entrance`, async (t) => {
     const { signOut } = mockLogin(t, { email, user_id: user.id, role: actualRole });
-    const selectedRole = actualRole === 'Admin' ? 'Employee' : 'Admin';
-    await assert.rejects(signInForRole(selectedRole, async () => ({ email })), new RegExp(`Select ${actualRole} Account`));
+    assert.equal(await signInVerifiedAccount(async () => ({ email }), actualRole), email);
+    const other = actualRole === 'Admin' ? 'Employee' : 'Admin';
+    await assert.rejects(signInVerifiedAccount(async () => ({ email }), other), new RegExp(`/${actualRole.toLowerCase()}/login`));
     assert.deepEqual(signOut.mock.calls[0].arguments, [{ scope: 'local' }]);
   });
 }
@@ -45,7 +45,7 @@ test('unverifiable profiles fail closed and clear the newly authenticated sessio
     { email, role: 'Admin', user_id: 'other-user' }, { email: 'other@mgenesis.com', role: 'Admin', user_id: user.id }]) {
     await t.test(JSON.stringify(profile), async (t) => {
       const { signOut } = mockLogin(t, profile);
-      await assert.rejects(signInForRole('Admin', async () => ({ email })), /Unable to verify your account type/);
+      await assert.rejects(signInVerifiedAccount(async () => ({ email })), /Unable to verify your account type/);
       assert.equal(signOut.mock.callCount(), 1);
     });
   }
@@ -58,7 +58,7 @@ test('identity and profile lookup failures never complete login', async (t) => {
       if (failure === 'identity') getUser.mock.mockImplementation(async () => { throw new Error('Identity unavailable'); });
       if (failure === 'profile') fetch.mock.mockImplementation(async () => new Response('{}', { status: 503 }));
       if (failure === 'unconfirmed') getUser.mock.mockImplementation(async () => ({ data: { user: { ...user, email_confirmed_at: undefined } }, error: null }));
-      await assert.rejects(signInForRole('Employee', async () => ({ email: failure === 'email-mismatch' ? 'other@mgenesis.com' : email })));
+      await assert.rejects(signInVerifiedAccount(async () => ({ email: failure === 'email-mismatch' ? 'other@mgenesis.com' : email })));
       assert.equal(signOut.mock.callCount(), 1);
     });
   }
@@ -66,7 +66,7 @@ test('identity and profile lookup failures never complete login', async (t) => {
 
 test('signup requiring email confirmation does not open the app or look up a role', async (t) => {
   const { getUser, signOut } = mockLogin(t, null);
-  assert.equal(await signInForRole('Employee', async () => null), null);
+  assert.equal(await signInVerifiedAccount(async () => null), null);
   assert.equal(getUser.mock.callCount(), 0);
   assert.equal(signOut.mock.callCount(), 0);
 });
@@ -74,21 +74,15 @@ test('signup requiring email confirmation does not open the app or look up a rol
 test('credential errors and session-cleanup errors remain blocking', async (t) => {
   const { signOut } = mockLogin(t, null);
   const authenticate = async () => { throw new Error('Invalid credentials'); };
-  await assert.rejects(signInForRole('Employee', authenticate), /Invalid credentials/);
+  await assert.rejects(signInVerifiedAccount(authenticate), /Invalid credentials/);
   signOut.mock.mockImplementation(async () => { throw new Error('Sign out unavailable'); });
-  await assert.rejects(signInForRole('Employee', authenticate), /Sign out unavailable/);
+  await assert.rejects(signInVerifiedAccount(authenticate), /Sign out unavailable/);
 });
 
 test('a confirmed Employee can sign in through an existing email-matched legacy profile with no user ID link', async (t) => {
   const { signOut } = mockLogin(t, { email, role: 'Employee', user_id: null });
-  assert.equal(await signInForRole('Employee', async () => ({ email })), email);
+  assert.equal(await signInVerifiedAccount(async () => ({ email })), email);
   assert.equal(signOut.mock.callCount(), 0);
-});
-
-test('an unlinked legacy Employee cannot enter through Admin Account', async (t) => {
-  const { signOut } = mockLogin(t, { email, role: 'Employee', user_id: null });
-  await assert.rejects(signInForRole('Admin', async () => ({ email })), /Select Employee Account/);
-  assert.equal(signOut.mock.callCount(), 1);
 });
 
 test('legacy compatibility never accepts an unlinked Admin, missing link field, or another user ID', async (t) => {
@@ -100,7 +94,7 @@ test('legacy compatibility never accepts an unlinked Admin, missing link field, 
   ]) {
     await t.test(JSON.stringify(profile), async (t) => {
       const { signOut } = mockLogin(t, profile);
-      await assert.rejects(signInForRole('Employee', async () => ({ email })), /Unable to verify your account type/);
+      await assert.rejects(signInVerifiedAccount(async () => ({ email })), /Unable to verify your account type/);
       assert.equal(signOut.mock.callCount(), 1);
     });
   }

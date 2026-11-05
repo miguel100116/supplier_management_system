@@ -3,6 +3,18 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const migration = readFileSync(new URL('../../supabase/migrations/202610280001_partner_document_compliance_rules.sql', import.meta.url), 'utf8');
+const remarksMigration = readFileSync(new URL('../../supabase/migrations/202610290001_partner_document_remarks.sql', import.meta.url), 'utf8');
+
+test('document remarks RPC has the frontend-compatible signature, admin permission guard, and authenticated-only execution', () => {
+  assert.match(remarksMigration, /create or replace function public\.update_partner_document_remarks\(\s*p_company_id text,\s*p_branch_id text,\s*p_document_name text,\s*p_expected_document jsonb,\s*p_remarks text\s*\)/i);
+  assert.match(remarksMigration, /security definer\s+set search_path = ''/i);
+  assert.match(remarksMigration, /role = 'Admin' or 'renew-documents' = any/i);
+  assert.match(remarksMigration, /v_current_document is distinct from p_expected_document/i);
+  assert.match(remarksMigration, /jsonb_set\(v_current_document, '\{remarks\}', to_jsonb\(p_remarks\), true\)/i);
+  assert.match(remarksMigration, /insert into public\.application_records\(record_type, record_id, payload, owner_id\)/i);
+  assert.match(remarksMigration, /revoke all on function public\.update_partner_document_remarks\(text, text, text, jsonb, text\) from public, anon/i);
+  assert.match(remarksMigration, /grant execute on function public\.update_partner_document_remarks\(text, text, text, jsonb, text\) to authenticated/i);
+});
 
 test('database enforces CORP/SOL applicability and remarks for missing applicable documents', () => {
   assert.match(migration, /v_class is not null and v_class not in \('CORP', 'SOL'\)/i);

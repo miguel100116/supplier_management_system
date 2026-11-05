@@ -11,7 +11,8 @@ import { Shell, NavItem } from './layouts/Shell';
 import { LoginPage } from './pages/LoginPage';
 import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage';
 import { restoreMicrosoftAccount, logoutMicrosoft, isMsalConfigured } from './services/msalAuth';
-import { signInForRole, signOutSupabase, type LoginAttempt, type LoginRole } from './services/authBridge';
+import { signInVerifiedAccount, signOutSupabase, type LoginAttempt } from './services/authBridge';
+import { getLoginAudience } from './utils/pageRouting';
 import { isSupabaseConfigured, supabase } from './services/supabaseClient';
 import { getSupabaseSessionEmail } from './services/supabasePasswordAuth';
 import { createAccount } from './features/account-management/services/createAccount';
@@ -135,7 +136,6 @@ const adminNavItems: NavItem<PageKey>[] = [
     children: [
       { key: 'partner-companies', label: 'Directory' },
       { key: 'document-register', label: 'Documents' },
-      { key: 'partners-feedback-hub', label: 'Feedback' },
     ],
   },
   {
@@ -147,6 +147,7 @@ const adminNavItems: NavItem<PageKey>[] = [
       { key: 'survey-forms', label: 'Workspace' },
       { key: 'archive', label: 'Archive' },
       { key: 'import-evaluations', label: 'Import Responses' },
+      { key: 'partners-feedback-hub', label: 'Feedback' },
     ],
   },
   // Single page already covers trends + company comparisons together, so
@@ -172,6 +173,7 @@ export default function App() {
   const [realtimeSyncUnavailable, setRealtimeSyncUnavailable] = useState(false);
   const [account, setAccount] = useState<string | null>(null);
   const loginPending = useRef(false);
+  const [loginEntryError, setLoginEntryError] = useState('');
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => {
     if (typeof window === 'undefined') return false;
     const hashType = new URLSearchParams(window.location.hash.slice(1)).get('type');
@@ -521,7 +523,7 @@ export default function App() {
     if (isPasswordRecovery) return;
 
     const currentPage = getPageKeyFromPathname(window.location.pathname, ROUTE_BASE_PATH);
-    if (window.location.pathname !== getPagePathname(currentPage, ROUTE_BASE_PATH)) {
+    if (window.location.pathname !== getPagePathname(currentPage, ROUTE_BASE_PATH) && !getLoginAudience(window.location.pathname, ROUTE_BASE_PATH)) {
       updatePageUrl(currentPage, 'replace');
     } else {
       const state = browserHistoryRef.current.createState(window.history.state, currentPage, 'replace');
@@ -532,7 +534,7 @@ export default function App() {
       const historyDelta = browserHistoryRef.current.handlePopState(event.state);
       if (historyDelta === null) return;
       const targetPage = getPageKeyFromPathname(window.location.pathname, ROUTE_BASE_PATH);
-      if (window.location.pathname !== getPagePathname(targetPage, ROUTE_BASE_PATH)) {
+      if (window.location.pathname !== getPagePathname(targetPage, ROUTE_BASE_PATH) && !getLoginAudience(window.location.pathname, ROUTE_BASE_PATH)) {
         updatePageUrl(targetPage, 'replace');
       }
       const routeParams = new URLSearchParams(window.location.search);
@@ -811,21 +813,37 @@ export default function App() {
   useEffect(() => {
     if (isSupabaseConfigured) {
       let cancelled = false;
-      const applyEmail = (email: string | null) => {
+      let authRevision = 0;
+      const publishEmail = (email: string | null) => {
         if (cancelled || loginPending.current) return;
         setAccount(email);
         if (email) localStorage.setItem('user_account', email);
         else localStorage.removeItem('user_account');
       };
+      const requiredRole = isPasswordRecovery ? undefined : getLoginAudience(window.location.pathname, ROUTE_BASE_PATH);
+      const applyEmail = (email: string | null) => {
+        if (cancelled || loginPending.current) return;
+        const revision = ++authRevision;
+        if (!email || !requiredRole) { publishEmail(email); return; }
+        // Keep Auth callbacks synchronous; verify restored sessions outside their lock.
+        return Promise.resolve().then(() => signInVerifiedAccount(async () => ({ email }), requiredRole))
+          .then((verifiedEmail) => { if (revision === authRevision) publishEmail(verifiedEmail); })
+          .catch((error) => {
+            if (cancelled || loginPending.current) return;
+            setLoginEntryError(error instanceof Error ? error.message : 'Unable to verify this login entrance.');
+            if (revision === authRevision) publishEmail(null);
+          });
+      };
 
       getSupabaseSessionEmail()
-        .then(applyEmail)
-        .catch(() => applyEmail(null))
+        .then((email) => { if (authRevision === 0) return applyEmail(email); })
+        .catch(() => { if (authRevision === 0) applyEmail(null); })
         .finally(() => {
           if (!cancelled) setAuthChecked(true);
         });
 
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'INITIAL_SESSION') return; // The explicit session read owns startup verification.
         if (event === 'PASSWORD_RECOVERY') {
           setIsPasswordRecovery(true);
           applyEmail(null);
@@ -996,11 +1014,12 @@ export default function App() {
     return () => { cancelled = true; };
   }, [account, isAdmin, canUseFeedbackHub, activePage, isSettingsModalOpen, sharedStoreRetry]);
 
-  const handleLogin = async (role: LoginRole, authenticate: LoginAttempt) => {
+  const handleLogin = async (authenticate: LoginAttempt) => {
     if (loginPending.current) return;
     loginPending.current = true;
+    setLoginEntryError('');
     try {
-      const email = await signInForRole(role, authenticate);
+      const email = await signInVerifiedAccount(authenticate, getLoginAudience(window.location.pathname, ROUTE_BASE_PATH));
       if (!email) return;
       recordSessionActivity(email);
       setAccount(email);
@@ -1038,7 +1057,7 @@ export default function App() {
 
   // Auth Guard
   if (!account) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={handleLogin} audience={getLoginAudience(window.location.pathname, ROUTE_BASE_PATH)} entryError={loginEntryError} />;
   }
 
   if (activePage === 'login') {

@@ -1777,7 +1777,7 @@ export function SurveyFormsPage({
 
                     {pickerCompanies.length === 0 ? (
                       <div className="text-center py-10 text-sm font-semibold text-slate-400 dark:text-slate-500">
-                        No {targetSurvey?.surveyType.toLowerCase()} partner companies are registered yet.
+                        No eligible {targetSurvey?.surveyType.toLowerCase()} companies match the uploaded Active Companies list. Review the upload and registry classifications.
                       </div>
                     ) : (
                       <div className="space-y-1.5">

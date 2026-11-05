@@ -5,10 +5,10 @@ import { useModalEscape } from '../hooks/useModalEscape';
 import { Pagination } from '../components/Pagination';
 import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, Filter, ChevronRight, MoreHorizontal, FilePlus2, ArrowDownUp, CalendarClock, CircleAlert, MessageSquareText } from 'lucide-react';
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { BranchRecord, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin, SurveyResponse } from '../types/survey';
+import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin, SurveyResponse } from '../types/survey';
 import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domain/leaderboardSelection';
 import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isBranchDocumentCompliant, isNTBranch, summarizeDocumentAttention } from '../features/document-tracker/domain/compliance';
-import { COMMON_DOCUMENTS, getAvailableDocumentKeys, getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
+import { COMMON_DOCUMENTS, getAvailableDocumentKeys, getRequiredDocumentKeys, isDocumentApplicableToClassification, isExpiryDocument, shouldShowHistoricalDocument } from '../features/document-tracker/domain/documentRequirements';
 import { companyDocumentRemarksError } from '../features/document-tracker/domain/documentValidation';
 import { RequiredDocumentAttention, type RequiredDocumentAttentionStatus } from '../features/document-tracker/components/RequiredDocumentAttention';
 import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../features/document-tracker/services/documentModificationLog';
@@ -336,9 +336,9 @@ function documentPartnerTypeBadgeClasses(type: PartnerCompanyType, isNT: boolean
 }
 
 function supplierRankTextClasses(rank?: string): string {
-  if (/major/i.test(rank ?? '')) return 'text-amber-600 dark:text-amber-400';
-  if (/regular/i.test(rank ?? '')) return 'text-[#346f91] dark:text-sky-300';
-  return 'text-slate-300 dark:text-slate-600';
+  if (/major/i.test(rank ?? '')) return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300';
+  if (/regular/i.test(rank ?? '')) return 'border-blue-200 bg-blue-50 text-[#155f8b] dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300';
+  return 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300';
 }
 
 function SupplierRankSelect({ value, label, onChange }: { value: string; label: string; onChange: (value: string) => void }) {
@@ -386,7 +386,7 @@ function SupplierRankSelect({ value, label, onChange }: { value: string; label: 
   return <div ref={rootRef} className="relative" onPointerEnter={(event) => {
     if (event.pointerType === 'touch') return;
     cancelTimers();
-    hoverTimer.current = window.setTimeout(() => { setKeyboardOpened(false); setOpen(true); }, 2000);
+    hoverTimer.current = window.setTimeout(() => { setKeyboardOpened(false); setOpen(true); }, 0);
   }} onPointerLeave={(event) => {
     if (event.pointerType === 'touch') return;
     cancelTimers();
@@ -397,8 +397,8 @@ function SupplierRankSelect({ value, label, onChange }: { value: string; label: 
       onKeyDown={(event) => {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); openFromKeyboard(); }
       }}
-      className={'inline-flex h-8 w-24 items-center justify-between rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:border-slate-700 dark:bg-slate-950 ' + supplierRankTextClasses(value)}>
-      <span>{value}</span><ChevronDown size={13} className="shrink-0 text-slate-600 dark:text-slate-300" aria-hidden="true" />
+      className={`${DOCUMENT_ROW_BADGE_CLASS} cursor-pointer whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] ${supplierRankTextClasses(value)}`}>
+      <span>{value}</span>
     </button>
     {open && <div role="listbox" aria-label={label} className="absolute left-0 top-full z-30 mt-1 min-w-full overflow-hidden rounded-md border border-slate-200 bg-white p-1 shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900"
       onPointerEnter={cancelTimers} onKeyDown={(event) => {
@@ -414,6 +414,30 @@ function SupplierRankSelect({ value, label, onChange }: { value: string; label: 
         onClick={() => choose(rank)} className={`flex min-h-8 w-full items-center rounded px-2 text-left text-xs hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800 ${supplierRankTextClasses(rank)} ${value === rank ? 'font-semibold' : 'font-medium'}`}>
         {rank}
       </button>)}
+    </div>}
+  </div>;
+}
+
+function BranchStatusSelect({ value, label, onChange, disabled = false }: { value: string; label: string; onChange: (value: string) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return <div className="relative inline-flex" onMouseEnter={() => { if (!disabled) setOpen(true); }} onMouseLeave={() => setOpen(false)}>
+    <button type="button" aria-label={label} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((current) => !current)} className={`${DOCUMENT_ROW_BADGE_CLASS} ${branchStatusBadgeClasses(value as BranchStatus)} disabled:cursor-not-allowed`}>
+      {value}
+    </button>
+    {open && !disabled && <div role="listbox" aria-label={label} className="absolute left-0 top-full z-40 mt-1 min-w-full rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900" onMouseEnter={() => setOpen(true)}>
+      {BRANCH_STATUS_OPTIONS.map((status) => <button key={status} type="button" role="option" aria-selected={status === value} onClick={() => { onChange(status); setOpen(false); }} className={`flex min-h-8 w-full whitespace-nowrap rounded px-2 text-left text-xs hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800 ${branchStatusBadgeClasses(status)}`}>{status}</button>)}
+    </div>}
+  </div>;
+}
+
+function BranchTypeSelect({ value, label, disabled = false, onChange }: { value: 'Trade' | 'Non-Trade'; label: string; disabled?: boolean; onChange: (value: 'Trade' | 'Non-Trade') => void }) {
+  const [open, setOpen] = useState(false);
+  return <div className="relative inline-flex" onMouseEnter={() => { if (!disabled) setOpen(true); }} onMouseLeave={() => setOpen(false)}>
+    <button type="button" aria-label={label} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((current) => !current)} className={`${DOCUMENT_ROW_BADGE_CLASS} cursor-pointer whitespace-nowrap disabled:cursor-not-allowed ${documentPartnerTypeBadgeClasses('Supplier', value === 'Non-Trade')}`}>
+      {value}
+    </button>
+    {open && !disabled && <div role="listbox" aria-label={label} className="absolute left-0 top-full z-40 mt-1 min-w-full rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      {(['Trade', 'Non-Trade'] as const).map((type) => <button key={type} type="button" role="option" aria-selected={type === value} onClick={() => { onChange(type); setOpen(false); }} className={`flex min-h-8 w-full whitespace-nowrap rounded px-2 text-left text-xs hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800 ${documentPartnerTypeBadgeClasses('Supplier', type === 'Non-Trade')}`}>{type}</button>)}
     </div>}
   </div>;
 }
@@ -1189,14 +1213,13 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     setMutationError('');
     try {
       await onUpdateDocumentRemarks(company.id, branch.id, docName, currentDocument, nextRemarks);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to save document remarks.';
-      setMutationError(message);
-      return message;
+    } catch {
+      setMutationError('Could not save document remarks. Please try again.');
+      return '';
     }
   };
 
-  const updateDocumentStatus = async (company: PartnerCompany, branch: BranchRecord, docName: string, provided: boolean, remarks = ''): Promise<string | void> => {
+  const updateDocumentStatus = async (company: PartnerCompany, branch: BranchRecord, docName: string, provided: boolean, remarks = '', renewalExpiryDate?: string): Promise<string | void> => {
     if (!canRenewDocuments) return 'You do not have permission to update documents.';
     const currentDocument = branch.documents?.[docName] ?? {};
     // Persist a changed remark in its own narrowly scoped request first. This
@@ -1217,12 +1240,11 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       }
       await onRenewDocument(company.id, branch.id, docName, expectedDocument, {
         provided,
-        ...(expectedDocument.expiryDate ? { expiryDate: expectedDocument.expiryDate } : {}),
+        ...(renewalExpiryDate ? { expiryDate: renewalExpiryDate } : expectedDocument.expiryDate ? { expiryDate: expectedDocument.expiryDate } : {}),
       });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to update the compliance document.';
-      setMutationError(message);
-      return message;
+    } catch {
+      setMutationError('Could not update the compliance document. Please try again.');
+      return '';
     }
   };
 
@@ -1248,6 +1270,17 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       docName: 'Supplier Rank',
       change: `Changed from ${previousRank} to ${supplierRank}`,
     });
+  };
+
+  const updateBranchStatus = (company: PartnerCompany, branch: BranchRecord, status: typeof BRANCH_STATUS_OPTIONS[number]) => {
+    if (!isAdmin) return;
+    onUpdateCompany({ ...company, branches: (company.branches ?? []).map((item) => item.id === branch.id ? { ...item, status } : item) });
+  };
+
+  const updateBranchBusinessType = (company: PartnerCompany, branch: BranchRecord, type: 'Trade' | 'Non-Trade') => {
+    if (!isAdmin) return;
+    setMutationError('');
+    onUpdateCompany({ ...company, branches: (company.branches ?? []).map((item) => item.id === branch.id ? { ...item, businessType: type } : item) });
   };
 
   const confirmRenewal = async () => {
@@ -2004,6 +2037,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           {paginatedRows.map((row) => {
             const cells = matrixCellData.get(row.key) ?? [];
             const currentCount = cells.filter((cell) => cell.status === 'Current').length;
+            const branchFullyCompliant = Boolean(row.branch && isBranchDocumentCompliant(row.company, row.branch, effectiveNow));
             const expiredCount = cells.filter((cell) => cell.status === 'Expired').length;
             const expiringCount = cells.filter((cell) => cell.status === 'Expiring Soon').length;
             const updateCount = cells.filter((cell) => cell.status === 'For Update').length;
@@ -2021,10 +2055,10 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               { label: 'Required documents', isRequired: true, documents: requiredStatusFilter ? cells.filter(cell => cell.status === requiredStatusFilter) : cells },
               { label: 'Historical & additional', isRequired: false, documents: Object.entries(row.branch?.documents ?? {})
                 .filter(([name]) => !cells.some((cell) => cell.docName === name))
+                .filter(([name]) => shouldShowHistoricalDocument(name, row.company.type, row.company.supplierOrigin, row.company.businessClassification))
                 .map(([docName, doc]) => ({ docName, doc, branch: row.branch, expiryBased: isExpiryDocument(docName),
-                  inactiveClassification: ['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)
-                    && ((docName === 'DTI (Sole)' && row.company.businessClassification !== 'SOL')
-                      || (docName !== 'DTI (Sole)' && row.company.businessClassification !== 'CORP')),
+                  inactiveClassification: !(row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign')
+                    && !isDocumentApplicableToClassification(docName, row.company.businessClassification),
                   ...computeDocumentStatus(doc, effectiveNow, docName) })) },
             ].filter((group) => group.isRequired || (!requiredStatusFilter && group.documents.length > 0));
             return (
@@ -2040,7 +2074,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     </div>
                   </div>
                   <div className="col-start-1 row-start-2 flex min-w-0 items-center xl:col-start-2 xl:row-auto">
-                    <span className={`${DOCUMENT_ROW_BADGE_CLASS} whitespace-nowrap ${documentPartnerTypeBadgeClasses(row.company.type, row.isNT)}`}>{typeLabel}</span>
+                    {isAdmin && row.branch ? <BranchTypeSelect label={`Branch type for ${row.branch.bpCode || row.company.name}`} value={row.isNT ? 'Non-Trade' : 'Trade'} onChange={(type) => updateBranchBusinessType(row.company, row.branch!, type)} /> : <span className={`${DOCUMENT_ROW_BADGE_CLASS} whitespace-nowrap ${documentPartnerTypeBadgeClasses(row.company.type, row.isNT)}`}>{typeLabel}</span>}
                   </div>
                   <div className="col-start-2 row-start-2 flex min-w-0 items-center xl:col-start-3 xl:row-auto">
                     {row.branch && (isAdmin ? (
@@ -2057,9 +2091,9 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     </div>
                   </div>
                   <div className="col-start-2 row-start-3 min-w-0 xl:col-start-5 xl:row-auto">
-                    {row.branch?.status ? (
-                      <span aria-label={`Branch status: ${row.branch.status}`} className={`${DOCUMENT_ROW_BADGE_CLASS} ${branchStatusBadgeClasses(row.branch.status)}`}>
-                        {row.branch.status}
+                    {row.branch && (row.branch.status || branchFullyCompliant) ? (
+                      isAdmin ? <BranchStatusSelect label={`Branch status for ${row.branch.bpCode || row.company.name}`} value={branchFullyCompliant ? 'Completed' : row.branch.status!} disabled={branchFullyCompliant} onChange={(status) => updateBranchStatus(row.company, row.branch!, status as BranchStatus)} /> : <span aria-label={`Branch status: ${branchFullyCompliant ? 'Completed' : row.branch.status}`} className={`${DOCUMENT_ROW_BADGE_CLASS} ${branchStatusBadgeClasses(branchFullyCompliant ? 'Completed' : row.branch.status!)}`}>
+                        {branchFullyCompliant ? 'Completed' : row.branch.status}
                       </span>
                     ) : (
                       <span className={`${DOCUMENT_ROW_BADGE_CLASS} border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400`}>
@@ -2132,7 +2166,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                   <div id={'documents-' + row.key} className="rounded-b-lg border-t border-slate-100 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/30">
                     {classificationRequired && (
                       <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
-                        CORP/SOL is not set. GIS, SEC, and DTI history remains available below; set classification in Partner details to activate the applicable requirements.
+                        CORP/SOL is not set. Registration document history remains available below; set classification in Partner Details to activate the applicable requirements.
                       </p>
                     )}
                     <RequiredDocumentAttention counts={requiredAttention} value={requiredStatusFilter}
@@ -2160,14 +2194,14 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                                       {inactiveClassification && <span className="text-slate-500 dark:text-slate-400">Historical · classification inactive</span>}
                                     </div>
                                   </div>
-                                  <DocumentQuickActions docName={docName} document={doc} status={status} disabled={!interactive || Boolean(inactiveClassification)} canDeleteRemarks={canDeleteRemarks} expiryBased={expiryBased}
+                                  {!inactiveClassification && <DocumentQuickActions docName={docName} document={doc} status={status} companyName={row.company.name} branchName={branch?.bpCode || 'Branch'} disabled={!interactive} canDeleteRemarks={canDeleteRemarks} expiryBased={expiryBased}
                                     remarksAtBottom={categoryKey === 'supplier-local'}
                                     popoverKey={`${row.key}::${docName}`} openPopoverKey={openDocumentPopoverKey} onOpenPopover={setOpenDocumentPopoverKey}
                                     requireRemarks={['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)}
                                     onRenew={() => { if (branch) openExpiryStatus(row.company, branch, docName); }}
-                                    onStatus={(provided, remarks) => branch ? updateDocumentStatus(row.company, branch, docName, provided, remarks) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
+                                    onStatus={(provided, remarks, expiryDate) => branch ? updateDocumentStatus(row.company, branch, docName, provided, remarks, expiryDate) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
                                     onRemarks={(remarks) => branch ? updateDocumentRemarks(row.company, branch, docName, remarks) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
-                                    onClearRemarks={() => branch ? updateDocumentRemarks(row.company, branch, docName, '') : Promise.resolve('Branch no longer exists. Refresh and retry.')} />
+                                    onClearRemarks={() => branch ? updateDocumentRemarks(row.company, branch, docName, '') : Promise.resolve('Branch no longer exists. Refresh and retry.')} />}
                                 </li>
                               );
                             })}
@@ -2770,6 +2804,8 @@ function DocumentQuickActions({
   docName,
   document,
   status,
+  companyName,
+  branchName,
   popoverKey,
   openPopoverKey,
   onOpenPopover,
@@ -2786,6 +2822,8 @@ function DocumentQuickActions({
   docName: string;
   document: ComplianceDocument;
   status: DocumentStatus;
+  companyName: string;
+  branchName: string;
   popoverKey: string;
   openPopoverKey: string | null;
   onOpenPopover: (key: string | null) => void;
@@ -2795,11 +2833,15 @@ function DocumentQuickActions({
   requireRemarks: boolean;
   remarksAtBottom?: boolean;
   onRenew: () => void;
-  onStatus: (provided: boolean, remarks: string) => Promise<string | void>;
+  onStatus: (provided: boolean, remarks: string, expiryDate?: string) => Promise<string | void>;
   onRemarks: (remarks: string) => Promise<string | void>;
   onClearRemarks: () => Promise<string | void>;
 }) {
   const [remarks, setRemarks] = useState(document.remarks ?? '');
+  const [verificationRemarks, setVerificationRemarks] = useState('');
+  const [verificationDate, setVerificationDate] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [isRemarksOpen, setIsRemarksOpen] = useState(false);
   const [isViewingRemarks, setIsViewingRemarks] = useState(false);
   const [confirmingRemarkDelete, setConfirmingRemarkDelete] = useState(false);
@@ -2822,6 +2864,10 @@ function DocumentQuickActions({
   };
   const scheduleHoverClose = () => {
     clearHoverClose();
+    // The panel is portalled and may move when it switches from the compact
+    // menu to the remarks editor. Keep active work open across that move;
+    // the outside-pointer and Escape handlers still provide dismissal.
+    if (isRemarksOpen || isViewingRemarks || confirmingRemarkDelete || isVerifying || saving) return;
     hoverCloseTimer.current = setTimeout(() => { setIsOpen(false); setIsRemarksOpen(false); setIsViewingRemarks(false); setConfirmingRemarkDelete(false); }, 180);
   };
   useEffect(() => {
@@ -2854,7 +2900,13 @@ function DocumentQuickActions({
       window.removeEventListener('resize', positionPanel);
       window.removeEventListener('scroll', positionPanel, true);
     };
-  }, [isOpen, isRemarksOpen, isViewingRemarks, error, feedback, saving]);
+  }, [isOpen, isRemarksOpen, isViewingRemarks, isVerifying, error, feedback, saving]);
+
+  useEffect(() => {
+    if (!isOpen || !isVerifying) return;
+    (panelRef.current?.querySelector<HTMLInputElement>('input[type="date"]')
+      ?? panelRef.current?.querySelector<HTMLTextAreaElement>('textarea'))?.focus();
+  }, [isOpen, isVerifying]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -2925,6 +2977,31 @@ function DocumentQuickActions({
     }
   };
 
+  const confirmVerification = async () => {
+    if (!reviewConfirmed) return;
+    if (expiryBased) {
+      if (!verificationDate) { setError('Enter the verified document expiry date.'); return; }
+      if (computeDocumentStatus({ provided: true, expiryDate: verificationDate }, new Date(), docName).status !== 'Current') {
+        setError('The expiry date must make this document current. Use the renewal workflow for an expired document.');
+        return;
+      }
+    }
+    setSaving(true);
+    setError('');
+    setFeedback('');
+    try {
+      const failure = await onStatus(true, verificationRemarks, expiryBased ? verificationDate : undefined);
+      if (typeof failure === 'string') { setError(failure); return; }
+      setIsVerifying(false);
+      setReviewConfirmed(false);
+      setVerificationRemarks('');
+      setVerificationDate('');
+      setFeedback('Saved');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteRemark = async () => {
     setSaving(true);
     setError('');
@@ -2956,8 +3033,17 @@ function DocumentQuickActions({
       {document.remarks?.trim() && <button ref={remarkTriggerRef} type="button" onClick={() => { anchorRef.current = remarkTriggerRef.current; setRemarks(document.remarks ?? ''); setIsRemarksOpen(false); setIsViewingRemarks(true); setConfirmingRemarkDelete(false); setError(''); setFeedback(''); setIsOpen(true); setPosition(null); }} aria-label={`View admin remarks for ${docName}`} title="View remarks" aria-haspopup="dialog" aria-expanded={isOpen && isViewingRemarks} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#536b80] hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-400 dark:hover:bg-slate-800"><MessageSquareText size={15} aria-hidden="true" /></button>}
       {!remarksAtBottom && trigger}
       {isOpen && createPortal(
-        <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
-          {isViewingRemarks ? <div className="p-2">
+        <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen || isVerifying ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isVerifying ? 'Verify document' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] box-border min-w-0 max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-x-hidden overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
+          {isVerifying ? <div className="p-2">
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Verify {docName}</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-600 dark:text-slate-300">{companyName} · {branchName}</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">This records an administrative verification; it does not upload a file.</p>
+            {expiryBased && <label className="mt-2 block text-[11px] font-medium text-slate-700 dark:text-slate-200">Verified expiry date<input type="date" value={verificationDate} onChange={(event) => { setVerificationDate(event.target.value); setError(''); }} className="field mt-1 h-8 text-xs" /></label>}
+            <label className="mt-2 block text-[11px] font-medium text-slate-700 dark:text-slate-200">Remarks (optional)<textarea value={verificationRemarks} onChange={(event) => setVerificationRemarks(event.target.value)} maxLength={2000} rows={2} className="field mt-1 resize-y py-1.5 text-xs" /></label>
+            <label className="mt-2 flex cursor-pointer items-start gap-2 text-[11px] leading-4 text-slate-700 dark:text-slate-200"><input type="checkbox" checked={reviewConfirmed} onChange={(event) => setReviewConfirmed(event.target.checked)} className="mt-0.5 accent-[#2187CD]" />I reviewed and verified this document.</label>
+            {error && <p role="alert" className="mt-1.5 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
+            <div className="mt-2 flex justify-end gap-1.5"><button type="button" disabled={saving} onClick={() => { setIsVerifying(false); setError(''); }} className="rounded px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button><button type="button" disabled={saving || !reviewConfirmed} onClick={() => void confirmVerification()} className="rounded bg-[#2187CD] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving...' : 'Confirm'}</button></div>
+          </div> : isViewingRemarks ? <div className="p-2">
             <div className="mb-1 flex items-center justify-between gap-2"><span className="text-xs font-semibold text-slate-800 dark:text-slate-100">Admin Remarks</span><button type="button" onClick={() => { setIsOpen(false); setIsViewingRemarks(false); (anchorRef.current ?? triggerRef.current)?.focus(); }} className="rounded px-1.5 py-1 text-[11px] text-slate-500 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800">Close</button></div>
             <p ref={remarkContentRef} tabIndex={-1} className="max-h-48 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-700 [overflow-wrap:anywhere] focus:outline-none dark:text-slate-200">{document.remarks}</p>
             {error && <p role="alert" className="mt-2 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
@@ -2968,7 +3054,7 @@ function DocumentQuickActions({
                 <button type="button" disabled={saving} onClick={() => void deleteRemark()} className="rounded px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30">{saving ? 'Deleting...' : 'Delete'}</button>
               </div>
             </div> : <div className="mt-2 flex justify-end gap-1.5 border-t border-slate-100 pt-2 dark:border-slate-800">
-              {canEditRemark && <button type="button" onClick={() => { setRemarks(document.remarks ?? ''); setIsViewingRemarks(false); setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="rounded px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">Edit</button>}
+              {canEditRemark && <button type="button" onClick={() => { clearHoverClose(); setRemarks(document.remarks ?? ''); setIsViewingRemarks(false); setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="rounded px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">Edit</button>}
               {canEditRemark && <button type="button" disabled={!canDeleteRemarks || saving} title={!canDeleteRemarks ? 'Remarks are required while this document is missing.' : undefined} onClick={() => setConfirmingRemarkDelete(true)} className="rounded px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-rose-300 dark:hover:bg-rose-950/30">Delete</button>}
             </div>}
           </div> : isRemarksOpen ? <div className="p-2">
@@ -2983,8 +3069,8 @@ function DocumentQuickActions({
             </div>
           </div> : <>
             {document.provided === true && status !== 'Missing' && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(false)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><XCircle size={15} aria-hidden="true" />Mark missing</button>}
-            {!expiryBased && document.provided !== true && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(true)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><Check size={15} aria-hidden="true" />Mark provided</button>}
-            <button role="menuitem" type="button" onClick={() => { setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-200 dark:hover:bg-slate-800"><FilePlus2 size={15} aria-hidden="true" />{document.remarks ? 'Edit remarks' : 'Add remarks'}</button>
+            {(status === 'Missing' || status === 'For Update') && <button role="menuitem" type="button" disabled={saving} onClick={() => { clearHoverClose(); setIsVerifying(true); setVerificationRemarks(''); setVerificationDate(''); setReviewConfirmed(false); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-medium text-[#155f8b] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950/30"><Check size={15} aria-hidden="true" />Verify and mark current</button>}
+            <button role="menuitem" type="button" onClick={() => { clearHoverClose(); setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-200 dark:hover:bg-slate-800"><FilePlus2 size={15} aria-hidden="true" />{document.remarks ? 'Edit remarks' : 'Add remarks'}</button>
             {expiryBased && <>
               <div role="separator" className="my-1 border-t border-slate-100 dark:border-slate-800" />
               <button role="menuitem" type="button" disabled={saving} onClick={() => { setIsOpen(false); onRenew(); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><RefreshCw size={15} aria-hidden="true" />{status === 'Missing' ? 'Add document or expiry' : status === 'Expired' || status === 'For Update' ? 'Renew or update expiry' : 'Renew / set expiry'}</button>

@@ -12,6 +12,37 @@ const form: CustomForm = { id: 'supplier', surveyType: 'Supplier', title: 'Suppl
 const active = { surveyType: 'Supplier' as const, companies: registry.slice(0, 20).map(company => company.name) };
 const now = new Date(2026, 9, 30);
 
+test('all vendor categories retain their complete uploaded scope and saved subsets for employees', () => {
+  for (const [surveyType, count] of [['Courier', 7], ['Supplier', 20], ['Subcontractor', 13]] as const) {
+    const companies = Array.from({ length: count }, (_, i) => ({ ...registry[0], id: `${surveyType}-${i}`, name: `${surveyType} ${i}`, type: surveyType }));
+    const lists = [{ surveyType, companies: companies.map(company => company.name) }];
+    const [scoped] = scopeSurveysToActiveLists([{ ...form, surveyType }], companies, lists);
+    assert.equal(getSurveyEvaluationCompanies(scoped, companies).length, count);
+    assert.equal(getPendingEmployeeEvaluations([scoped], companies, [], 'employee@example.com', now).length, count);
+    const saved = parseApplicationRecordPayload('survey', { ...scoped, evaluationCompanyIds: [companies[0].id] }, scoped.id) as CustomForm;
+    const [reloaded] = scopeSurveysToActiveLists([saved], companies, lists);
+    assert.deepEqual(getSurveyEvaluationCompanies(reloaded, companies).map(company => company.id), [companies[0].id]);
+    assert.equal(getPendingEmployeeEvaluations([reloaded], companies, [], 'employee@example.com', now).length, 1);
+  }
+});
+
+test('misclassified, inactive-only and archived uploads are explained and excluded on both sides', () => {
+  const companies: PartnerCompany[] = [
+    { ...registry[0], name: 'Wrong category', type: 'Uncategorized' },
+    { ...registry[1], name: 'Inactive partner', branches: [{ id: 'i', bpCode: '', status: 'Inactive' }] },
+    { ...registry[2], name: 'Archived partner', isArchived: true },
+    { ...registry[3], name: 'Mixed partner', branches: [{ id: 'i', bpCode: '', status: 'Inactive' }, { id: 'a', bpCode: '' }] },
+  ];
+  const [scoped] = scopeSurveysToActiveLists([form], companies, [{ ...active, companies: companies.map(company => company.name) }]);
+  assert.deepEqual(getSurveyEvaluationCompanies(scoped, companies).map(company => company.name), ['Mixed partner']);
+  assert.equal(getPendingEmployeeEvaluations([scoped], companies, [], 'employee@example.com', now).length, 1);
+  assert.match(scoped.activeEvaluationListIssue!, /Wrong category \(different or unclassified category\)/);
+  assert.match(scoped.activeEvaluationListIssue!, /Inactive partner \(archived or inactive\)/);
+  const fixed = companies.map(company => company.name === 'Wrong category' ? { ...company, type: 'Supplier' as const } : company);
+  const [refreshed] = scopeSurveysToActiveLists([form], fixed, [{ ...active, companies: companies.map(company => company.name) }]);
+  assert.equal(getSurveyEvaluationCompanies(refreshed, fixed).length, 2);
+});
+
 test('273 registered suppliers produce exactly the 20 uploaded assignments, not 273', () => {
   const scoped = scopeSurveysToActiveLists([form], registry, [active]);
   assert.equal(getSurveyEvaluationCompanies(scoped[0], registry).length, 20);

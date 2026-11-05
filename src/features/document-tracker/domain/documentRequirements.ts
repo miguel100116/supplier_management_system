@@ -55,6 +55,28 @@ export function isExpiryDocument(docName: string): boolean {
   return EXPIRY_DOCUMENTS.has(docName);
 }
 
+/** Whether a registration-specific local requirement belongs in the current checklist. */
+export function isDocumentApplicableToClassification(
+  docName: string,
+  businessClassification: BusinessClassification | undefined,
+): boolean {
+  if (['SEC (Corp)', 'GIS (Corp)', 'Articles of Incorporation'].includes(docName)) return businessClassification === 'CORP';
+  if (['DTI (Sole)', "Sole Proprietorship (Owner's ID)"].includes(docName)) return businessClassification === 'SOL';
+  return true;
+}
+
+/** Keep classification history visible until the Directory record is classified; once set, omit excluded documents from the active UI. */
+export function shouldShowHistoricalDocument(
+  docName: string,
+  type: PartnerCompanyType,
+  origin: SupplierOrigin | undefined,
+  businessClassification: BusinessClassification | undefined,
+): boolean {
+  if (type === 'Supplier' && origin === 'Foreign') return true;
+  if (!businessClassification) return true;
+  return isDocumentApplicableToClassification(docName, businessClassification);
+}
+
 // Full ordered list of document keys required for a given partner category.
 // Per the client: Supplier, Courier, and Subcontractor all carry the same
 // (local) checklist - only Supplier ever splits into Local/Foreign, since
@@ -68,9 +90,7 @@ export function getRequiredDocumentKeys(
   if (type === 'Uncategorized') return [...COMMON_DOCUMENTS];
   const originDocs = type === 'Supplier' && origin === 'Foreign' ? FOREIGN_SUPPLIER_DOCUMENTS : LOCAL_SUPPLIER_DOCUMENTS;
   const applicable = originDocs.filter((name) => {
-    if (name === 'SEC (Corp)' || name === 'GIS (Corp)') return businessClassification === 'CORP';
-    if (name === 'DTI (Sole)') return businessClassification === 'SOL';
-    return true;
+    return (type === 'Supplier' && origin === 'Foreign') || isDocumentApplicableToClassification(name, businessClassification);
   });
   return [...COMMON_DOCUMENTS, ...applicable];
 }

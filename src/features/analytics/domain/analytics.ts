@@ -1,4 +1,5 @@
 import { formatUnroundedNumber } from '../../../utils/formatUnroundedNumber';
+import { isActiveEvaluationCompany } from '../../active-companies/domain/companyEligibility';
 import { ArchiveSeries, CustomForm, FilterState, KpiSummary, PartnerCompany, Rating, SurveyResponse, SurveyType } from '../../../types/survey';
 import { getQuestionMaxPoints, isScoredQuestion } from '../../../data/questionWeights';
 
@@ -23,7 +24,7 @@ export function getSurveyEvaluationCompanies(
   currentDateStr: string = new Date().toISOString().slice(0, 10)
 ): PartnerCompany[] {
   const uploadedIds = survey.activeEvaluationCompanyIds === undefined ? null : new Set(survey.activeEvaluationCompanyIds);
-  const activeCompaniesOfType = partnerCompanies.filter((c) => c.type === survey.surveyType && !c.isArchived && (!uploadedIds || uploadedIds.has(c.id)));
+  const activeCompaniesOfType = partnerCompanies.filter((c) => c.type === survey.surveyType && isActiveEvaluationCompany(c) && (!uploadedIds || uploadedIds.has(c.id)));
   if (!survey.evaluationCompanyIds || survey.evaluationCompanyIds.length === 0) {
     return activeCompaniesOfType;
   }
@@ -40,7 +41,7 @@ export function getAllCompaniesOfType(
   surveyType: SurveyType,
   partnerCompanies: PartnerCompany[]
 ): PartnerCompany[] {
-  return partnerCompanies.filter((c) => c.type === surveyType && !c.isArchived);
+  return partnerCompanies.filter((c) => c.type === surveyType && isActiveEvaluationCompany(c));
 }
 
 export const initialFilters: FilterState = {

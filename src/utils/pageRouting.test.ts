@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getPageKeyFromPathname, getPageNavigationMode, getPagePathname, shouldConfirmSurveySwitch } from './pageRouting';
+import { getLoginAudience, getPageKeyFromPathname, getPageNavigationMode, getPagePathname, shouldConfirmSurveySwitch } from './pageRouting';
+
+test('login aliases preserve their presentation audience under root and base paths', () => {
+  for (const base of ['', '/sms']) {
+    for (const [entry, audience] of [['admin', 'Admin'], ['employee', 'Employee']] as const) {
+      assert.equal(getPageKeyFromPathname(`${base}/${entry}/login`, base), 'login');
+      assert.equal(getLoginAudience(`${base}/${entry}/login`, base), audience);
+    }
+    assert.equal(getLoginAudience(`${base}/login`, base), undefined);
+    assert.equal(getLoginAudience('/unrelated/admin/login', base), undefined);
+  }
+});
 
 test('same-page navigation replaces the current route while module changes add a history entry', () => {
   assert.equal(getPageNavigationMode('analytics', 'analytics'), 'replace');

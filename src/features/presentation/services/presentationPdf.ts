@@ -26,10 +26,11 @@ function setText(doc: jsPDF, hex: string) {
 }
 
 function drawCoverBackground(doc: jsPDF) {
-  setFill(doc, '#0063a9');
+  setFill(doc, '#10243a');
   doc.rect(0, 0, PAGE_W, PAGE_H, 'F');
-  setFill(doc, '#00335a');
-  doc.circle(PAGE_W - 60, 40, 90, 'F');
+  setFill(doc, BRAND);
+  doc.rect(0, 0, 8, PAGE_H, 'F');
+  doc.rect(PAGE_W * 0.68, 0, PAGE_W * 0.32, 3, 'F');
 }
 
 function drawClosingBackground(doc: jsPDF) {
@@ -85,9 +86,10 @@ export async function exportSlidesAsPDF(slides: Slide[], deckTitle: string) {
     }
   }
 
+  const reportingPeriod = slides.find((slide) => slide.kind === 'title')?.meta[0];
   slides.forEach((slide, index) => {
     if (index > 0) doc.addPage();
-    renderSlide(doc, slide, pdfMaxRating);
+    renderSlide(doc, slide, pdfMaxRating, reportingPeriod);
   });
 
   const filename = `${deckTitle.replace(/[^a-z0-9]+/gi, '_').toLowerCase() || 'presentation'}_${new Date()
@@ -97,7 +99,7 @@ export async function exportSlidesAsPDF(slides: Slide[], deckTitle: string) {
   doc.save(filename);
 }
 
-function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
+function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number, reportingPeriod?: string) {
   switch (slide.kind) {
     case 'title': {
       drawCoverBackground(doc);
@@ -130,7 +132,7 @@ function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.text(String(i + 1), MARGIN + 8, y - 1.5, { align: 'center' });
+        doc.text(String(item.number), MARGIN + 8, y - 1.5, { align: 'center' });
 
         setText(doc, INK);
         doc.setFontSize(12);
@@ -416,8 +418,100 @@ function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
       break;
     }
 
+    case 'period-change': {
+      drawHeader(doc, SLIDE_EYEBROWS['period-change'], 'What changed since the last period?', slide.insight.available ? 'Equal-duration periods; response counts are shown to keep score movement in context.' : 'Current performance snapshot from the selected evaluation records.');
+      const insight = slide.insight;
+      if (!insight.available) {
+        setText(doc, '#475569'); doc.setFontSize(9); doc.text(insight.contextMessage, MARGIN, 137, { maxWidth: CONTENT_W });
+        setText(doc, INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
+        doc.text(`${insight.currentScore?.toFixed(2) ?? '—'}${insight.currentScore === undefined ? '' : ' / 100'}`, MARGIN, 177);
+        setText(doc, '#64748b'); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(`${insight.currentResponses} scored responses · ${insight.currentPeriod}`, MARGIN, 193);
+        if (insight.currentSnapshot.strongest) {
+          const strongest = insight.currentSnapshot.strongest;
+          setText(doc, BRAND); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text('HIGHEST CURRENT RESULT', PAGE_W - MARGIN - 230, 160);
+          setText(doc, INK); doc.setFontSize(9); doc.text(`${strongest.label} · ${strongest.surveyType}`, PAGE_W - MARGIN - 230, 175, { maxWidth: 230 });
+          setText(doc, '#64748b'); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(`${strongest.score.toFixed(1)} / 100 · ${strongest.responses} scored responses`, PAGE_W - MARGIN - 230, 190);
+        }
+        const groups = [
+          { title: 'LOWEST CATEGORY RESULTS', rows: insight.currentSnapshot.weakestCategories, x: MARGIN },
+          { title: 'LOWEST PARTNER RESULTS', rows: insight.currentSnapshot.lowestPartners, x: MARGIN + CONTENT_W / 2 + 10 },
+        ];
+        groups.forEach((group) => {
+          const width = CONTENT_W / 2 - 10; let y = 235;
+          setText(doc, BRAND); doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.text(group.title, group.x, y); y += 16;
+          if (!group.rows.length) { setText(doc, '#64748b'); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text('No scored results in this group.', group.x, y); return; }
+          group.rows.forEach((row) => {
+            setText(doc, INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text(`${row.label} · ${row.surveyType}`, group.x, y, { maxWidth: width - 48 });
+            setText(doc, '#334155'); doc.text(row.score.toFixed(1), group.x + width, y, { align: 'right' });
+            setText(doc, '#64748b'); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text(`${row.responses} scored responses`, group.x, y + 11);
+            bar(doc, group.x, y + 15, width, 4, row.score / 100, BRAND); y += 38;
+          });
+        });
+        break;
+      }
+      setText(doc, '#64748b'); doc.setFontSize(8.5);
+      doc.text(`Previous · ${insight.previousPeriod} · ${insight.previousResponses} scored responses`, MARGIN, 140);
+      doc.text(`Current · ${insight.currentPeriod} · ${insight.currentResponses} scored responses`, PAGE_W - MARGIN, 140, { align: 'right' });
+      setText(doc, INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(19);
+      doc.text(`${insight.previousScore?.toFixed(2)}  →  ${insight.currentScore?.toFixed(2)}`, MARGIN, 165);
+      const deltaColor = (insight.delta ?? 0) >= 0 ? '#047857' : '#be123c';
+      const overallDelta = insight.delta ?? 0;
+      setText(doc, overallDelta === 0 ? '#64748b' : deltaColor);
+      doc.text(`${overallDelta > 0 ? 'Increased' : overallDelta < 0 ? 'Declined' : 'Unchanged'} · ${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(2)} points`, PAGE_W - MARGIN, 165, { align: 'right' });
+      bar(doc, MARGIN, 174, CONTENT_W * 0.42, 6, (insight.previousScore ?? 0) / 100, '#94a3b8');
+      bar(doc, PAGE_W - MARGIN - CONTENT_W * 0.42, 174, CONTENT_W * 0.42, 6, (insight.currentScore ?? 0) / 100, BRAND);
+      const columns = [{ title: 'Largest improvements', rows: insight.improvements, x: MARGIN, color: '#047857' }, { title: 'Largest declines', rows: insight.declines, x: MARGIN + CONTENT_W / 2 + 10, color: '#be123c' }];
+      const colW = CONTENT_W / 2 - 10;
+      columns.forEach((column) => {
+        let y = 205; setText(doc, column.color); doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.text(column.title, column.x, y); y += 17;
+        if (!column.rows.length) { setText(doc, '#64748b'); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text('No matched change in this direction.', column.x, y); return; }
+        column.rows.forEach((row) => {
+          setText(doc, INK); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text(row.label, column.x, y, { maxWidth: colW - 46 });
+          setText(doc, column.color); doc.text(`${row.delta > 0 ? '+' : ''}${row.delta.toFixed(2)}`, column.x + colW, y, { align: 'right' });
+          setText(doc, '#64748b'); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text(`${row.surveyType} · ${row.kind} · ${row.previousScore.toFixed(1)} → ${row.currentScore.toFixed(1)} · ${row.previousResponses}/${row.currentResponses} scored responses`, column.x, y + 12, { maxWidth: colW }); y += 37;
+        });
+      });
+      break;
+    }
+
+    case 'focus': {
+      drawHeader(doc, SLIDE_EYEBROWS.focus, 'Where should we focus?', 'Evidence-triggered priorities using the existing score bands and matched period changes.');
+      if (!slide.insight.priorities.length) { setText(doc, '#64748b'); doc.setFontSize(10); doc.text(slide.insight.reason ?? 'No priority finding is available.', MARGIN, 155, { maxWidth: CONTENT_W }); break; }
+      let y = 145;
+      slide.insight.priorities.forEach((priority, index) => {
+        setText(doc, BRAND); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(`0${index + 1}`, MARGIN, y + 5);
+        setText(doc, INK); doc.setFontSize(9); doc.text(`${priority.surveyType} · ${priority.category}`, MARGIN + 36, y, { maxWidth: 205 });
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.text(priority.question, MARGIN + 36, y + 13, { maxWidth: 205 });
+        setText(doc, '#64748b'); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text(`${priority.questionScore.toFixed(1)} / 100 · ${priority.responses} responses · ${priority.affectedPartners} affected partners${priority.categoryDelta === undefined ? '' : ` · category ${priority.categoryDelta > 0 ? '+' : ''}${priority.categoryDelta.toFixed(2)}`}`, MARGIN + 36, y + 29, { maxWidth: 205 });
+        setText(doc, BRAND); doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.text('SUGGESTED DISCUSSION POINTS', MARGIN + 265, y);
+        setText(doc, INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.text(priority.discussionPoints.join('\n'), MARGIN + 265, y + 13, { maxWidth: CONTENT_W - 265 });
+        doc.setDrawColor(226, 232, 240); doc.line(MARGIN + 30, y + 43, PAGE_W - MARGIN, y + 43); y += 52;
+      });
+      break;
+    }
+
+    case 'portfolio-spread': {
+      drawHeader(doc, SLIDE_EYEBROWS['portfolio-spread'], 'Is this isolated or widespread?', `${slide.insight.totalPartners} evaluated partners · ${slide.insight.unsatisfactoryPartners} Unsatisfactory (${slide.insight.unsatisfactoryPercentage.toFixed(1)}%).`);
+      if (!slide.insight.totalPartners) { setText(doc, '#64748b'); doc.setFontSize(10); doc.text('No evaluated partners have scoreable submissions in this reporting window.', MARGIN, 155); break; }
+      setText(doc, '#64748b'); doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.text('PARTNER SCORE DISTRIBUTION', MARGIN, 145);
+      let y = 162;
+      slide.insight.bands.forEach((band) => {
+        setText(doc, INK); doc.setFont('helvetica', 'normal'); doc.text(`${band.label} · ${band.count} (${band.percentage.toFixed(1)}%)`, MARGIN, y);
+        bar(doc, MARGIN, y + 5, CONTENT_W * 0.43, 7, band.percentage / 100, band.color); y += 24;
+      });
+      const x = MARGIN + CONTENT_W * 0.52; setText(doc, '#64748b'); doc.setFont('helvetica', 'bold'); doc.text('CATEGORY REACH BY PARTNER', x, 145); y = 162;
+      slide.insight.categories.slice(0, 9).forEach((category) => {
+        setText(doc, INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(`${category.category} · ${category.surveyType}`, x, y, { maxWidth: 170 });
+        setText(doc, '#64748b'); doc.setFontSize(7.5); doc.text(`${category.unsatisfactoryPartners}/${category.evaluatedPartners} · ${category.affectedPercentage.toFixed(1)}% · avg ${category.average.toFixed(1)}`, PAGE_W - MARGIN, y, { align: 'right' });
+        bar(doc, x, y + 5, CONTENT_W * 0.45, 5, category.affectedPercentage / 100, BRAND); y += 24;
+      });
+      break;
+    }
+
     case 'closing': {
       drawClosingBackground(doc);
+      setFill(doc, BRAND);
+      doc.rect(0, 0, PAGE_W, 5, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(22);
       doc.setFont('helvetica', 'bold');
@@ -425,16 +519,28 @@ function renderSlide(doc: jsPDF, slide: Slide, pdfMaxRating: number) {
       let y = 120;
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      slide.takeaways.forEach((point) => {
+      slide.takeaways.forEach((point, index) => {
         doc.setTextColor(147, 197, 253);
-        doc.text('•', MARGIN, y);
+        doc.setFont('helvetica', 'bold');
+        doc.text(String(index + 1).padStart(2, '0'), MARGIN, y);
         doc.setTextColor(226, 232, 240);
         doc.text(point, MARGIN + 16, y, { maxWidth: PAGE_W - MARGIN * 2 - 16 });
+        if (index < slide.takeaways.length - 1) {
+          doc.setDrawColor(71, 85, 105);
+          doc.line(MARGIN, y + 12, PAGE_W - MARGIN, y + 12);
+        }
         y += 34;
       });
       break;
     }
     default:
       break;
+  }
+
+  if (slide.kind !== 'title' && reportingPeriod) {
+    setText(doc, '#64748b');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text(`Reporting period: ${reportingPeriod}`, PAGE_W - MARGIN, PAGE_H - 15, { align: 'right' });
   }
 }
