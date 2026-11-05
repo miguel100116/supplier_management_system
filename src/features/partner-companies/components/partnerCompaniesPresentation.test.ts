@@ -39,7 +39,7 @@ test('directory category strip replaces partner status and uses the selected cat
 test('branch category and rank analysis remains separate and before directory controls', () => {
   const props = { categorySummary, branchCount: 8 };
   const breakdown = renderToStaticMarkup(createElement(PartnerCategoryRankBreakdown, props));
-  for (const text of ['Category &amp; Supplier Rank Breakdown', '7 Accredited Branches Mapped', 'Standard', 'Non-Trade (NT)', 'Regular Rank', 'Major Rank', '88% Rank Mapping Coverage']) assert.ok(breakdown.includes(text), text);
+  for (const text of ['Category &amp; Supplier Rank Breakdown', '7 Accredited Branches Mapped', 'Trade', 'Non-Trade (NT)', 'Regular Rank', 'Major Rank', '88% Rank Mapping Coverage']) assert.ok(breakdown.includes(text), text);
   assert.match(breakdown, /id="partner-category-breakdown-content"/);
   assert.doesNotMatch(breakdown, /Hide breakdown|View breakdown|aria-expanded/);
   assert.match(breakdown, /8 partner branches have a mapped supplier rank/);

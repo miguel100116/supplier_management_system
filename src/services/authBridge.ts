@@ -28,7 +28,7 @@ export interface LoginIdentity {
 }
 export type LoginAttempt = () => Promise<LoginIdentity | null>;
 
-export async function signInForRole(role: LoginRole, authenticate: LoginAttempt): Promise<string | null> {
+export async function signInVerifiedAccount(authenticate: LoginAttempt, requiredRole?: LoginRole): Promise<string | null> {
   try {
     const identity = await authenticate();
     if (!identity) return null;
@@ -52,8 +52,9 @@ export async function signInForRole(role: LoginRole, authenticate: LoginAttempt)
       || (profile.data.role !== 'Admin' && profile.data.role !== 'Employee')) {
       throw new Error('Unable to verify your account type. Please contact your administrator.');
     }
-    if (profile.data.role !== role) {
-      throw new Error(`This is an ${profile.data.role} account. Select ${profile.data.role} Account to sign in.`);
+    if (requiredRole && profile.data.role !== requiredRole) {
+      const destination = profile.data.role === 'Admin' ? '/admin/login' : '/employee/login';
+      throw new Error(`This is an ${profile.data.role} account. Please sign in at ${destination}.`);
     }
     return email;
   } catch (error) {

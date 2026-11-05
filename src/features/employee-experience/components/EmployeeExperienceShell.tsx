@@ -83,7 +83,7 @@ export function EmployeeExperienceShell<T extends string>({ pages, activePage, o
         <header className="topbar">
           <div className="breadcrumb">
             {activePage === homePage?.key ? (
-              <span aria-current="page">Home</span>
+              <span aria-current="page" className="truncate max-w-[180px] sm:max-w-none" title="Vendor Performance Evaluation">Vendor Performance Evaluation</span>
             ) : (
               <button
                 type="button"

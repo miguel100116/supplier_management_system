@@ -203,10 +203,10 @@ A condensed cheat-sheet of who gets what, by default:
 
 | Step | Actor | Action |
 |---|---|---|
-| 1 | User | Selects Admin Account or Employee Account, then enters an @mgenesis.com email + password, or clicks "Sign in with Microsoft" (if configured). |
+| 1 | User | Opens /login, /admin/login, or /employee/login and enters an @mgenesis.com email + password, or clicks "Sign in with Microsoft" (if configured). No role selection is required. |
 | 2 | System | Rejects any email that does not end in @mgenesis.com. |
 | 3 | System | Verifies the password with Supabase Auth. Microsoft sign-in, when configured, must also establish a Supabase session. |
-| 4 | System | Verifies the confirmed Supabase identity and linked account profile. If the stored role differs from the selected account type, login stops, the new session is cleared, and the user is told which account type to select. Missing/unverifiable profiles also block login. Role, Designation, and Department come from the persisted profile. |
+| 4 | System | Verifies the confirmed Supabase identity and linked account profile. All login links use the same form; role is determined by the stored profile. Separate Admin/Employee entrances reject the opposite role and clear the session; /login accepts both roles. Missing/unverifiable profiles block login and clear the new session. Role, Designation, and Department come from the persisted profile. |
 | 5 | System | Computes the account's permitted pages and survey types (role/designation/department defaults, or a saved per-account override). |
 | 6 | User | Lands on the Dashboard with only the permitted modules visible in the navigation. |
 

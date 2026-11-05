@@ -96,15 +96,16 @@ export function Shell<T extends string>({
     (page): page is NavGroup<T> => page.type === 'group' && page.children.some((child) => child.key === activePage)
   );
   const ActiveIcon = activePageItem?.icon ?? Menu;
-  const moduleLabel = activePageItem?.label ?? title;
+  const moduleLabel = activePage === 'dashboard' ? (adminMode ? 'Vendor Management System' : 'Vendor Performance Evaluation') : activePageItem?.label ?? title;
   const contentHeading = pageHeading || title;
   const showModuleContext = !hideModuleContext && moduleLabel !== contentHeading;
 
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = `${title} | Supplier Management System`;
+    const systemTitle = adminMode ? 'Vendor Management System' : 'Vendor Performance Evaluation';
+    document.title = activePage === 'dashboard' ? systemTitle : `${title} | ${systemTitle}`;
     return () => { document.title = previousTitle; };
-  }, [title]);
+  }, [title, adminMode, activePage]);
 
   // Auto-expand whichever group currently contains the active page, without
   // collapsing groups the user has already opened manually.

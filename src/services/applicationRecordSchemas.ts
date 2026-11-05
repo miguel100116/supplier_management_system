@@ -103,6 +103,7 @@ function parsePartnerCompany(value: unknown, recordId: string, label: string): J
   optionalText(candidate.testImportBatchId, `${label}.testImportBatchId`, 2_000);
   text(candidate.name, `${label}.name`, { max: 500 });
   oneOf(candidate.type, PARTNER_TYPES, `${label}.type`);
+  if (candidate.registrationType !== undefined) oneOf(candidate.registrationType, ['Trade', 'Non-Trade', 'Both'], `${label}.registrationType`);
   isoDate(candidate.createdAt, `${label}.createdAt`);
   optionalDate(candidate.registeredAt, `${label}.registeredAt`);
   optionalBoolean(candidate.isArchived, `${label}.isArchived`);

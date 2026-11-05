@@ -114,6 +114,7 @@ export function getPageKeyFromPathname(pathname: string, basePath = ''): PageKey
   }
 
   const segments = routePathname.split('/').filter(Boolean);
+  if (segments.length === 2 && ['admin', 'employee'].includes(segments[0]) && segments[1] === 'login') return 'login';
   if (segments.length !== 1) return 'dashboard';
 
   const segment = segments[0];
@@ -121,4 +122,12 @@ export function getPageKeyFromPathname(pathname: string, basePath = ''): PageKey
   const canonicalPage = PAGE_KEYS_BY_PATH_SEGMENT.get(segment);
   if (canonicalPage) return canonicalPage;
   return PAGE_KEYS.has(segment as PageKey) ? segment as PageKey : 'dashboard';
+}
+
+export function getLoginAudience(pathname: string, basePath = ''): 'Admin' | 'Employee' | undefined {
+  const base = normalizeBasePath(basePath);
+  const path = pathname.replace(/\/+$/, '');
+  if (path === `${base}/admin/login`) return 'Admin';
+  if (path === `${base}/employee/login`) return 'Employee';
+  return undefined;
 }

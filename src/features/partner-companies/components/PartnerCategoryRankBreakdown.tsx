@@ -40,7 +40,7 @@ export function PartnerCategoryRankBreakdown({ categorySummary, branchCount }: P
         <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-4 dark:border-slate-800 dark:bg-slate-900/30">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-3 dark:border-slate-800">
-              <div><h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">Category Distribution</h3><p className="mt-0.5 text-[10px] text-slate-400">4 core families · Paired Standard &amp; Non-Trade (NT)</p></div>
+              <div><h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-700 dark:text-slate-200">Category Distribution</h3><p className="mt-0.5 text-[10px] text-slate-400">4 core families · Paired Trade &amp; Non-Trade (NT)</p></div>
               <span className="shrink-0 rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-500 dark:border-slate-800 dark:bg-slate-950">{categorySummary.total.toLocaleString()} branches total</span>
             </div>
             <div className="mt-3 space-y-2">
@@ -49,7 +49,7 @@ export function PartnerCategoryRankBreakdown({ categorySummary, branchCount }: P
                 const nt = categorySummary.buckets[`${family}-NT`] ?? 0;
                 return <div key={family} className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(135px,1fr)_minmax(92px,0.65fr)_minmax(100px,0.7fr)_auto] sm:items-center dark:border-slate-800 dark:bg-slate-950">
                   <div className={`admin-directory-family-label admin-directory-family-${tone}`}><span className="admin-directory-family-dot" aria-hidden="true" />{label}</div>
-                  <div className="rounded-md border border-slate-100 bg-slate-50 px-2 py-1.5 text-[10px] text-slate-500 dark:border-slate-800 dark:bg-slate-900">Standard <strong className="ml-1 text-slate-700 dark:text-slate-200">{standard.toLocaleString()}</strong></div>
+                  <div className="rounded-md border border-slate-100 bg-slate-50 px-2 py-1.5 text-[10px] text-slate-500 dark:border-slate-800 dark:bg-slate-900">Trade <strong className="ml-1 text-slate-700 dark:text-slate-200">{standard.toLocaleString()}</strong></div>
                   <div className="rounded-md border border-slate-100 bg-slate-50 px-2 py-1.5 text-[10px] text-slate-500 dark:border-slate-800 dark:bg-slate-900">Non-Trade (NT) <strong className="ml-1 text-slate-700 dark:text-slate-200">{nt.toLocaleString()}</strong></div>
                   <span className="justify-self-end rounded bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">Total: {(standard + nt).toLocaleString()}</span>
                 </div>;
