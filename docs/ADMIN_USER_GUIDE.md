@@ -38,7 +38,9 @@ The Document Tracker gathers partner compliance documents in one place. It helps
 1. Open **Partner Companies** → **Document Tracker**.
 2. Search by company name or BP Code, or use the filters to narrow the list.
 3. Select a document or status to review its details.
-4. If you have renewal access, use the renewal action to enter the new date or status and confirm the change.
+4. For a **Missing** or **For Update** document, choose **Verify and mark current**, confirm that you reviewed it, and add optional remarks. Date-based documents also require a valid expiry date; expired documents continue through the renewal action.
+
+For local partners, the registration classification in Partner Directory controls the applicable legal documents. Sole proprietorships show DTI registration and the owner's ID; corporations show SEC registration, GIS, and Articles of Incorporation. Changing classification hides inapplicable documents from compliance totals while preserving their saved records and history. Foreign suppliers use their separate requirement list. Verification records an administrator action and does not upload a file.
 
 In **Supplier (Local)**, administrators can expand a company and click its **Missing**, **Expired**, or **For update** count above the required documents to show matching required documents. The **Historical & additional** section is hidden while a filter is selected. Click the selected count again to show every required document and history, or another count to switch. The counts, company totals, and saved records stay unchanged. Opening another company resets the filter; **For update** includes outdated AFS records and remains separate from Expired.
 

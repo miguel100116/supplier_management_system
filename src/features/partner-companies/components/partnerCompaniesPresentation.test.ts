@@ -62,7 +62,7 @@ test('branch category and rank analysis remains separate and before directory co
 test('directory filters open from icons and reset independently inside their popovers', () => {
   const noop = () => {};
   const base: ComponentProps<typeof PartnerCompaniesFilterToolbar> = {
-    categoryTab: 'All', onCategoryChange: noop, originFilter: 'All', onOriginChange: noop,
+    categoryTab: 'All', onCategoryChange: noop, originFilter: ['Local', 'Foreign'], onOriginChange: noop, businessTypeFilter: ['Trade', 'Non-Trade'], onBusinessTypeChange: noop,
     searchQuery: '', onSearchChange: noop, onSearchClear: noop,
     sortOptions: [{ value: 'default', label: 'Default order' }, { value: 'name-desc', label: 'Company: Z-A' }], sortValue: 'default', onSortChange: noop,
     registeredFrom: '', registeredTo: '', onRegisteredFromChange: noop, onRegisteredToChange: noop,
@@ -77,10 +77,15 @@ test('directory filters open from icons and reset independently inside their pop
   assert.doesNotMatch(defaultMarkup, /Additional category|Filter by category|All Categories/);
 
   const activeMarkup = renderToStaticMarkup(createElement(PartnerCompaniesFilterToolbar, {
-    ...base, categoryTab: 'Supplier', originFilter: 'Foreign', searchQuery: ' Acme ', sortValue: 'name-desc',
+    ...base, categoryTab: 'Supplier', originFilter: ['Foreign'], searchQuery: ' Acme ', sortValue: 'name-desc',
     registeredFrom: '2026-01-01', documentFilter: 'expired',
   }));
-  for (const label of ['Filter by supplier origin', 'Filter by document status', 'Filter by registration date']) assert.ok(activeMarkup.includes(label), label);
+  for (const label of ['Filter by supplier origin and business type', 'Filter by document status', 'Filter by registration date']) assert.ok(activeMarkup.includes(label), label);
+  assert.match(FILTER_TOOLBAR_SOURCE, /All Origins/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /All Types/);
+  assert.doesNotMatch(FILTER_TOOLBAR_SOURCE, /categoryTab === 'Supplier' && <fieldset/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /onMouseEnter=\{\(\) => \{ if \(kind === 'origin'\) setOpenPopover\(kind\); \}\}/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /type="checkbox" checked=\{businessTypeFilter\.includes\(value\)\}/);
   assert.match(activeMarkup, /Clear partner search/);
   assert.match(FILTER_TOOLBAR_SOURCE, /FileCheck2/);
   assert.doesNotMatch(FILTER_TOOLBAR_SOURCE, /<select aria-label="Document status"/);

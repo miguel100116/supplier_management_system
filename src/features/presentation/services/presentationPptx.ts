@@ -67,7 +67,8 @@ export function exportSlidesAsPPTX(slides: Slide[], deckTitle: string) {
     if (match) pdfMaxRating = parseFloat(match[1]);
   }
 
-  slides.forEach((slide) => renderSlide(pres, slide, pdfMaxRating));
+  const reportingPeriod = slides.find((slide) => slide.kind === 'title')?.meta[0];
+  slides.forEach((slide) => renderPptxSlide(pres, slide, pdfMaxRating, reportingPeriod));
 
   const filename = `${deckTitle.replace(/[^a-z0-9]+/gi, '_').toLowerCase() || 'presentation'}_${new Date()
     .toISOString()
@@ -75,16 +76,14 @@ export function exportSlidesAsPPTX(slides: Slide[], deckTitle: string) {
   pres.writeFile({ fileName: filename });
 }
 
-function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
+export function renderPptxSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number, reportingPeriod?: string) {
   const pptxSlide = pres.addSlide();
 
   switch (slide.kind) {
     case 'title': {
-      pptxSlide.background = { color: BRAND };
-      pptxSlide.addShape('ellipse', {
-        x: SLIDE_W - 2.6, y: -1.3, w: 3.2, h: 3.2,
-        fill: { color: '00335A' }, line: { type: 'none' },
-      });
+      pptxSlide.background = { color: '10243A' };
+      pptxSlide.addShape('rect', { x: 0, y: 0, w: 0.06, h: SLIDE_H, fill: { color: BRAND }, line: { type: 'none' } });
+      pptxSlide.addShape('rect', { x: SLIDE_W * 0.68, y: 0, w: SLIDE_W * 0.32, h: 0.035, fill: { color: BRAND }, line: { type: 'none' } });
       pptxSlide.addText(`Generated ${slide.generatedDate}`, {
         x: SLIDE_W - 4.4, y: 0.3, w: 4, h: 0.25, align: 'right',
         fontSize: 9, color: 'DBEAFE', fontFace: FONT,
@@ -110,7 +109,7 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
       let y = 1.15;
       slide.items.forEach((item, i) => {
         pptxSlide.addShape('ellipse', { x: MARGIN, y: y + (rowH - 0.34) / 2, w: 0.34, h: 0.34, fill: { color: BRAND }, line: { type: 'none' } });
-        pptxSlide.addText(String(i + 1), {
+        pptxSlide.addText(String(item.number), {
           x: MARGIN, y: y + (rowH - 0.34) / 2, w: 0.34, h: 0.34, align: 'center', valign: 'middle',
           fontSize: 11, bold: true, color: 'FFFFFF', fontFace: FONT,
         });
@@ -193,23 +192,28 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
     }
 
     case 'comparison': {
-      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.comparison, 'Survey Type Comparison');
+      const noResponseTypes = slide.data.filter((item) => item.responses === 0).map((item) => item.surveyType);
+      const subtitle = noResponseTypes.length
+        ? `Average rating is out of 100; labels show countable submissions. No responses: ${noResponseTypes.join(', ')}.`
+        : 'Average rating is out of 100; labels show countable submissions.';
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.comparison, 'Survey Type Comparison', subtitle);
       const chartH = CONTENT_BOTTOM - contentTop;
-      pptxSlide.addChart(
-        pres.ChartType.bar,
-        [
-          {
-            name: 'Average rating',
-            labels: slide.data.map((d) => d.surveyType),
-            values: slide.data.map((d) => Number(d.average.toFixed(2))),
-          },
-        ],
-        {
+      const scoredTypes = slide.data.filter((item) => item.responses > 0);
+      if (!scoredTypes.length) {
+        pptxSlide.addText('No countable responses for the selected survey types.', {
+          x: MARGIN, y: contentTop + 0.2, w: CONTENT_W, h: 0.5, fontSize: 11, italic: true, color: MUTED, fontFace: FONT,
+        });
+      } else {
+        pptxSlide.addChart(pres.ChartType.bar, [{
+          name: 'Average rating',
+          labels: scoredTypes.map((item) => `${item.surveyType} · ${item.responses} response${item.responses === 1 ? '' : 's'}`),
+          values: scoredTypes.map((item) => Number(item.average.toFixed(2))),
+        }], {
           x: MARGIN, y: contentTop, w: CONTENT_W, h: chartH,
           barDir: 'bar',
-          chartColors: slide.data.map((d) => surveyTypeHex[d.surveyType] ?? BRAND),
+          chartColors: scoredTypes.map((item) => surveyTypeHex[item.surveyType] ?? BRAND),
           valAxisMinVal: 0,
-          valAxisMaxVal: pdfMaxRating,
+          valAxisMaxVal: 100,
           showValue: true,
           dataLabelPosition: 'outEnd',
           dataLabelFontSize: 10,
@@ -221,22 +225,32 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
           showLegend: false,
           barGapWidthPct: 40,
           valGridLine: { color: BORDER },
-        },
-      );
+        });
+      }
       break;
     }
 
     case 'sections': {
-      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.sections, 'Category Breakdown');
+      const scoredCategories = slide.data.filter((item) => item.submissions > 0);
+      const noResponseCategories = slide.data.filter((item) => item.submissions === 0).map((item) => item.category);
+      const subtitle = noResponseCategories.length
+        ? `Average rating is out of 100; labels show countable submissions. No countable responses: ${noResponseCategories.join(', ')}.`
+        : 'Average rating is out of 100; labels show countable submissions.';
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.sections, 'Category Breakdown', subtitle);
       const chartH = CONTENT_BOTTOM - contentTop;
-      const sorted = slide.data;
-      const maxAvg = Math.max(4, ...sorted.map((d) => d.average));
+      const sorted = scoredCategories;
+      if (!sorted.length) {
+        pptxSlide.addText('No countable category responses for this period.', {
+          x: MARGIN, y: contentTop + 0.2, w: CONTENT_W, h: 0.5, fontSize: 11, italic: true, color: MUTED, fontFace: FONT,
+        });
+        break;
+      }
       pptxSlide.addChart(
         pres.ChartType.bar,
         [
           {
             name: 'Average rating',
-            labels: sorted.map((d) => d.category),
+            labels: sorted.map((d) => `${d.category} · ${d.submissions} response${d.submissions === 1 ? '' : 's'}`),
             values: sorted.map((d) => Number(d.average.toFixed(2))),
           },
         ],
@@ -245,7 +259,7 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
           barDir: 'bar',
           chartColors: sorted.map((d, i) => (i === 0 ? '10B981' : i === sorted.length - 1 ? 'EF4444' : BRAND)),
           valAxisMinVal: 0,
-          valAxisMaxVal: Number(maxAvg.toFixed(2)),
+          valAxisMaxVal: 100,
           showValue: true,
           dataLabelPosition: 'outEnd',
           dataLabelFontSize: 9,
@@ -304,20 +318,32 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
     }
 
     case 'trends': {
-      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.trends, 'Trends Over Time');
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.trends, 'Trends Over Time', 'Monthly average rating and countable response volume.');
       const chartH = CONTENT_BOTTOM - contentTop;
-      pptxSlide.addChart(
-        pres.ChartType.line,
-        [
-          {
-            name: 'Average rating',
-            labels: slide.data.filter((d) => d.average !== null).map((d) => d.month),
-            values: slide.data.filter((d) => d.average !== null).map((d) => Number(d.average!.toFixed(2))),
-          },
-        ],
-        {
-          x: MARGIN, y: contentTop, w: CONTENT_W, h: chartH,
+      if (slide.data.length === 0) {
+        pptxSlide.addText('No monthly response data for this period.', {
+          x: MARGIN, y: contentTop + 0.2, w: CONTENT_W, h: 0.5, fontSize: 11, italic: true, color: MUTED, fontFace: FONT,
+        });
+        break;
+      }
+
+      const averageData = slide.data.filter((item) => item.average !== null);
+      const averageChartH = chartH * 0.62;
+      const volumeTitleY = contentTop + averageChartH + 0.05;
+      const volumeChartY = volumeTitleY + 0.2;
+      const volumeChartH = Math.max(0.55, CONTENT_BOTTOM - volumeChartY);
+      if (averageData.length) {
+        pptxSlide.addText('AVERAGE RATING (OUT OF 100)', {
+          x: MARGIN, y: contentTop, w: CONTENT_W, h: 0.16, fontSize: 7.5, bold: true, color: MUTED, fontFace: FONT,
+        });
+        pptxSlide.addChart(pres.ChartType.line, [{
+          name: 'Average rating',
+          labels: averageData.map((item) => item.month),
+          values: averageData.map((item) => Number(item.average!.toFixed(2))),
+        }], {
+          x: MARGIN, y: contentTop + 0.16, w: CONTENT_W, h: averageChartH - 0.16,
           valAxisMinVal: 0,
+          valAxisMaxVal: 100,
           lineDataSymbol: 'circle',
           lineDataSymbolSize: 5,
           lineSize: 2.5,
@@ -332,8 +358,37 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
           dataLabelFontSize: 8.5,
           dataLabelColor: MUTED,
           dataLabelPosition: 't',
-        },
-      );
+        });
+      } else {
+        pptxSlide.addText('No scored monthly ratings in this period.', {
+          x: MARGIN, y: contentTop + 0.2, w: CONTENT_W, h: 0.36, fontSize: 9, italic: true, color: MUTED, fontFace: FONT,
+        });
+      }
+
+      pptxSlide.addText('COUNTABLE RESPONSES BY MONTH', {
+        x: MARGIN, y: volumeTitleY, w: CONTENT_W, h: 0.16, fontSize: 7.5, bold: true, color: MUTED, fontFace: FONT,
+      });
+      pptxSlide.addChart(pres.ChartType.bar, [{
+        name: 'Countable responses',
+        labels: slide.data.map((item) => item.month),
+        values: slide.data.map((item) => item.responses),
+      }], {
+        x: MARGIN, y: volumeChartY, w: CONTENT_W, h: volumeChartH,
+        barDir: 'col',
+        chartColors: ['10B981'],
+        valAxisMinVal: 0,
+        showValue: true,
+        dataLabelPosition: 'outEnd',
+        dataLabelFontSize: 7.5,
+        dataLabelColor: INK,
+        catAxisLabelFontSize: 8,
+        catAxisLabelColor: MUTED,
+        valAxisLabelFontSize: 7.5,
+        valAxisLabelColor: MUTED,
+        showLegend: false,
+        barGapWidthPct: 45,
+        valGridLine: { color: BORDER },
+      });
       break;
     }
 
@@ -519,8 +574,100 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
       break;
     }
 
+    case 'period-change': {
+      const insight = slide.insight;
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS['period-change'], 'What changed since the last period?', insight.available ? 'Equal-duration periods; response counts are shown to keep score movement in context.' : 'Current performance snapshot from the selected evaluation records.');
+      if (!insight.available) {
+        pptxSlide.addText(insight.contextMessage, { x: MARGIN, y: contentTop, w: CONTENT_W, h: 0.42, fontSize: 9, color: MUTED, fontFace: FONT, valign: 'middle' });
+        pptxSlide.addText(`${insight.currentScore?.toFixed(2) ?? '—'}${insight.currentScore === undefined ? '' : ' / 100'}`, { x: MARGIN, y: contentTop + 0.46, w: 3.2, h: 0.42, fontSize: 19, bold: true, color: INK, fontFace: FONT });
+        pptxSlide.addText(`${insight.currentResponses} scored responses · ${insight.currentPeriod}`, { x: MARGIN, y: contentTop + 0.88, w: 4.2, h: 0.2, fontSize: 7.5, color: MUTED, fontFace: FONT });
+        if (insight.currentSnapshot.strongest) {
+          const strongest = insight.currentSnapshot.strongest;
+          pptxSlide.addText('HIGHEST CURRENT RESULT', { x: 5.05, y: contentTop + 0.48, w: 4.5, h: 0.18, fontSize: 7.5, bold: true, color: BRAND, fontFace: FONT, charSpacing: 1 });
+          pptxSlide.addText(`${strongest.label} · ${strongest.surveyType} · ${strongest.score.toFixed(1)} / 100 · ${strongest.responses} scored responses`, { x: 5.05, y: contentTop + 0.68, w: 4.5, h: 0.38, fontSize: 8.5, color: INK, fontFace: FONT, valign: 'middle' });
+        }
+        const groups = [
+          { title: 'LOWEST CATEGORY RESULTS', rows: insight.currentSnapshot.weakestCategories, x: MARGIN },
+          { title: 'LOWEST PARTNER RESULTS', rows: insight.currentSnapshot.lowestPartners, x: SLIDE_W / 2 + 0.1 },
+        ];
+        groups.forEach((group) => {
+          const width = CONTENT_W / 2 - 0.1; let y = contentTop + 1.25;
+          pptxSlide.addText(group.title, { x: group.x, y, w: width, h: 0.18, fontSize: 7.5, bold: true, color: BRAND, fontFace: FONT, charSpacing: 1 }); y += 0.24;
+          if (!group.rows.length) { pptxSlide.addText('No scored results in this group.', { x: group.x, y, w: width, h: 0.2, fontSize: 8, color: MUTED, fontFace: FONT }); return; }
+          group.rows.forEach((row) => {
+            pptxSlide.addText(`${row.label} · ${row.surveyType} · ${row.score.toFixed(1)} / 100`, { x: group.x, y, w: width, h: 0.18, fontSize: 8, bold: true, color: INK, fontFace: FONT });
+            pptxSlide.addText(`${row.responses} scored responses`, { x: group.x, y: y + 0.18, w: width, h: 0.16, fontSize: 7, color: MUTED, fontFace: FONT });
+            pptxSlide.addShape('rect', { x: group.x, y: y + 0.35, w: width, h: 0.05, fill: { color: BORDER }, line: { type: 'none' } });
+            if (row.score > 0) pptxSlide.addShape('rect', { x: group.x, y: y + 0.35, w: width * row.score / 100, h: 0.05, fill: { color: BRAND }, line: { type: 'none' } });
+            y += 0.52;
+          });
+        });
+        break;
+      }
+      pptxSlide.addText(`Previous · ${insight.previousPeriod} · ${insight.previousResponses} scored responses`, { x: MARGIN, y: contentTop, w: 4, h: 0.22, fontSize: 8, color: MUTED, fontFace: FONT });
+      pptxSlide.addText(`Current · ${insight.currentPeriod} · ${insight.currentResponses} scored responses`, { x: SLIDE_W - MARGIN - 4, y: contentTop, w: 4, h: 0.22, align: 'right', fontSize: 8, color: MUTED, fontFace: FONT });
+      pptxSlide.addText(`${insight.previousScore?.toFixed(2)}  →  ${insight.currentScore?.toFixed(2)}`, { x: MARGIN, y: contentTop + 0.22, w: 4.6, h: 0.48, fontSize: 20, bold: true, color: INK, fontFace: FONT });
+      const overallDelta = insight.delta ?? 0;
+      pptxSlide.addText(`${overallDelta > 0 ? 'Increased' : overallDelta < 0 ? 'Declined' : 'Unchanged'}\n${overallDelta > 0 ? '+' : ''}${overallDelta.toFixed(2)} points`, { x: SLIDE_W - MARGIN - 2.3, y: contentTop + 0.22, w: 2.3, h: 0.48, align: 'right', fontSize: 11, bold: true, color: overallDelta > 0 ? '047857' : overallDelta < 0 ? 'BE123C' : MUTED, fontFace: FONT });
+      [
+        { x: MARGIN, score: insight.previousScore ?? 0, color: '94A3B8' },
+        { x: SLIDE_W - MARGIN - 4, score: insight.currentScore ?? 0, color: BRAND },
+      ].forEach((item) => {
+        pptxSlide.addShape('rect', { x: item.x, y: contentTop + 0.72, w: 4, h: 0.06, fill: { color: 'E2E8F0' }, line: { type: 'none' } });
+        if (item.score > 0) pptxSlide.addShape('rect', { x: item.x, y: contentTop + 0.72, w: 4 * Math.min(100, item.score) / 100, h: 0.06, fill: { color: item.color }, line: { type: 'none' } });
+      });
+      const groups = [{ title: 'LARGEST IMPROVEMENTS', rows: insight.improvements, x: MARGIN, color: '047857' }, { title: 'LARGEST DECLINES', rows: insight.declines, x: SLIDE_W / 2 + 0.1, color: 'BE123C' }];
+      groups.forEach((group) => {
+        const width = CONTENT_W / 2 - 0.1; let y = contentTop + 0.9;
+        pptxSlide.addText(group.title, { x: group.x, y, w: width, h: 0.2, fontSize: 8, bold: true, color: group.color, fontFace: FONT, charSpacing: 1 }); y += 0.25;
+        if (!group.rows.length) { pptxSlide.addText('No matched change in this direction.', { x: group.x, y, w: width, h: 0.25, fontSize: 8, color: MUTED, fontFace: FONT }); return; }
+        group.rows.forEach((row) => {
+          pptxSlide.addText(row.label, { x: group.x, y, w: width - 0.7, h: 0.2, fontSize: 8.5, bold: true, color: INK, fontFace: FONT });
+          pptxSlide.addText(`${row.delta > 0 ? '+' : ''}${row.delta.toFixed(2)}`, { x: group.x + width - 0.65, y, w: 0.65, h: 0.2, align: 'right', fontSize: 9, bold: true, color: group.color, fontFace: FONT });
+          pptxSlide.addText(`${row.surveyType} · ${row.kind} · ${row.previousScore.toFixed(1)} → ${row.currentScore.toFixed(1)} · ${row.previousResponses}/${row.currentResponses} scored responses`, { x: group.x, y: y + 0.2, w: width, h: 0.2, fontSize: 7, color: MUTED, fontFace: FONT }); y += 0.53;
+        });
+      });
+      break;
+    }
+
+    case 'focus': {
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.focus, 'Where should we focus?', 'Evidence-triggered priorities using existing score bands and matched period changes.');
+      if (!slide.insight.priorities.length) { pptxSlide.addText(slide.insight.reason ?? 'No priority finding is available.', { x: MARGIN, y: contentTop + 0.2, w: CONTENT_W, h: 0.45, fontSize: 10, color: MUTED, fontFace: FONT }); break; }
+      let y = contentTop;
+      slide.insight.priorities.forEach((priority, index) => {
+        pptxSlide.addText(`0${index + 1}`, { x: MARGIN, y, w: 0.35, h: 0.4, fontSize: 19, color: BRAND, fontFace: FONT });
+        pptxSlide.addText(`${priority.surveyType} · ${priority.category}\n${priority.question}`, { x: MARGIN + 0.45, y, w: 3.4, h: 0.46, fontSize: 8.5, bold: true, color: INK, fontFace: FONT, valign: 'middle' });
+        const evidence = `${priority.questionScore.toFixed(1)} / 100 · ${priority.responses} responses · ${priority.affectedPartners} affected partners${priority.categoryDelta === undefined ? '' : ` · category ${priority.categoryDelta > 0 ? '+' : ''}${priority.categoryDelta.toFixed(2)}`}`;
+        pptxSlide.addText(evidence, { x: MARGIN + 0.45, y: y + 0.46, w: 3.4, h: 0.22, fontSize: 6.8, color: MUTED, fontFace: FONT });
+        pptxSlide.addText('SUGGESTED DISCUSSION POINTS', { x: 4.4, y, w: 5.1, h: 0.18, fontSize: 7, bold: true, color: BRAND, fontFace: FONT, charSpacing: 1 });
+        pptxSlide.addText(priority.discussionPoints.map((point) => `• ${point}`).join('\n'), { x: 4.4, y: y + 0.19, w: 5.1, h: 0.48, fontSize: 7.4, color: MUTED, fontFace: FONT, valign: 'top', breakLine: false });
+        pptxSlide.addShape('line', { x: MARGIN + 0.45, y: y + 0.72, w: CONTENT_W - 0.45, h: 0, line: { color: BORDER, width: 0.7 } }); y += 0.78;
+      });
+      break;
+    }
+
+    case 'portfolio-spread': {
+      const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS['portfolio-spread'], 'Is this isolated or widespread?', `${slide.insight.totalPartners} evaluated partners · ${slide.insight.unsatisfactoryPartners} Unsatisfactory (${slide.insight.unsatisfactoryPercentage.toFixed(1)}%).`);
+      if (!slide.insight.totalPartners) { pptxSlide.addText('No evaluated partners have scoreable submissions in this reporting window.', { x: MARGIN, y: contentTop + 0.2, w: CONTENT_W, h: 0.4, fontSize: 10, color: MUTED, fontFace: FONT }); break; }
+      pptxSlide.addText('PARTNER SCORE DISTRIBUTION', { x: MARGIN, y: contentTop, w: 4.3, h: 0.2, fontSize: 8, bold: true, color: MUTED, fontFace: FONT, charSpacing: 1 });
+      pptxSlide.addText('CATEGORY REACH BY PARTNER', { x: 5.05, y: contentTop, w: 4.5, h: 0.2, fontSize: 8, bold: true, color: MUTED, fontFace: FONT, charSpacing: 1 });
+      let y = contentTop + 0.32;
+      slide.insight.bands.forEach((band) => {
+        pptxSlide.addText(`${band.label} · ${band.count} (${band.percentage.toFixed(1)}%)`, { x: MARGIN, y, w: 4.1, h: 0.18, fontSize: 8, color: INK, fontFace: FONT });
+        pptxSlide.addShape('rect', { x: MARGIN, y: y + 0.2, w: Math.max(0.02, 4.1 * band.percentage / 100), h: 0.07, fill: { color: band.color.replace('#', '') }, line: { type: 'none' } }); y += 0.45;
+      });
+      y = contentTop + 0.32;
+      slide.insight.categories.slice(0, 8).forEach((category) => {
+        pptxSlide.addText(`${category.category} · ${category.surveyType}`, { x: 5.05, y, w: 2.35, h: 0.18, fontSize: 7.5, bold: true, color: INK, fontFace: FONT });
+        pptxSlide.addText(`${category.unsatisfactoryPartners}/${category.evaluatedPartners} · ${category.affectedPercentage.toFixed(1)}% · avg ${category.average.toFixed(1)}`, { x: 7.35, y, w: 2.2, h: 0.18, align: 'right', fontSize: 6.7, color: MUTED, fontFace: FONT });
+        pptxSlide.addShape('rect', { x: 5.05, y: y + 0.2, w: Math.max(0.02, 4.5 * category.affectedPercentage / 100), h: 0.06, fill: { color: BRAND }, line: { type: 'none' } }); y += 0.39;
+      });
+      break;
+    }
+
     case 'closing': {
       pptxSlide.background = { color: '172033' };
+      pptxSlide.addShape('rect', { x: 0, y: 0, w: SLIDE_W, h: 0.035, fill: { color: BRAND }, line: { type: 'none' } });
       pptxSlide.addText('Key Takeaways', {
         x: MARGIN, y: 0.5, w: CONTENT_W, h: 0.5, fontSize: 24, bold: true, color: 'FFFFFF', fontFace: FONT,
       });
@@ -530,17 +677,15 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
       const rowH = Math.min(0.75, (listH - rowGap * (slide.takeaways.length - 1)) / slide.takeaways.length);
       slide.takeaways.forEach((point, i) => {
         const y = listTop + i * (rowH + rowGap);
-        pptxSlide.addShape('roundRect', {
-          x: MARGIN, y, w: CONTENT_W, h: rowH, rectRadius: 0.06,
-          fill: { color: 'FFFFFF', transparency: 92 }, line: { color: 'FFFFFF', width: 0.75, transparency: 75 },
-        });
-        pptxSlide.addShape('ellipse', {
-          x: MARGIN + 0.22, y: y + rowH / 2 - 0.04, w: 0.08, h: 0.08, fill: { color: '7DD3FC' }, line: { type: 'none' },
+        pptxSlide.addText(String(i + 1).padStart(2, '0'), {
+          x: MARGIN, y, w: 0.35, h: rowH, valign: 'middle',
+          fontSize: 8, bold: true, color: '7DD3FC', fontFace: FONT,
         });
         pptxSlide.addText(point, {
-          x: MARGIN + 0.42, y, w: CONTENT_W - 0.6, h: rowH, valign: 'middle',
+          x: MARGIN + 0.4, y, w: CONTENT_W - 0.4, h: rowH, valign: 'middle',
           fontSize: 11, color: 'E2E8F0', fontFace: FONT,
         });
+        if (i < slide.takeaways.length - 1) pptxSlide.addShape('line', { x: MARGIN, y: y + rowH + 0.06, w: CONTENT_W, h: 0, line: { color: '475569', width: 0.5 } });
       });
       pptxSlide.addText('THANK YOU', {
         x: MARGIN, y: SLIDE_H - 0.5, w: CONTENT_W, h: 0.3, align: 'center',
@@ -551,5 +696,12 @@ function renderSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number) {
 
     default:
       break;
+  }
+
+  if (slide.kind !== 'title' && reportingPeriod) {
+    pptxSlide.addText(`Reporting period: ${reportingPeriod}`, {
+      x: MARGIN, y: SLIDE_H - 0.15, w: CONTENT_W, h: 0.1,
+      fontSize: 6.5, color: MUTED, fontFace: FONT, align: 'right',
+    });
   }
 }

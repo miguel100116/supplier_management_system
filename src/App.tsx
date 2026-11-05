@@ -135,7 +135,6 @@ const adminNavItems: NavItem<PageKey>[] = [
     children: [
       { key: 'partner-companies', label: 'Directory' },
       { key: 'document-register', label: 'Documents' },
-      { key: 'partners-feedback-hub', label: 'Feedback' },
     ],
   },
   {
@@ -147,6 +146,7 @@ const adminNavItems: NavItem<PageKey>[] = [
       { key: 'survey-forms', label: 'Workspace' },
       { key: 'archive', label: 'Archive' },
       { key: 'import-evaluations', label: 'Import Responses' },
+      { key: 'partners-feedback-hub', label: 'Feedback' },
     ],
   },
   // Single page already covers trends + company comparisons together, so

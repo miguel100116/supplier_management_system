@@ -3,6 +3,15 @@ import { surveyTypeDisplayLabel } from '../../../data/questionWeights';
 import { isOverallCategory } from '../../../data/questionCategories';
 import { computeCompanyComposite, getLeaderboard, getOutliers, getSectionPeerAverages } from '../../evaluations/domain/scoring';
 import {
+  buildFocusInsight,
+  buildPeriodComparisonInsight,
+  buildPortfolioSpreadInsight,
+  type PeriodComparisonInsight,
+  type FocusInsight,
+  type PortfolioSpreadInsight,
+  type ReportingPeriodBounds,
+} from './presentationInsights';
+import {
   averageBySurveyType,
   categoryPerformance,
   formatNumber,
@@ -33,6 +42,16 @@ export interface DateRangeSelection {
   id: DateRangeId;
   from?: string;
   to?: string;
+}
+
+export function resolveDateRangeBounds(selection: DateRangeSelection, now = new Date()): ReportingPeriodBounds | null {
+  const to = now.toISOString().slice(0, 10);
+  if (selection.id === 'all') return null;
+  if (selection.id === '6m') return { from: monthsAgoISO(6, now), to };
+  if (selection.id === '1m') return { from: daysAgoISO(30, now), to };
+  if (selection.id === '1w') return { from: daysAgoISO(7, now), to };
+  if (selection.from && selection.to && selection.from <= selection.to) return { from: selection.from, to: selection.to };
+  return null;
 }
 
 function daysAgoISO(days: number, from = new Date()): string {
@@ -123,6 +142,9 @@ export const SLIDE_EYEBROWS: Record<Slide['kind'], string> = {
   questions: 'Question Insights',
   spotlight: 'Featured Partner',
   distribution: 'Needs Attention',
+  'period-change': 'Period Comparison',
+  focus: 'Discussion Priorities',
+  'portfolio-spread': 'Portfolio Distribution',
   closing: 'Closing',
 };
 
@@ -183,12 +205,12 @@ export interface TopPerformer {
 
 export type Slide =
   | { kind: 'title'; title: string; subtitle: string; meta: string[]; generatedDate: string }
-  | { kind: 'agenda'; items: { label: string; description: string }[] }
+  | { kind: 'agenda'; items: { number: number; label: string; description: string }[] }
   | { kind: 'overview'; kpis: KpiStat[]; topPerformers: TopPerformer[]; highlight: string; standout: { name: string; score: string; type: string }; surveyTypes?: SurveyType[] }
   | { kind: 'comparison'; data: { surveyType: SurveyType; average: number; responses: number }[] }
   | {
       kind: 'sections';
-      data: { category: string; average: number; responses: number; naCount: number }[];
+      data: { category: string; average: number; responses: number; submissions: number; naCount: number }[];
     }
   | {
       kind: 'leaderboard';
@@ -219,6 +241,9 @@ export type Slide =
         weakestPercent?: number;
       }[];
     }
+  | { kind: 'period-change'; insight: PeriodComparisonInsight }
+  | { kind: 'focus'; insight: FocusInsight }
+  | { kind: 'portfolio-spread'; insight: PortfolioSpreadInsight }
   | { kind: 'closing'; takeaways: string[] };
 
 const ALL_SURVEY_TYPES: SurveyType[] = ['Courier', 'Supplier', 'Subcontractor'];
@@ -271,50 +296,68 @@ function computeTopPerformers(responses: SurveyResponse[], partnerCompanies: Par
 }
 
 function generateTakeaways(
-  responses: SurveyResponse[],
-  categoryIds: PresentationCategoryId[],
-  topPerformers: ReturnType<typeof computeTopPerformers>,
+  comparison: PeriodComparisonInsight,
+  focus: FocusInsight,
+  portfolio: PortfolioSpreadInsight,
 ): string[] {
   const takeaways: string[] = [];
-  const summary = getKpiSummary(responses);
-  const maxVal = summary.maxRating ?? 100;
-  const maxValStr = maxVal.toFixed(2);
+  const priority = focus.priorities[0];
+  const weakestCategory = comparison.currentSnapshot.weakestCategories[0];
 
-  if (topPerformers.top) {
-    takeaways.push(
-      `${topPerformers.top.name} leads the field with a ${formatNumber(topPerformers.top.average, 2)} / ${maxValStr} average rating.`,
-    );
+  if (portfolio.totalPartners > 0) {
+    takeaways.push(portfolio.unsatisfactoryPartners > 0
+      ? `${portfolio.unsatisfactoryPartners} of ${portfolio.totalPartners} evaluated partners (${formatNumber(portfolio.unsatisfactoryPercentage, 1)}%) are in the existing Unsatisfactory band.`
+      : `None of the ${portfolio.totalPartners} evaluated partners are in the existing Unsatisfactory band.`);
   }
 
-  const sections = categoryPerformance(responses);
-  if (sections.length) {
-    const strongest = sections[0];
-    const weakest = sections[sections.length - 1];
-    takeaways.push(`${strongest.category} is the strongest-performing category at ${formatNumber(strongest.average, 2)} / ${maxValStr}.`);
-    if (weakest.category !== strongest.category) {
-      takeaways.push(`${weakest.category} scores lowest overall and is the clearest opportunity for improvement.`);
-    }
+  if (priority) {
+    takeaways.push(`${priority.surveyType} ${priority.category}: “${priority.question}” scored ${formatNumber(priority.questionScore, 1)} / 100 from ${priority.responses} scored evaluations; ${priority.affectedPartners} partners are in the Unsatisfactory band for this question.`);
+  } else if (weakestCategory) {
+    takeaways.push(`Lowest current category result: ${weakestCategory.surveyType} ${weakestCategory.label} at ${formatNumber(weakestCategory.score, 1)} / 100 across ${weakestCategory.responses} scored evaluations.`);
   }
 
-  const trend = monthlyTrend(responses).filter((item): item is typeof item & { average: number } => item.average !== null);
-  if (trend.length >= 2) {
-    const delta = trend[trend.length - 1].average - trend[0].average;
-    if (Math.abs(delta) >= 0.05) {
-      takeaways.push(
-        delta > 0
-          ? `Average satisfaction has climbed by ${formatNumber(delta, 2)} points since ${trend[0].month}.`
-          : `Average satisfaction has slipped by ${formatNumber(Math.abs(delta), 2)} points since ${trend[0].month} — worth a closer look.`,
-      );
-    }
+  if (comparison.available && comparison.declines[0]) {
+    const decline = comparison.declines[0];
+    takeaways.push(`Largest matched decline: ${decline.surveyType} ${decline.kind.toLowerCase()} ${decline.label} fell ${formatNumber(Math.abs(decline.delta), 2)} points (${decline.previousResponses} to ${decline.currentResponses} scored evaluations).`);
+  }
+  if (comparison.available && comparison.improvements[0]) {
+    const improvement = comparison.improvements[0];
+    takeaways.push(`Largest matched improvement: ${improvement.surveyType} ${improvement.kind.toLowerCase()} ${improvement.label} rose ${formatNumber(improvement.delta, 2)} points (${improvement.previousResponses} to ${improvement.currentResponses} scored evaluations).`);
   }
 
-  if (summary.naPercentage > 15) {
-    takeaways.push(`${formatNumber(summary.naPercentage, 1)}% of ratings were marked N/A — consider reviewing question relevance.`);
+  if (priority?.discussionPoints[0]) {
+    takeaways.push(`Suggested discussion: ${priority.discussionPoints[0]}`);
+  } else if (weakestCategory) {
+    takeaways.push(`Suggested discussion: Review the ${weakestCategory.label} result with the ${weakestCategory.responses} scored evaluations before agreeing next steps.`);
   }
-
-  takeaways.push(`This presentation is based on ${summary.totalResponses} evaluation responses.`);
 
   return takeaways.slice(0, 5);
+}
+
+function agendaTitle(slide: Slide, categories: PresentationCategoryDef[]): string {
+  if (slide.kind === 'closing') return 'Key Takeaways';
+  if (slide.kind === 'period-change') return 'What Changed Since the Last Period?';
+  if (slide.kind === 'focus') return 'Where Should We Focus?';
+  if (slide.kind === 'portfolio-spread') return 'Is This Isolated or Widespread?';
+  if (slide.kind === 'overview') return 'Overview';
+  const ids: Partial<Record<Slide['kind'], PresentationCategoryId>> = {
+    comparison: 'comparison', sections: 'sections', leaderboard: 'leaderboard', trends: 'trends',
+    questions: 'questions', spotlight: 'spotlight', distribution: 'distribution',
+  };
+  return categories.find((category) => category.id === ids[slide.kind])?.label ?? slide.kind;
+}
+
+function agendaDescription(slide: Slide, categories: PresentationCategoryDef[]): string {
+  if (slide.kind === 'closing') return 'Executive findings and evidence-based discussion points';
+  if (slide.kind === 'period-change') return 'Current and preceding equal-duration performance with response counts';
+  if (slide.kind === 'focus') return 'Question-level findings and suggested discussion points';
+  if (slide.kind === 'portfolio-spread') return 'Distribution across existing performance bands and category reach';
+  if (slide.kind === 'overview') return 'Current-period measures and partner leaders';
+  const ids: Partial<Record<Slide['kind'], PresentationCategoryId>> = {
+    comparison: 'comparison', sections: 'sections', leaderboard: 'leaderboard', trends: 'trends',
+    questions: 'questions', spotlight: 'spotlight', distribution: 'distribution',
+  };
+  return categories.find((category) => category.id === ids[slide.kind])?.description ?? '';
 }
 
 export interface BuildSlidesOptions {
@@ -322,6 +365,8 @@ export interface BuildSlidesOptions {
   partnerCompanies: PartnerCompany[];
   categoryIds: PresentationCategoryId[];
   dateRangeLabel: string;
+  currentPeriod?: ReportingPeriodBounds | null;
+  previousPeriodResponses?: SurveyResponse[];
   surveyTypes?: SurveyType[];
   presentationTitle?: string;
 }
@@ -332,6 +377,8 @@ export function buildSlides(options: BuildSlidesOptions): Slide[] {
     partnerCompanies,
     categoryIds,
     dateRangeLabel,
+    currentPeriod = null,
+    previousPeriodResponses = [],
     surveyTypes = ALL_SURVEY_TYPES,
     presentationTitle = 'Stakeholder Satisfaction Presentation',
   } = options;
@@ -340,6 +387,14 @@ export function buildSlides(options: BuildSlidesOptions): Slide[] {
   const selectedCategoryDefs = PRESENTATION_CATEGORIES.filter((c) => categoryIds.includes(c.id));
   const topPerformers = computeTopPerformers(responses, partnerCompanies);
   const summary = getKpiSummary(responses);
+  const comparisonInsight = buildPeriodComparisonInsight(
+    responses,
+    previousPeriodResponses,
+    currentPeriod,
+    dateRangeLabel,
+  );
+  const focusInsight = buildFocusInsight(responses, comparisonInsight);
+  const portfolioInsight = buildPortfolioSpreadInsight(responses);
 
   // 1. Intro / Title
   slides.push({
@@ -353,11 +408,7 @@ export function buildSlides(options: BuildSlidesOptions): Slide[] {
   // 2. Contents / Agenda
   slides.push({
     kind: 'agenda',
-    items: [
-      { label: 'Overview', description: 'Key metrics and top performers at a glance' },
-      ...selectedCategoryDefs.map((c) => ({ label: c.label, description: c.description })),
-      { label: 'Key Takeaways', description: 'Closing summary and recommendations' },
-    ],
+    items: [],
   });
 
   // 3. Overview (always included, highlights top performers)
@@ -404,7 +455,15 @@ export function buildSlides(options: BuildSlidesOptions): Slide[] {
       // Covered") - it has no rating data behind it, so it always renders as
       // an empty bar. Excluded here rather than in categoryPerformance()
       // itself since other consumers (Analytics page) may still want it.
-      slides.push({ kind: 'sections', data: categoryPerformance(responses).filter((c) => !isOverallCategory(c.category)) });
+      slides.push({
+        kind: 'sections',
+        data: categoryPerformance(responses)
+          .filter((category) => !isOverallCategory(category.category))
+          .map((category) => ({
+            ...category,
+            submissions: submissionCount(responses.filter((response) => response.questionCategory === category.category)),
+          })),
+      });
     }
 
     if (id === 'leaderboard') {
@@ -515,8 +574,26 @@ export function buildSlides(options: BuildSlidesOptions): Slide[] {
 
   });
 
-  // 5. Closing / takeaways (always included)
-  slides.push({ kind: 'closing', takeaways: generateTakeaways(responses, categoryIds, topPerformers) });
+  // These evidence slides are always included so the client deck contains the
+  // requested decision context even when optional topics are deselected.
+  slides.push({ kind: 'period-change', insight: comparisonInsight });
+  slides.push({ kind: 'focus', insight: focusInsight });
+  slides.push({ kind: 'portfolio-spread', insight: portfolioInsight });
+
+  // Final takeaways always follow the complete analytical section.
+  slides.push({
+    kind: 'closing',
+    takeaways: generateTakeaways(comparisonInsight, focusInsight, portfolioInsight),
+  });
+
+  const agenda = slides.find((slide): slide is Extract<Slide, { kind: 'agenda' }> => slide.kind === 'agenda');
+  if (agenda) {
+    agenda.items = slides.slice(2).map((slide, index) => ({
+      number: index + 3,
+      label: agendaTitle(slide, selectedCategoryDefs),
+      description: agendaDescription(slide, selectedCategoryDefs),
+    }));
+  }
 
   return slides;
 }
