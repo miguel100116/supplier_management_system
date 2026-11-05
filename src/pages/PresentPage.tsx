@@ -21,9 +21,11 @@ import {
   DateRangeId,
   describeDateRange,
   filterByDateRange,
+  resolveDateRangeBounds,
   PRESENTATION_CATEGORIES,
   PresentationCategoryId,
 } from '../features/presentation/domain/presentation';
+import { filterByPeriod, previousEqualDurationPeriod } from '../features/presentation/domain/presentationInsights';
 
 interface PresentPageProps {
   responses: SurveyResponse[];
@@ -71,11 +73,20 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
   );
 
   const isCustomInvalid = dateRangeId === 'custom' && (!customFrom || !customTo || customFrom > customTo);
+  const currentPeriod = useMemo(
+    () => resolveDateRangeBounds({ id: dateRangeId, from: customFrom, to: customTo }),
+    [dateRangeId, customFrom, customTo],
+  );
 
   const dateFiltered = useMemo(() => {
     if (isCustomInvalid) return [];
     return filterByDateRange(scopedResponses, { id: dateRangeId, from: customFrom, to: customTo });
   }, [scopedResponses, dateRangeId, customFrom, customTo, isCustomInvalid]);
+
+  const previousPeriodResponses = useMemo(() => {
+    if (!currentPeriod || isCustomInvalid) return [];
+    return filterByPeriod(scopedResponses, previousEqualDurationPeriod(currentPeriod));
+  }, [scopedResponses, currentPeriod, isCustomInvalid]);
 
   const canGenerate = selectedCategories.length > 0 && dateFiltered.length > 0 && !isCustomInvalid;
 
@@ -89,6 +100,8 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
       partnerCompanies,
       categoryIds: selectedCategories,
       dateRangeLabel,
+      currentPeriod,
+      previousPeriodResponses,
       surveyTypes: activeTypes,
       presentationTitle: finalTitle,
     });
