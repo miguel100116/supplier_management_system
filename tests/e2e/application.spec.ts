@@ -212,34 +212,33 @@ test('Supplier Local attention containers filter only the expanded company and t
   const openFirst = () => company.getByRole('button', { name: 'Review documents for First Local Supplier (LOCAL-ONE)', exact: true }).first().click();
   await openFirst();
   const required = company.getByRole('region', { name: 'Required documents', exact: true });
-  const history = company.getByRole('region', { name: 'Historical & additional', exact: true });
   const attention = company.getByLabel('Required document attention summary', { exact: true });
   const missing = attention.getByRole('button', { name: '4 missing', exact: true });
   const expired = attention.getByRole('button', { name: '1 expired', exact: true });
   const forUpdate = attention.getByRole('button', { name: '1 for update', exact: true });
   const summary = await attention.textContent() ?? '';
-  const checkScope = async (count: number, showHistory = count === 15) => {
+  const checkScope = async (count: number, showHistory = count === 14) => {
     await expect(required.getByRole('listitem')).toHaveCount(count);
     await expect(attention).toHaveText(summary);
     if (showHistory) {
-      await expect(history).toBeVisible();
-      await expect(history.getByRole('listitem')).toHaveCount(1);
-      await expect(history).toContainText('DTI (Sole)');
-    } else await expect(history).toHaveCount(0);
+      const cards = (await company.getByRole('listitem').allTextContents()).join('\n');
+      expect(cards).not.toContain('DTI (Sole)');
+      expect(cards).not.toContain("Sole Proprietorship (Owner's ID)");
+    }
     for (const control of [missing, expired, forUpdate]) {
       const box = await control.boundingBox();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     }
   };
-  await checkScope(15, true);
+  await checkScope(14, true);
   await missing.click();
   await expect(missing).toHaveAttribute('aria-pressed', 'true');
   await expect(missing.locator('svg.lucide-x')).toBeVisible();
   await expect(expired.locator('svg.lucide-x')).toHaveCount(0);
   await checkScope(4, false);
   await expect(required.getByRole('listitem')).toHaveText([/SIF.*Missing/, /BIR2303.*Missing/, /Articles of Incorporation.*Missing/, /Product Profile.*Missing/]);
-  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 15');
+  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 14');
   const sifCard = required.getByRole('listitem').filter({ has: page.getByText('SIF', { exact: true }) });
   const actionsBox = await sifCard.getByRole('button', { name: 'Actions for SIF', exact: true }).boundingBox();
   const remarksBox = await sifCard.getByRole('button', { name: 'View admin remarks for SIF', exact: true }).boundingBox();
@@ -270,22 +269,63 @@ test('Supplier Local attention containers filter only the expanded company and t
   await page.keyboard.press('Space');
   await expect(forUpdate).toHaveAttribute('aria-pressed', 'false');
   await expect(forUpdate.locator('svg.lucide-x')).toHaveCount(0);
-  await checkScope(15, true);
+  await checkScope(14, true);
   await expired.click();
   await checkScope(1, false);
   await page.getByRole('button', { name: 'Review documents for Second Local Supplier (LOCAL-TWO)', exact: true }).first().click();
   const second = page.getByRole('region', { name: 'Required documents', exact: true });
-  await expect(second.getByRole('listitem')).toHaveCount(15);
+  await expect(second.getByRole('listitem')).toHaveCount(14);
   await expect(page.getByRole('button', { name: '1 missing', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await openFirst();
-  await checkScope(15, true);
+  await checkScope(14, true);
   await expect(expired).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Hide documents for First Local Supplier (LOCAL-ONE)', exact: true }).first().click();
   await openFirst();
-  await checkScope(15, true);
+  await checkScope(14, true);
   expect(JSON.stringify(service.records.filter(record => record.record_type === 'partner_company'))).toBe(originalPartners);
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
+});
+
+test('local registration cards render only applicable documents and hide excluded history', async ({ page }) => {
+  const allDocuments = Object.fromEntries([
+    'Confidentiality and Non-Disclosure Agreement', 'Letter of Accreditation', 'Supplier Code of Business Conduct and Ethics',
+    'SIF', 'BIR2303', 'SEC (Corp)', 'Articles of Incorporation', 'AFS', 'GIS (Corp)', 'DTI (Sole)', 'Business Permit',
+    'Import Permit', 'Product Profile', 'Proof of Present Address', "Sole Proprietorship (Owner's ID)", 'Other Documents',
+  ].map(name => [name, { provided: true, expiryDate: '2099-12-31' }]));
+  const service = await backend(page, 'Admin', false, { records: [
+    { record_type: 'document_maintenance', record_id: 'default', created_at: createdAt, payload: { id: 'default', validityYears: {}, reminderDays: [60, 30], dailyFinalDays: 30 } },
+    ...(['CORP', 'SOL'] as const).map(classification => ({
+      record_type: 'partner_company', record_id: `classification-${classification}`, created_at: createdAt,
+      payload: { id: `classification-${classification}`, name: `Classification ${classification}`, type: 'Supplier', supplierOrigin: 'Local', businessClassification: classification, createdAt,
+        branches: [{ id: `branch-${classification}`, bpCode: classification, status: 'Accredited', documents: allDocuments }] },
+    })),
+  ] });
+  await page.goto('/login');
+  await signIn(page);
+  await openReadyPage(page, '/document-tracker?category=supplier-local');
+
+  for (const [classification, included, excluded] of [
+    ['CORP', ['GIS (Corp)', 'SEC (Corp)', 'Articles of Incorporation'], ['DTI (Sole)', "Sole Proprietorship (Owner's ID)"]],
+    ['SOL', ['DTI (Sole)', "Sole Proprietorship (Owner's ID)"], ['GIS (Corp)', 'SEC (Corp)', 'Articles of Incorporation']],
+  ] as const) {
+    const name = `Classification ${classification}`;
+    const company = page.getByRole('article').filter({ has: page.getByRole('button', { name: new RegExp(`(Review|Hide) documents for ${name}`) }) });
+    await company.getByRole('button', { name: new RegExp(`Review documents for ${name}`) }).first().click();
+    const required = company.getByRole('region', { name: 'Required documents', exact: true });
+    for (const documentName of included) await expect(company.getByRole('button', { name: `Actions for ${documentName}`, exact: true })).toBeVisible();
+    const allCardText = await company.innerText();
+    for (const documentName of excluded) {
+      expect(allCardText).not.toContain(documentName);
+      await expect(company.getByRole('button', { name: `Actions for ${documentName}`, exact: true })).toHaveCount(0);
+    }
+    await expect(required.getByRole('listitem')).toHaveCount(classification === 'CORP' ? 14 : 13);
+    const actionButtons = required.getByRole('button', { name: /^Actions for / });
+    await expect(actionButtons).toHaveCount(classification === 'CORP' ? 14 : 13);
+    for (const action of await actionButtons.all()) await expect(action).toBeEnabled();
+  }
+  expect(service.errors).toEqual([]);
+  expect(service.unexpected).toEqual([]);
 });
 
 test('Document reminder failures and missing setup stay visible and recover through Retry', async ({ page }) => {

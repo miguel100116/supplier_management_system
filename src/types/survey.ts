@@ -67,6 +67,9 @@ export interface BranchRecord {
   supplierRank?: string;
   dateAccredited?: string;
   status?: BranchStatus;
+  businessType?: 'Trade' | 'Non-Trade';
+  /** Status selected by an administrator before the system enforced completion. */
+  manualStatus?: BranchStatus;
   // Original sheet row number, for tracing an imported branch back to source.
   sourceRow?: number;
   documents?: Record<string, ComplianceDocument>;

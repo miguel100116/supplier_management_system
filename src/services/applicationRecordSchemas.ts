@@ -12,6 +12,7 @@ export interface ApplicationRecordParseContext {
 
 const SURVEY_TYPES = ['Courier', 'Supplier', 'Subcontractor'] as const;
 const PARTNER_TYPES = [...SURVEY_TYPES, 'Uncategorized'] as const;
+const BRANCH_STATUSES = ['Pending', 'Updated', 'Outdated', 'Incomplete', 'Completed', 'Inactive', 'Accredited'] as const;
 const PAGE_MODULES = [
   'dashboard', 'survey-forms', 'explorer', 'analytics', 'reports', 'present',
   'partner-companies', 'partners-feedback-hub', 'account-management', 'notifications',
@@ -118,6 +119,8 @@ function parsePartnerCompany(value: unknown, recordId: string, label: string): J
       const parsed = object(branch, `${label}.branches[${index}]`);
       text(parsed.id, `${label}.branches[${index}].id`, { max: 500 });
       text(parsed.bpCode, `${label}.branches[${index}].bpCode`, { allowEmpty: true, max: 500 });
+      if (parsed.businessType !== undefined && parsed.businessType !== null) oneOf(parsed.businessType, ['Trade', 'Non-Trade'] as const, `${label}.branches[${index}].businessType`);
+      if (parsed.manualStatus !== undefined && parsed.manualStatus !== null) oneOf(parsed.manualStatus, BRANCH_STATUSES, `${label}.branches[${index}].manualStatus`);
       optionalDate(parsed.dateAccredited, `${label}.branches[${index}].dateAccredited`);
       if (parsed.documents !== undefined) {
         const documents = object(parsed.documents, `${label}.branches[${index}].documents`);

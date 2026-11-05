@@ -34,6 +34,8 @@ test('category document review is a compact expandable company list with accessi
   assert.match(DOCUMENT_TRACKER_SOURCE, /Review documents/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /Required documents/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /Historical & additional/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /shouldShowHistoricalDocument\(name, row\.company\.type, row\.company\.supplierOrigin, row\.company\.businessClassification\)/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /\{!inactiveClassification && <DocumentQuickActions/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /DOCUMENT_STATUS_ICONS\[status\]/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /<DocumentQuickActions/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-1 gap-2\.5 sm:grid-cols-2 xl:grid-cols-4/);
@@ -43,7 +45,7 @@ test('category document review is a compact expandable company list with accessi
   assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseEnter=\{clearHoverClose\} onMouseLeave=\{scheduleHoverClose\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /'Add remarks'/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /aria-haspopup="menu"/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \? 'group' : 'menu'\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \|\| isVerifying \? 'group' : 'menu'\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /role="menuitem"[^>]*>[\s\S]*?Mark missing/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /role="dialog" aria-label=\{`Actions for \$\{docName\}`\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /w-\[min\(16rem,calc\(100vw-24px\)\)\]/);
@@ -59,6 +61,21 @@ test('category document review is a compact expandable company list with accessi
       assert.match(markup, /Review documents/);
     }
   }
+});
+
+test('missing and for-update documents expose a verification confirmation with optional remarks and expiry validation', () => {
+  assert.match(DOCUMENT_TRACKER_SOURCE, /status === 'Missing' \|\| status === 'For Update'/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Verify and mark current/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /I reviewed and verified this document\./);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Remarks \(optional\)/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /Verified expiry date/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /computeDocumentStatus\(\{ provided: true, expiryDate: verificationDate \}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /renewalExpiryDate/);
+});
+
+test('remarks editor ignores hover dismissal while active and cancels a pending close when opened', () => {
+  assert.match(DOCUMENT_TRACKER_SOURCE, /if \(isRemarksOpen \|\| isViewingRemarks \|\| confirmingRemarkDelete \|\| isVerifying \|\| saving\) return;/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /onClick=\{\(\) => \{ clearHoverClose\(\); setIsRemarksOpen\(true\); setError\(''\); setFeedback\(''\); \}\}/);
 });
 
 test('document maintenance separates schedules, validity, and category alerts with guarded saving', () => {
@@ -92,11 +109,13 @@ test('partner rows show the saved branch status as a badge, separate from docume
   assert.match(DOCUMENT_TRACKER_SOURCE, /col-start-2 row-start-3 min-w-0 xl:col-start-5 xl:row-auto/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_ROW_BADGE_CLASS = 'inline-flex h-8 max-w-full items-center rounded-md border px-2\.5 text-\[10px\] font-semibold';/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /col-span-2 row-start-4 flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label=\{`Branch status: \$\{row\.branch\.status\}`\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /BranchStatusSelect label=\{`Branch status for/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /disabled=\{branchFullyCompliant\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label=\{`Branch status: \$\{branchFullyCompliant \? 'Completed' : row\.branch\.status\}`\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /SupplierRankSelect label=\{`Supplier rank for \$\{row\.branch\.bpCode \|\| row\.company\.name\}`\}/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /<span[^>]*>Supplier rank<\/span>|<span[^>]*>Status<\/span>/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /branchStatusBadgeClasses\(row\.branch\.status\)/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /\{row\.branch\.status\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /branchStatusBadgeClasses\(branchFullyCompliant \? 'Completed' : row\.branch\.status!\)/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /\{branchFullyCompliant \? 'Completed' : row\.branch\.status\}/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Calculated from required documents, classification, and expiry dates/);
 });
 
