@@ -286,8 +286,8 @@ async function openReadyPage(page: Page, path: string) {
 async function waitForReadyPage(page: Page) {
   const main = page.getByRole('main');
   await main.waitFor({ state: 'visible' });
-  // Feature assertions start after the route's code and shared data are ready.
-  await main.getByRole('status').filter({ hasText: /Loading page|Refreshing shared data/ }).waitFor({ state: 'hidden' });
+  // Route and Realtime loaders can overlap; wait until all are hidden.
+  await expect(main.getByRole('status').filter({ hasText: /Loading page|Refreshing shared data/ }).filter({ visible: true })).toHaveCount(0, { timeout: 30_000 });
 }
 
 test('Stored source files separate segmented status navigation from underlined category filters', async ({ page }, testInfo) => {
