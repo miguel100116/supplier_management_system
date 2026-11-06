@@ -42,19 +42,6 @@ test('Admin desktop navigation stays expanded and preserves grouped destinations
   assert.match(adminBranch, /sidebarExtra\(false\)/);
 });
 
-test('login audience switch shares responsive headings and validates the selected type before entering the app', () => {
-  const source = readFileSync(new URL('../pages/LoginPage.tsx', import.meta.url), 'utf8');
-  assert.match(source, /useState<LoginRole>\('Admin'\)/);
-  assert.match(source, /loginAudience === 'Admin' \? 'Vendor Management System' : 'Vendor Performance Evaluation'/);
-  assert.equal((source.match(/\{loginHeading\}/g) ?? []).length, 2);
-  assert.match(source, /role="group" aria-label="Account sign-in heading"/);
-  assert.match(source, /disabled=\{isMsSigningIn \|\| isPasswordSubmitting\}\s+aria-pressed=\{loginAudience === audience\}\s+onClick=\{\(\) => setLoginAudience\(audience\)\}/);
-  assert.equal((source.match(/await onLogin\(loginAudience,/g) ?? []).length, 3);
-  assert.match(APP_SOURCE, /if \(cancelled \|\| loginPending.current\) return;\s+setAccount\(email\)/);
-  assert.match(APP_SOURCE, /loginPending.current = true;[\s\S]*?await signInForRole\(role, authenticate\);[\s\S]*?setAccount\(email\);[\s\S]*?finally \{\s+loginPending.current = false/);
-  assert.doesNotMatch(source, /Supplier Management Performance Evaluation Survey Analytics/);
-});
-
 test('employee quick guide is beside the header actions instead of in the sidebar', () => {
   const source = readFileSync(new URL('../features/employee-experience/components/EmployeeExperienceShell.tsx', import.meta.url), 'utf8');
   const sidebar = source.match(/<aside\b[\s\S]*?<\/aside>/)?.[0] ?? '';
@@ -93,6 +80,7 @@ test('module titles follow sidebar labels, including all workspace views, and up
   assert.match(titleSource, /if \(navigationTitle\) return navigationTitle/);
   assert.doesNotMatch(titleSource, /Administrative Partner Registry|Document Tracker|Account Management|Import Evaluation Responses/);
   const shellSource = readFileSync(new URL('./Shell.tsx', import.meta.url), 'utf8');
-  assert.ok(shellSource.includes('document.title = `${title} | Supplier Management System`'));
+  assert.match(shellSource, /adminMode \? 'Vendor Management System' : 'Vendor Performance Evaluation'/);
+  assert.match(shellSource, /document.title = activePage === 'dashboard' \? systemTitle/);
   assert.ok(shellSource.includes('document.title = previousTitle'));
 });

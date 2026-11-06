@@ -14,7 +14,9 @@ import type { LoginAttempt, LoginRole } from '../services/authBridge';
 export type { MicrosoftAuth } from '../services/authBridge';
 
 interface LoginPageProps {
-  onLogin: (role: LoginRole, authenticate: LoginAttempt) => Promise<void>;
+  onLogin: (authenticate: LoginAttempt) => Promise<void>;
+  audience?: LoginRole;
+  entryError?: string;
 }
 
 // Ambient dot texture for the hero panel — kept extremely faint (2–5% via the
@@ -111,10 +113,9 @@ function HeroIllustration({ className }: { className?: string }) {
   );
 }
 
-export function LoginPage({ onLogin }: LoginPageProps) {
-  const [loginAudience, setLoginAudience] = useState<LoginRole>('Admin');
-  const loginHeading = loginAudience === 'Admin' ? 'Vendor Management System' : 'Vendor Performance Evaluation';
-  const heroDescription = loginAudience === 'Admin'
+export function LoginPage({ onLogin, audience: loginAudience, entryError }: LoginPageProps) {
+  const loginHeading = loginAudience === 'Employee' ? 'Vendor Performance Evaluation' : 'Vendor Management System';
+  const heroDescription = loginAudience !== 'Employee'
     ? 'Manage supplier records, compliance, and evaluation programs across Microgenesis.'
     : 'Complete evaluations and review performance feedback for your assigned suppliers.';
   const reduceMotion = useReducedMotion();
@@ -132,7 +133,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setMsError('');
     setIsMsSigningIn(true);
     try {
-      await onLogin(loginAudience, async () => {
+      await onLogin(async () => {
         const result = await loginWithMicrosoft();
         const normalized = result.email.trim().toLowerCase();
         if (!normalized.endsWith('@mgenesis.com')) {
@@ -153,7 +154,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setPasswordMessage('');
     setIsPasswordSubmitting(true);
     try {
-      await onLogin(loginAudience, async () => ({ email: await signInWithSupabasePassword(email, password) }));
+      await onLogin(async () => ({ email: await signInWithSupabasePassword(email, password) }));
     } catch (err) {
       setPasswordError(err instanceof Error ? err.message : 'Unable to sign in.');
     } finally {
@@ -166,7 +167,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     setPasswordMessage('');
     setIsPasswordSubmitting(true);
     try {
-      await onLogin(loginAudience, async () => {
+      await onLogin(async () => {
         const result = await signUpWithSupabasePassword(email, password);
         if (result.signedIn) return { email: result.email };
         setPasswordMessage('Check your company email, confirm the account, then return here to sign in.');
@@ -277,23 +278,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               className="mb-8 h-8 object-contain object-left md:mb-10 md:h-9"
             />
 
-            <div className="mb-6 flex gap-1 rounded-lg bg-slate-100 p-1" role="group" aria-label="Account sign-in heading">
-              {(['Admin', 'Employee'] as const).map((audience) => (
-                <button
-                  key={audience}
-                  type="button"
-                  disabled={isMsSigningIn || isPasswordSubmitting}
-                  aria-pressed={loginAudience === audience}
-                  onClick={() => setLoginAudience(audience)}
-                  className={`flex-1 rounded-md px-2 py-2 text-xs font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] focus-visible:ring-offset-2 motion-reduce:transition-none ${loginAudience === audience ? 'bg-white text-[#0063a9] shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-                >
-                  {audience} Account
-                </button>
-              ))}
-            </div>
-
             <div className="mb-7">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#0063a9]">{loginAudience} Account</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#0063a9]">Company account</p>
               <h1 className="mt-1.5 text-2xl font-medium text-slate-900">Welcome back</h1>
               <p className="mt-1.5 text-sm font-light text-slate-500">
                 {isSupabaseConfigured
@@ -302,9 +288,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               </p>
             </div>
 
-            {(msError || passwordError) && (
+            {(msError || passwordError || entryError) && (
               <p role="alert" className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose">
-                {msError || passwordError}
+                {msError || passwordError || entryError}
               </p>
             )}
 

@@ -6,6 +6,8 @@ This guide explains the administrator screens in everyday language. Use it when 
 
 Sign in with your company email and the password provided for your account. Some deployments may offer Microsoft sign-in as well. If you cannot sign in, contact your system administrator. Do not share your password.
 
+The shared `/login` entrance and the separate `/admin/login` and `/employee/login` links use the same form. Use /admin/login for Admin accounts and /employee/login for Employee accounts. The separate links reject the opposite role and tell you which path to use; /login accepts either role. Your saved role still determines dashboard permissions. There is no role toggle. Sign-out returns to `/login`.
+
 ![Sign-in screen](screenshots/shared/sign-in.png)
 
 The pictures in this guide show a clean preview account with no partner or survey records. The example email addresses and zero counts are not real company data. Your screen will show the records available to your account.
@@ -24,12 +26,24 @@ This is the company directory for Couriers, Suppliers, and Subcontractors.
 
 1. Open **Partner Companies**, then choose **Partners**.
 2. Search by company name or BP Code. Use the status and category lists to narrow the results.
-3. Choose **Register New Partner** to add a company. Fill in the requested company, branch, contact, and document details, then save.
-4. To update a company, open its row and change the needed details.
+3. Choose **Register New Partner** to add a company. Select **Trade**, **Non-Trade**, or **Both** as the registration type. Trade keeps the existing BP Code field; Non-Trade shows only the required Non-Trade BP Code field; Both shows both fields and requires the Non-Trade code. Codes are saved as separate branches in Document Tracker.
+4. Open a company and use **Overview → Contact & Registration → Save registration** to edit the type and primary codes. Existing records infer their type from their branches. Code edits retain branch IDs and documents. Type changes that would remove an existing branch are blocked; additional branches are retained.
 
 Check the company category and branch before saving. These details affect where the company appears in surveys and reports.
 
 ![Partners page](screenshots/admin/partners.png)
+
+## Directory metric refresh
+
+The Category & Supplier Rank Breakdown refreshes from the shared partner registry when records change and reconciles after reconnecting. Reloading the page fetches the registry again. An empty shared registry remains empty; deleted partners are not reloaded from older bootstrap tables.
+
+## Evaluation company assignments
+
+Confirming **Register New Partner → Upload Master List** saves the reviewed registry and generates current Courier, Supplier, and Subcontractor Active Company Lists together. Standard and V4 layouts are accepted as Excel or CSV. Recognized categories and unarchived companies qualify unless all branches are explicitly Inactive; an unset legacy branch status remains eligible. A system-generated Completed status does not override a saved manual Inactive status. Document completeness, accreditation status, spend tier, and PO Activity are not selection requirements. The masterlist's Inactive label is used as supplied; the system does not infer two years of inactivity from PO counts.
+
+Review the resulting category counts before applying. Merge mode includes eligible existing partners retained in the resulting registry; Replace Registry uses only reviewed file records and removes omitted partners after confirmation. All three current active lists are replaced, including an empty list for a category with no eligible companies; prior list snapshots remain available. A later separate Active Company List upload overrides that category until the next masterlist import. Saved per-form subsets still narrow assignments. Rejected database writes leave the registry and lists unchanged and keep the review open for retry; invalid save confirmations ask you to refresh before retrying. This workflow requires database migration `202611060001_master_list_active_companies.sql`; missing setup blocks the import without changing records.
+
+Manage Access and employee Evaluations use the latest uploaded Active Companies list for each vendor category. Only uniquely matched registry companies in that category are eligible. Archived companies and companies whose branches are all explicitly Inactive are excluded; an unset legacy branch status remains eligible. The company picker identifies uploaded names that are unregistered, misclassified, inactive/archived, or ambiguous. Correct the registry or upload before assigning those companies. Saving a subset limits eligible employees to that subset; a failed save keeps the draft available for retry.
 
 ## Document Tracker
 

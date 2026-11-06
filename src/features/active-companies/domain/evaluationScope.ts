@@ -1,5 +1,6 @@
 import type { CustomForm, PartnerCompany, SurveyType } from '../../../types/survey';
 import { normalizeCompanyName } from '../../partner-companies/domain/companyName';
+import { isActiveEvaluationCompany } from './companyEligibility';
 
 export interface ActiveEvaluationList {
   surveyType: SurveyType;
@@ -10,7 +11,7 @@ export interface ActiveEvaluationList {
 export function scopeSurveysToActiveLists(surveys: CustomForm[], companies: PartnerCompany[], lists: ActiveEvaluationList[]): CustomForm[] {
   return surveys.map(survey => {
     const list = lists.find(item => item.surveyType === survey.surveyType);
-    const registry = companies.filter(company => company.type === survey.surveyType && !company.isArchived);
+    const registry = companies.filter(company => company.type === survey.surveyType && isActiveEvaluationCompany(company));
     const byName = new Map<string, PartnerCompany[]>();
     for (const company of registry) {
       const key = normalizeCompanyName(company.name);
@@ -18,15 +19,25 @@ export function scopeSurveysToActiveLists(surveys: CustomForm[], companies: Part
     }
     const ids = new Set<string>();
     let unresolved = 0;
+    const issues: string[] = [];
     for (const name of list?.companies ?? []) {
       // Prefer an unambiguous exact name; otherwise use the existing import normalization.
       const exact = registry.filter(company => company.name.normalize('NFKC').trim().toLocaleLowerCase() === name.normalize('NFKC').trim().toLocaleLowerCase());
       const matches = exact.length ? exact : byName.get(normalizeCompanyName(name)) ?? [];
       if (matches.length === 1) ids.add(matches[0].id);
-      else unresolved++;
+      else {
+        unresolved++;
+        const candidates = companies.filter(company => normalizeCompanyName(company.name) === normalizeCompanyName(name));
+        const reason = matches.length > 1 ? 'ambiguous registry matches'
+          : !candidates.length ? 'not registered'
+          : candidates.every(company => !isActiveEvaluationCompany(company)) ? 'archived or inactive'
+          : candidates.every(company => company.type !== survey.surveyType) ? 'different or unclassified category'
+          : 'no unique eligible registry match';
+        issues.push(`${name} (${reason})`);
+      }
     }
     return { ...survey, activeEvaluationCompanyIds: [...ids],
       activeEvaluationListIssue: !list ? 'No uploaded Active Companies list is available for this category.'
-        : unresolved ? `${unresolved} uploaded company name${unresolved === 1 ? '' : 's'} could not be matched uniquely to a registered ${survey.surveyType.toLowerCase()}. Review the Active Companies upload and Partner Registry.` : undefined };
+        : unresolved ? `${unresolved} uploaded company name${unresolved === 1 ? '' : 's'} could not be matched uniquely to a registered ${survey.surveyType.toLowerCase()}. Review the Active Companies upload and Partner Registry: ${issues.join('; ')}.` : undefined };
   });
 }

@@ -51,6 +51,7 @@ import {
 import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
 import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';
+import { activeListsFromRegistry } from '../features/active-companies/domain/companyEligibility';
 import { DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS, DocumentMaintenanceSettings, loadDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
 import { PartnerCompaniesFilterToolbar } from '../features/partner-companies/components/PartnerCompaniesFilterToolbar';
 import { PartnerCompanyDirectoryCard } from '../features/partner-companies/components/PartnerCompanyDirectoryCard';
@@ -58,6 +59,7 @@ import { PartnerRegistryOverview } from '../features/partner-companies/component
 import { PartnerCategoryRankBreakdown } from '../features/partner-companies/components/PartnerCategoryRankBreakdown';
 import { PartnerDirectoryArchiveButton } from '../features/partner-companies/components/PartnerDirectoryArchiveButton';
 import { matchesDirectoryClassificationFilters } from '../features/partner-companies/domain/directoryClassificationFilters';
+import { PartnerRegistrationEditor } from '../features/partner-companies/components/PartnerRegistrationEditor';
 
 const MISSING_FIELD_ICONS: Record<MissingProfileField, typeof MapPin> = {
   address: MapPin,
@@ -152,7 +154,8 @@ interface PartnerCompaniesPageProps {
     registeredAt?: string,
     bpCode?: string,
     ntBpCode?: string,
-    supplierOrigin?: SupplierOrigin
+    supplierOrigin?: SupplierOrigin,
+    registrationType?: 'Trade' | 'Non-Trade' | 'Both'
   ) => Promise<PartnerCompany>;
   onRemoveCompany: (id: string) => Promise<void>;
   onUpdateCompany: (company: PartnerCompany) => Promise<PartnerCompany>;
@@ -169,7 +172,7 @@ interface PartnerCompaniesPageProps {
     excludedRowKeys: string[],
     options?: { replace?: boolean },
   ) => ImportResult;
-  onCommitMasterListImport?: (result: ImportResult) => Promise<void>;
+  onCommitMasterListImport?: (result: ImportResult, sourceFileName: string) => Promise<void>;
   isAdmin?: boolean;
   /** Distinct from isAdmin - can be granted to a role without full Admin access (Account Management -> "Renew Compliance Documents"). */
   canRenewDocuments?: boolean;
@@ -219,6 +222,12 @@ export function PartnerCompaniesPage({
 
   // Detail Modal State
   const [selectedCompany, setSelectedCompany] = useState<PartnerCompany | null>(null);
+  const registrationDirty = useRef(false);
+  const closePartnerRecord = () => {
+    if (registrationDirty.current && !window.confirm('Discard unsaved registration changes?')) return;
+    registrationDirty.current = false;
+    setSelectedCompany(null);
+  };
   const [selectedCompanyView, setSelectedCompanyView] = useState<'overview' | 'branches' | 'performance'>('overview');
   const [businessClassificationDraft, setBusinessClassificationDraft] = useState<BusinessClassification | ''>('');
   const [businessClassificationRemarks, setBusinessClassificationRemarks] = useState<Record<string, string>>({});
@@ -251,11 +260,7 @@ export function PartnerCompaniesPage({
   const [newAffiliation, setNewAffiliation] = useState('');
   const [newRegDate, setNewRegDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [newBpCode, setNewBpCode] = useState('');
-  // A company can carry a second, Non-Trade BP Code (e.g. "ABC123-NT")
-  // alongside its regular one - checking this reveals a second field so both
-  // get registered as separate branches and both show up as their own row
-  // in the Document Tracker (see displayRows in DocumentRegisterPage).
-  const [newHasNTBranch, setNewHasNTBranch] = useState(false);
+  const [newRegistrationType, setNewRegistrationType] = useState<'Trade' | 'Non-Trade' | 'Both'>('Trade');
   const [newNtBpCode, setNewNtBpCode] = useState('');
 
   // Feedback Messages
@@ -287,7 +292,7 @@ export function PartnerCompaniesPage({
   useModalEscape(Boolean(duplicateMasterListReview), () => setDuplicateMasterListReview(null), 80);
   useModalEscape(isReplaceConfirmationOpen, () => setIsReplaceConfirmationOpen(false), 90);
   useModalEscape(isRegisterOpen, () => setIsRegisterOpen(false), 50);
-  useModalEscape(Boolean(selectedCompany), () => setSelectedCompany(null), 50);
+  useModalEscape(Boolean(selectedCompany), closePartnerRecord, 50);
   useEffect(() => {
     if (!isAdmin) return;
     const controller = new AbortController();
@@ -443,12 +448,11 @@ export function PartnerCompaniesPage({
     }
 
     const trimmedBpCode = newBpCode.trim();
-    // Falls back to the suggested "<BP Code>-NT" value if the admin left the
-    // NT field blank after checking the box - the placeholder is a suggestion,
-    // not a requirement to retype it.
-    const trimmedNtBpCode = newHasNTBranch
-      ? (newNtBpCode.trim() || (trimmedBpCode ? `${trimmedBpCode}-NT` : ''))
-      : undefined;
+    const trimmedNtBpCode = newRegistrationType !== 'Trade' ? newNtBpCode.trim() : undefined;
+    if (newRegistrationType !== 'Trade' && !trimmedNtBpCode) {
+      setErrorMessage('Non-Trade BP Code is required.');
+      return;
+    }
 
     try {
       await onAddCompany(
@@ -456,9 +460,10 @@ export function PartnerCompaniesPage({
         newType,
         newAffiliation || undefined,
         newRegDate,
-        trimmedBpCode || undefined,
+        newRegistrationType === 'Non-Trade' ? undefined : trimmedBpCode || undefined,
         trimmedNtBpCode || undefined,
-        newType === 'Supplier' ? newSupplierOrigin : undefined
+        newType === 'Supplier' ? newSupplierOrigin : undefined,
+        newRegistrationType
       );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to add the partner company.');
@@ -471,7 +476,7 @@ export function PartnerCompaniesPage({
     setNewName('');
     setNewAffiliation('');
     setNewBpCode('');
-    setNewHasNTBranch(false);
+    setNewRegistrationType('Trade');
     setNewNtBpCode('');
     setNewSupplierOrigin('Local');
     setIsRegisterOpen(false);
@@ -545,7 +550,7 @@ export function PartnerCompaniesPage({
     setIsApplyingImport(true);
     setImportError('');
     try {
-      await onCommitMasterListImport(importPreview.result);
+      await onCommitMasterListImport(importPreview.result, importPreview.files.map(file => file.fileName).join(', '));
       setImportResult(importPreview.result);
       setImportPreview(null);
       setIsReplaceConfirmationOpen(false);
@@ -735,6 +740,7 @@ export function PartnerCompaniesPage({
 
   // Click handler to open company details modal
   const handleCompanyClick = (company: PartnerCompany, view: 'overview' | 'branches' | 'performance' = 'overview') => {
+    registrationDirty.current = false;
     setSelectedCompanyView(view);
     setSelectedCompany(company);
   };
@@ -994,7 +1000,7 @@ export function PartnerCompaniesPage({
           branchCount={partnerCompanies.reduce((total, company) => total + (company.branches?.length ?? 0), 0)}
         />
       </PartnerRegistryOverview>
-      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleImportFileSelected} />
+      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls,.csv" multiple className="hidden" onChange={handleImportFileSelected} />
       <section className="space-y-3" aria-label="Partner directory workspace">
 
       {importError && (
@@ -1231,7 +1237,7 @@ export function PartnerCompaniesPage({
               </div>
 
               <button
-                onClick={() => setSelectedCompany(null)}
+                onClick={closePartnerRecord}
                 className="admin-partner-details-close"
                 title="Close panel"
                 aria-label="Close partner record"
@@ -1242,10 +1248,10 @@ export function PartnerCompaniesPage({
 
               <div className="admin-partner-dialog-tabs" role="group" aria-label="Partner record sections">
                 <button type="button" aria-pressed={selectedCompanyView === 'overview'} onClick={() => setSelectedCompanyView('overview')}>Overview</button>
-                <button type="button" aria-pressed={selectedCompanyView === 'branches'} onClick={() => setSelectedCompanyView('branches')}>
+                <button type="button" aria-pressed={selectedCompanyView === 'branches'} onClick={() => { if (!registrationDirty.current || window.confirm('Discard unsaved registration changes?')) { registrationDirty.current = false; setSelectedCompanyView('branches'); } }}>
                   Branches &amp; documents <span>{(selectedCompany.branches ?? []).length}</span>
                 </button>
-                <button type="button" aria-pressed={selectedCompanyView === 'performance'} onClick={() => setSelectedCompanyView('performance')}>Performance</button>
+                <button type="button" aria-pressed={selectedCompanyView === 'performance'} onClick={() => { if (!registrationDirty.current || window.confirm('Discard unsaved registration changes?')) { registrationDirty.current = false; setSelectedCompanyView('performance'); } }}>Performance</button>
               </div>
             </div>
 
@@ -1375,6 +1381,11 @@ export function PartnerCompaniesPage({
                       className="field text-xs py-1.5"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">Used automatically when dispatching evaluation feedback reports to this partner.</p>
+                  </div>
+                  <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <PartnerRegistrationEditor key={selectedCompany.id} company={selectedCompany} isAdmin={Boolean(isAdmin)}
+                      onDirtyChange={(dirty) => { registrationDirty.current = dirty; }}
+                      onSave={async (company) => { const saved = await onUpdateCompany(company); setSelectedCompany(saved); }} />
                   </div>
                   <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-200 dark:border-slate-800">
                     <span className="text-slate-400 font-medium">Registration Date:</span>
@@ -2008,7 +2019,7 @@ export function PartnerCompaniesPage({
             {registerModalTab === 'upload' && onPreviewMasterListImport ? (
               <div className="mt-6 space-y-4">
                 <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Upload the latest Master List Excel file to refresh the registry. Companies are matched to existing
+                  Upload the latest Master List to refresh the registry and all three Active Company Lists. Companies are matched to existing
                   records by name (fuzzy matching handles minor spelling/casing differences), so re-uploading a
                   refreshed file is safe: matches are merged as an extra branch/BP Code rather than duplicated, and
                   only genuinely new or newly-accredited companies are added.
@@ -2055,10 +2066,10 @@ export function PartnerCompaniesPage({
                   className="w-full bg-[#2187CD] hover:bg-[#2187CD]/90 text-white flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                 >
                   {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                  <span>{isImporting ? 'Reading files…' : importReplace ? 'Choose Excel Files & Replace Registry' : 'Choose Excel File(s) (.xlsx, .xls)'}</span>
+                  <span>{isImporting ? 'Reading files…' : importReplace ? 'Choose Files & Replace Registry' : 'Choose Master List Files (.xlsx, .xls, .csv)'}</span>
                 </button>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
-                  You can select multiple Excel files. Review each file and choose which companies to skip before applying the update.
+                  Select standard or V4 Master List files. Review each file and choose which companies to skip before applying the update.
                 </p>
 
               </div>
@@ -2133,7 +2144,7 @@ export function PartnerCompaniesPage({
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+                {newRegistrationType !== 'Non-Trade' && <div>
                   <label htmlFor="modal-reg-bpcode" className="field-label">BP Code</label>
                   <input
                     id="modal-reg-bpcode"
@@ -2143,33 +2154,29 @@ export function PartnerCompaniesPage({
                     value={newBpCode}
                     onChange={(e) => setNewBpCode(e.target.value)}
                   />
-                </div>
+                </div>}
 
-                <div className="flex items-end">
-                  <label className="flex w-full items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2.5 cursor-pointer hover:border-[#2187CD]/40 transition">
-                    <input
-                      type="checkbox"
-                      checked={newHasNTBranch}
-                      onChange={(e) => setNewHasNTBranch(e.target.checked)}
-                      className="rounded border-slate-300"
-                    />
-                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">Also register a Non-Trade (NT) BP Code</span>
-                  </label>
+                <div>
+                  <label htmlFor="registration-type" className="field-label">Registration type</label>
+                  <select id="registration-type" className="field text-xs py-2.5" value={newRegistrationType} onChange={(e) => setNewRegistrationType(e.target.value as 'Trade' | 'Non-Trade' | 'Both')}>
+                    <option>Trade</option><option>Non-Trade</option><option>Both</option>
+                  </select>
                 </div>
               </div>
 
-              {newHasNTBranch && (
+              {newRegistrationType !== 'Trade' && (
                 <div>
                   <label htmlFor="modal-reg-ntbpcode" className="field-label">Non-Trade (NT) BP Code</label>
                   <input
                     id="modal-reg-ntbpcode"
                     type="text"
+                    required
                     className="field text-xs py-2.5"
                     placeholder={`${newBpCode.trim() || 'e.g. ABC123'}-NT`}
                     value={newNtBpCode}
                     onChange={(e) => setNewNtBpCode(e.target.value)}
                   />
-                  <p className="mt-1 text-[10.5px] text-slate-400">Registered as a second branch — both BP Codes will show as their own row in the Document Tracker.</p>
+                  <p className="mt-1 text-[10.5px] text-slate-400">Each BP Code appears as a separate branch in the Document Tracker.</p>
                 </div>
               )}
 
@@ -2228,7 +2235,7 @@ export function PartnerCompaniesPage({
               <span className="rounded-lg bg-amber-50 p-2 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"><AlertTriangle size={19} aria-hidden="true" /></span>
               <div>
                 <h3 id="duplicate-master-list-title" className="text-base font-bold text-slate-900 dark:text-white">Duplicate Master List file selected</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">These workbooks repeat a filename or file content in this selection. The registry does not keep uploaded Master List files, so there is no prior workbook to replace.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">These files repeat a filename or file content in this selection. The registry does not keep uploaded Master List files, so there is no prior file to replace.</p>
               </div>
             </div>
             <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-3 text-xs dark:border-slate-800">
@@ -2275,7 +2282,7 @@ export function PartnerCompaniesPage({
           anything is saved; nothing is written to the registry until the
           admin clicks "Apply Update" here. */}
       {importPreview && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+        <div role="dialog" aria-modal="true" aria-labelledby="master-list-import-review-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-transparent dark:bg-slate-950 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <button
               onClick={cancelImportPreview}
@@ -2291,7 +2298,7 @@ export function PartnerCompaniesPage({
                 <ClipboardList size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Review Master List Import</h3>
+                <h3 id="master-list-import-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review Master List Import</h3>
                 <p className="text-xs text-slate-500">
                   {importPreview.files.reduce((total, file) => total + file.rows.length, 0)} companies found in {importPreview.files.length} file{importPreview.files.length === 1 ? '' : 's'} &bull; nothing has been saved yet
                 </p>
@@ -2302,7 +2309,7 @@ export function PartnerCompaniesPage({
               <div className="bg-slate-50 dark:bg-slate-900/60 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">Companies to review</h4>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Check a company to skip it. Files are grouped below so you can review each workbook separately.
+                  Check a company to skip it. Files are grouped below so you can review each file separately.
                   {importPreview.excludedRowKeys.length > 0 && ` ${importPreview.excludedRowKeys.length} selected to skip.`}
                 </p>
               </div>
@@ -2329,7 +2336,7 @@ export function PartnerCompaniesPage({
                           <span className="min-w-0 flex-1">
                             <span className={`block text-xs font-semibold ${excluded ? 'line-through text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>{row.bpName}</span>
                             <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400">
-                              {row.bpCode ? `BP Code: ${row.bpCode}` : `Excel row ${row.sourceRow}`}
+                              {row.bpCode ? `BP Code: ${row.bpCode}` : `Source row ${row.sourceRow}`}
                               {row.category ? ` · ${row.category}` : ''}
                             </span>
                           </span>
@@ -2417,8 +2424,13 @@ export function PartnerCompaniesPage({
               </div>
             )}
 
-            <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-              Apply Update saves these changes to the registry. Cancel discards this import - the current registry stays untouched.
+            <p className="text-[11px] text-slate-500 mt-4 leading-relaxed">
+              Apply Update saves the registry and replaces all three Active Company Lists, keeping their history.
+              Categorized, unarchived companies qualify unless every branch is Inactive; unset statuses remain eligible.
+              {importReplace ? ' Only reviewed file records are included.' : ' Merge mode includes eligible existing partners.'}
+            </p>
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300" aria-label="Resulting active company counts">
+              {activeListsFromRegistry(importPreview.result.companies).map(list => `${list.surveyType}: ${list.companies.length}`).join(' · ')}
             </p>
 
             {importError && <p role="alert" className="mt-3 text-xs text-rose-700 dark:text-rose-300">{importError}</p>}
@@ -2428,6 +2440,7 @@ export function PartnerCompaniesPage({
                 onClick={cancelImportPreview}
                 className="secondary-button text-xs py-2 px-4"
                 type="button"
+                disabled={isApplyingImport}
               >
                 Cancel
               </button>
@@ -2435,8 +2448,9 @@ export function PartnerCompaniesPage({
                 onClick={applyImportPreview}
                 className="bg-[#2187CD] hover:bg-[#2187CD]/90 text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
                 type="button"
+                disabled={isApplyingImport || importPreview.result.stats.totalRows === 0}
               >
-                Apply Update
+                {isApplyingImport ? 'Applying…' : 'Apply Update'}
               </button>
             </div>
           </div>
@@ -2463,7 +2477,7 @@ export function PartnerCompaniesPage({
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">Master List Import Complete</h3>
-                <p className="text-xs text-slate-500">{importResult.stats.totalRows} rows processed</p>
+                <p className="text-xs text-slate-500">{importResult.stats.totalRows} rows processed; Active Company Lists updated.</p>
               </div>
             </div>
 

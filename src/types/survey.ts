@@ -80,6 +80,7 @@ export interface PartnerCompany {
   // Present only on temporary partners created by an isolated evaluation test import.
   testImportBatchId?: string;
   name: string;
+  registrationType?: 'Trade' | 'Non-Trade' | 'Both';
   type: PartnerCompanyType;
   supplierOrigin?: SupplierOrigin;
   // Legal entity classification for local partner categories. Absent/invalid legacy
