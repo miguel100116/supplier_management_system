@@ -38,9 +38,11 @@ test('category document review is a compact expandable company list with accessi
   assert.match(DOCUMENT_TRACKER_SOURCE, /\{!inactiveClassification && <DocumentQuickActions/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /DOCUMENT_STATUS_ICONS\[status\]/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /<DocumentQuickActions/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-1 gap-2\.5 sm:grid-cols-2 xl:grid-cols-4/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-1 gap-2\.5 sm:grid-cols-2 xl:grid-cols-3/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[32px_minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,1fr\)\] xl:gap-x-3 2xl:grid-cols-\[32px_minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,1fr\)\] 2xl:gap-x-5';/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /flex min-h-12 min-w-0 w-full flex-col items-start justify-center gap-y-1 text-xs/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /<div className="w-full">/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /ml-auto grid w-\[15rem\] grid-cols-\[max-content_max-content\] items-center justify-start gap-x-6 gap-y-1\.5/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /const statusColor = status === 'Missing' \? 'text-rose-700[\s\S]*?status === 'Expired' \? 'text-rose-800[\s\S]*?'text-amber-700/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseEnter=\{clearHoverClose\} onMouseLeave=\{scheduleHoverClose\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /'Add remarks'/);

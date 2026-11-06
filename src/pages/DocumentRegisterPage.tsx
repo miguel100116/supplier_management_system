@@ -2086,15 +2086,15 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     {needsAttention === 0 ? (
                       <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-emerald-700 dark:text-emerald-400"><Check size={14} /> All current</span>
                     ) : (
-                      <>
+                      <div className="w-full">
                         {classificationRequired && (
-                          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium text-[#536b80] dark:text-slate-300">
+                          <span className="flex items-center justify-start gap-1.5 whitespace-nowrap font-medium text-[#536b80] dark:text-slate-300">
                             <CircleAlert size={12} strokeWidth={1.8} aria-hidden="true" />
                             Classification needed
                           </span>
                         )}
                         {(expiredCount > 0 || expiringCount > 0 || updateCount > 0 || missingCount > 0) && (
-                          <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                          <div className={`ml-auto grid w-[15rem] grid-cols-[max-content_max-content] items-center justify-start gap-x-6 gap-y-1.5 ${classificationRequired ? 'mt-1.5' : ''}`}>
                             {expiredCount > 0 && (
                               <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-rose-700 dark:text-rose-300">
                                 <AlertTriangle size={12} strokeWidth={1.8} aria-hidden="true" />
@@ -2125,7 +2125,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                             )}
                           </div>
                         )}
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2143,7 +2143,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                         <section key={group.label} aria-label={group.label} className="min-w-0">
                           <h3 className="mb-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{group.label}<span className="ml-1.5 font-normal text-slate-400">{group.documents.length}{group.isRequired && requiredStatusFilter ? ` / ${cells.length}` : ''}</span></h3>
                           {group.documents.length === 0 && <p role="status" className="py-3 text-xs text-slate-500 dark:text-slate-400">No {requiredStatusFilter?.toLowerCase()} required documents.</p>}
-                          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                             {group.documents.map(({ docName, status, daysLeft, doc, branch, expiryBased, inactiveClassification }) => {
                               const Icon = DOCUMENT_STATUS_ICONS[status];
                               const dateLine = getCellDateLine(status, doc.expiryDate, daysLeft);
@@ -2154,7 +2154,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                               return (
                                 <li key={docName} className={`flex min-h-[76px] min-w-0 items-start justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950 ${statusAccent}`}>
                                   <div className="min-w-0 flex-1">
-                                    <div className="break-words text-xs font-medium text-slate-800 dark:text-slate-200">{docName}</div>
+                                    <div className="break-words text-xs font-medium leading-4 text-slate-800 dark:text-slate-200">{docName}</div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
                                       <span className={`inline-flex items-center gap-1 font-medium ${statusColor}`}><Icon size={11} strokeWidth={2.3} aria-hidden="true" />{status}</span>
                                       {dateLine && <span className="text-slate-500 dark:text-slate-400">{dateLine}</span>}
