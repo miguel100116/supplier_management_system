@@ -371,10 +371,19 @@ test('Supplier Local attention containers filter only the expanded company and t
   await page.goto('/login');
   await signIn(page);
   await openReadyPage(page, '/document-tracker?category=supplier-local');
-  const company = page.getByRole('article').filter({ has: page.getByRole('button', { name: /^(Review|Hide) documents for First Local Supplier \(LOCAL-ONE\)$/ }) });
-  const openFirst = () => company.getByRole('button', { name: 'Review documents for First Local Supplier (LOCAL-ONE)', exact: true }).first().click();
-  await openFirst();
+  const company = page.getByRole('article').filter({ hasText: 'First Local Supplier' });
   const required = company.getByRole('region', { name: 'Required documents', exact: true });
+  const expandTrigger = () => company.getByRole('button').first();
+  await company.getByText('First Local Supplier', { exact: true }).hover();
+  await expect(required).toBeHidden();
+  await expandTrigger().hover();
+  await expect(required).toBeVisible();
+  await page.mouse.move(5, 5);
+  await expect(required).toBeVisible();
+  await expandTrigger().hover();
+  await expect(required).toBeHidden();
+  const openFirst = () => expandTrigger().click();
+  await openFirst();
   const attention = company.getByLabel('Required document attention summary', { exact: true });
   const missing = attention.getByRole('button', { name: '4 missing', exact: true });
   const expired = attention.getByRole('button', { name: '1 expired', exact: true });
@@ -552,7 +561,7 @@ test('Workspace category and status badges use consistent typography and geometr
         return { category: geometry(element.children[1]), status: geometry(element.children[2]) };
       });
       expect(badges.category).toEqual(badges.status);
-      expect(badges.category.size).toBe('12px');
+      expect(badges.category.size).toBe('10px');
       const box = await row.getByRole('cell').nth(1).locator('span').boundingBox();
       const cell = await row.getByRole('cell').nth(1).boundingBox();
       expect(box!.x + box!.width).toBeLessThanOrEqual(cell!.x + cell!.width);
@@ -796,7 +805,11 @@ test('Admin module headings match the compact Directory title and subtitle forma
     const header = page.locator('.admin-page-heading');
     await expect(header.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
     if (hasSubtitle) await expect(header.locator('p')).toHaveCount(1);
-    if (route === 'employees-users') await expect(page.locator('.admin-accounts-page')).toBeVisible();
+    if (route === 'employees-users') {
+      await expect(page.locator('.admin-accounts-page')).toBeVisible();
+      const currentAccount = page.getByRole('row', { name: /synthetic\.admin@mgenesis\.com/i });
+      await expect(currentAccount.getByRole('button', { name: 'Delete Account', exact: true })).toBeDisabled();
+    }
     if (route === 'present-mode') await expect(page.locator('.admin-presentation-page')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`heading-${route}.png`), animations: 'disabled' });
     const actual = await header.evaluate(headerFormat);
