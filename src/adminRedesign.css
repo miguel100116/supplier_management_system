@@ -623,6 +623,7 @@ body:has(.admin-workspace) .fixed.inset-0.flex.items-center.justify-center > :no
 .admin-survey-forms-page .survey-forms-toolbar .icon-button { width: 34px; height: 34px; border-radius: 6px; }
 .admin-survey-forms-page .survey-forms-toolbar .icon-button:focus-visible { outline: 2px solid #2187cd; outline-offset: 2px; }
 .admin-survey-forms-page .survey-forms-table { min-width: 960px; table-layout: fixed; font-size: 12px; }
+.admin-survey-forms-page .survey-forms-table tbody td:first-child button { font-size: 14px; }
 .admin-survey-forms-page .survey-forms-table th,
 .admin-survey-forms-page .survey-forms-table td { padding: 8px 10px; overflow-wrap: normal; word-break: normal; }
 .admin-survey-forms-page .survey-forms-table thead th { font-size: 10px; letter-spacing: .035em; white-space: nowrap; }

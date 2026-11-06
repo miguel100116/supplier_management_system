@@ -39,13 +39,13 @@ test('category document review is a compact expandable company list with accessi
   assert.match(DOCUMENT_TRACKER_SOURCE, /DOCUMENT_STATUS_ICONS\[status\]/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /<DocumentQuickActions/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-1 gap-2\.5 sm:grid-cols-2 xl:grid-cols-4/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,0\.5fr\)_32px\] xl:gap-x-3 2xl:grid-cols-\[minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,0\.5fr\)_32px\] 2xl:gap-x-5';/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[32px_minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,1fr\)\] xl:gap-x-3 2xl:grid-cols-\[32px_minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,1fr\)\] 2xl:gap-x-5';/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /flex min-h-12 min-w-0 w-full flex-col items-start justify-center gap-y-1 text-xs/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /const statusColor = status === 'Missing' \? 'text-rose-700[\s\S]*?status === 'Expired' \? 'text-rose-800[\s\S]*?'text-amber-700/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseEnter=\{clearHoverClose\} onMouseLeave=\{scheduleHoverClose\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /'Add remarks'/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /aria-haspopup="menu"/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \|\| isVerifying \? 'group' : 'menu'\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \|\| isVerifying \|\| isRenewing \? 'group' : 'menu'\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /role="menuitem"[^>]*>[\s\S]*?Mark missing/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /role="dialog" aria-label=\{`Actions for \$\{docName\}`\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /w-\[min\(16rem,calc\(100vw-24px\)\)\]/);
@@ -74,7 +74,7 @@ test('missing and for-update documents expose a verification confirmation with o
 });
 
 test('remarks editor ignores hover dismissal while active and cancels a pending close when opened', () => {
-  assert.match(DOCUMENT_TRACKER_SOURCE, /if \(isRemarksOpen \|\| isViewingRemarks \|\| confirmingRemarkDelete \|\| isVerifying \|\| saving\) return;/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /if \(isRemarksOpen \|\| isViewingRemarks \|\| confirmingRemarkDelete \|\| isVerifying \|\| isRenewing \|\| saving\) return;/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /onClick=\{\(\) => \{ clearHoverClose\(\); setIsRemarksOpen\(true\); setError\(''\); setFeedback\(''\); \}\}/);
 });
 
@@ -101,14 +101,14 @@ test('document maintenance separates schedules, validity, and category alerts wi
 });
 
 test('partner rows show the saved branch status as a badge, separate from document compliance statuses', () => {
-  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,0\.5fr\)_32px\] xl:gap-x-3 2xl:grid-cols-\[minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,0\.5fr\)_32px\] 2xl:gap-x-5';/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-\[minmax\(0,1fr\)_auto\]/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[32px_minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,1fr\)\] xl:gap-x-3 2xl:grid-cols-\[32px_minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,1fr\)\] 2xl:gap-x-5';/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-\[auto_minmax\(0,1fr\)\]/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /title=\{row\.company\.name\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /className="block w-full[^\"]*break-words[^\"]*xl:truncate"/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /xl:flex-nowrap/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /col-start-2 row-start-3 min-w-0 xl:col-start-5 xl:row-auto/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /col-start-2 row-start-3 min-w-0 xl:col-start-6 xl:row-auto/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_ROW_BADGE_CLASS = 'inline-flex h-8 max-w-full items-center rounded-md border px-2\.5 text-\[10px\] font-semibold';/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /col-span-2 row-start-4 flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /col-span-2 row-start-4 flex min-h-12 min-w-0 w-full flex-col items-start justify-center gap-y-1 text-xs/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /BranchStatusSelect label=\{`Branch status for/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /disabled=\{branchFullyCompliant\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label=\{`Branch status: \$\{branchFullyCompliant \? 'Completed' : row\.branch\.status\}`\}/);
