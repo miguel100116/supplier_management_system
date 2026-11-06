@@ -184,7 +184,6 @@ export function parseActiveCompanySnapshot(value: unknown): ActiveCompanySnapsho
     || candidate.surveyType === 'Supplier'
     || candidate.surveyType === 'Subcontractor';
   const validCompanies = Array.isArray(candidate.companies)
-    && candidate.companies.length > 0
     && candidate.companies.length <= 10_000
     && candidate.companies.every((company) => typeof company === 'string' && company.trim().length > 0 && company.length <= 500);
   const validDate = typeof candidate.uploadedAt === 'string' && !Number.isNaN(Date.parse(candidate.uploadedAt));

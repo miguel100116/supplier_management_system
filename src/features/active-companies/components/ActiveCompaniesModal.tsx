@@ -162,7 +162,7 @@ export function ActiveCompaniesModal({ isOpen, onClose }: ActiveCompaniesModalPr
                         ))}
                       </ul>
                     ) : (
-                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">No active-company upload is available yet.</p>
+                      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{latest ? 'No eligible active companies in the latest list.' : 'No active-company upload is available yet.'}</p>
                     )}
                   </section>
                 );

@@ -6,6 +6,81 @@ const email = 'synthetic.admin@mgenesis.com';
 const userId = '00000000-0000-4000-8000-000000000001';
 const createdAt = '2026-01-01T00:00:00.000Z';
 
+test('Master List import previews active lists, cancels safely, retries failures and replaces category scopes', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  const header: string[] = []; header[0] = '#'; header[5] = 'Status'; header[6] = 'Category'; header[8] = 'BP Code'; header[9] = 'BP Name';
+  const sheet = XLSX.utils.aoa_to_sheet([header, ...[
+    ['NEW', 'Imported Supplier', 'Pending', 'Supplier-Local'],
+    ['OLD', 'Inactive Supplier', 'Inactive', 'Supplier-Local'],
+    ['SKIP', 'Skipped Subcontractor', 'Accredited', 'Subcontructor'],
+  ].map(([code, name, status, category], i) => {
+    const row: string[] = []; row[0] = String(i + 1); row[5] = status; row[6] = category; row[8] = code; row[9] = name; return row;
+  })]);
+  const file = { name: 'synthetic-master.csv', mimeType: 'text/csv', buffer: Buffer.from(XLSX.utils.sheet_to_csv(sheet)) };
+  service.records.push({ record_type: 'active_company_snapshot', record_id: 'old-supplier-list', created_at: createdAt,
+    payload: { id: 'old-supplier-list', surveyType: 'Supplier', companies: ['Previous Supplier'], uploadedAt: createdAt, uploadedBy: email, sourceFileName: 'old.csv' } });
+  const importRecords = () => service.records.filter(record => record.record_type === 'partner_company' || record.record_type === 'active_company_snapshot');
+  const before = structuredClone(importRecords());
+  await page.goto('/'); await signIn(page);
+  await openReadyPage(page, '/partner-companies');
+  const upload = async (selectedFile = file, replace = false) => {
+    await page.getByRole('button', { name: /Register.*Partner/i }).click();
+    await page.getByRole('button', { name: 'Upload Master List', exact: true }).click();
+    if (replace) await page.getByRole('checkbox', { name: /Replace the entire registry/ }).check();
+    await page.locator('input[type=file][multiple]').setInputFiles(selectedFile);
+    await expect(page.getByRole('heading', { name: 'Review Master List Import' })).toBeVisible();
+  };
+  await upload();
+  await page.getByRole('checkbox', { name: 'Skip Skipped Subcontractor', exact: true }).check();
+  await expect(page.getByLabel('Resulting active company counts')).toHaveText('Courier: 1 · Supplier: 1 · Subcontractor: 0');
+  await page.screenshot({ path: testInfo.outputPath('master-list-active-preview.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(importRecords()).toEqual(before);
+  await upload();
+  await page.getByRole('checkbox', { name: 'Skip Skipped Subcontractor', exact: true }).check();
+  service.failures.masterListWrites = true;
+  await page.getByRole('button', { name: 'Apply Update', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Review Master List Import' }).getByRole('alert').filter({ hasText: 'Synthetic master-list write rejected' })).toBeVisible();
+  expect(importRecords()).toEqual(before);
+  service.failures.masterListWrites = false;
+  await page.getByRole('button', { name: 'Apply Update', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Master List Import Complete' })).toBeVisible();
+  const snapshots = service.records.filter(record => record.record_type === 'active_company_snapshot');
+  expect(snapshots).toHaveLength(4);
+  expect(snapshots.filter(record => record.record_id !== 'old-supplier-list').map(record => [record.payload.surveyType, record.payload.companies])).toEqual([
+    ['Courier', ['Synthetic Courier']], ['Supplier', ['Imported Supplier']], ['Subcontractor', []],
+  ]);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /Active Companies by Type/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Active Companies by Type' }).getByText('Imported Supplier', { exact: true })).toBeVisible();
+  await expect(page.getByText('No eligible active companies in the latest list.', { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('master-list-active-saved.png'), fullPage: true });
+  await page.keyboard.press('Escape');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Partner directory' })).toBeVisible();
+  await page.getByRole('button', { name: /Active Companies by Type/ }).click();
+  await expect(page.getByRole('dialog').getByText('Imported Supplier', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  const replacement = { ...file, name: 'inactive-only.csv', buffer: Buffer.from(XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet([
+    header, ['1', '', '', '', '', 'Inactive', 'Supplier-Local', '', 'INACTIVE', 'Replacement Supplier'],
+  ]))) };
+  await upload(replacement, true);
+  await expect(page.getByLabel('Resulting active company counts')).toHaveText('Courier: 0 · Supplier: 0 · Subcontractor: 0');
+  const beforeReplace = structuredClone(importRecords());
+  await page.getByRole('button', { name: 'Apply Update', exact: true }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Replace the entire partner registry?' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  expect(importRecords()).toEqual(beforeReplace);
+  await expect(page.getByRole('heading', { name: 'Review Master List Import' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply Update', exact: true }).click();
+  await page.getByRole('button', { name: 'Replace Registry', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Master List Import Complete' })).toBeVisible();
+  expect(service.records.filter(record => record.record_type === 'partner_company').map(record => record.payload.name)).toEqual(['Replacement Supplier']);
+  expect(service.activeLists.value?.map(list => list.companies)).toEqual([[], [], []]);
+  expect(service.records.filter(record => record.record_type === 'active_company_snapshot')).toHaveLength(7);
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
+});
+
 test('Manage Access saves a complete Courier selection and preserves drafts after rejected writes', async ({ page, browser }, testInfo) => {
   const service = await backend(page);
   const names = Array.from({ length: 7 }, (_, i) => `Assigned Courier ${i + 1}`);
@@ -95,7 +170,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
   ];
   const unexpected: string[] = [];
   const errors: string[] = [];
-  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false, activeListReads: false };
+  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false, activeListReads: false, masterListWrites: false };
   const activeLists: { value: Array<{ survey_type: string; companies: string[] }> | null } = { value: null };
   const historyReads: Array<{ select: string; id: string | null }> = [];
   page.on('pageerror', error => errors.push(error.message));
@@ -117,6 +192,22 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     }
     if (url.pathname === '/auth/v1/user') return reply(user);
     if (url.pathname === '/auth/v1/logout') return reply({});
+    if (url.pathname === '/rest/v1/rpc/import_partner_master_list') {
+      if (role !== 'Admin') return reply({ message: 'Admin required' }, 403);
+      if (failures.masterListWrites) return reply({ message: 'Synthetic master-list write rejected' }, 500);
+      const body = request.postDataJSON();
+      const snapshots = ['Courier', 'Supplier', 'Subcontractor'].map(type => {
+        const id = `${type}-master-list-${crypto.randomUUID()}`;
+        return { id, surveyType: type, uploadedAt: new Date().toISOString(), uploadedBy: email, sourceFileName: body.p_source_file_name,
+          companies: body.p_companies.filter((company: { type: string; isArchived?: boolean; branches: Array<{ status?: string }> }) => company.type === type && !company.isArchived
+            && (!company.branches.length || company.branches.some(branch => branch.status !== 'Inactive'))).map((company: { name: string }) => company.name).sort() };
+      });
+      for (let i = records.length - 1; i >= 0; i--) if (records[i].record_type === 'partner_company') records.splice(i, 1);
+      records.push(...body.p_companies.map((company: { id: string }) => ({ record_type: 'partner_company', record_id: company.id, payload: company, created_at: createdAt })),
+        ...snapshots.map(snapshot => ({ record_type: 'active_company_snapshot', record_id: snapshot.id, payload: snapshot, created_at: createdAt })));
+      activeLists.value = snapshots.map(snapshot => ({ survey_type: snapshot.surveyType, companies: snapshot.companies }));
+      return reply({ companies: body.p_companies, snapshots });
+    }
     if (url.pathname === '/rest/v1/rpc/get_active_evaluation_lists') {
       if (failures.activeListReads) return reply({ message: 'Synthetic active-list failure' }, 500);
       // Existing fixtures supply all their synthetic partners as the uploaded
@@ -195,8 +286,8 @@ async function openReadyPage(page: Page, path: string) {
 async function waitForReadyPage(page: Page) {
   const main = page.getByRole('main');
   await main.waitFor({ state: 'visible' });
-  // Feature assertions start after the route's code and shared data are ready.
-  await main.getByRole('status').filter({ hasText: /Loading page|Refreshing shared data/ }).waitFor({ state: 'hidden' });
+  // Route and Realtime loaders can overlap; wait until all are hidden.
+  await expect(main.getByRole('status').filter({ hasText: /Loading page|Refreshing shared data/ }).filter({ visible: true })).toHaveCount(0, { timeout: 30_000 });
 }
 
 test('Stored source files separate segmented status navigation from underlined category filters', async ({ page }, testInfo) => {

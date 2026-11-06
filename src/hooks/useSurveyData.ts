@@ -61,6 +61,7 @@ import { createDebouncedTask } from '../utils/debouncedTask';
 import { createCoalescedTaskRunner, createRefreshGuard } from '../utils/coalescedTask';
 import { scopeSurveysToActiveLists, type ActiveEvaluationList } from '../features/active-companies/domain/evaluationScope';
 import { createActiveEvaluationListRefresh, loadActiveEvaluationLists } from '../features/active-companies/services/activeEvaluationLists';
+import { saveMasterListImport } from '../features/partner-companies/services/commitMasterListImport';
 
 // Versioned browser cache for the authenticated Partner Company registry.
 // A missing cache starts empty until Supabase hydration completes.
@@ -421,10 +422,10 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     return () => window.clearInterval(timer);
   }, []);
 
-  const persistRemoteAsync = async (operation: Promise<void>): Promise<void> => {
+  const persistRemoteAsync = async <T,>(operation: Promise<T>): Promise<T> => {
     setError(null);
     try {
-      await operation;
+      return await operation;
     } catch (persistenceError) {
       if (isMountedRef.current) {
         setError(persistenceError instanceof Error ? persistenceError.message : 'Unable to save data to Supabase.');
@@ -1952,7 +1953,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     return updatedCompany;
   };
 
-  // Import the Master List Excel: fuzzy-matches each row's BP Name against
+  // Import Master List files: fuzzy-matches each row's BP Name against
   // existing companies (merging as a branch when matched, creating a new
   // company otherwise). This only parses/merges and returns the result for
   // review - nothing is saved until the caller confirms via
@@ -1980,11 +1981,15 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
   };
 
   // Applies a previously-previewed import result to the live registry.
-  const commitMasterListImport = async (result: ImportResult) => {
+  const commitMasterListImport = async (result: ImportResult, sourceFileName: string) => {
+    if (!isAdmin) throw new Error('Only an Admin can import the Master List.');
+    if (!result.stats.totalRows) throw new Error('Keep at least one Master List row before applying the import.');
     const normalized = result.companies.map(normalizePartnerCompany);
-    await persistRemoteAsync(replaceApplicationRecords('partner_company', normalized, (company) => company.id));
-    setPartnerCompanies(normalized);
-    safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(normalized));
+    const saved = await persistRemoteAsync(saveMasterListImport(normalized, sourceFileName));
+    setPartnerCompanies(saved.companies);
+    setActiveEvaluationLists(saved.lists);
+    setActiveEvaluationError(null);
+    safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(saved.companies));
   };
 
   // Remove a partner company
