@@ -13,10 +13,6 @@ import { computeDocumentStatus } from '../../document-tracker/domain/compliance'
 import { companyDocumentRemarksError } from '../../document-tracker/domain/documentValidation';
 import { COMMON_DOCUMENTS, FOREIGN_SUPPLIER_DOCUMENTS, LOCAL_SUPPLIER_DOCUMENTS } from '../../document-tracker/domain/documentRequirements';
 
-// The sheet opens with a legend/summary block before the real header row -
-// its exact row count has varied between revisions, so findHeaderRowIndex
-// locates it by content. This is only the last-known fallback position.
-const HEADER_ROW_INDEX = 19;
 export const MAX_MASTER_LIST_FILE_BYTES = 25 * 1024 * 1024;
 
 export type MasterListDuplicateReason = 'matching-filename' | 'identical-content' | 'both';
@@ -33,8 +29,8 @@ export async function findDuplicateMasterListFiles(files: readonly File[]): Prom
   const fingerprints: Array<{ name: string; fingerprint: string }> = [];
   for (const file of files) {
     const extension = file.name.slice(file.name.lastIndexOf('.')).toLocaleLowerCase();
-    if (extension !== '.xlsx' && extension !== '.xls') {
-      throw new Error(`"${file.name}" must be an Excel workbook (.xlsx or .xls).`);
+    if (!['.xlsx', '.xls', '.csv'].includes(extension)) {
+      throw new Error(`"${file.name}" must be a Master List file (.xlsx, .xls, or .csv).`);
     }
     if (!Number.isInteger(file.size) || file.size <= 0 || file.size > MAX_MASTER_LIST_FILE_BYTES) {
       throw new Error(`"${file.name}" must be between 1 byte and 25 MB.`);
@@ -43,7 +39,7 @@ export async function findDuplicateMasterListFiles(files: readonly File[]): Prom
     try {
       rows = parseMasterListWorkbook(await file.arrayBuffer());
     } catch (error) {
-      throw new Error(`"${file.name}": ${error instanceof Error ? error.message : 'Unable to read this workbook.'}`);
+      throw new Error(`"${file.name}": ${error instanceof Error ? error.message : 'Unable to read this file.'}`);
     }
     if (rows.length === 0) throw new Error(`"${file.name}" has no partner company rows.`);
     const fingerprintRows = rows.map(({ cells }) => {
@@ -135,6 +131,22 @@ const COL = {
   },
 } as const;
 
+// V4 adds PO fields before Status and uses a shorter general-information block.
+// Normalize it to the existing document mapper's layout, preserving both formats.
+const V4_COLUMNS: Array<[number, number]> = [
+  [COL.status, 5], [COL.category, 6], [COL.supplierRank, 7], [COL.bpCode, 8], [COL.bpName, 9],
+  [COL.bpAddress, 10], [COL.federalTaxId, 12], [COL.industry, 13], [COL.contactPerson, 14],
+  [COL.position, 15], [COL.mobilePhone, 16], [COL.email, 17], [COL.dateAccredited, 18],
+  [COL.confidentiality, 19], [COL.letterOfAccreditation, 20], [COL.codeOfConduct, 21],
+  [COL.local.sif, 22], [COL.local.bir2303, 23], [COL.local.sec, 24],
+  [COL.local.articlesOfIncorporation, 25], [COL.local.afs, 26], [COL.local.gis, 29],
+  [COL.local.dti, 32], [COL.local.businessPermit, 35], [COL.local.importPermit, 38],
+  [COL.local.productProfile, 41], [COL.local.proofOfAddress, 42], [COL.local.ownersId, 43],
+  [COL.local.otherDocuments, 44], [COL.foreign.sif, 45], [COL.foreign.articlesOfIncorporation, 46],
+  [COL.foreign.certOfIncorporation, 47], [COL.foreign.afs, 48], [COL.foreign.businessPermitLicense, 51],
+  [COL.foreign.ownersId, 54], [COL.foreign.productProfile, 55], [COL.foreign.otherDocuments, 56],
+];
+
 export interface RawMasterListRow {
   sourceRow: number; // 1-based sheet row number, for audit
   status: string;
@@ -163,11 +175,14 @@ export interface RawMasterListRow {
 function findHeaderRowIndex(rows: unknown[][]): number {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    if (String(row[0] ?? '').trim() === '#' && String(row[COL.bpName] ?? '').trim().toUpperCase() === 'BP NAME') {
+    if (String(row[0] ?? '').trim() === '#' && (
+      (String(row[COL.bpName] ?? '').trim().toUpperCase() === 'BP NAME' && String(row[COL.bpCode] ?? '').trim().toUpperCase() === 'BP CODE')
+      || (String(row[9] ?? '').trim().toUpperCase() === 'BP NAME' && String(row[8] ?? '').trim().toUpperCase() === 'BP CODE')
+    )) {
       return i;
     }
   }
-  return HEADER_ROW_INDEX; // fallback to the last-known layout
+  throw new Error('Unrecognized Master List layout. Expected the standard or V4 BP Code and BP Name headers.');
 }
 
 export function parseMasterListWorkbook(data: ArrayBuffer | Uint8Array): RawMasterListRow[] {
@@ -179,10 +194,18 @@ export function parseMasterListWorkbook(data: ArrayBuffer | Uint8Array): RawMast
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
 
   const str = (v: unknown) => (v == null ? '' : String(v).trim());
-  const dataStartRowIndex = findHeaderRowIndex(rows) + 1;
+  const headerIndex = findHeaderRowIndex(rows);
+  const isV4 = str(rows[headerIndex][9]).toUpperCase() === 'BP NAME';
+  const dataStartRowIndex = headerIndex + 1;
 
   return rows
     .slice(dataStartRowIndex)
+    .map(cells => {
+      if (!isV4) return cells;
+      const normalized: unknown[] = [];
+      for (const [target, source] of V4_COLUMNS) normalized[target] = cells[source];
+      return normalized;
+    })
     .map((cells, i) => ({
       sourceRow: dataStartRowIndex + i + 1, // 1-based Excel row number
       status: str(cells[COL.status]),
@@ -482,17 +505,17 @@ export async function prepareMasterListSourceFiles(files: File[]): Promise<Maste
   return Promise.all(files.map(async (file, index) => {
     try {
       const extension = file.name.slice(file.name.lastIndexOf('.')).toLocaleLowerCase();
-      if (extension !== '.xlsx' && extension !== '.xls') {
-        throw new Error('Choose an Excel workbook (.xlsx or .xls).');
+      if (!['.xlsx', '.xls', '.csv'].includes(extension)) {
+        throw new Error('Choose a Master List file (.xlsx, .xls, or .csv).');
       }
       if (!Number.isInteger(file.size) || file.size <= 0 || file.size > MAX_MASTER_LIST_FILE_BYTES) {
         throw new Error('The file must be between 1 byte and 25 MB.');
       }
       const rows = parseMasterListWorkbook(await file.arrayBuffer());
-      if (rows.length === 0) throw new Error('No partner company rows were found. Check that this is a populated Master List workbook.');
+      if (rows.length === 0) throw new Error('No partner company rows were found. Check that this is a populated Master List file.');
       return { id: `file-${index}`, fileName: file.name, rows };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to read this workbook.';
+      const message = error instanceof Error ? error.message : 'Unable to read this file.';
       throw new Error(`${file.name}: ${message}`);
     }
   }));

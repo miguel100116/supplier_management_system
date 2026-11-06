@@ -59,7 +59,7 @@ It is a role-aware platform: what each employee sees — which modules, which da
 | **Presentation mode** | Build a staggered slide deck from the current analytics for leadership presentations (exportable to PDF/PPTX). |
 | **Archiving** | Archive completed survey periods into named series so multi-year trends accumulate without cluttering the active view. |
 | **Account & access management** | Admins manage employee accounts, per-department access ceilings, and per-account permission overrides. |
-| **Bulk imports** | Import a partner-company master list, or import Supplier, Subcontractor, and Courier evaluation worksheets together from one Excel workbook. |
+| **Bulk imports** | Import a standard or V4 partner-company master list (Excel/CSV) and update all three Active Company Lists together, or import Supplier, Subcontractor, and Courier evaluation worksheets together from one Excel workbook. |
 
 ---
 

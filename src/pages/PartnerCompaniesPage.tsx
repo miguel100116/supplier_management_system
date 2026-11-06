@@ -51,6 +51,7 @@ import {
 import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
 import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';
+import { activeListsFromRegistry } from '../features/active-companies/domain/companyEligibility';
 import { DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS, DocumentMaintenanceSettings, loadDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
 import { PartnerCompaniesFilterToolbar } from '../features/partner-companies/components/PartnerCompaniesFilterToolbar';
 import { PartnerCompanyDirectoryCard } from '../features/partner-companies/components/PartnerCompanyDirectoryCard';
@@ -171,7 +172,7 @@ interface PartnerCompaniesPageProps {
     excludedRowKeys: string[],
     options?: { replace?: boolean },
   ) => ImportResult;
-  onCommitMasterListImport?: (result: ImportResult) => Promise<void>;
+  onCommitMasterListImport?: (result: ImportResult, sourceFileName: string) => Promise<void>;
   isAdmin?: boolean;
   /** Distinct from isAdmin - can be granted to a role without full Admin access (Account Management -> "Renew Compliance Documents"). */
   canRenewDocuments?: boolean;
@@ -549,7 +550,7 @@ export function PartnerCompaniesPage({
     setIsApplyingImport(true);
     setImportError('');
     try {
-      await onCommitMasterListImport(importPreview.result);
+      await onCommitMasterListImport(importPreview.result, importPreview.files.map(file => file.fileName).join(', '));
       setImportResult(importPreview.result);
       setImportPreview(null);
       setIsReplaceConfirmationOpen(false);
@@ -999,7 +1000,7 @@ export function PartnerCompaniesPage({
           branchCount={partnerCompanies.reduce((total, company) => total + (company.branches?.length ?? 0), 0)}
         />
       </PartnerRegistryOverview>
-      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls" multiple className="hidden" onChange={handleImportFileSelected} />
+      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls,.csv" multiple className="hidden" onChange={handleImportFileSelected} />
       <section className="space-y-3" aria-label="Partner directory workspace">
 
       {importError && (
@@ -2018,7 +2019,7 @@ export function PartnerCompaniesPage({
             {registerModalTab === 'upload' && onPreviewMasterListImport ? (
               <div className="mt-6 space-y-4">
                 <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Upload the latest Master List Excel file to refresh the registry. Companies are matched to existing
+                  Upload the latest Master List to refresh the registry and all three Active Company Lists. Companies are matched to existing
                   records by name (fuzzy matching handles minor spelling/casing differences), so re-uploading a
                   refreshed file is safe: matches are merged as an extra branch/BP Code rather than duplicated, and
                   only genuinely new or newly-accredited companies are added.
@@ -2065,10 +2066,10 @@ export function PartnerCompaniesPage({
                   className="w-full bg-[#2187CD] hover:bg-[#2187CD]/90 text-white flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
                 >
                   {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                  <span>{isImporting ? 'Reading files…' : importReplace ? 'Choose Excel Files & Replace Registry' : 'Choose Excel File(s) (.xlsx, .xls)'}</span>
+                  <span>{isImporting ? 'Reading files…' : importReplace ? 'Choose Files & Replace Registry' : 'Choose Master List Files (.xlsx, .xls, .csv)'}</span>
                 </button>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
-                  You can select multiple Excel files. Review each file and choose which companies to skip before applying the update.
+                  Select standard or V4 Master List files. Review each file and choose which companies to skip before applying the update.
                 </p>
 
               </div>
@@ -2234,7 +2235,7 @@ export function PartnerCompaniesPage({
               <span className="rounded-lg bg-amber-50 p-2 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"><AlertTriangle size={19} aria-hidden="true" /></span>
               <div>
                 <h3 id="duplicate-master-list-title" className="text-base font-bold text-slate-900 dark:text-white">Duplicate Master List file selected</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">These workbooks repeat a filename or file content in this selection. The registry does not keep uploaded Master List files, so there is no prior workbook to replace.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">These files repeat a filename or file content in this selection. The registry does not keep uploaded Master List files, so there is no prior file to replace.</p>
               </div>
             </div>
             <ul className="mt-4 max-h-48 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-3 text-xs dark:border-slate-800">
@@ -2281,7 +2282,7 @@ export function PartnerCompaniesPage({
           anything is saved; nothing is written to the registry until the
           admin clicks "Apply Update" here. */}
       {importPreview && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+        <div role="dialog" aria-modal="true" aria-labelledby="master-list-import-review-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-transparent dark:bg-slate-950 relative animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
             <button
               onClick={cancelImportPreview}
@@ -2297,7 +2298,7 @@ export function PartnerCompaniesPage({
                 <ClipboardList size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Review Master List Import</h3>
+                <h3 id="master-list-import-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review Master List Import</h3>
                 <p className="text-xs text-slate-500">
                   {importPreview.files.reduce((total, file) => total + file.rows.length, 0)} companies found in {importPreview.files.length} file{importPreview.files.length === 1 ? '' : 's'} &bull; nothing has been saved yet
                 </p>
@@ -2308,7 +2309,7 @@ export function PartnerCompaniesPage({
               <div className="bg-slate-50 dark:bg-slate-900/60 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
                 <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">Companies to review</h4>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Check a company to skip it. Files are grouped below so you can review each workbook separately.
+                  Check a company to skip it. Files are grouped below so you can review each file separately.
                   {importPreview.excludedRowKeys.length > 0 && ` ${importPreview.excludedRowKeys.length} selected to skip.`}
                 </p>
               </div>
@@ -2335,7 +2336,7 @@ export function PartnerCompaniesPage({
                           <span className="min-w-0 flex-1">
                             <span className={`block text-xs font-semibold ${excluded ? 'line-through text-slate-500' : 'text-slate-800 dark:text-slate-100'}`}>{row.bpName}</span>
                             <span className="mt-0.5 block text-[10px] text-slate-500 dark:text-slate-400">
-                              {row.bpCode ? `BP Code: ${row.bpCode}` : `Excel row ${row.sourceRow}`}
+                              {row.bpCode ? `BP Code: ${row.bpCode}` : `Source row ${row.sourceRow}`}
                               {row.category ? ` · ${row.category}` : ''}
                             </span>
                           </span>
@@ -2423,8 +2424,13 @@ export function PartnerCompaniesPage({
               </div>
             )}
 
-            <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-              Apply Update saves these changes to the registry. Cancel discards this import - the current registry stays untouched.
+            <p className="text-[11px] text-slate-500 mt-4 leading-relaxed">
+              Apply Update saves the registry and replaces all three Active Company Lists, keeping their history.
+              Categorized, unarchived companies qualify unless every branch is Inactive; unset statuses remain eligible.
+              {importReplace ? ' Only reviewed file records are included.' : ' Merge mode includes eligible existing partners.'}
+            </p>
+            <p className="mt-2 text-xs text-slate-600 dark:text-slate-300" aria-label="Resulting active company counts">
+              {activeListsFromRegistry(importPreview.result.companies).map(list => `${list.surveyType}: ${list.companies.length}`).join(' · ')}
             </p>
 
             {importError && <p role="alert" className="mt-3 text-xs text-rose-700 dark:text-rose-300">{importError}</p>}
@@ -2434,6 +2440,7 @@ export function PartnerCompaniesPage({
                 onClick={cancelImportPreview}
                 className="secondary-button text-xs py-2 px-4"
                 type="button"
+                disabled={isApplyingImport}
               >
                 Cancel
               </button>
@@ -2441,8 +2448,9 @@ export function PartnerCompaniesPage({
                 onClick={applyImportPreview}
                 className="bg-[#2187CD] hover:bg-[#2187CD]/90 text-white text-xs font-bold py-2 px-4 rounded-lg transition cursor-pointer"
                 type="button"
+                disabled={isApplyingImport || importPreview.result.stats.totalRows === 0}
               >
-                Apply Update
+                {isApplyingImport ? 'Applying…' : 'Apply Update'}
               </button>
             </div>
           </div>
@@ -2469,7 +2477,7 @@ export function PartnerCompaniesPage({
               </div>
               <div>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">Master List Import Complete</h3>
-                <p className="text-xs text-slate-500">{importResult.stats.totalRows} rows processed</p>
+                <p className="text-xs text-slate-500">{importResult.stats.totalRows} rows processed; Active Company Lists updated.</p>
               </div>
             </div>
 
