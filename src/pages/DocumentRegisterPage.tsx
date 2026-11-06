@@ -325,7 +325,7 @@ type DocumentSortKey = 'company' | 'compliance' | 'ntType' | 'bpCode' | string;
 // Matches the Master List's own "Supplier Rank" column values exactly, so an
 // edit here round-trips cleanly through a future re-import.
 const SUPPLIER_RANK_OPTIONS = ['Major', 'Regular'];
-const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-[minmax(170px,1fr)_88px_104px_minmax(120px,1fr)_88px_minmax(220px,0.5fr)_32px] xl:gap-x-3 2xl:grid-cols-[minmax(240px,1fr)_88px_104px_minmax(210px,1fr)_88px_minmax(300px,0.5fr)_32px] 2xl:gap-x-5';
+const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-[32px_minmax(170px,1fr)_88px_104px_minmax(120px,1fr)_88px_minmax(220px,1fr)] xl:gap-x-3 2xl:grid-cols-[32px_minmax(240px,1fr)_88px_104px_minmax(210px,1fr)_88px_minmax(300px,1fr)] 2xl:gap-x-5';
 const DOCUMENT_ROW_BADGE_CLASS = 'inline-flex h-8 max-w-full items-center rounded-md border px-2.5 text-[10px] font-semibold';
 
 function documentPartnerTypeBadgeClasses(type: PartnerCompanyType, isNT: boolean): string {
@@ -436,8 +436,8 @@ function BranchTypeSelect({ value, label, disabled = false, onChange }: { value:
     <button type="button" aria-label={label} aria-haspopup="listbox" aria-expanded={open} disabled={disabled} onClick={() => setOpen((current) => !current)} className={`${DOCUMENT_ROW_BADGE_CLASS} cursor-pointer whitespace-nowrap disabled:cursor-not-allowed ${documentPartnerTypeBadgeClasses('Supplier', value === 'Non-Trade')}`}>
       {value}
     </button>
-    {open && !disabled && <div role="listbox" aria-label={label} className="absolute left-0 top-full z-40 mt-1 min-w-full rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
-      {(['Trade', 'Non-Trade'] as const).map((type) => <button key={type} type="button" role="option" aria-selected={type === value} onClick={() => { onChange(type); setOpen(false); }} className={`flex min-h-8 w-full whitespace-nowrap rounded px-2 text-left text-xs hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800 ${documentPartnerTypeBadgeClasses('Supplier', type === 'Non-Trade')}`}>{type}</button>)}
+    {open && !disabled && <div role="listbox" aria-label={label} className="absolute left-0 top-full z-40 mt-0.5 min-w-full rounded-md border border-slate-200 bg-white p-0.5 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+      {(['Trade', 'Non-Trade'] as const).map((type) => <button key={type} type="button" role="option" aria-selected={type === value} onClick={() => { onChange(type); setOpen(false); }} className={`flex min-h-7 w-full whitespace-nowrap rounded px-2 py-1 text-left text-xs leading-4 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:hover:bg-slate-800 ${documentPartnerTypeBadgeClasses('Supplier', type === 'Non-Trade')}`}>{type}</button>)}
     </div>}
   </div>;
 }
@@ -479,8 +479,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const [documentStatusFilters, setDocumentStatusFilters] = useState<DocumentStatusFilter[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DOCUMENT_ROWS_PER_PAGE);
-  const [renewalTarget, setRenewalTarget] = useState<{ company: PartnerCompany; branchId: string; docName: string } | null>(null);
-  const [renewalDate, setRenewalDate] = useState('');
   const [mutationError, setMutationError] = useState('');
   // Flag docs (plain provided/not-provided checklist items, no expiry date):
   // clicking a cell opens a two-step flow. Step 'choose' lets the user pick
@@ -495,10 +493,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     currentProvided: boolean;
     selectedProvided: boolean;
   } | null>(null);
-  // Expiry docs (AFS, GIS, etc.): clicking a cell opens a status readout
-  // (Active till.../Expired/Missing) with Renew Document / Mark as Missing
-  // actions. confirmingMissing toggles this same popup into its own warning
-  // step before Mark as Missing actually clears the document.
   const [expiryStatusTarget, setExpiryStatusTarget] = useState<{
     company: PartnerCompany;
     branch: BranchRecord;
@@ -524,7 +518,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const sortCloseTimerRef = useRef<number | null>(null);
   const [complianceHistory, setComplianceHistory] = useState<Record<string, ComplianceSnapshot[]>>({});
   const [modificationLog, setModificationLog] = useState<DocumentModificationEntry[]>([]);
-  const [sortKey, setSortKey] = useState<DocumentSortKey>('company');
+  const [sortKeys, setSortKeys] = useState<DocumentSortKey[]>(['company']);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isSortPopoverOpen, setIsSortPopoverOpen] = useState(false);
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
@@ -533,7 +527,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const rowExpandHoverTimerRef = useRef<number | null>(null);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   const maintenanceDialogRef = useRef<HTMLDivElement>(null);
-  useModalEscape(Boolean(renewalTarget), () => setRenewalTarget(null), 50);
   useModalEscape(Boolean(flagFlow), () => setFlagFlow(null), 50);
   useModalEscape(Boolean(expiryStatusTarget), () => setExpiryStatusTarget(null), 50);
   const [notificationRules, setNotificationRules] = useState<DocNotificationRule[]>(DEFAULT_NOTIFICATION_RULES);
@@ -622,7 +615,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   // A selected document sort/filter is reset when switching to another
   // category's requirements.
   useEffect(() => {
-    setSortKey('company');
+    setSortKeys(['company']);
     setSortDirection('asc');
     setDocumentStatusFilters([]);
   }, [categoryKey]);
@@ -702,16 +695,26 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const hasAppliedFilters = Boolean(
     searchQuery.trim() || includeInactiveCompanies || withinTop20 || documentStatusFilters.length > 0 || customFilterRows.some((row) => row.value.trim()),
   );
-  const hasActiveTableState = hasAppliedFilters || sortKey !== 'company' || sortDirection !== 'asc';
+  const hasActiveTableState = hasAppliedFilters || sortKeys.length !== 1 || sortKeys[0] !== 'company' || sortDirection !== 'asc';
 
   const resetFiltersAndSort = () => {
     clearAppliedFilters();
-    setSortKey('company');
+    setSortKeys(['company']);
     setSortDirection('asc');
     setIsFilterPopoverOpen(false);
     setIsMoreFiltersOpen(false);
     cancelMoreFiltersClose();
     setIsSortPopoverOpen(false);
+  };
+
+  const toggleSortKey = (key: DocumentSortKey) => {
+    setSortKeys((current) => {
+      if (current.includes(key)) {
+        const next = current.filter((item) => item !== key);
+        return next.length > 0 ? next : ['company'];
+      }
+      return [...current, key];
+    });
   };
 
   const cancelSortMenuClose = () => {
@@ -753,6 +756,13 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       window.clearTimeout(rowExpandHoverTimerRef.current);
       rowExpandHoverTimerRef.current = null;
     }
+  };
+  const scheduleRowExpandHover = (rowKey: string) => {
+    cancelRowExpandHover();
+    rowExpandHoverTimerRef.current = window.setTimeout(() => {
+      setExpandedRowKey((current) => current === rowKey ? null : rowKey);
+      rowExpandHoverTimerRef.current = null;
+    }, 120);
   };
   useEffect(() => () => cancelRowExpandHover(), []);
   useEffect(() => { setOpenDocumentPopoverKey(null); }, [expandedRowKey]);
@@ -976,7 +986,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     }
     // Sort by the selected company, branch or document field, then use a
     // stable company/branch fallback to keep split branches together.
-    const compareBySortKey = (a: DisplayRow, b: DisplayRow): number => {
+    const compareBySortKey = (a: DisplayRow, b: DisplayRow, sortKey: DocumentSortKey): number => {
       if (sortKey === 'compliance') {
         const aCells = matrixCellData.get(a.key) ?? [];
         const bCells = matrixCellData.get(b.key) ?? [];
@@ -1008,11 +1018,11 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     };
     const fallback = (a: DisplayRow, b: DisplayRow) => a.company.name.localeCompare(b.company.name) || Number(a.isNT) - Number(b.isNT);
     return [...list].sort((a, b) => {
-      const primary = compareBySortKey(a, b);
+      const primary = sortKeys.reduce((result, key) => result || compareBySortKey(a, b, key), 0);
       const cmp = primary !== 0 ? primary : fallback(a, b);
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [displayRows, searchQuery, documentStatusFilters, customFilterRows, matrixCellData, sortKey, sortDirection]);
+  }, [displayRows, searchQuery, documentStatusFilters, customFilterRows, matrixCellData, sortKeys, sortDirection]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const paginatedRows = useMemo(() => {
@@ -1022,7 +1032,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [categoryKey, searchQuery, documentStatusFilters, customFilterRows, sortKey, sortDirection, includeInactiveCompanies, withinTop20]);
+  }, [categoryKey, searchQuery, documentStatusFilters, customFilterRows, sortKeys, sortDirection, includeInactiveCompanies, withinTop20]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, pageCount));
@@ -1158,17 +1168,22 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     });
   }, [categoryKey, currentDateStr, overview.statusTotal, overview.complianceRate]);
 
-  // Opens the renewal date picker directly - called either from a fresh
-  // click on an expiry-doc cell's "Renew Document" button in the status
-  // popup, or as a normal continuation once that popup is dismissed.
-  const openRenewal = (company: PartnerCompany, branch: BranchRecord, docName: string) => {
-    if (!canRenewDocuments) return;
+  const getSuggestedRenewalDate = (branch: BranchRecord, docName: string) => {
     const doc = branch.documents?.[docName];
     const validityYears = maintenanceSettings.validityYears[docName as keyof DocumentMaintenanceSettings['validityYears']];
     const suggested = new Date(effectiveNow);
     if (!doc?.expiryDate && typeof validityYears === 'number') suggested.setFullYear(suggested.getFullYear() + validityYears);
-    setRenewalDate(doc?.expiryDate || (Number.isFinite(suggested.getTime()) ? suggested.toISOString().slice(0, 10) : currentDateStr));
-    setRenewalTarget({ company, branchId: branch.id, docName });
+    return doc?.expiryDate || (Number.isFinite(suggested.getTime()) ? suggested.toISOString().slice(0, 10) : currentDateStr);
+  };
+
+  const renewDocument = async (company: PartnerCompany, branch: BranchRecord, docName: string, expiryDate: string): Promise<string | void> => {
+    if (!canRenewDocuments) return 'You do not have permission to renew documents.';
+    setMutationError('');
+    try {
+      await onRenewDocument(company.id, branch.id, docName, branch.documents?.[docName] ?? {}, { provided: true, expiryDate });
+    } catch {
+      return 'Could not update the compliance document. Please try again.';
+    }
   };
 
   // Applies an explicit provided/not-provided value (never a blind flip) -
@@ -1190,14 +1205,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     if (!canRenewDocuments) return;
     const currentProvided = !!branch.documents?.[docName]?.provided;
     setFlagFlow({ company, branch, docName, step: 'choose', currentProvided, selectedProvided: currentProvided });
-  };
-
-  // Opens the expiry-doc status popup (Active till.../Expired/Missing +
-  // Renew Document/Mark as Missing) instead of jumping straight to the date
-  // picker, so a click first shows what's on record before acting on it.
-  const openExpiryStatus = (company: PartnerCompany, branch: BranchRecord, docName: string) => {
-    if (!canRenewDocuments) return;
-    setExpiryStatusTarget({ company, branch, docName, confirmingMissing: false, missingRemarks: branch.documents?.[docName]?.remarks ?? '' });
   };
 
   const updateDocumentRemarks = async (company: PartnerCompany, branch: BranchRecord, docName: string, remarks: string): Promise<string | void> => {
@@ -1281,30 +1288,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     if (!isAdmin) return;
     setMutationError('');
     onUpdateCompany({ ...company, branches: (company.branches ?? []).map((item) => item.id === branch.id ? { ...item, businessType: type } : item) });
-  };
-
-  const confirmRenewal = async () => {
-    if (!renewalTarget || !renewalDate) return;
-    const { company, branchId, docName } = renewalTarget;
-    const branch = (company.branches ?? []).find((b) => b.id === branchId);
-    if (!branch) {
-      setMutationError('The selected branch no longer exists. Refresh and retry.');
-      return;
-    }
-    setMutationError('');
-    try {
-      await onRenewDocument(
-        company.id,
-        branchId,
-        docName,
-        branch.documents?.[docName] ?? {},
-        { provided: true, expiryDate: renewalDate },
-      );
-      // The server RPC writes the audit entry atomically with the document change.
-      setRenewalTarget(null);
-    } catch (error) {
-      setMutationError(error instanceof Error ? error.message : 'Unable to renew the compliance document.');
-    }
   };
 
   // Category-alert edits remain a draft until the maintenance workspace's
@@ -1890,25 +1873,17 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               <div className="relative" ref={sortPopoverRef}
                 onPointerEnter={(event) => { if (event.pointerType !== 'touch') { cancelSortMenuClose(); setIsSortPopoverOpen(true); } }}
                 onPointerLeave={(event) => { if (event.pointerType !== 'touch') scheduleSortMenuClose(); }}>
-                <button ref={sortTriggerRef} type="button" aria-label="Sort companies" title={`Sort by ${describeDocumentSort(sortKey)}, ${sortDirection === 'asc' ? 'ascending' : 'descending'}`} aria-haspopup="menu" aria-expanded={isSortPopoverOpen} aria-controls="document-sort-popover" onClick={() => { setIsFilterPopoverOpen(false); cancelSortMenuClose(); setIsSortPopoverOpen((open) => !open); }} onKeyDown={(event) => {
+                <button ref={sortTriggerRef} type="button" aria-label="Sort companies" title={`Sort by ${sortKeys.map(describeDocumentSort).join(', ')}, ${sortDirection === 'asc' ? 'ascending' : 'descending'}`} aria-haspopup="menu" aria-expanded={isSortPopoverOpen} aria-controls="document-sort-popover" onClick={() => { setIsFilterPopoverOpen(false); cancelSortMenuClose(); setIsSortPopoverOpen((open) => !open); }} onKeyDown={(event) => {
                   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                     event.preventDefault();
                     setIsFilterPopoverOpen(false);
                     setIsSortPopoverOpen(true);
-                    requestAnimationFrame(() => sortPopoverRef.current?.querySelector<HTMLButtonElement>('[data-sort-selected="true"]')?.focus());
+                    requestAnimationFrame(() => sortPopoverRef.current?.querySelector<HTMLInputElement>('input[data-sort-selected="true"]')?.focus());
                   }
                 }} className={`inline-flex h-9 w-9 items-center justify-center rounded-md border focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] ${isSortPopoverOpen ? 'border-[#8bbbd7] bg-[#eff6fa] text-[#155f8b]' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200'}`}>
                   <ArrowDownUp size={16} aria-hidden="true" />
                 </button>
-                {isSortPopoverOpen && <div id="document-sort-popover" role="menu" aria-label="Sort document register" onKeyDown={(event) => {
-                  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') return;
-                  const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
-                  const currentIndex = items.indexOf(event.target as HTMLButtonElement);
-                  if (currentIndex < 0 || items.length === 0) return;
-                  event.preventDefault();
-                  const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (currentIndex + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
-                  items[nextIndex].focus();
-                }} className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,32rem)] w-max min-w-48 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900">
+                {isSortPopoverOpen && <div id="document-sort-popover" role="menu" aria-label="Sort document register" className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,32rem)] w-max min-w-48 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900">
                   <div role="group" aria-label="Sort field">
                   {[
                     { value: 'company', label: 'Company' },
@@ -1919,10 +1894,12 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     { value: 'supplierRank', label: 'Supplier Rank' },
                     ...docColumns.map((docName) => ({ value: `doc:${docName}`, label: docName })),
                   ].map((option) => {
-                    const selected = sortKey === option.value;
-                    return <button key={option.value} type="button" role="menuitemradio" aria-checked={selected} data-sort-selected={selected || undefined} onClick={() => { setSortKey(option.value); setIsSortPopoverOpen(false); }} className={`flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] ${selected ? 'font-semibold text-[#155f8b] dark:text-sky-300' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
-                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{selected && <Check size={13} aria-hidden="true" />}</span><span className="truncate">{option.label}</span>
-                    </button>;
+                    const sortOption = option.value as DocumentSortKey;
+                    const selected = sortKeys.includes(sortOption);
+                    return <label key={option.value} role="menuitemcheckbox" aria-checked={selected} className={`flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2.5 text-left text-xs ${selected ? 'font-semibold text-[#155f8b] dark:text-sky-300' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
+                      <input type="checkbox" checked={selected} onChange={() => toggleSortKey(sortOption)} data-sort-selected={selected || undefined} className="rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]" />
+                      <span className="truncate">{option.label}</span>
+                    </label>;
                   })}
                   </div>
                   <div role="separator" className="my-1.5 border-t border-slate-100 dark:border-slate-800" />
@@ -1993,7 +1970,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               return <button key={status} type="button" onClick={() => setDocumentStatusFilters((current) => current.filter((item) => item !== status))} aria-label={`Remove document status filter: ${label}`} className="admin-directory-filter-chip"><span>Document status: {label}</span><X size={12} aria-hidden="true" /></button>;
             })}
             {customFilterRows.filter((row) => row.value.trim()).map((row) => <button key={row.id} type="button" onClick={() => removeFilterRow(row.id)} aria-label={`Remove filter: ${describeFilterRow(row)}`} title={describeFilterRow(row)} className="admin-directory-filter-chip"><span className="break-words">{describeFilterRow(row)}</span><X size={12} aria-hidden="true" /></button>)}
-            {(sortKey !== 'company' || sortDirection !== 'asc') && <button type="button" onClick={() => { setSortKey('company'); setSortDirection('asc'); }} aria-label="Remove sort" className="admin-directory-filter-chip"><span>Sort: {describeDocumentSort(sortKey)} ({sortDirection === 'asc' ? 'Ascending' : 'Descending'})</span><X size={12} aria-hidden="true" /></button>}
+            {(sortKeys.length !== 1 || sortKeys[0] !== 'company' || sortDirection !== 'asc') && <button type="button" onClick={() => { setSortKeys(['company']); setSortDirection('asc'); }} aria-label="Remove sort" className="admin-directory-filter-chip"><span>Sort: {sortKeys.map(describeDocumentSort).join(', ')} ({sortDirection === 'asc' ? 'Ascending' : 'Descending'})</span><X size={12} aria-hidden="true" /></button>}
             <button type="button" onClick={resetFiltersAndSort} className="admin-directory-reset-button ml-auto">Reset</button>
           </div>}
         </div>
@@ -2027,12 +2004,12 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       ) : (
         <div className="space-y-2" aria-label="Partner compliance list">
           <div role="group" aria-label="Partner compliance column headings" className={`hidden items-center px-4 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 xl:grid ${DOCUMENT_LIST_GRID_COLUMNS}`}>
-            <div className="xl:col-start-1">Company</div>
-            <div className="xl:col-start-2">Type</div>
-            <div className="xl:col-start-3">Supplier rank</div>
-            <div className="xl:col-start-4">Compliance</div>
-            <div className="xl:col-start-5">Branch status</div>
-            <div className="xl:col-start-6">Attention</div>
+            <div className="xl:col-start-2">Company</div>
+            <div className="xl:col-start-3">Type</div>
+            <div className="xl:col-start-4">Supplier rank</div>
+            <div className="xl:col-start-5">Compliance</div>
+            <div className="xl:col-start-6">Branch status</div>
+            <div className="xl:col-start-7">Attention</div>
           </div>
           {paginatedRows.map((row) => {
             const cells = matrixCellData.get(row.key) ?? [];
@@ -2063,25 +2040,29 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             ].filter((group) => group.isRequired || (!requiredStatusFilter && group.documents.length > 0));
             return (
               <article key={row.key} className="rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.025] dark:border-slate-800 dark:bg-slate-950">
-                  <div className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:grid-cols-2 sm:px-4 sm:py-3 xl:min-h-[72px] xl:gap-y-0 ${DOCUMENT_LIST_GRID_COLUMNS}`}>
-                  <div className="col-start-1 row-start-1 min-w-0 xl:col-auto xl:row-auto">
-                    <button type="button" title={row.company.name} aria-label={`${isExpanded ? 'Hide' : 'Review'} documents for ${row.company.name}${row.branch?.bpCode ? ` (${row.branch.bpCode})` : ''}`} aria-expanded={isExpanded} aria-controls={isExpanded ? 'documents-' + row.key : undefined}
-                      onClick={() => { cancelRowExpandHover(); setExpandedRowKey(isExpanded ? null : row.key); }}
-                      className="block w-full cursor-pointer break-words rounded-sm text-left text-sm !font-bold leading-5 text-[#1c2f4b] hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-100 dark:hover:text-sky-300 xl:truncate">{row.company.name}</button>
+                  <div className={`grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:px-4 sm:py-3 xl:min-h-[72px] xl:gap-y-0 ${DOCUMENT_LIST_GRID_COLUMNS}`}>
+                  <button type="button" aria-label={`${isExpanded ? 'Hide' : 'Review'} documents for ${row.company.name}${row.branch?.bpCode ? ` (${row.branch.bpCode})` : ''}`} title={isExpanded ? 'Hide documents' : 'Review documents'} aria-expanded={isExpanded} aria-controls={isExpanded ? 'documents-' + row.key : undefined}
+                    onMouseEnter={() => scheduleRowExpandHover(row.key)}
+                    onClick={() => { cancelRowExpandHover(); setExpandedRowKey(isExpanded ? null : row.key); }}
+                    className="col-start-1 row-start-1 inline-flex h-8 w-8 items-center justify-center rounded-md text-[#346f91] hover:bg-[#346f91]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#346f91] dark:text-sky-300 dark:hover:bg-sky-400/10 xl:col-auto xl:row-auto">
+                    <ChevronRight size={17} className={'transition-transform duration-150 ' + (isExpanded ? 'rotate-90' : '')} aria-hidden="true" />
+                  </button>
+                  <div className="col-start-2 row-start-1 min-w-0 xl:col-start-2 xl:row-auto">
+                    <div title={row.company.name} className="block w-full break-words text-left text-sm !font-bold leading-5 text-[#1c2f4b] dark:text-slate-100 xl:truncate">{row.company.name}</div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400 xl:flex-nowrap">
                       <span className="whitespace-nowrap font-mono">{row.branch?.bpCode || 'No BP Code'}</span>
                       {row.isSplit && <span className="whitespace-nowrap">{row.isNT ? 'Non-Trade branch' : 'Trade branch'}</span>}
                     </div>
                   </div>
-                  <div className="col-start-1 row-start-2 flex min-w-0 items-center xl:col-start-2 xl:row-auto">
+                  <div className="col-start-1 row-start-2 flex min-w-0 items-center xl:col-start-3 xl:row-auto">
                     {isAdmin && row.branch ? <BranchTypeSelect label={`Branch type for ${row.branch.bpCode || row.company.name}`} value={row.isNT ? 'Non-Trade' : 'Trade'} onChange={(type) => updateBranchBusinessType(row.company, row.branch!, type)} /> : <span className={`${DOCUMENT_ROW_BADGE_CLASS} whitespace-nowrap ${documentPartnerTypeBadgeClasses(row.company.type, row.isNT)}`}>{typeLabel}</span>}
                   </div>
-                  <div className="col-start-2 row-start-2 flex min-w-0 items-center xl:col-start-3 xl:row-auto">
+                  <div className="col-start-2 row-start-2 flex min-w-0 items-center xl:col-start-4 xl:row-auto">
                     {row.branch && (isAdmin ? (
                       <SupplierRankSelect label={`Supplier rank for ${row.branch.bpCode || row.company.name}`} value={row.branch.supplierRank || SUPPLIER_RANK_OPTIONS[0]} onChange={(rank) => updateSupplierRank(row.company, row.branch!, rank)} />
                     ) : <span className={'inline-flex h-8 items-center text-xs font-semibold ' + supplierRankTextClasses(row.branch.supplierRank)}>{row.branch.supplierRank || 'Not set'}</span>)}
                   </div>
-                  <div className="col-start-1 row-start-3 min-w-0 xl:col-start-4 xl:row-auto">
+                  <div className="col-start-1 row-start-3 min-w-0 xl:col-start-5 xl:row-auto">
                     <div className="flex items-center justify-between gap-2 text-xs">
                       <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">{currentCount}/{cells.length} current</span>
                       <span className="text-slate-400">{cells.length ? Math.round(currentCount / cells.length * 100) : 0}%</span>
@@ -2090,7 +2071,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                       <div className="h-full rounded-full bg-emerald-500" style={{ width: (cells.length ? currentCount / cells.length * 100 : 0) + '%' }} />
                     </div>
                   </div>
-                  <div className="col-start-2 row-start-3 min-w-0 xl:col-start-5 xl:row-auto">
+                  <div className="col-start-2 row-start-3 min-w-0 xl:col-start-6 xl:row-auto">
                     {row.branch && (row.branch.status || branchFullyCompliant) ? (
                       isAdmin ? <BranchStatusSelect label={`Branch status for ${row.branch.bpCode || row.company.name}`} value={branchFullyCompliant ? 'Completed' : row.branch.status!} disabled={branchFullyCompliant} onChange={(status) => updateBranchStatus(row.company, row.branch!, status as BranchStatus)} /> : <span aria-label={`Branch status: ${branchFullyCompliant ? 'Completed' : row.branch.status}`} className={`${DOCUMENT_ROW_BADGE_CLASS} ${branchStatusBadgeClasses(branchFullyCompliant ? 'Completed' : row.branch.status!)}`}>
                         {branchFullyCompliant ? 'Completed' : row.branch.status}
@@ -2101,19 +2082,19 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                       </span>
                     )}
                   </div>
-                  <div className="col-span-2 row-start-4 flex min-h-12 min-w-0 flex-col items-start justify-center gap-y-1 text-xs xl:col-span-1 xl:col-start-6 xl:row-auto" aria-label={needsAttention + ' compliance items need attention'}>
+                  <div className="col-span-2 row-start-4 flex min-h-12 min-w-0 w-full flex-col items-start justify-center gap-y-1 text-xs xl:col-span-1 xl:col-start-7 xl:row-auto" aria-label={needsAttention + ' compliance items need attention'}>
                     {needsAttention === 0 ? (
                       <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-emerald-700 dark:text-emerald-400"><Check size={14} /> All current</span>
                     ) : (
-                      <>
+                      <div className="w-full">
                         {classificationRequired && (
-                          <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium text-[#536b80] dark:text-slate-300">
+                          <span className="flex items-center justify-start gap-1.5 whitespace-nowrap font-medium text-[#536b80] dark:text-slate-300">
                             <CircleAlert size={12} strokeWidth={1.8} aria-hidden="true" />
                             Classification needed
                           </span>
                         )}
                         {(expiredCount > 0 || expiringCount > 0 || updateCount > 0 || missingCount > 0) && (
-                          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                          <div className={`ml-auto grid w-[15rem] grid-cols-[max-content_max-content] items-center justify-start gap-x-6 gap-y-1.5 ${classificationRequired ? 'mt-1.5' : ''}`}>
                             {expiredCount > 0 && (
                               <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-rose-700 dark:text-rose-300">
                                 <AlertTriangle size={12} strokeWidth={1.8} aria-hidden="true" />
@@ -2144,23 +2125,9 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                             )}
                           </div>
                         )}
-                      </>
+                      </div>
                     )}
                   </div>
-                  <button type="button" aria-label={`${isExpanded ? 'Hide' : 'Review'} documents for ${row.company.name}${row.branch?.bpCode ? ` (${row.branch.bpCode})` : ''}`} title={isExpanded ? 'Hide documents' : 'Review documents'} aria-expanded={isExpanded} aria-controls={isExpanded ? 'documents-' + row.key : undefined}
-                    onPointerEnter={(event) => {
-                      if (event.pointerType === 'touch' || isExpanded) return;
-                      cancelRowExpandHover();
-                      rowExpandHoverTimerRef.current = window.setTimeout(() => {
-                        setExpandedRowKey(row.key);
-                        rowExpandHoverTimerRef.current = null;
-                      }, 1000);
-                    }}
-                    onPointerLeave={cancelRowExpandHover}
-                    onClick={() => { cancelRowExpandHover(); setExpandedRowKey(isExpanded ? null : row.key); }}
-                    className="col-start-2 row-start-1 inline-flex h-8 w-8 items-center justify-center rounded-md text-[#346f91] hover:bg-[#346f91]/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#346f91] dark:text-sky-300 dark:hover:bg-sky-400/10 xl:col-start-7 xl:row-auto">
-                    <ChevronRight size={17} className={'transition-transform duration-150 ' + (isExpanded ? 'rotate-90' : '')} aria-hidden="true" />
-                  </button>
                 </div>
                 {isExpanded && (
                   <div id={'documents-' + row.key} className="rounded-b-lg border-t border-slate-100 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/30">
@@ -2176,7 +2143,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                         <section key={group.label} aria-label={group.label} className="min-w-0">
                           <h3 className="mb-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">{group.label}<span className="ml-1.5 font-normal text-slate-400">{group.documents.length}{group.isRequired && requiredStatusFilter ? ` / ${cells.length}` : ''}</span></h3>
                           {group.documents.length === 0 && <p role="status" className="py-3 text-xs text-slate-500 dark:text-slate-400">No {requiredStatusFilter?.toLowerCase()} required documents.</p>}
-                          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+                          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                             {group.documents.map(({ docName, status, daysLeft, doc, branch, expiryBased, inactiveClassification }) => {
                               const Icon = DOCUMENT_STATUS_ICONS[status];
                               const dateLine = getCellDateLine(status, doc.expiryDate, daysLeft);
@@ -2187,7 +2154,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                               return (
                                 <li key={docName} className={`flex min-h-[76px] min-w-0 items-start justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950 ${statusAccent}`}>
                                   <div className="min-w-0 flex-1">
-                                    <div className="break-words text-xs font-medium text-slate-800 dark:text-slate-200">{docName}</div>
+                                    <div className="break-words text-xs font-medium leading-4 text-slate-800 dark:text-slate-200">{docName}</div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
                                       <span className={`inline-flex items-center gap-1 font-medium ${statusColor}`}><Icon size={11} strokeWidth={2.3} aria-hidden="true" />{status}</span>
                                       {dateLine && <span className="text-slate-500 dark:text-slate-400">{dateLine}</span>}
@@ -2198,7 +2165,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                                     remarksAtBottom={categoryKey === 'supplier-local'}
                                     popoverKey={`${row.key}::${docName}`} openPopoverKey={openDocumentPopoverKey} onOpenPopover={setOpenDocumentPopoverKey}
                                     requireRemarks={['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)}
-                                    onRenew={() => { if (branch) openExpiryStatus(row.company, branch, docName); }}
+                                    renewalDate={branch ? getSuggestedRenewalDate(branch, docName) : ''}
+                                    onRenew={(expiryDate) => branch ? renewDocument(row.company, branch, docName, expiryDate) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
                                     onStatus={(provided, remarks, expiryDate) => branch ? updateDocumentStatus(row.company, branch, docName, provided, remarks, expiryDate) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
                                     onRemarks={(remarks) => branch ? updateDocumentRemarks(row.company, branch, docName, remarks) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
                                     onClearRemarks={() => branch ? updateDocumentRemarks(row.company, branch, docName, '') : Promise.resolve('Branch no longer exists. Refresh and retry.')} />}
@@ -2442,7 +2410,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     <button
                       type="button"
                       onClick={() => {
-                        openRenewal(expiryStatusTarget.company, expiryStatusTarget.branch, expiryStatusTarget.docName);
                         setExpiryStatusTarget(null);
                       }}
                       className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white transition cursor-pointer"
@@ -2519,69 +2486,6 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           document.body
         );
       })()}
-
-      {/* Simple renewal date picker */}
-      {renewalTarget && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-transparent dark:bg-slate-950 relative">
-            <button
-              onClick={() => setRenewalTarget(null)}
-              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer"
-              type="button"
-            >
-              <X size={18} />
-            </button>
-            <div className="flex items-center gap-2.5 text-emerald-600 mb-1">
-              <RefreshCw size={20} />
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Renew Document</h3>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              <strong className="text-slate-800 dark:text-slate-100">"{renewalTarget.docName}"</strong> for{' '}
-              <strong className="text-slate-800 dark:text-slate-100">
-                "{branchAwareCompanyLabel(renewalTarget.company, (renewalTarget.company.branches ?? []).find((b) => b.id === renewalTarget.branchId))}"
-              </strong>
-            </p>
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-[#a16207] dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
-              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-              <span>This immediately updates the company's compliance record. Double-check the date before confirming.</span>
-            </div>
-            <label htmlFor="doc-register-renewal-date" className="field-label text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-              New Expiry Date
-            </label>
-            {(() => {
-              const branch = (renewalTarget.company.branches ?? []).find((item) => item.id === renewalTarget.branchId);
-              const currentExpiry = branch?.documents?.[renewalTarget.docName]?.expiryDate;
-              const years = maintenanceSettings.validityYears[renewalTarget.docName as keyof DocumentMaintenanceSettings['validityYears']];
-              return !currentExpiry && typeof years === 'number' ? (
-                <p className="mb-1 text-[10px] text-slate-400">Suggested from the configured {years}-year period. You can adjust this date.</p>
-              ) : null;
-            })()}
-            <input
-              id="doc-register-renewal-date"
-              type="date"
-              className="field text-sm py-2"
-              value={renewalDate}
-              onChange={(e) => setRenewalDate(e.target.value)}
-              autoFocus
-            />
-            <div className="flex items-center justify-end gap-3 mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <button onClick={() => setRenewalTarget(null)} className="secondary-button py-2 px-4 text-xs" type="button">
-                Cancel
-              </button>
-              <button
-                onClick={confirmRenewal}
-                disabled={!renewalDate}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 py-2 text-xs font-bold text-white transition cursor-pointer"
-                type="button"
-              >
-                <Check size={14} />
-                <span>Confirm Renewal</span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Content-sized maintenance dialog; the validity list gets a bounded
           scroll area only when the viewport cannot show the full table. */}
@@ -2812,6 +2716,7 @@ function DocumentQuickActions({
   disabled,
   canDeleteRemarks,
   expiryBased,
+  renewalDate,
   requireRemarks,
   remarksAtBottom = false,
   onRenew,
@@ -2832,7 +2737,8 @@ function DocumentQuickActions({
   expiryBased: boolean;
   requireRemarks: boolean;
   remarksAtBottom?: boolean;
-  onRenew: () => void;
+  renewalDate: string;
+  onRenew: (expiryDate: string) => Promise<string | void>;
   onStatus: (provided: boolean, remarks: string, expiryDate?: string) => Promise<string | void>;
   onRemarks: (remarks: string) => Promise<string | void>;
   onClearRemarks: () => Promise<string | void>;
@@ -2841,6 +2747,8 @@ function DocumentQuickActions({
   const [verificationRemarks, setVerificationRemarks] = useState('');
   const [verificationDate, setVerificationDate] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isRenewing, setIsRenewing] = useState(false);
+  const [renewalDraft, setRenewalDraft] = useState(renewalDate);
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [isRemarksOpen, setIsRemarksOpen] = useState(false);
   const [isViewingRemarks, setIsViewingRemarks] = useState(false);
@@ -2867,12 +2775,14 @@ function DocumentQuickActions({
     // The panel is portalled and may move when it switches from the compact
     // menu to the remarks editor. Keep active work open across that move;
     // the outside-pointer and Escape handlers still provide dismissal.
-    if (isRemarksOpen || isViewingRemarks || confirmingRemarkDelete || isVerifying || saving) return;
+    if (isRemarksOpen || isViewingRemarks || confirmingRemarkDelete || isVerifying || isRenewing || saving) return;
     hoverCloseTimer.current = setTimeout(() => { setIsOpen(false); setIsRemarksOpen(false); setIsViewingRemarks(false); setConfirmingRemarkDelete(false); }, 180);
   };
   useEffect(() => {
     if (!isRemarksOpen) setRemarks(document.remarks ?? '');
   }, [document.remarks, isRemarksOpen]);
+
+  useEffect(() => setRenewalDraft(renewalDate), [renewalDate]);
 
   useEffect(() => {
     if (isOpen && isViewingRemarks) remarkContentRef.current?.focus();
@@ -2900,13 +2810,18 @@ function DocumentQuickActions({
       window.removeEventListener('resize', positionPanel);
       window.removeEventListener('scroll', positionPanel, true);
     };
-  }, [isOpen, isRemarksOpen, isViewingRemarks, isVerifying, error, feedback, saving]);
+  }, [isOpen, isRemarksOpen, isViewingRemarks, isVerifying, isRenewing, error, feedback, saving]);
 
   useEffect(() => {
     if (!isOpen || !isVerifying) return;
     (panelRef.current?.querySelector<HTMLInputElement>('input[type="date"]')
       ?? panelRef.current?.querySelector<HTMLTextAreaElement>('textarea'))?.focus();
   }, [isOpen, isVerifying]);
+
+  useEffect(() => {
+    if (!isOpen || !isRenewing) return;
+    panelRef.current?.querySelector<HTMLInputElement>('input[type="date"]')?.focus();
+  }, [isOpen, isRenewing]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -2916,6 +2831,7 @@ function DocumentQuickActions({
         setIsOpen(false);
         setIsRemarksOpen(false);
         setIsViewingRemarks(false);
+        setIsRenewing(false);
         setConfirmingRemarkDelete(false);
       }
     };
@@ -2925,6 +2841,7 @@ function DocumentQuickActions({
       setIsOpen(false);
       setIsRemarksOpen(false);
       setIsViewingRemarks(false);
+      setIsRenewing(false);
       setConfirmingRemarkDelete(false);
       (anchorRef.current ?? triggerRef.current)?.focus();
     };
@@ -2956,6 +2873,23 @@ function DocumentQuickActions({
       }
       setFeedback('Saved');
       return true;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmRenewal = async () => {
+    if (!renewalDraft) return;
+    setSaving(true);
+    setError('');
+    try {
+      const failure = await onRenew(renewalDraft);
+      if (typeof failure === 'string') {
+        setError(failure);
+        return;
+      }
+      setIsRenewing(false);
+      setIsOpen(false);
     } finally {
       setSaving(false);
     }
@@ -3023,7 +2957,7 @@ function DocumentQuickActions({
   };
 
   const trigger = (
-    <button ref={triggerRef} type="button" disabled={disabled} onMouseEnter={() => { clearHoverClose(); anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsOpen(true); }} onClick={() => { anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsOpen(true); setPosition(null); }} aria-haspopup="menu" aria-expanded={isOpen && !isViewingRemarks && !isRemarksOpen} aria-label={`Actions for ${docName}`} title={`Actions for ${docName}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800">
+    <button ref={triggerRef} type="button" disabled={disabled} onMouseEnter={() => { clearHoverClose(); anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsRenewing(false); setIsOpen(true); }} onClick={() => { anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsRenewing(false); setIsOpen(true); setPosition(null); }} aria-haspopup="menu" aria-expanded={isOpen && !isViewingRemarks && !isRemarksOpen && !isRenewing} aria-label={`Actions for ${docName}`} title={`Actions for ${docName}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800">
       <MoreHorizontal size={17} aria-hidden="true" />
     </button>
   );
@@ -3033,8 +2967,17 @@ function DocumentQuickActions({
       {document.remarks?.trim() && <button ref={remarkTriggerRef} type="button" onClick={() => { anchorRef.current = remarkTriggerRef.current; setRemarks(document.remarks ?? ''); setIsRemarksOpen(false); setIsViewingRemarks(true); setConfirmingRemarkDelete(false); setError(''); setFeedback(''); setIsOpen(true); setPosition(null); }} aria-label={`View admin remarks for ${docName}`} title="View remarks" aria-haspopup="dialog" aria-expanded={isOpen && isViewingRemarks} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#536b80] hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-400 dark:hover:bg-slate-800"><MessageSquareText size={15} aria-hidden="true" /></button>}
       {!remarksAtBottom && trigger}
       {isOpen && createPortal(
-        <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen || isVerifying ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isVerifying ? 'Verify document' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] box-border min-w-0 max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-x-hidden overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
-          {isVerifying ? <div className="p-2">
+        <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen || isVerifying || isRenewing ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isVerifying ? 'Verify document' : isRenewing ? 'Renew document' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] box-border min-w-0 max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-x-hidden overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
+          {isRenewing ? <div className="p-2">
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Renew {docName}</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-600 dark:text-slate-300">Choose the new expiry date for {companyName} · {branchName}.</p>
+            <label htmlFor={`renewal-date-${popoverKey}`} className="mt-3 block text-[11px] font-medium text-slate-700 dark:text-slate-200">New expiry date
+              <input id={`renewal-date-${popoverKey}`} type="date" value={renewalDraft} onChange={(event) => { setRenewalDraft(event.target.value); setError(''); }} className="field mt-1 h-8 text-xs" />
+            </label>
+            <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">This updates the compliance record immediately.</p>
+            {error && <p role="alert" className="mt-1.5 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
+            <div className="mt-2 flex justify-end gap-1.5"><button type="button" disabled={saving} onClick={() => { setIsRenewing(false); setError(''); }} className="rounded px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">Back</button><button type="button" disabled={saving || !renewalDraft} onClick={() => void confirmRenewal()} className="rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving...' : 'Confirm renewal'}</button></div>
+          </div> : isVerifying ? <div className="p-2">
             <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Verify {docName}</p>
             <p className="mt-1 text-[11px] leading-4 text-slate-600 dark:text-slate-300">{companyName} · {branchName}</p>
             <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">This records an administrative verification; it does not upload a file.</p>
@@ -3068,12 +3011,12 @@ function DocumentQuickActions({
               <button type="button" disabled={saving || remarks === (document.remarks ?? '')} onClick={() => void saveRemarks()} className="rounded bg-[#2187CD] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
             </div>
           </div> : <>
-            {document.provided === true && status !== 'Missing' && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(false)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><XCircle size={15} aria-hidden="true" />Mark missing</button>}
+            {document.provided === true && status !== 'Missing' && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(false)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><XCircle size={15} aria-hidden="true" />{expiryBased ? 'Mark as Missing' : 'Mark missing'}</button>}
             {(status === 'Missing' || status === 'For Update') && <button role="menuitem" type="button" disabled={saving} onClick={() => { clearHoverClose(); setIsVerifying(true); setVerificationRemarks(''); setVerificationDate(''); setReviewConfirmed(false); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-medium text-[#155f8b] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950/30"><Check size={15} aria-hidden="true" />Verify and mark current</button>}
             <button role="menuitem" type="button" onClick={() => { clearHoverClose(); setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-200 dark:hover:bg-slate-800"><FilePlus2 size={15} aria-hidden="true" />{document.remarks ? 'Edit remarks' : 'Add remarks'}</button>
             {expiryBased && <>
               <div role="separator" className="my-1 border-t border-slate-100 dark:border-slate-800" />
-              <button role="menuitem" type="button" disabled={saving} onClick={() => { setIsOpen(false); onRenew(); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><RefreshCw size={15} aria-hidden="true" />{status === 'Missing' ? 'Add document or expiry' : status === 'Expired' || status === 'For Update' ? 'Renew or update expiry' : 'Renew / set expiry'}</button>
+              <button role="menuitem" type="button" disabled={saving} onClick={() => { clearHoverClose(); setRenewalDraft(renewalDate); setIsRenewing(true); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><RefreshCw size={15} aria-hidden="true" />{status === 'Missing' ? 'Add document or expiry' : status === 'Expired' || status === 'For Update' ? 'Renew Document' : 'Renew / set expiry'}</button>
             </>}
             {error && <p role="alert" className="px-2.5 py-1 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
             {feedback && <p role="status" className="px-2.5 py-1 text-[11px] text-emerald-700 dark:text-emerald-300">{feedback}</p>}

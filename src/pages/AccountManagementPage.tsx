@@ -514,15 +514,18 @@ export function AccountManagementPage({
                       >
                         <Edit2 size={16} />
                       </button>
-                      {canDeleteAccount(acc) && (
-                        <button
-                          onClick={() => handleDelete(acc.email)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors cursor-pointer animate-fade-in"
-                          title="Delete Account"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(acc.email)}
+                        disabled={!canDeleteAccount(acc)}
+                        aria-label="Delete Account"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/30 transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                        title={canDeleteAccount(acc)
+                          ? 'Delete Account'
+                          : 'Delete Account unavailable for your own account or an account with the same role'}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </button>
                     </div>
                   </td>
                 </tr>

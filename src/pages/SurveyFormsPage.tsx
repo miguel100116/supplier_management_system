@@ -57,7 +57,7 @@ const surveyTypeBadges: Record<SurveyType, string> = {
   Subcontractor: 'bg-orange-50 text-orange-700 border border-orange-100 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/20',
 };
 
-const surveyBadgeClassName = 'inline-flex items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold uppercase leading-4 tracking-wider';
+const surveyBadgeClassName = 'inline-flex items-center justify-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase leading-4 tracking-wider';
 
 const departmentOptions = [
   'Accounts Payable - Trade',
@@ -938,7 +938,7 @@ export function SurveyFormsPage({
                             <button
                               type="button"
                               onClick={() => { setPreviewSurveyId(survey.id); setDistributionFeedback(null); setPreviewPeriodSaveMessage(''); setPreviewPeriodSaveError(''); }}
-                              className="block max-w-full truncate text-left text-[13px] font-semibold leading-5 text-slate-800 hover:text-[#2187CD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] dark:text-slate-100 dark:hover:text-blue-300"
+                              className="block max-w-full truncate text-left text-sm font-semibold leading-5 text-slate-800 hover:text-[#2187CD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] dark:text-slate-100 dark:hover:text-blue-300"
                               aria-label={`Preview ${survey.title}`}
                             >
                               {survey.title}
