@@ -341,13 +341,13 @@ function yesNo(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function expiryDoc(value: unknown, docName: string): ComplianceDocument {
+function expiryDoc(value: unknown, docName: string, type: PartnerCompanyType, origin?: SupplierOrigin): ComplianceDocument {
   const v = String(value ?? '').trim();
   if (!v || /^n\/a$/i.test(v)) return {};
   if (/^missing$/i.test(v)) return { provided: false };
   const expiryDate = parseFlexibleDate(v);
   if (!expiryDate) return {};
-  const { status, daysLeft } = computeDocumentStatus({ expiryDate }, new Date(), docName);
+  const { status, daysLeft } = computeDocumentStatus({ expiryDate }, new Date(), docName, { type, supplierOrigin: origin });
   return { provided: true, expiryDate, status, daysLeft };
 }
 
@@ -369,7 +369,7 @@ function buildDocuments(
     if (Object.keys(doc).length) docs[label] = doc;
   };
   const setExpiry = (label: string, idx: number) => {
-    const doc = expiryDoc(cells[idx], label);
+    const doc = expiryDoc(cells[idx], label, type, origin);
     if (Object.keys(doc).length) docs[label] = doc;
   };
 
@@ -387,15 +387,14 @@ function buildDocuments(
   // those categories have the same list of requirements, except the foreign
   // one", and there's no Courier-Foreign/Subcontractor-Foreign category).
   if (type === 'Supplier' && origin === 'Foreign') {
-    const [sif, articles, cert, afs, bpLicense, ownersId, productProfile, otherDocs] = FOREIGN_SUPPLIER_DOCUMENTS;
+    const [sif, afs, cert, articles, bpLicense, ownersId, productProfile] = FOREIGN_SUPPLIER_DOCUMENTS;
     setFlag(sif, COL.foreign.sif);
-    setFlag(articles, COL.foreign.articlesOfIncorporation);
-    setFlag(cert, COL.foreign.certOfIncorporation);
     setExpiry(afs, COL.foreign.afs);
+    setFlag(cert, COL.foreign.certOfIncorporation);
+    setFlag(articles, COL.foreign.articlesOfIncorporation);
     setExpiry(bpLicense, COL.foreign.businessPermitLicense);
     setFlag(ownersId, COL.foreign.ownersId);
     setFlag(productProfile, COL.foreign.productProfile);
-    setFlag(otherDocs, COL.foreign.otherDocuments);
   } else {
     const [sif, bir, sec, articles, afs, gis, dti, bp, ip, productProfile, proofOfAddress, ownersId, otherDocs] = LOCAL_SUPPLIER_DOCUMENTS;
     setFlag(sif, COL.local.sif);

@@ -122,6 +122,8 @@
 .employee-experience .workflow-steps .completed{color:#7388a6}
 .employee-experience .workflow-steps .completed span{background:#e5effa;color:var(--brand)}
 .employee-experience .draft-save-error{margin-top:13px;padding:10px 12px;border:1px solid #eed3d6;border-radius:6px;background:#fdf5f5;color:#9d646b;font-size:12px;line-height:1.6}
+.employee-experience .draft-autosave-status{margin-top:5px;font-size:12px;line-height:1.5;color:#8c99ad}
+.employee-experience .draft-autosave-status.has-error{color:#9d646b}
 @media(max-width:560px){.employee-experience .evaluation-progress-panel{padding:15px 13px;margin-bottom:18px}.employee-experience .evaluation-progress-panel .workflow-steps>div{font-size:9px}.employee-experience .evaluation-progress-panel .workflow-steps i{margin:0 4px}.employee-experience .rating-scale-shell{width:100%}.employee-experience .rating-option{min-width:38px;min-height:40px;flex-basis:38px;padding:0 8px}.employee-experience .draft-confirmation-modal{padding:24px 20px 20px}.employee-experience .draft-modal-content{padding-right:12px}.employee-experience .draft-confirmation-modal .confirmation-actions{flex-wrap:wrap}.employee-experience .draft-confirmation-modal .confirmation-actions .primary-button{order:-1;width:100%}.employee-experience .draft-confirmation-modal .confirmation-actions .secondary-button{flex:1}}
 
 /* Evaluation flow layout follows the single-column Figma reference. Keep these
@@ -160,7 +162,6 @@
 .employee-experience #survey-filler-container .rating-scale-shell{width:100%;overflow:visible;padding:0;border:0;border-radius:0;background:transparent}
 .employee-experience #survey-filler-container .rating-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(42px,1fr));gap:7px;overflow:visible;padding:0}
 .employee-experience #survey-filler-container .rating-option{width:100%;min-width:42px;height:48px;min-height:48px;flex:none;flex-direction:column;gap:2px;padding:5px 4px;border:1px solid #dce5ef;border-radius:8px;background:#fff;color:#111827;font-size:15px;line-height:1.2}
-.employee-experience #survey-filler-container .rating-option-description{color:#8998ac;font-size:9px;font-weight:400;line-height:1.1;text-align:center}
 .employee-experience #survey-filler-container .rating-option.not-applicable{flex-basis:auto;font-size:13px}
 .employee-experience #survey-filler-container .rating-option:hover{border-color:var(--brand);background:#f3f9fd;color:var(--brand)}
 .employee-experience #survey-filler-container .rating-option.selected,.employee-experience #survey-filler-container .rating-option[aria-checked=true]{border:2px solid var(--brand);background:#edf7fd;color:var(--brand)}

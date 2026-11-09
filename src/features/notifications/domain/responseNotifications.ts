@@ -9,6 +9,8 @@ export function toNotification(rows: SurveyResponse[]): ResponseNotification | n
   return {
     id: first.responseId,
     company: first.company,
+    companyId: first.companyId,
+    surveyId: first.surveyId,
     surveyType: first.surveyType,
     respondentType: first.respondentType,
     submissionDate: first.submissionDate,

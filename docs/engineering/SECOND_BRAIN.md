@@ -2,6 +2,28 @@
 
 Last verified: 2026-11-05
 
+### 2026-11-09 - Local Supplier optional supporting documents
+
+The legacy Local Supplier `Other Documents` item is no longer a required checklist card, but saved values remain visible in Historical & additional. Admins and users with `renew-documents` can add branch-specific `Other: ...` requirements through the shared Add Other Document action; they use the existing status, remarks, optional-expiry, and audited removal workflow without becoming universal requirements. Migration `202611090004_supplier_optional_supporting_documents.sql` updates persisted completion rules and adds the permission-checked removal RPC; it has been authored but not applied. Evidence: `documentRequirements.ts`, `DocumentRegisterPage.tsx`, `partnerDocumentFiles.ts`, and the migration.
+
+### 2026-11-09 - Foreign Supplier supporting-document removal
+
+Added Foreign Supplier supporting documents can be removed from their document action menu. Removal uses a dedicated compare-and-set RPC that checks the existing document-renewal permission, partner origin, branch, and expected document, and writes to document modification history. If a supporting document has an uploaded private file, the client removes the object before the RPC and restores it if the record mutation fails. The forward-only migration `202611090002_remove_foreign_supplier_supporting_document.sql` has been authored but not applied. Evidence: `partnerDocumentFiles.ts`, `DocumentRegisterPage.tsx`, `useSurveyData.ts`, and the migration.
+
+### 2026-11-09 - Notification click-through destinations
+
+Admin notification items are actionable: response alerts open the corresponding response in the Feedback Hub; document alerts focus the affected partner in the Document Tracker. Both paths mark the selected notification read using the existing owner-scoped read-state persistence. The header bell exposes Mark all as read in place of its unread-count label. Notification metadata carries survey and partner IDs where available, retaining name/category matching as a legacy fallback. Evidence: `src/features/notifications/components/NotificationBell.tsx`, `src/features/notifications/domain/responseNotifications.ts`, `src/pages/AdminNotificationCenter.tsx`, and `src/App.tsx`.
+
+### 2026-11-09 - Employee evaluation auto-drafts
+
+Employee evaluation answers are saved to device-local storage on each form change and restored when the same employee reopens the same survey and partner. Employee draft keys are scoped by normalized account email; the exit dialog still offers explicit discard and save actions. Storage failures are shown in the form. Older unscoped drafts are not adopted because their owner cannot be verified. Evidence: `src/pages/SurveyFillerPage.tsx` and `src/features/employee-experience/components/employeeExperience.css`.
+
+### 2026-11-09 - Foreign Supplier document audit requirements and files
+
+Foreign Supplier requirements in `documentRequirements.ts` are exactly seven predefined items, including Business Permit / Licenses. Their descriptions and validity rules match the supplied reference: SIF and Product Profile update as needed; AFS matches the current fiscal/calendar year; Certificate and Articles update only if amended; permit/license follows current-year or stated expiry validity; Owner ID requires a valid-through date. `Other: ...` entries remain supplier-specific and conditional, with optional expiry, upload, remarks, status and audit paths. The Foreign Supplier UI's Additional list shows only these added `Other: ...` documents; legacy DTI, GIS, Business Permit, and Import Permit entries remain saved in branch JSON but are not rendered as required or additional checklist cards. No record/file/history deletion is part of requirement changes. Local rules are unchanged. Database completion alignment is authored in `202611090003_foreign_supplier_requirement_rules.sql`, after the original file/rule migration `202611090001_foreign_supplier_document_files_and_rules.sql`; neither migration has been applied. Review and apply migrations through the normal database release process before relying on remote RPC/storage behavior.
+
+Evidence: `documentRequirements.ts`, `compliance.ts`, `masterListImport.ts`, `partnerDocumentFiles.ts`, `DocumentRegisterPage.tsx`, `202611090003_foreign_supplier_requirement_rules.sql`, and `branchCompletionMigration.test.ts`. The file bucket and `attach_foreign_supplier_document_file` enforce the existing Admin/`renew-documents` permission and write document-modification history. The added supporting-document action uses the same permission guard and the existing `renew_partner_document` RPC. The new completion rule requires the exact seven Foreign items, current-year AFS and a non-expired Owner ID date; its rollback is restoring the prior completion function, without deleting saved records or private files.
+
 ### 2026-11-06 - Empty database audit actor fallback repaired
 
 Live CLI inspection in `supplier-management-staging` found one unowned classification-reset audit entry with an empty actor among 35 modification records. `private.my_app_email()` returns `''` without an app JWT, so the audit trigger's `coalesce(email, 'system')` did not activate its fallback. Migration [202611060002](../../supabase/migrations/202611060002_document_audit_actor_fallback.sql) handles blank/whitespace actors in both classification and maintenance audit paths and backfills only unowned blank-actor history as `system`; it never invents a human identity. Frontend validation remains strict.

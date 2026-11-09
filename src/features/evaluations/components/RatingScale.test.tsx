@@ -26,7 +26,8 @@ test('rating scale keeps zero and N/A as distinct selectable values on a 0–4 s
   assert.equal((markup.match(/role="radio"/g) ?? []).length, 6);
   assert.match(markup, /id="rating-btn-Q1-0"[^>]*aria-checked="true"/);
   assert.match(markup, /id="rating-btn-Q1-N\/A"[^>]*aria-label="Not applicable"/);
-  assert.match(markup, />N\/A<span class="rating-option-description">Not applicable<\/span><\/button>/);
+  assert.match(markup, />N\/A<\/button>/);
+  assert.doesNotMatch(markup, /rating-option-description|>Not applicable</);
 });
 
 test('rating scale respects a configured 1–7 range and omits N/A when disallowed', () => {

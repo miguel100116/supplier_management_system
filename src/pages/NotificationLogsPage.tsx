@@ -14,6 +14,7 @@ interface NotificationLogsPageProps {
   onMarkRead: (id: string) => void;
   onMarkUnread: (id: string) => void;
   onMarkAllRead: () => void;
+  onOpenNotification: (notification: ResponseNotification) => void;
 }
 
 const surveyTypeOptions: Array<'All' | SurveyType> = ['All', 'Courier', 'Supplier', 'Subcontractor'];
@@ -31,6 +32,7 @@ export function NotificationLogsPage({
   onMarkRead,
   onMarkUnread,
   onMarkAllRead,
+  onOpenNotification,
 }: NotificationLogsPageProps) {
   const [surveyType, setSurveyType] = useState<'All' | SurveyType>('All');
   const [search, setSearch] = useState('');
@@ -319,7 +321,14 @@ export function NotificationLogsPage({
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-2">
                           {item.isNew && <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" title="New" />}
-                          <span className="font-bold text-slate-800 dark:text-slate-100">{item.company}</span>
+                          <button
+                            type="button"
+                            onClick={() => onOpenNotification(item)}
+                            className="text-left font-bold text-slate-800 hover:text-[#0063a9] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] dark:text-slate-100"
+                            aria-label={`Open ${isDocumentNotification(item) ? 'documents' : 'feedback'} for ${item.company}`}
+                          >
+                            {item.company}
+                          </button>
                         </div>
                       </div>
                     </td>

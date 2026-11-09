@@ -13,6 +13,7 @@ interface AdminNotificationCenterProps {
   onMarkRead: (id: string) => void;
   onMarkUnread: (id: string) => void;
   onMarkAllRead: () => void;
+  onOpenNotification?: (notification: ResponseNotification) => void;
 }
 
 const surveyTypeOptions: Array<'All' | SurveyType> = ['All', 'Courier', 'Supplier', 'Subcontractor'];
@@ -67,6 +68,7 @@ export function AdminNotificationCenter({
   onMarkRead,
   onMarkUnread,
   onMarkAllRead,
+  onOpenNotification,
 }: AdminNotificationCenterProps) {
   const [readFilter, setReadFilter] = useState<ReadFilter>('all');
   const [surveyType, setSurveyType] = useState<'All' | SurveyType>('All');
@@ -239,7 +241,16 @@ export function AdminNotificationCenter({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <h3 className={`break-words text-sm leading-5 text-slate-900 dark:text-white ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.company || 'Company unavailable'}</h3>
+                        <h3 className="text-left">
+                          <button
+                            type="button"
+                            onClick={() => onOpenNotification?.(item)}
+                            className={`break-words text-sm leading-5 text-slate-900 hover:text-[#2187CD] hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] dark:text-white ${item.isUnread ? 'font-semibold' : 'font-medium'}`}
+                            aria-label={`Open ${isDocument ? 'documents' : 'feedback'} for ${item.company}`}
+                          >
+                            {item.company || 'Company unavailable'}
+                          </button>
+                        </h3>
                         <span className={`rounded border border-transparent px-1.5 py-0.5 text-[10px] font-medium leading-4 ${categoryClasses[item.surveyType]}`}>{item.surveyType}</span>
                         <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${item.isUnread ? 'text-[#2187CD]' : 'text-slate-400 dark:text-slate-500'}`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${item.isUnread ? 'bg-[#2187CD]' : 'bg-slate-300 dark:bg-slate-600'}`} aria-hidden="true" />

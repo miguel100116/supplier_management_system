@@ -18,7 +18,7 @@ interface PartnerCompaniesFilterToolbarProps {
 
 type OpenPopover = 'documents' | 'origin' | 'dates' | 'sort' | null;
 const DOCUMENT_LABELS: Record<PartnerDocumentFilter, string> = {
-  all: 'All document states', current: 'Current', expiring: 'Expiring soon', expired: 'Expired / for update', missing: 'Missing required docs',
+  all: 'All document states', current: 'Current', expiring: 'Expiring soon', expired: 'Expired / for update', missing: 'Pending required docs',
 };
 
 export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolbarProps) {
@@ -26,6 +26,8 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
     sortOptions, sortValue, onSortChange, registeredFrom, registeredTo, onRegisteredFromChange, onRegisteredToChange,
     documentFilter, onDocumentFilterChange, onReset } = props;
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
+  const suppressTriggerFocusOpen = useRef(false);
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRefs = useRef<Partial<Record<Exclude<OpenPopover, null>, HTMLButtonElement>>>({});
   const hasAnyFilters = Boolean(searchQuery.trim() || categoryTab !== 'All' || documentFilter !== 'all' || originFilter.length !== 2 || businessTypeFilter.length !== 2 || registeredFrom || registeredTo || sortValue !== 'default');
@@ -38,6 +40,24 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
   if (registeredFrom) chips.push({ key: 'from', label: `Registered from: ${registeredFrom}`, remove: () => onRegisteredFromChange('') });
   if (registeredTo) chips.push({ key: 'to', label: `Registered to: ${registeredTo}`, remove: () => onRegisteredToChange('') });
   if (sortValue !== 'default') chips.push({ key: 'sort', label: `Sort: ${sortOptions.find((option) => option.value === sortValue)?.label ?? sortValue}`, remove: () => onSortChange('default') });
+
+  const clearHoverClose = () => {
+    if (hoverCloseTimer.current !== null) clearTimeout(hoverCloseTimer.current);
+    hoverCloseTimer.current = null;
+  };
+  const openPopoverOnHover = (kind: Exclude<OpenPopover, null>) => {
+    clearHoverClose();
+    setOpenPopover(kind);
+  };
+  const schedulePopoverClose = (kind: Exclude<OpenPopover, null>) => {
+    clearHoverClose();
+    hoverCloseTimer.current = setTimeout(() => {
+      setOpenPopover((current) => current === kind ? null : current);
+      hoverCloseTimer.current = null;
+    }, 140);
+  };
+
+  useEffect(() => () => clearHoverClose(), []);
 
   useEffect(() => {
     if (!openPopover) return;
@@ -56,6 +76,7 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
   const selectOption = <T extends string,>(kind: Exclude<OpenPopover, null>, value: T, onSelect: (value: T) => void) => {
     onSelect(value);
     setOpenPopover(null);
+    suppressTriggerFocusOpen.current = true;
     triggerRefs.current[kind]?.focus();
   };
 
@@ -86,8 +107,8 @@ export function PartnerCompaniesFilterToolbar(props: PartnerCompaniesFilterToolb
   );
 
   const trigger = (kind: Exclude<OpenPopover, null>, label: string, icon: React.ReactNode, active: boolean, content: React.ReactNode) => (
-    <div className={`admin-directory-popover-anchor admin-directory-popover-${kind}`}>
-      <button ref={(element) => { triggerRefs.current[kind] = element ?? undefined; }} type="button" className="admin-directory-icon-trigger" aria-label={label} title={label} aria-expanded={openPopover === kind} aria-haspopup="dialog" onMouseEnter={() => { if (kind === 'origin') setOpenPopover(kind); }} onFocus={() => { if (kind === 'origin') setOpenPopover(kind); }} onClick={() => setOpenPopover((current) => current === kind ? null : kind)}>
+    <div className={`admin-directory-popover-anchor admin-directory-popover-${kind}`} onMouseEnter={() => openPopoverOnHover(kind)} onMouseLeave={() => schedulePopoverClose(kind)}>
+      <button ref={(element) => { triggerRefs.current[kind] = element ?? undefined; }} type="button" className="admin-directory-icon-trigger" aria-label={label} title={label} aria-expanded={openPopover === kind} aria-haspopup="dialog" onFocus={() => { clearHoverClose(); if (suppressTriggerFocusOpen.current) suppressTriggerFocusOpen.current = false; else setOpenPopover(kind); }} onClick={() => setOpenPopover(kind)}>
         {icon}{active && <span className="admin-directory-active-dot" aria-hidden="true" />}
       </button>
       {openPopover === kind && <div className="admin-directory-compact-popover" role="dialog" aria-label={label}>{content}</div>}
