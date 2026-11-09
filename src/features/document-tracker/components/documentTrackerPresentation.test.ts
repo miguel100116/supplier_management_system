@@ -42,13 +42,12 @@ test('category document review is a compact expandable company list with accessi
   assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[32px_minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,1fr\)\] xl:gap-x-3 2xl:grid-cols-\[32px_minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,1fr\)\] 2xl:gap-x-5';/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /flex min-h-12 min-w-0 w-full flex-col items-start justify-center gap-y-1 text-xs/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /<div className="w-full">/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /ml-auto grid w-\[15rem\] grid-cols-\[max-content_max-content\] items-center justify-start gap-x-6 gap-y-1\.5/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /const statusColor = status === 'Missing' \? 'text-rose-700[\s\S]*?status === 'Expired' \? 'text-rose-800[\s\S]*?'text-amber-700/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /const statusColor = status === 'Missing' \? 'text-orange-800[\s\S]*?status === 'Expired' \? 'text-rose-800[\s\S]*?'text-amber-700/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /onMouseEnter=\{clearHoverClose\} onMouseLeave=\{scheduleHoverClose\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /'Add remarks'/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /aria-haspopup="menu"/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \|\| isVerifying \|\| isRenewing \? 'group' : 'menu'\}/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /role="menuitem"[^>]*>[\s\S]*?Mark missing/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /role=\{isViewingRemarks \? 'dialog' : isRemarksOpen \|\| isVerifying \|\| isRenewing \|\| confirmingSupportingDocumentRemoval \? 'group' : 'menu'\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /role="menuitem"[^>]*>[\s\S]*?Mark as Pending/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /role="dialog" aria-label=\{`Actions for \$\{docName\}`\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /w-\[min\(16rem,calc\(100vw-24px\)\)\]/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Current record|Not provided|Close document actions/);
@@ -66,7 +65,7 @@ test('category document review is a compact expandable company list with accessi
 });
 
 test('missing and for-update documents expose a verification confirmation with optional remarks and expiry validation', () => {
-  assert.match(DOCUMENT_TRACKER_SOURCE, /status === 'Missing' \|\| status === 'For Update'/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /status === 'Missing' \|\| status === 'Expired' \|\| status === 'For Update'/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /Verify and mark current/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /I reviewed and verified this document\./);
   assert.match(DOCUMENT_TRACKER_SOURCE, /Remarks \(optional\)/);
@@ -76,7 +75,7 @@ test('missing and for-update documents expose a verification confirmation with o
 });
 
 test('remarks editor ignores hover dismissal while active and cancels a pending close when opened', () => {
-  assert.match(DOCUMENT_TRACKER_SOURCE, /if \(isRemarksOpen \|\| isViewingRemarks \|\| confirmingRemarkDelete \|\| isVerifying \|\| isRenewing \|\| saving\) return;/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /if \(isRemarksOpen \|\| isViewingRemarks \|\| confirmingRemarkDelete \|\| confirmingSupportingDocumentRemoval \|\| isVerifying \|\| isRenewing \|\| saving\) return;/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /onClick=\{\(\) => \{ clearHoverClose\(\); setIsRemarksOpen\(true\); setError\(''\); setFeedback\(''\); \}\}/);
 });
 
@@ -105,7 +104,7 @@ test('document maintenance separates schedules, validity, and category alerts wi
 test('partner rows show the saved branch status as a badge, separate from document compliance statuses', () => {
   assert.match(DOCUMENT_TRACKER_SOURCE, /const DOCUMENT_LIST_GRID_COLUMNS = 'xl:grid-cols-\[32px_minmax\(170px,1fr\)_88px_104px_minmax\(120px,1fr\)_88px_minmax\(220px,1fr\)\] xl:gap-x-3 2xl:grid-cols-\[32px_minmax\(240px,1fr\)_88px_104px_minmax\(210px,1fr\)_88px_minmax\(300px,1fr\)\] 2xl:gap-x-5';/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /grid-cols-\[auto_minmax\(0,1fr\)\]/);
-  assert.match(DOCUMENT_TRACKER_SOURCE, /title=\{row\.company\.name\}/);
+  assert.match(DOCUMENT_TRACKER_SOURCE, /aria-label=\{\`\$\{isExpanded \? 'Collapse' : 'Expand'\} documents for \$\{row\.company\.name\}/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /className="block w-full[^\"]*break-words[^\"]*xl:truncate"/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /xl:flex-nowrap/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /col-start-2 row-start-3 min-w-0 xl:col-start-6 xl:row-auto/);
@@ -119,6 +118,7 @@ test('partner rows show the saved branch status as a badge, separate from docume
   assert.match(DOCUMENT_TRACKER_SOURCE, /branchStatusBadgeClasses\(branchFullyCompliant \? 'Completed' : row\.branch\.status!\)/);
   assert.match(DOCUMENT_TRACKER_SOURCE, /\{branchFullyCompliant \? 'Completed' : row\.branch\.status\}/);
   assert.doesNotMatch(DOCUMENT_TRACKER_SOURCE, /Calculated from required documents, classification, and expiry dates/);
+  assert.match(renderCategoryEntry('supplier-local'), /aria-label="Expand documents for Local \(LOCAL\)"/);
 });
 
 

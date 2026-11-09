@@ -432,11 +432,11 @@ test('Supplier Local attention containers filter only the expanded company and t
   const openFirst = () => expandTrigger().click();
   await openFirst();
   const attention = company.getByLabel('Required document attention summary', { exact: true });
-  const missing = attention.getByRole('button', { name: '4 missing', exact: true });
+  const missing = attention.getByRole('button', { name: '4 pending', exact: true });
   const expired = attention.getByRole('button', { name: '1 expired', exact: true });
   const forUpdate = attention.getByRole('button', { name: '1 for update', exact: true });
   const summary = await attention.textContent() ?? '';
-  const checkScope = async (count: number, showHistory = count === 14) => {
+  const checkScope = async (count: number, showHistory = count === 13) => {
     await expect(required.getByRole('listitem')).toHaveCount(count);
     await expect(attention).toHaveText(summary);
     if (showHistory) {
@@ -450,14 +450,14 @@ test('Supplier Local attention containers filter only the expanded company and t
       expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     }
   };
-  await checkScope(14, true);
+  await checkScope(13, true);
   await missing.click();
   await expect(missing).toHaveAttribute('aria-pressed', 'true');
   await expect(missing.locator('svg.lucide-x')).toBeVisible();
   await expect(expired.locator('svg.lucide-x')).toHaveCount(0);
   await checkScope(4, false);
-  await expect(required.getByRole('listitem')).toHaveText([/SIF.*Missing/, /BIR2303.*Missing/, /Articles of Incorporation.*Missing/, /Product Profile.*Missing/]);
-  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 14');
+  await expect(required.getByRole('listitem')).toHaveText([/SIF.*Pending/, /BIR2303.*Pending/, /Articles of Incorporation.*Pending/, /Product Profile.*Pending/]);
+  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 13');
   const sifCard = required.getByRole('listitem').filter({ has: page.getByText('SIF', { exact: true }) });
   const actionsBox = await sifCard.getByRole('button', { name: 'Actions for SIF', exact: true }).boundingBox();
   const remarksBox = await sifCard.getByRole('button', { name: 'View admin remarks for SIF', exact: true }).boundingBox();
@@ -488,19 +488,19 @@ test('Supplier Local attention containers filter only the expanded company and t
   await page.keyboard.press('Space');
   await expect(forUpdate).toHaveAttribute('aria-pressed', 'false');
   await expect(forUpdate.locator('svg.lucide-x')).toHaveCount(0);
-  await checkScope(14, true);
+  await checkScope(13, true);
   await expired.click();
   await checkScope(1, false);
   await page.getByRole('button', { name: 'Review documents for Second Local Supplier (LOCAL-TWO)', exact: true }).first().click();
   const second = page.getByRole('region', { name: 'Required documents', exact: true });
-  await expect(second.getByRole('listitem')).toHaveCount(14);
-  await expect(page.getByRole('button', { name: '1 missing', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(second.getByRole('listitem')).toHaveCount(13);
+  await expect(page.getByRole('button', { name: '1 pending', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await openFirst();
-  await checkScope(14, true);
+  await checkScope(13, true);
   await expect(expired).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Hide documents for First Local Supplier (LOCAL-ONE)', exact: true }).first().click();
   await openFirst();
-  await checkScope(14, true);
+  await checkScope(13, true);
   expect(JSON.stringify(service.records.filter(record => record.record_type === 'partner_company'))).toBe(originalPartners);
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
