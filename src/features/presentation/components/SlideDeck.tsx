@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
@@ -912,41 +912,41 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
   const layoutConfig = useMemo(() => {
     if (numGroups === 1) {
       return {
-        containerClass: "mt-4 max-w-2xl mx-auto w-full flex-1 flex flex-col justify-center",
-        gridClass: "grid grid-cols-1",
-        groupBlockClass: "rounded-2xl border-2 border-slate-100 p-8 bg-slate-50/40 shadow-md",
+        containerClass: "mt-4 max-w-2xl mx-auto w-full min-h-0 flex-1 flex flex-col",
+        gridClass: "grid min-h-0 flex-1 grid-cols-1",
+        groupBlockClass: "flex min-h-0 flex-col rounded-2xl border-2 border-slate-100 p-8 bg-slate-50/40 shadow-md",
         titleClass: "mb-6 text-lg sm:text-2xl font-black uppercase tracking-[0.2em] text-center block",
-        listSpacingClass: "space-y-3.5",
-        buttonPaddingClass: "py-3 px-4",
-        rankClass: "flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs sm:text-lg font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-sm sm:text-lg font-bold text-slate-800 group-hover:text-[#0063a9] group-hover:underline transition-all",
-        scoreClass: "shrink-0 text-sm sm:text-lg font-extrabold transition-all group-hover:scale-105",
+        listSpacingClass: "min-h-0 flex-1 overflow-y-auto space-y-1.5",
+        buttonPaddingClass: "py-1.5 px-2.5",
+        rankClass: "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
+        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-sm font-bold text-slate-800 group-hover:text-[#0063a9] group-hover:underline transition-all",
+        scoreClass: "shrink-0 text-xs sm:text-sm font-extrabold transition-all group-hover:scale-105",
         noDataClass: "text-base sm:text-lg text-slate-400 text-center py-6",
       };
     } else if (numGroups === 2) {
       return {
-        containerClass: "mt-4 max-w-5xl mx-auto w-full flex-1 flex flex-col justify-center",
-        gridClass: "grid grid-cols-1 sm:grid-cols-2 gap-8",
-        groupBlockClass: "rounded-xl border-2 border-slate-100 p-6 bg-slate-50/30 shadow-sm",
-        titleClass: "mb-5 text-sm sm:text-lg font-extrabold uppercase tracking-wider text-center block",
-        listSpacingClass: "space-y-2.5",
-        buttonPaddingClass: "py-2 px-3",
-        rankClass: "flex h-7 w-7 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs sm:text-base font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-base font-semibold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
-        scoreClass: "shrink-0 text-xs sm:text-base font-bold transition-all group-hover:scale-105",
+        containerClass: "mt-4 max-w-5xl mx-auto w-full min-h-0 flex-1 flex flex-col",
+        gridClass: "grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-8",
+        groupBlockClass: "flex min-h-0 flex-col rounded-xl border-2 border-slate-100 p-6 bg-slate-50/30 shadow-sm",
+        titleClass: "mb-3 shrink-0 text-sm sm:text-lg font-extrabold uppercase tracking-wider text-center block",
+        listSpacingClass: "min-h-0 flex-1 overflow-y-auto space-y-1",
+        buttonPaddingClass: "py-1.5 px-2.5",
+        rankClass: "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
+        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-sm font-semibold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
+        scoreClass: "shrink-0 text-xs sm:text-sm font-bold transition-all group-hover:scale-105",
         noDataClass: "text-xs sm:text-sm text-slate-400 text-center py-4",
       };
     } else {
       return {
-        containerClass: "mt-4 w-full flex-1",
-        gridClass: "grid grid-cols-1 sm:grid-cols-3 gap-4",
-        groupBlockClass: "rounded-xl border border-slate-100 p-4 bg-slate-50/30",
-        titleClass: "mb-3 text-xs sm:text-sm font-extrabold uppercase tracking-wider text-center block",
-        listSpacingClass: "space-y-1.5",
-        buttonPaddingClass: "py-1.5 px-2.5",
-        rankClass: "flex h-5 w-5 sm:h-7 sm:w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] sm:text-xs font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-sm font-bold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
-        scoreClass: "shrink-0 text-xs sm:text-sm font-bold transition-all group-hover:scale-105",
+        containerClass: "mt-4 w-full min-h-0 flex-1",
+        gridClass: "grid h-full min-h-0 grid-cols-1 gap-4 sm:grid-cols-3",
+        groupBlockClass: "flex min-h-0 flex-col rounded-xl border border-slate-100 p-4 bg-slate-50/30",
+        titleClass: "mb-2 shrink-0 text-xs sm:text-sm font-extrabold uppercase tracking-wider text-center block",
+        listSpacingClass: "min-h-0 flex-1 overflow-y-auto space-y-0.5",
+        buttonPaddingClass: "py-1 px-2",
+        rankClass: "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
+        companyClass: "min-w-0 flex-1 truncate text-[11px] sm:text-xs font-bold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
+        scoreClass: "shrink-0 text-[11px] sm:text-xs font-bold transition-all group-hover:scale-105",
         noDataClass: "text-xs text-slate-400 text-center py-2",
       };
     }
@@ -1141,8 +1141,15 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
               >
                 {group.surveyType}
               </p>
+              {group.selectedCompanyOutsideTopTwenty && (
+                <p className="mb-2 rounded-md bg-[#eef7fc] px-2.5 py-2 text-[11px] leading-4 text-slate-600">
+                  <span className="font-semibold text-[#176FAE]">{group.selectedCompanyOutsideTopTwenty.company}</span> is not included in the top 20 and is ranked{' '}
+                  <span className="font-semibold text-slate-800">{group.selectedCompanyOutsideTopTwenty.rank}</span> out of{' '}
+                  <span className="font-semibold text-slate-800">{group.selectedCompanyOutsideTopTwenty.total}</span> {group.surveyType.toLowerCase()} companies.
+                </p>
+              )}
               {group.rows.length ? (
-                <ol className={layoutConfig.listSpacingClass}>
+                <ol className={`${layoutConfig.listSpacingClass} presentation-leaderboard-scroll`}>
                   {group.rows.map((row) => (
                     <li key={row.company}>
                       <button
@@ -1154,7 +1161,8 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
                           })
                         }
                         title={`Click to view detailed metrics for ${row.company}`}
-                        className={`flex w-full items-center gap-2.5 rounded-lg text-left transition hover:bg-slate-100 group cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500/50 ${layoutConfig.buttonPaddingClass}`}
+                        aria-current={row.isSelected ? 'true' : undefined}
+                        className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-transparent text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500/60 ${row.isSelected ? 'border-[#2187CD]/50 bg-[#eef7fc]' : 'hover:bg-slate-100'} ${layoutConfig.buttonPaddingClass}`}
                       >
                         <span
                           className={layoutConfig.rankClass}
@@ -1610,15 +1618,31 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
     setIndex(next);
   };
 
+  const toggleFullscreen = useCallback(async () => {
+    if (!shellRef.current) return;
+    if (document.fullscreenElement === shellRef.current) {
+      await document.exitFullscreen();
+    } else if (!document.fullscreenElement) {
+      await shellRef.current.requestFullscreen();
+    }
+  }, []);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key === 'ArrowRight') goTo(index + 1);
       if (event.key === 'ArrowLeft') goTo(index - 1);
       if (event.key === 'Escape' && document.fullscreenElement) document.exitFullscreen();
+      if (event.key.toLowerCase() === 'f' && !event.altKey && !event.ctrlKey && !event.metaKey) {
+        const target = event.target as HTMLElement | null;
+        const isTyping = target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '');
+        if (isTyping) return;
+        event.preventDefault();
+        void toggleFullscreen();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [index, slides.length]);
+  }, [index, slides.length, toggleFullscreen]);
 
   useEffect(() => {
     const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -1685,15 +1709,6 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
     viewportSize.width > 0 && viewportSize.height > 0
       ? Math.min(viewportSize.width / SLIDE_WIDTH, viewportSize.height / SLIDE_HEIGHT)
       : 1;
-
-  const toggleFullscreen = async () => {
-    if (!shellRef.current) return;
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-    } else {
-      await shellRef.current.requestFullscreen();
-    }
-  };
 
   const handleExport = async (format: 'pdf' | 'pptx') => {
     setExportMenuOpen(false);

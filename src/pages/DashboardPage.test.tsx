@@ -212,7 +212,7 @@ test('Admin dashboard keeps the protected banner and presents its work in an act
   assert.match(html, /Partners needing document review/);
   assert.match(html, /Partner documents/);
   assert.match(html, /Northstar Logistics/);
-  assert.match(html, /Missing/);
+  assert.match(html, /Pending/);
   assert.match(html, /Evaluation forms in progress/);
   assert.match(html, /class="admin-dashboard-cycle-status running">Active<\/span>/);
   assert.match(html, /Recent submissions/);

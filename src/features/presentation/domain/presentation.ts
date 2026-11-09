@@ -214,7 +214,11 @@ export type Slide =
     }
   | {
       kind: 'leaderboard';
-      groups: { surveyType: SurveyType; rows: { rank: number; company: string; score: number; band: string; hex: string }[] }[];
+      groups: {
+        surveyType: SurveyType;
+        rows: { rank: number; company: string; score: number; band: string; hex: string; isSelected?: boolean }[];
+        selectedCompanyOutsideTopTwenty?: { company: string; rank: number; total: number };
+      }[];
     }
   | { kind: 'trends'; data: { month: string; average: number | null; responses: number }[] }
   | { kind: 'questions'; top: { question: string; average: number }[]; bottom: { question: string; average: number }[]; maxRating?: number }
@@ -368,6 +372,7 @@ export interface BuildSlidesOptions {
   currentPeriod?: ReportingPeriodBounds | null;
   previousPeriodResponses?: SurveyResponse[];
   surveyTypes?: SurveyType[];
+  selectedCompany?: { company: string; surveyType: SurveyType } | null;
   presentationTitle?: string;
 }
 
@@ -380,6 +385,7 @@ export function buildSlides(options: BuildSlidesOptions): Slide[] {
     currentPeriod = null,
     previousPeriodResponses = [],
     surveyTypes = ALL_SURVEY_TYPES,
+    selectedCompany = null,
     presentationTitle = 'Stakeholder Satisfaction Presentation',
   } = options;
 
@@ -468,15 +474,24 @@ export function buildSlides(options: BuildSlidesOptions): Slide[] {
 
     if (id === 'leaderboard') {
       const groups = surveyTypes.map((type) => {
-        const leaderboard = getLeaderboard(responses, type).slice(0, 5);
+        const allRankedCompanies = getLeaderboard(responses, type);
+        const selectedRank = selectedCompany?.surveyType === type
+          ? allRankedCompanies.findIndex((company) => company.company === selectedCompany.company) + 1
+          : 0;
+        const selectedCompanyOutsideTopTwenty = selectedCompany && selectedRank > 20
+          ? { company: selectedCompany.company, rank: selectedRank, total: allRankedCompanies.length }
+          : undefined;
+        const leaderboard = allRankedCompanies.slice(0, 20);
         return {
           surveyType: type,
+          selectedCompanyOutsideTopTwenty,
           rows: leaderboard.map((c, index) => ({
             rank: index + 1,
             company: c.company,
             score: c.compositeScore,
             band: c.band.label,
             hex: c.band.hex,
+            isSelected: selectedRank === index + 1,
           })),
         };
       });

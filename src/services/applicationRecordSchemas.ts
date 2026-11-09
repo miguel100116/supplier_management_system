@@ -132,6 +132,18 @@ function parsePartnerCompany(value: unknown, recordId: string, label: string): J
           optionalDate(parsedDocument.expiryDate, `${label}.documents.${name}.expiryDate`);
           optionalText(parsedDocument.remarks, `${label}.documents.${name}.remarks`, 2_000);
           optionalText(parsedDocument.description, `${label}.documents.${name}.description`, 500);
+          if (parsedDocument.file !== undefined) {
+            const file = object(parsedDocument.file, `${label}.documents.${name}.file`);
+            text(file.storagePath, `${label}.documents.${name}.file.storagePath`, { max: 500 });
+            text(file.originalName, `${label}.documents.${name}.file.originalName`, { max: 255 });
+            text(file.contentType, `${label}.documents.${name}.file.contentType`, { max: 150 });
+            const fileSize = finiteNumber(file.fileSize, `${label}.documents.${name}.file.fileSize`);
+            if (!/^[0-9a-f-]{36}$/i.test(String(file.storagePath)) || !Number.isInteger(fileSize) || fileSize < 1 || fileSize > 10 * 1024 * 1024
+              || !['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/jpeg', 'image/png'].includes(String(file.contentType))) {
+              throw new Error(`${label}.documents.${name}.file has unsupported metadata.`);
+            }
+            isoDate(file.uploadedAt, `${label}.documents.${name}.file.uploadedAt`);
+          }
         });
       }
     });

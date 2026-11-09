@@ -40,6 +40,13 @@ interface PendingExit {
   onCancelled?: () => void;
 }
 
+const getSurveyDraftKey = (surveyId: string, companyName: string, employeeEmail?: string) => {
+  const employeeScope = employeeEmail?.trim().toLowerCase();
+  return employeeScope
+    ? `survey_analytics_draft_${encodeURIComponent(employeeScope)}_${surveyId}_${companyName.trim()}`
+    : `survey_analytics_draft_${surveyId}_${companyName.trim()}`;
+};
+
 interface SurveyFillerPageProps {
   surveys: CustomForm[];
   knownSurveys?: CustomForm[];
@@ -104,6 +111,8 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
   const [showReview, setShowReview] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
   const [draftSaveError, setDraftSaveError] = useState('');
+  const [autoSaveError, setAutoSaveError] = useState('');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'saving' | 'saved'>('saving');
   // True once the respondent has entered the Questions Form at least once for
   // this session. Lets us tell apart the *first* transition into step 2
   // (where answers should be freshly initialized from any saved draft) from
@@ -122,6 +131,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
   // Respondent metadata
   const [company, setCompany] = useState('');
+  const [submittedCompany, setSubmittedCompany] = useState('');
   const department = defaultDepartment ?? '';
   const respondentType = defaultRespondentType ?? '';
   const hasOrganizationalProfile = Boolean(department && respondentType);
@@ -145,6 +155,33 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       ? previous
       : { ...previous, [periodQuestionId]: periodCovered });
   }, [periodCovered, periodQuestionId]);
+
+  useEffect(() => {
+    if (!employeeExperience || step !== 2 || !selectedSurveyId || !company.trim() || !activeSurvey) return;
+
+    try {
+      const draftKey = getSurveyDraftKey(selectedSurveyId, company, userEmail);
+      localStorage.setItem(draftKey, JSON.stringify({
+        ratings,
+        comments,
+        periodCovered,
+        department,
+        respondentType,
+        address,
+        respondentEmail: userEmail.trim().toLowerCase(),
+      }));
+      setAutoSaveError('');
+      setAutoSaveStatus('saved');
+    } catch {
+      setAutoSaveError('Automatic saving is unavailable. Keep this page open and try again after checking your browser storage.');
+    }
+  }, [employeeExperience, step, selectedSurveyId, company, activeSurvey, ratings, comments, periodCovered, department, respondentType, address, userEmail]);
+
+  useEffect(() => {
+    if (employeeExperience && step === 2 && showReview) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+  }, [employeeExperience, step, showReview]);
 
   useEffect(() => {
     const nextId = resolveSelectableSurveyId(surveys, selectedSurveyId);
@@ -234,6 +271,10 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
   // Sync company with selected survey type
   useEffect(() => {
+    // Once an evaluation starts, keep its selected partner stable. A successful
+    // submission removes that partner from the pending list and must not cause
+    // the form (or confirmation) to switch to the next partner.
+    if (hasStartedForm) return;
     if (matchingCompanies.length > 0) {
       setCompany(matchingCompanies.some((item) => item.name === initialCompanyName)
         ? initialCompanyName
@@ -241,7 +282,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     } else {
       setCompany('');
     }
-  }, [matchingCompanies, initialCompanyName]);
+  }, [matchingCompanies, initialCompanyName, hasStartedForm]);
 
   useEffect(() => {
     if (employeeExperience) setAddress(selectedCompanyAddress);
@@ -296,15 +337,22 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     }
 
     // Try to load saved draft for this survey & company if it exists
-    const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company}`;
-    const savedDraft = localStorage.getItem(draftKey);
+    const draftKey = getSurveyDraftKey(selectedSurveyId, company, employeeExperience ? userEmail : undefined);
+    let savedDraft: string | null = null;
+    try {
+      savedDraft = localStorage.getItem(draftKey);
+    } catch {
+      setAutoSaveError('Automatic saving is unavailable. Check your browser storage settings.');
+    }
     let draftRatings: Record<string, any> = {};
     let draftComments: Record<string, string> = {};
     if (savedDraft) {
       try {
         const parsed = JSON.parse(savedDraft);
-        draftRatings = parsed.ratings || {};
-        draftComments = parsed.comments || {};
+        if (!employeeExperience || parsed.respondentEmail === userEmail.trim().toLowerCase()) {
+          draftRatings = parsed.ratings || {};
+          draftComments = parsed.comments || {};
+        }
       } catch (_) {}
     }
 
@@ -358,6 +406,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
     setComments(initialComments);
     setValidationErrors({});
     setHasStartedForm(true);
+    setAutoSaveStatus('saving');
     startTimeRef.current = new Date().toISOString();
 
     setStep(2);
@@ -381,7 +430,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       finishExit();
       return;
     }
-    const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company}`;
+    const draftKey = getSurveyDraftKey(selectedSurveyId, company, employeeExperience ? userEmail : undefined);
     const draftData = {
       ratings,
       comments,
@@ -389,6 +438,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       department,
       respondentType,
       address,
+      ...(employeeExperience ? { respondentEmail: userEmail.trim().toLowerCase() } : {}),
     };
     try {
       localStorage.setItem(draftKey, JSON.stringify(draftData));
@@ -401,8 +451,12 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
   const handleExitWithoutSaving = () => {
     if (selectedSurveyId && company) {
-      const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company}`;
-      localStorage.removeItem(draftKey);
+      const draftKey = getSurveyDraftKey(selectedSurveyId, company, employeeExperience ? userEmail : undefined);
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // Continue exiting even when browser storage is unavailable.
+      }
     }
     finishExit();
   };
@@ -608,10 +662,12 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
 
     submittingRef.current = true;
     setIsSubmitting(true);
+    const companyBeingSubmitted = company.trim();
+    setSubmittedCompany(companyBeingSubmitted);
     try {
       const responseId = await onSubmitted(
         selectedSurveyId,
-        company.trim(),
+        companyBeingSubmitted,
         department,
         respondentType,
         address.trim(),
@@ -624,8 +680,12 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       }
 
       if (selectedSurveyId && company) {
-        const draftKey = `survey_analytics_draft_${selectedSurveyId}_${company.trim()}`;
-        localStorage.removeItem(draftKey);
+        const draftKey = getSurveyDraftKey(selectedSurveyId, company.trim(), employeeExperience ? userEmail : undefined);
+        try {
+          localStorage.removeItem(draftKey);
+        } catch {
+          // Submission is already recorded; local cleanup must not undo success.
+        }
       }
 
       setStep(3);
@@ -913,7 +973,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
       {step === 2 && activeSurvey && (
         <form onSubmit={handleSubmit} className={employeeExperience ? 'panel form-panel feedback-panel space-y-4' : 'space-y-6'} id="survey-filler-step-2">
           {/* Form Header Info card */}
-          {employeeExperience ? <div className="form-section-heading"><h2>{showReview ? 'Review your evaluation' : 'Your feedback'}</h2><p>{showReview ? 'Check your responses before submitting this evaluation.' : activeSurvey.description}</p></div> : <div className="panel bg-[#0063a9]/5 border-blue-100 dark:border-blue-900/30"><h3 className="text-lg font-bold text-[#0063a9] dark:text-blue-300">{activeSurvey.title}</h3><p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{activeSurvey.description}</p><div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-blue-400/10"><div>Company: <strong className="text-slate-700 dark:text-slate-200">{company}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Department: <strong className="text-slate-700 dark:text-slate-200">{department}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Role: <strong className="text-slate-700 dark:text-slate-200">{respondentType}</strong></div></div></div>}
+          {employeeExperience ? <div className="form-section-heading"><h2>{showReview ? 'Review your evaluation' : 'Your feedback'}</h2><p>{showReview ? 'Check your responses before submitting this evaluation.' : activeSurvey.description}</p>{!showReview && <p className={`draft-autosave-status${autoSaveError ? ' has-error' : ''}`} role={autoSaveError ? 'alert' : 'status'}>{autoSaveError || (autoSaveStatus === 'saved' ? 'Draft saved automatically on this device.' : 'Saving draft on this device…')}</p>}</div> : <div className="panel bg-[#0063a9]/5 border-blue-100 dark:border-blue-900/30"><h3 className="text-lg font-bold text-[#0063a9] dark:text-blue-300">{activeSurvey.title}</h3><p className="text-xs text-slate-500 mt-1 dark:text-slate-400">{activeSurvey.description}</p><div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-blue-400/10"><div>Company: <strong className="text-slate-700 dark:text-slate-200">{company}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Department: <strong className="text-slate-700 dark:text-slate-200">{department}</strong></div><div className="hidden sm:inline text-slate-300">|</div><div>Role: <strong className="text-slate-700 dark:text-slate-200">{respondentType}</strong></div></div></div>}
 
           {employeeExperience && showReview && (
             <div className="respondent-summary">
@@ -1248,7 +1308,7 @@ export const SurveyFillerPage = forwardRef<SurveyFillerHandle, SurveyFillerPageP
             </svg>
           </motion.div>
 
-          {employeeExperience ? <><motion.h1 variants={successItemVariants}>Thank you for your feedback</motion.h1><motion.p variants={successItemVariants}>Your evaluation for <strong>{company}</strong> has been submitted.</motion.p></> : <motion.div className="space-y-2 max-w-md mx-auto" variants={successCopyVariants}><motion.h2 className="text-2xl font-bold text-slate-800 dark:text-white" variants={successItemVariants}>Submission Successful</motion.h2><motion.p className="text-sm text-slate-500 dark:text-slate-400" variants={successItemVariants}>Thank you! Your ratings and comments have been registered in our database. The central administrator has been notified.</motion.p></motion.div>}
+          {employeeExperience ? <><motion.h1 variants={successItemVariants}>Thank you for your feedback</motion.h1><motion.p variants={successItemVariants}>Your evaluation for <strong>{submittedCompany}</strong> has been submitted.</motion.p></> : <motion.div className="space-y-2 max-w-md mx-auto" variants={successCopyVariants}><motion.h2 className="text-2xl font-bold text-slate-800 dark:text-white" variants={successItemVariants}>Submission Successful</motion.h2><motion.p className="text-sm text-slate-500 dark:text-slate-400" variants={successItemVariants}>Thank you! Your ratings and comments have been registered in our database. The central administrator has been notified.</motion.p></motion.div>}
 
           {employeeExperience ? <motion.div className="confirmation-meta" variants={successItemVariants}><CheckCircle size={16} /><span>{activeSurvey?.title} — {new Date().toLocaleDateString()}</span></motion.div> : <motion.div className="border border-dashed border-slate-200 dark:border-slate-800 rounded-lg p-5 max-w-sm mx-auto text-left text-xs space-y-2" variants={successItemVariants}><div className="flex justify-between"><span className="text-slate-400 font-semibold">Respondent:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{company}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Audience Segment:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{activeSurvey?.surveyType}</span></div><div className="flex justify-between"><span className="text-slate-400 font-semibold">Date Registered:</span><span className="text-slate-700 dark:text-slate-300 font-bold">{new Date().toLocaleString()}</span></div></motion.div>}
           {employeeExperience && <motion.small variants={successItemVariants}>Your response is recorded with your employee account.</motion.small>}

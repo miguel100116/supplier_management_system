@@ -23,13 +23,18 @@ const categorySummary = {
 
 test('directory category strip replaces partner status and uses the selected category state', () => {
   const overview = renderToStaticMarkup(createElement(PartnerRegistryOverview, {
-    category: 'Supplier', onCategoryChange: () => {}, isAdmin: true,
+    category: 'Supplier (Local)', onCategoryChange: () => {}, isAdmin: true,
     onOpenActiveCompanies: () => {}, onOpenRegister: () => {},
   }));
 
-  for (const label of ['All Categories', 'Courier', 'Supplier', 'Subcontractor', 'Uncategorized']) assert.ok(overview.includes(label), label);
+  const tabOrder = ['All Categories', 'Supplier (Local)', 'Supplier (Foreign)', 'Courier', 'Subcontractor', 'Uncategorized'];
+  for (const label of tabOrder) assert.ok(overview.includes(label), label);
+  assert.ok(overview.indexOf('All Categories') < overview.indexOf('Supplier (Local)'));
+  assert.ok(overview.indexOf('Supplier (Local)') < overview.indexOf('Supplier (Foreign)'));
+  assert.ok(overview.indexOf('Supplier (Foreign)') < overview.indexOf('Courier'));
+  assert.doesNotMatch(overview, />Supplier<\/button>/);
   assert.match(overview, /aria-label="Partner categories" role="tablist"/);
-  assert.match(overview, /data-category="Supplier" aria-selected="true" tabindex="0"/);
+  assert.match(overview, /data-category="Supplier \(Local\)" aria-selected="true" tabindex="0"/);
   assert.doesNotMatch(overview, /Partner status|Incomplete Profile|Expired,|Archived,/);
   assert.match(overview, /admin-directory-category-strip admin-tab-strip/);
   assert.match(ADMIN_REDESIGN_SOURCE, /\.admin-tab-strip > button:is\(\[aria-pressed="true"\], \[aria-selected="true"\], \[aria-current="page"\]\)[^{]*\{[^}]*border-bottom-color: #0063a9/);
@@ -84,7 +89,8 @@ test('directory filters open from icons and reset independently inside their pop
   assert.match(FILTER_TOOLBAR_SOURCE, /All Origins/);
   assert.match(FILTER_TOOLBAR_SOURCE, /All Types/);
   assert.doesNotMatch(FILTER_TOOLBAR_SOURCE, /categoryTab === 'Supplier' && <fieldset/);
-  assert.match(FILTER_TOOLBAR_SOURCE, /onMouseEnter=\{\(\) => \{ if \(kind === 'origin'\) setOpenPopover\(kind\); \}\}/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /onMouseEnter=\{\(\) => openPopoverOnHover\(kind\)\}/);
+  assert.match(FILTER_TOOLBAR_SOURCE, /onMouseLeave=\{\(\) => schedulePopoverClose\(kind\)\}/);
   assert.match(FILTER_TOOLBAR_SOURCE, /type="checkbox" checked=\{businessTypeFilter\.includes\(value\)\}/);
   assert.match(activeMarkup, /Clear partner search/);
   assert.match(FILTER_TOOLBAR_SOURCE, /FileCheck2/);

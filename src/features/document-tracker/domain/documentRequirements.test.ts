@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getRequiredDocumentKeys, isExpiryDocument, shouldShowHistoricalDocument } from './documentRequirements';
+import { FOREIGN_SUPPLIER_REQUIREMENTS, getAvailableDocumentKeys, getRequiredDocumentKeys, isExpiryDocument, shouldShowHistoricalDocument } from './documentRequirements';
 import { computeCompanyDocumentSummary, computeDocumentStatus } from './compliance';
 
 const localSupplier = { type: 'Supplier' as const, supplierOrigin: 'Local' as const, createdAt: '2026-01-01', id: 'c', name: 'Supplier', branches: [{ id: 'b', bpCode: 'BP-1', documents: {} }] };
@@ -9,6 +9,11 @@ test('CORP and SOL are mutually exclusive and unset classification does not coun
   const unknown = getRequiredDocumentKeys('Supplier', 'Local');
   const corp = getRequiredDocumentKeys('Supplier', 'Local', 'CORP');
   const sol = getRequiredDocumentKeys('Supplier', 'Local', 'SOL');
+  assert.equal(unknown.includes('Other Documents'), false);
+  assert.equal(corp.includes('Other Documents'), false);
+  assert.equal(sol.includes('Other Documents'), false);
+  assert.ok(getAvailableDocumentKeys('Supplier', 'Local').includes('Other Documents'));
+  assert.ok(getRequiredDocumentKeys('Courier', undefined).includes('Other Documents'));
   assert.equal(unknown.includes('GIS (Corp)') || unknown.includes('SEC (Corp)') || unknown.includes('DTI (Sole)'), false);
   assert.ok(corp.includes('GIS (Corp)') && corp.includes('SEC (Corp)'));
   assert.ok(corp.includes('Articles of Incorporation'));
@@ -26,13 +31,40 @@ test('CORP and SOL are mutually exclusive and unset classification does not coun
 
 test('foreign suppliers keep their separate checklist regardless of domestic classification', () => {
   const foreign = getRequiredDocumentKeys('Supplier', 'Foreign', 'CORP');
-  for (const name of ['SIF', 'AFS', 'Certificate of Incorporation', 'Articles of Incorporation', 'Business Permit/License', "Owner's ID", 'Product Profile', 'Other Documents']) {
+  assert.deepEqual(FOREIGN_SUPPLIER_REQUIREMENTS.map((item) => item.key), ['SIF', 'AFS', 'Certificate of Incorporation', 'Articles of Incorporation', 'Business Permit/License', "Owner's ID", 'Product Profile']);
+  for (const name of ['SIF', 'AFS', 'Certificate of Incorporation', 'Articles of Incorporation', 'Business Permit/License', "Owner's ID", 'Product Profile']) {
     assert.ok(foreign.includes(name), `${name} remains required`);
   }
+  assert.equal(foreign.length, 7);
+  assert.deepEqual(getAvailableDocumentKeys('Supplier', 'Foreign'), FOREIGN_SUPPLIER_REQUIREMENTS.map((item) => item.key));
+  assert.equal(getRequiredDocumentKeys('Supplier', 'Foreign').includes('BIR2303'), false);
+  assert.equal(getRequiredDocumentKeys('Supplier', 'Foreign').includes('Confidentiality and Non-Disclosure Agreement'), false);
   assert.equal(foreign.includes('GIS (Corp)'), false);
   assert.equal(foreign.includes('SEC (Corp)'), false);
   assert.equal(foreign.includes('DTI (Sole)'), false);
   assert.equal(foreign.includes("Sole Proprietorship (Owner's ID)"), false);
+});
+
+test('foreign validity rules match the reference and do not change local AFS renewal behavior', () => {
+  const referenceDate = new Date('2026-11-05T00:00:00Z');
+  assert.equal(isExpiryDocument('AFS', 'Supplier', 'Foreign'), true);
+  assert.equal(isExpiryDocument('Business Permit/License', 'Supplier', 'Foreign'), true);
+  assert.equal(isExpiryDocument("Owner's ID", 'Supplier', 'Foreign'), true);
+  for (const name of ['SIF', 'Certificate of Incorporation', 'Articles of Incorporation', 'Product Profile']) {
+    assert.equal(isExpiryDocument(name, 'Supplier', 'Foreign'), false, `${name} must not receive annual expiry rules`);
+  }
+  assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2025-12-31' }, referenceDate, 'AFS', { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'For Update');
+  assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2027-12-31' }, referenceDate, 'AFS', { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'For Update');
+  assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2026-12-31' }, referenceDate, 'AFS', { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Current');
+  assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2025-12-31' }, referenceDate, 'AFS', { type: 'Supplier', supplierOrigin: 'Local' }).status, 'Current');
+  assert.equal(computeDocumentStatus({ provided: true }, referenceDate, 'SIF', { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Current');
+  assert.equal(computeDocumentStatus({ provided: true }, referenceDate, "Owner's ID", { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Missing');
+  assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2027-12-31' }, referenceDate, "Owner's ID", { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Current');
+  assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2026-10-31' }, referenceDate, "Owner's ID", { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Expired');
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[0].description, /Completed and signed form/);
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[1].validity, /current fiscal or calendar year/);
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[2].validity, /One-time submission/);
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[5].validity, /valid at the time of submission/);
 });
 
 test('classified local partners hide inapplicable history while unclassified and foreign records retain it', () => {
@@ -46,6 +78,10 @@ test('classified local partners hide inapplicable history while unclassified and
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', 'Local', 'SOL'), false);
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', 'Local', 'CORP'), true);
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', undefined, undefined), true);
+  }
+  for (const name of ['DTI (Sole)', 'GIS (Corp)', 'Business Permit']) {
+    assert.equal(getRequiredDocumentKeys('Supplier', 'Foreign').includes(name), false, `${name} is not a Foreign requirement`);
+    assert.equal(shouldShowHistoricalDocument(name, 'Supplier', 'Foreign', undefined), true, `${name} remains visible as saved history`);
   }
 });
 

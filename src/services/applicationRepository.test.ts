@@ -400,3 +400,19 @@ test('normalizes inconsistent CORP/SOL classification to unclassified and valida
     branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: { DTI: { remarks: 'x'.repeat(2001) } } }],
   }, 'company-1'), /too long/);
 });
+
+test('partner document records accept validated private-file metadata while preserving legacy document shapes', () => {
+  const payload = {
+    ...validApplicationRecords.partner_company.payload as object,
+    branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: {
+      SIF: { provided: true, file: { storagePath: '550e8400-e29b-41d4-a716-446655440000', originalName: 'supplier-form.pdf', contentType: 'application/pdf', fileSize: 123, uploadedAt: now } },
+      AFS: { provided: true, expiryDate: '2026-12-31' },
+    } }],
+  };
+  const parsed = parseApplicationRecordPayload('partner_company', payload, 'company-1') as { branches: Array<{ documents: Record<string, { file?: { originalName: string } }> }> };
+  assert.equal(parsed.branches[0].documents.SIF.file?.originalName, 'supplier-form.pdf');
+  assert.throws(() => parseApplicationRecordPayload('partner_company', {
+    ...payload,
+    branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: { SIF: { provided: true, file: { storagePath: 'x', originalName: 'x.pdf', contentType: 'application/pdf', fileSize: '123', uploadedAt: now } } } }],
+  }, 'company-1'), /fileSize must be a finite number/);
+});

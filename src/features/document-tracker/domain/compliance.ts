@@ -43,19 +43,24 @@ export function daysUntil(dateStr: string, referenceDate: Date = new Date()): nu
 export function computeDocumentStatus(
   doc: Pick<ComplianceDocument, 'provided' | 'expiryDate'>,
   referenceDate: Date = new Date(),
-  docName?: string
+  docName?: string,
+  category?: Pick<PartnerCompany, 'type' | 'supplierOrigin'>,
 ): { status: DocumentStatus; daysLeft?: number } {
   if (doc.provided === false) {
     const daysLeft = doc.expiryDate ? daysUntil(doc.expiryDate, referenceDate) : undefined;
     return { status: 'Missing', ...(Number.isFinite(daysLeft) ? { daysLeft } : {}) };
   }
   if (!doc.expiryDate) {
-    const expiryDateRequired = Boolean(docName && isExpiryDocument(docName));
+    const expiryDateRequired = Boolean(docName && isExpiryDocument(docName, category?.type, category?.supplierOrigin));
     return { status: doc.provided && !expiryDateRequired ? 'Current' : 'Missing' };
   }
   const daysLeft = daysUntil(doc.expiryDate, referenceDate);
   if (!Number.isFinite(daysLeft)) return { status: 'Missing' };
   if (docName && AFS_FISCAL_YEAR_DOCUMENTS.has(docName)) {
+    if (category?.type === 'Supplier' && category.supplierOrigin === 'Foreign') {
+      const docYear = Number(doc.expiryDate.slice(0, 4));
+      return { status: docYear === referenceDate.getFullYear() ? 'Current' : 'For Update', daysLeft };
+    }
     return { status: computeAfsFiscalYearStatus(doc.expiryDate, referenceDate), daysLeft };
   }
   if (daysLeft < 0) return { status: 'Expired', daysLeft };
@@ -77,7 +82,7 @@ export function getBranchDocumentComplianceStatus(
     && !(company.type === 'Supplier' && company.supplierOrigin === 'Foreign')
     && !['CORP', 'SOL'].includes(company.businessClassification ?? '');
   const documentStatuses = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification)
-    .map((docName) => computeDocumentStatus(branch.documents?.[docName] ?? {}, referenceDate, docName).status);
+    .map((docName) => computeDocumentStatus(branch.documents?.[docName] ?? {}, referenceDate, docName, company).status);
 
   if (documentStatuses.includes('Expired')) return 'Expired';
   if (documentStatuses.includes('Missing')) return 'Missing';
@@ -162,7 +167,7 @@ export function computeCompanyDocumentSummary(
   branchesToCheck.forEach((branch) => {
     requiredKeys.forEach((key) => {
       const doc: ComplianceDocument | undefined = branch?.documents?.[key];
-      const { status, daysLeft } = computeDocumentStatus(doc ?? {}, referenceDate, key);
+      const { status, daysLeft } = computeDocumentStatus(doc ?? {}, referenceDate, key, company);
       if (status === 'Expired' || status === 'Expiring Soon' || status === 'For Update') {
         issues.push({
           documentName: key,

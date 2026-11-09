@@ -28,6 +28,13 @@ export interface ComplianceDocument {
   expiryDate?: string;
   remarks?: string;
   description?: string;
+  file?: {
+    storagePath: string;
+    originalName: string;
+    contentType: string;
+    fileSize: number;
+    uploadedAt: string;
+  };
   // status/daysLeft are derived from expiryDate; they may be present on
   // imported rows as a snapshot, but UI should recompute rather than trust
   // a stale value.
@@ -186,6 +193,8 @@ export interface KpiSummary {
 export interface ResponseNotification {
   id: string;
   company: string;
+  companyId?: string;
+  surveyId?: string;
   surveyType: SurveyType;
   respondentType: string;
   submissionDate: string;

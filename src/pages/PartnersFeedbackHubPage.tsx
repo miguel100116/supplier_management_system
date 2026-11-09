@@ -34,6 +34,8 @@ interface PartnersFeedbackHubPageProps {
   currentUser: { email: string; role: string } | null;
   onNavigatePage?: (page: string) => void;
   onMarkSurveyComplete?: (surveyId: string) => void;
+  initialNotificationTarget?: { surveyId: string; responseId: string } | null;
+  onNotificationTargetOpened?: () => void;
 }
 
 export type FeedbackHubTab = 'current-forms' | 'past-results' | 'sent-reports';
@@ -46,6 +48,8 @@ export function PartnersFeedbackHubPage({
   currentUser,
   onNavigatePage,
   onMarkSurveyComplete,
+  initialNotificationTarget,
+  onNotificationTargetOpened,
 }: PartnersFeedbackHubPageProps) {
   const [activeTab, setActiveTab] = useState<FeedbackHubTab>('current-forms');
 
@@ -496,6 +500,8 @@ export function PartnersFeedbackHubPage({
           onSendToPartner={handleOpenSendToPartner}
           onMarkSurveyComplete={onMarkSurveyComplete}
           isAdmin={currentUser?.role === 'Admin'}
+          initialNotificationTarget={initialNotificationTarget}
+          onNotificationTargetOpened={onNotificationTargetOpened}
         />
       )}
 

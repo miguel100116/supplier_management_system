@@ -36,7 +36,8 @@ import type { SurveyFillerHandle } from './pages/SurveyFillerPage';
 import { logAdminActivity } from './features/account-management/services/adminActivityLog';
 import { useSurveyData } from './hooks/useSurveyData';
 import { applyFilters, initialFilters, submissionCount } from './features/analytics/domain/analytics';
-import { FilterState, SurveyType, CustomForm, SurveyResponse } from './types/survey';
+import { FilterState, SurveyType, CustomForm, SurveyResponse, ResponseNotification } from './types/survey';
+import { isDocumentNotification } from './features/notifications/domain/notificationPresentation';
 import { PageModuleKey, getProfilePermissions, getEffectiveSurveyTypes, hasPageAccess, getDepartmentDefaultPermissions } from './utils/rbac';
 import { clearSessionActivity, recordSessionActivity, useIdleSessionTimeout } from './hooks/useIdleSessionTimeout';
 import { formatSessionTimeRemaining } from './utils/sessionTimeout';
@@ -363,6 +364,8 @@ export default function App() {
     addPartnerCompany,
     updatePartnerCompany,
     updatePartnerDocument,
+    uploadForeignSupplierDocumentFile,
+    removeSupplierSupportingDocument,
     updatePartnerDocumentRemarks,
     removePartnerCompany,
     previewMasterListImport,
@@ -578,6 +581,9 @@ export default function App() {
   // Deep-link into Partner Companies' detail/edit panel for one specific
   // company (e.g. from a notification click-through).
   const [focusCompanyId, setFocusCompanyId] = useState<string | null>(null);
+  const [focusPendingDocumentsCompanyId, setFocusPendingDocumentsCompanyId] = useState<string | null>(null);
+  const [feedbackNotificationTarget, setFeedbackNotificationTarget] = useState<{ surveyId: string; responseId: string } | null>(null);
+  const clearFeedbackNotificationTarget = useCallback(() => setFeedbackNotificationTarget(null), []);
   const [filters, setFilters] = useState<FilterState>(initialFilters);
   const [darkMode, setDarkMode] = useState(false);
   useEffect(() => {
@@ -1103,6 +1109,29 @@ export default function App() {
     navigateTo('fill-form', { surveyId });
   };
 
+  const handleAdminNotificationSelect = (notification: ResponseNotification) => {
+    markNotificationRead(notification.id);
+    setIsNotificationModalOpen(false);
+
+    if (isDocumentNotification(notification)) {
+      const targetCompany = partnerCompanies.find((company) => company.id === notification.companyId)
+        ?? partnerCompanies.find((company) => company.type === notification.surveyType
+          && company.name.trim().toLowerCase() === notification.company.trim().toLowerCase());
+      setFocusPendingDocumentsCompanyId(targetCompany?.id ?? null);
+      navigateTo('document-register');
+      return;
+    }
+
+    const response = userAccessibleResponses.find((item) => item.responseId === notification.id);
+    const surveyId = notification.surveyId ?? response?.surveyId;
+    const matchingSurveys = userAccessibleSurveys.filter((survey) => survey.surveyType === notification.surveyType && survey.status !== 'Archived');
+    const targetSurveyId = surveyId && matchingSurveys.some((survey) => survey.id === surveyId)
+      ? surveyId
+      : !surveyId && matchingSurveys.length === 1 ? matchingSurveys[0].id : null;
+
+    setFeedbackNotificationTarget(targetSurveyId ? { surveyId: targetSurveyId, responseId: notification.id } : null);
+    navigateTo('partners-feedback-hub');
+  };
   // ----------------------------------------------------
   // ADMIN EXPERIENCE (ALL ANALYTICS SECURED HERE)
   // ----------------------------------------------------
@@ -1156,6 +1185,10 @@ export default function App() {
         onAddCompany={addPartnerCompany}
         onRemoveCompany={removePartnerCompany}
         onUpdateCompany={updatePartnerCompany}
+        onOpenPendingDocuments={(companyId) => {
+          setFocusPendingDocumentsCompanyId(companyId);
+          navigateTo('document-register');
+        }}
         onRenewDocument={updatePartnerDocument}
         onPreviewMasterListImport={previewMasterListImport}
         onRebuildMasterListImport={rebuildMasterListImportPreview}
@@ -1170,6 +1203,8 @@ export default function App() {
     'document-register': (
       <DocumentRegisterPage
         categoryFromUrl={documentCategory}
+        initialFocusCompanyId={focusPendingDocumentsCompanyId}
+        onInitialFocusConsumed={() => setFocusPendingDocumentsCompanyId(null)}
         onCategoryChange={(category) => {
           setDocumentCategory(category);
           const url = new URL(window.location.href);
@@ -1182,6 +1217,8 @@ export default function App() {
         canRenewDocuments={canRenewDocuments}
         onUpdateCompany={updatePartnerCompany}
         onRenewDocument={updatePartnerDocument}
+        onUploadForeignDocumentFile={uploadForeignSupplierDocumentFile}
+        onRemoveSupportingDocument={removeSupplierSupportingDocument}
         onUpdateDocumentRemarks={updatePartnerDocumentRemarks}
         currentUserEmail={account || ''}
         isAdmin={isAdmin}
@@ -1199,6 +1236,8 @@ export default function App() {
           const survey = surveys.find((candidate) => candidate.id === id);
           if (survey) updateSurvey({ ...survey, status: 'Completed', manuallyEndedAt: survey.manuallyEndedAt || new Date().toISOString() });
         }}
+        initialNotificationTarget={feedbackNotificationTarget}
+        onNotificationTargetOpened={clearFeedbackNotificationTarget}
       />
     ),
     'account-management': (
@@ -1332,6 +1371,7 @@ export default function App() {
         onMarkRead={markNotificationRead}
         onMarkUnread={markNotificationUnread}
         onMarkAllRead={markNotificationsRead}
+        onOpenNotification={handleAdminNotificationSelect}
       />
     ) : (
       profile && (
@@ -1519,6 +1559,8 @@ export default function App() {
                   unreadNotificationIds={unreadNotificationIds}
                   onOpen={() => undefined}
                   onViewAll={() => setIsNotificationModalOpen(true)}
+                  onMarkAllRead={markNotificationsRead}
+                  onSelectNotification={handleAdminNotificationSelect}
                   appearance="neutral"
                 />
               </div>
@@ -1684,6 +1726,7 @@ export default function App() {
                     onMarkRead={markNotificationRead}
                     onMarkUnread={markNotificationUnread}
                     onMarkAllRead={markNotificationsRead}
+                    onOpenNotification={handleAdminNotificationSelect}
                   />
                 ) : (
                   profile && (

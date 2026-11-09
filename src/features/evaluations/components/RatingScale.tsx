@@ -69,7 +69,6 @@ export function RatingScale({ questionId, questionOrder, min, max, allowNa, valu
               className={`rating-option${isSelected ? ' selected' : ''}${option === 'N/A' ? ' not-applicable' : ''}`}
             >
               {option}
-              {option === 'N/A' && <span className="rating-option-description">Not applicable</span>}
             </button>
           );
         })}

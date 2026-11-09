@@ -192,6 +192,53 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     }
     if (url.pathname === '/auth/v1/user') return reply(user);
     if (url.pathname === '/auth/v1/logout') return reply({});
+    if (url.pathname === '/rest/v1/rpc/renew_partner_document') {
+      const body = request.postDataJSON();
+      const recordIndex = records.findIndex(record => record.record_type === 'partner_company' && record.record_id === body.p_company_id);
+      if (recordIndex < 0) return reply({ message: 'Synthetic partner not found' }, 404);
+      const record = records[recordIndex];
+      const branches = record.payload.branches as Array<{ id: string; documents?: Record<string, Record<string, unknown>> }>;
+      const branchIndex = branches.findIndex(branch => branch.id === body.p_branch_id);
+      if (branchIndex < 0) return reply({ message: 'Synthetic branch not found' }, 404);
+      const branch = branches[branchIndex];
+      const documents = branch.documents ?? {};
+      const current = documents[String(body.p_document_name)] ?? {};
+      if (JSON.stringify(current) !== JSON.stringify(body.p_expected_document)) return reply({ message: 'Synthetic document changed' }, 409);
+      const nextPayload = structuredClone(record.payload);
+      const nextBranches = nextPayload.branches as typeof branches;
+      nextBranches[branchIndex] = { ...branch, documents: { ...documents, [String(body.p_document_name)]: { ...current, ...(body.p_next_document as Record<string, unknown>) } } };
+      records[recordIndex] = { ...record, payload: nextPayload };
+      records.push({ record_type: 'document_modification', record_id: `DOC-MOD-${crypto.randomUUID()}`,
+        created_at: new Date().toISOString(), payload: { id: `DOC-MOD-${crypto.randomUUID()}`, actorEmail: email,
+          category: 'Supplier', companyName: record.payload.name, docName: body.p_document_name,
+          change: 'Synthetic supporting document added', timestamp: new Date().toISOString() } });
+      return reply(nextPayload);
+    }
+    if (url.pathname === '/rest/v1/rpc/remove_supplier_supporting_document') {
+      const body = request.postDataJSON();
+      const recordIndex = records.findIndex(record => record.record_type === 'partner_company' && record.record_id === body.p_company_id);
+      if (recordIndex < 0) return reply({ message: 'Synthetic partner not found' }, 404);
+      const record = records[recordIndex];
+      const branches = record.payload.branches as Array<{ id: string; documents?: Record<string, Record<string, unknown>> }>;
+      const branchIndex = branches.findIndex(branch => branch.id === body.p_branch_id);
+      if (branchIndex < 0) return reply({ message: 'Synthetic branch not found' }, 404);
+      const branch = branches[branchIndex];
+      const documents = branch.documents ?? {};
+      const documentName = String(body.p_document_name);
+      const current = documents[documentName];
+      if (!current || JSON.stringify(current) !== JSON.stringify(body.p_expected_document)) return reply({ message: 'Synthetic document changed' }, 409);
+      const nextPayload = structuredClone(record.payload);
+      const nextBranches = nextPayload.branches as typeof branches;
+      const nextDocuments = { ...documents };
+      delete nextDocuments[documentName];
+      nextBranches[branchIndex] = { ...branch, documents: nextDocuments };
+      records[recordIndex] = { ...record, payload: nextPayload };
+      records.push({ record_type: 'document_modification', record_id: `DOC-MOD-${crypto.randomUUID()}`,
+        created_at: new Date().toISOString(), payload: { id: `DOC-MOD-${crypto.randomUUID()}`, actorEmail: email,
+          category: 'Supplier', companyName: record.payload.name, docName: documentName,
+          change: 'Synthetic supporting document removed', timestamp: new Date().toISOString() } });
+      return reply(nextPayload);
+    }
     if (url.pathname === '/rest/v1/rpc/import_partner_master_list') {
       if (role !== 'Admin') return reply({ message: 'Admin required' }, 403);
       if (failures.masterListWrites) return reply({ message: 'Synthetic master-list write rejected' }, 500);
@@ -385,11 +432,11 @@ test('Supplier Local attention containers filter only the expanded company and t
   const openFirst = () => expandTrigger().click();
   await openFirst();
   const attention = company.getByLabel('Required document attention summary', { exact: true });
-  const missing = attention.getByRole('button', { name: '4 missing', exact: true });
+  const missing = attention.getByRole('button', { name: '4 pending', exact: true });
   const expired = attention.getByRole('button', { name: '1 expired', exact: true });
   const forUpdate = attention.getByRole('button', { name: '1 for update', exact: true });
   const summary = await attention.textContent() ?? '';
-  const checkScope = async (count: number, showHistory = count === 14) => {
+  const checkScope = async (count: number, showHistory = count === 13) => {
     await expect(required.getByRole('listitem')).toHaveCount(count);
     await expect(attention).toHaveText(summary);
     if (showHistory) {
@@ -403,14 +450,14 @@ test('Supplier Local attention containers filter only the expanded company and t
       expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     }
   };
-  await checkScope(14, true);
+  await checkScope(13, true);
   await missing.click();
   await expect(missing).toHaveAttribute('aria-pressed', 'true');
   await expect(missing.locator('svg.lucide-x')).toBeVisible();
   await expect(expired.locator('svg.lucide-x')).toHaveCount(0);
   await checkScope(4, false);
-  await expect(required.getByRole('listitem')).toHaveText([/SIF.*Missing/, /BIR2303.*Missing/, /Articles of Incorporation.*Missing/, /Product Profile.*Missing/]);
-  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 14');
+  await expect(required.getByRole('listitem')).toHaveText([/SIF.*Pending/, /BIR2303.*Pending/, /Articles of Incorporation.*Pending/, /Product Profile.*Pending/]);
+  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 13');
   const sifCard = required.getByRole('listitem').filter({ has: page.getByText('SIF', { exact: true }) });
   const actionsBox = await sifCard.getByRole('button', { name: 'Actions for SIF', exact: true }).boundingBox();
   const remarksBox = await sifCard.getByRole('button', { name: 'View admin remarks for SIF', exact: true }).boundingBox();
@@ -441,22 +488,90 @@ test('Supplier Local attention containers filter only the expanded company and t
   await page.keyboard.press('Space');
   await expect(forUpdate).toHaveAttribute('aria-pressed', 'false');
   await expect(forUpdate.locator('svg.lucide-x')).toHaveCount(0);
-  await checkScope(14, true);
+  await checkScope(13, true);
   await expired.click();
   await checkScope(1, false);
   await page.getByRole('button', { name: 'Review documents for Second Local Supplier (LOCAL-TWO)', exact: true }).first().click();
   const second = page.getByRole('region', { name: 'Required documents', exact: true });
-  await expect(second.getByRole('listitem')).toHaveCount(14);
-  await expect(page.getByRole('button', { name: '1 missing', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(second.getByRole('listitem')).toHaveCount(13);
+  await expect(page.getByRole('button', { name: '1 pending', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await openFirst();
-  await checkScope(14, true);
+  await checkScope(13, true);
   await expect(expired).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Hide documents for First Local Supplier (LOCAL-ONE)', exact: true }).first().click();
   await openFirst();
-  await checkScope(14, true);
+  await checkScope(13, true);
   expect(JSON.stringify(service.records.filter(record => record.record_type === 'partner_company'))).toBe(originalPartners);
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
+});
+
+test('Foreign Supplier checklist keeps seven requirements, retains legacy history and adds supplier-specific documents', async ({ page }) => {
+  const service = await backend(page);
+  const legacyDocuments = {
+    'DTI (Sole)': { provided: true, expiryDate: '2027-12-31' },
+    'GIS (Corp)': { provided: true, expiryDate: '2027-12-31' },
+    'Business Permit': { provided: true, expiryDate: '2027-12-31' },
+    'Import Permit': { provided: true, expiryDate: '2027-12-31' },
+  };
+  for (const [id, name, bpCode] of [['foreign-primary', 'Foreign Supplier One', 'FOR-1'], ['foreign-secondary', 'Foreign Supplier Two', 'FOR-2']] as const) {
+    service.records.push({ record_type: 'partner_company', record_id: id, created_at: createdAt,
+      payload: { id, name, type: 'Supplier', supplierOrigin: 'Foreign', createdAt,
+        branches: [{ id: `${id}-branch`, bpCode, documents: id === 'foreign-primary' ? structuredClone(legacyDocuments) : {} }] } });
+  }
+
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/document-tracker?category=supplier-foreign');
+  const first = page.getByRole('article').filter({ hasText: 'Foreign Supplier One' });
+  const second = page.getByRole('article').filter({ hasText: 'Foreign Supplier Two' });
+  await first.getByRole('button', { name: 'Expand documents for Foreign Supplier One (FOR-1)' }).click();
+  const required = first.getByRole('region', { name: 'Required documents', exact: true });
+  await expect(required.getByRole('listitem')).toHaveCount(7);
+  const addOtherDocument = first.getByRole('region', { name: 'Supplier document actions', exact: true });
+  await expect(addOtherDocument.getByText('Other Supporting Documents (as applicable)', { exact: true })).toHaveCount(0);
+  const attentionSummary = first.getByLabel('Required document attention summary');
+  await expect(attentionSummary).toContainText('7 pending');
+  const attentionBox = await attentionSummary.boundingBox();
+  const addButtonBox = await addOtherDocument.getByRole('button', { name: 'Add Other Document', exact: true }).boundingBox();
+  const requiredHeadingBox = await required.locator('h3').boundingBox();
+  expect(attentionBox && addButtonBox && requiredHeadingBox).not.toBeNull();
+  expect(Math.abs(attentionBox!.y - addButtonBox!.y)).toBeLessThan(5);
+  expect(requiredHeadingBox!.y).toBeGreaterThan(attentionBox!.y + attentionBox!.height);
+  await expect(required.getByRole('listitem')).toContainText([
+    'Supplier Information Form (SIF)', 'Audited Financial Statements (AFS)',
+    'Certificate of Incorporation / Registration', 'Articles of Incorporation',
+    'Business Permit / Licenses', "Owner's Government-Issued Identification (ID)", 'Product Profile',
+  ]);
+  for (const removedRequirement of ['DTI (Sole)', 'GIS (Corp)', 'Business Permit', 'Import Permit']) {
+    await expect(required.getByText(removedRequirement, { exact: true })).toHaveCount(0);
+  }
+  const additional = first.getByRole('region', { name: 'Additional', exact: true });
+  for (const savedDocument of Object.keys(legacyDocuments)) {
+    await expect(required.getByText(savedDocument, { exact: true })).toHaveCount(0);
+    await expect(additional.getByText(savedDocument, { exact: true })).toHaveCount(0);
+  }
+  await expect(required.getByText('Completed and signed form containing company profile, contact details, banking information, and authorized representatives.', { exact: true })).toHaveCount(0);
+  await expect(required.getByText('Renewable annually; accept the current fiscal or calendar year.', { exact: true })).toHaveCount(0);
+  await expect(required.getByText('Must be valid at the time of submission.', { exact: true })).toHaveCount(0);
+
+  await addOtherDocument.getByRole('button', { name: 'Add Other Document', exact: true }).click();
+  await addOtherDocument.getByLabel('Document name').fill('Industry Permit');
+  await addOtherDocument.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(additional.getByRole('listitem').filter({ hasText: 'Other: Industry Permit' })).toHaveCount(1);
+  await expect(additional.getByRole('listitem')).toHaveCount(1);
+  const savedPartner = service.records.find(record => record.record_id === 'foreign-primary')!;
+  const savedBranch = (savedPartner.payload.branches as Array<{ documents: Record<string, unknown> }>)[0];
+  expect(savedBranch.documents).toMatchObject(legacyDocuments);
+  expect(savedBranch.documents['Other: Industry Permit']).toMatchObject({ provided: false, description: 'Industry Permit' });
+  expect(service.records.filter(record => record.record_type === 'document_modification')).toHaveLength(1);
+
+  await second.getByRole('button', { name: 'Expand documents for Foreign Supplier Two (FOR-2)' }).click();
+  await expect(second.getByRole('region', { name: 'Required documents', exact: true }).getByRole('listitem')).toHaveCount(7);
+  await expect(second.getByRole('region', { name: 'Additional', exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await expect(second.getByRole('region', { name: 'Required documents', exact: true }).getByRole('listitem')).toHaveCount(7);
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
 });
 
 test('local registration cards render only applicable documents and hide excluded history', async ({ page }) => {
@@ -491,13 +606,61 @@ test('local registration cards render only applicable documents and hide exclude
       expect(allCardText).not.toContain(documentName);
       await expect(company.getByRole('button', { name: `Actions for ${documentName}`, exact: true })).toHaveCount(0);
     }
-    await expect(required.getByRole('listitem')).toHaveCount(classification === 'CORP' ? 14 : 13);
+    await expect(required.getByRole('listitem')).toHaveCount(classification === 'CORP' ? 13 : 12);
+    await expect(required.getByRole('listitem').filter({ hasText: 'Other Documents' })).toHaveCount(0);
+    const history = company.getByRole('region', { name: 'Historical & additional', exact: true });
+    await expect(history.getByRole('listitem').filter({ hasText: 'Other Documents' })).toHaveCount(1);
     const actionButtons = required.getByRole('button', { name: /^Actions for / });
-    await expect(actionButtons).toHaveCount(classification === 'CORP' ? 14 : 13);
+    await expect(actionButtons).toHaveCount(classification === 'CORP' ? 13 : 12);
     for (const action of await actionButtons.all()) await expect(action).toBeEnabled();
   }
   expect(service.errors).toEqual([]);
   expect(service.unexpected).toEqual([]);
+});
+
+test('Local Supplier can add and remove optional supporting documents without requiring Other Documents', async ({ page }) => {
+  const service = await backend(page, 'Admin', false, { records: [
+    { record_type: 'document_maintenance', record_id: 'default', created_at: createdAt, payload: { id: 'default', validityYears: {}, reminderDays: [60, 30], dailyFinalDays: 30 } },
+    { record_type: 'partner_company', record_id: 'local-supporting', created_at: createdAt,
+      payload: { id: 'local-supporting', name: 'Local Supporting Supplier', type: 'Supplier', supplierOrigin: 'Local', businessClassification: 'CORP', createdAt,
+        branches: [{ id: 'local-supporting-branch', bpCode: 'LOC-1', documents: { 'Other Documents': { provided: false } } }] } },
+  ] });
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/document-tracker?category=supplier-local');
+  const company = page.getByRole('article').filter({ hasText: 'Local Supporting Supplier' });
+  await company.getByRole('button', { name: 'Expand documents for Local Supporting Supplier (LOC-1)' }).click();
+  const required = company.getByRole('region', { name: 'Required documents', exact: true });
+  await expect(required.getByRole('listitem')).toHaveCount(13);
+  await expect(required.getByText('Other Documents', { exact: true })).toHaveCount(0);
+  const history = company.getByRole('region', { name: 'Historical & additional', exact: true });
+  await expect(history.getByRole('listitem').filter({ hasText: 'Other Documents' })).toHaveCount(1);
+  const actions = company.getByRole('region', { name: 'Supplier document actions', exact: true });
+  const attentionSummary = actions.getByLabel('Required document attention summary');
+  const attentionBox = await attentionSummary.boundingBox();
+  const addButtonBox = await actions.getByRole('button', { name: 'Add Other Document', exact: true }).boundingBox();
+  const requiredHeadingBox = await required.locator('h3').boundingBox();
+  expect(attentionBox && addButtonBox && requiredHeadingBox).not.toBeNull();
+  expect(attentionBox!.x + attentionBox!.width).toBeLessThan(addButtonBox!.x);
+  expect(Math.abs(attentionBox!.y - addButtonBox!.y)).toBeLessThan(5);
+  expect(requiredHeadingBox!.y).toBeGreaterThan(attentionBox!.y + attentionBox!.height);
+  await actions.getByRole('button', { name: 'Add Other Document', exact: true }).click();
+  await actions.getByLabel('Document name').fill('Safety Certificate');
+  await actions.getByRole('button', { name: 'Add', exact: true }).click();
+  const addedDocument = history.getByRole('listitem').filter({ hasText: 'Other: Safety Certificate' });
+  await expect(addedDocument).toHaveCount(1);
+  const menuButton = addedDocument.getByRole('button', { name: 'Actions for Other: Safety Certificate', exact: true });
+  await menuButton.click();
+  const verifyAction = page.getByRole('menuitem', { name: 'Verify and mark current' });
+  await expect(verifyAction).toBeVisible();
+  await verifyAction.click();
+  await expect(page.getByText('Verify Other: Safety Certificate', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Remove supporting document' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Remove supporting document' }).click();
+  await page.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(history.getByRole('listitem').filter({ hasText: 'Other: Safety Certificate' })).toHaveCount(0);
+  expect(service.records.filter(record => record.record_type === 'document_modification')).toHaveLength(2);
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
 });
 
 test('Document reminder failures and missing setup stay visible and recover through Retry', async ({ page }) => {
