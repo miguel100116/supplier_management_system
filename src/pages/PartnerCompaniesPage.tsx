@@ -50,7 +50,7 @@ import {
 } from '../features/partner-companies/services/masterListImport';
 import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
-import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';
+import { MasterListUploadPanel } from '../features/partner-companies/components/MasterListUploadPanel';
 import { activeListsFromRegistry } from '../features/active-companies/domain/companyEligibility';
 import { DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS, DocumentMaintenanceSettings, loadDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
 import { PartnerCompaniesFilterToolbar } from '../features/partner-companies/components/PartnerCompaniesFilterToolbar';
@@ -290,12 +290,12 @@ export function PartnerCompaniesPage({
   const [companyToArchive, setCompanyToArchive] = useState<PartnerCompany | null>(null);
 
   // Master List import state
-  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   // Parsed + merged result awaiting admin confirmation - nothing is saved
   // until they click "Apply Update" on the review modal below.
   const [importPreview, setImportPreview] = useState<MasterListImportReview | null>(null);
+  const importSourceRowCount = importPreview?.files.reduce((total, file) => total + file.rows.length, 0) ?? 0;
   const [duplicateMasterListReview, setDuplicateMasterListReview] = useState<{ files: File[]; duplicates: MasterListFileDuplicate[] } | null>(null);
   const [isReplaceConfirmationOpen, setIsReplaceConfirmationOpen] = useState(false);
   const [isApplyingImport, setIsApplyingImport] = useState(false);
@@ -306,9 +306,9 @@ export function PartnerCompaniesPage({
   useModalEscape(Boolean(companyToArchive), () => setCompanyToArchive(null), 60);
   useModalEscape(Boolean(importPreview), () => setImportPreview(null), 50);
   useModalEscape(Boolean(importResult), () => setImportResult(null), 50);
-  useModalEscape(Boolean(duplicateMasterListReview), () => setDuplicateMasterListReview(null), 80);
+  useModalEscape(Boolean(duplicateMasterListReview), cancelDuplicateMasterListReview, 80);
   useModalEscape(isReplaceConfirmationOpen, () => setIsReplaceConfirmationOpen(false), 90);
-  useModalEscape(isRegisterOpen, () => setIsRegisterOpen(false), 50);
+  useModalEscape(isRegisterOpen, closeRegisterModal, 50);
   useModalEscape(Boolean(selectedCompany), closePartnerRecord, 50);
   useEffect(() => {
     if (!isAdmin) return;
@@ -514,15 +514,15 @@ export function PartnerCompaniesPage({
       setIsRegisterOpen(false);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Failed to import the Master List file.');
+      setRegisterModalTab('upload');
+      setIsRegisterOpen(true);
     } finally {
       setIsImporting(false);
     }
   };
 
-  const handleImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = ''; // allow re-selecting the same file next time
-    if (!files.length || !onPreviewMasterListImport) return;
+  const inspectMasterListFiles = async (files: File[]) => {
+    if (!files.length || !onPreviewMasterListImport || isImporting) return;
 
     setIsImporting(true);
     setImportError('');
@@ -544,11 +544,15 @@ export function PartnerCompaniesPage({
     }
   };
 
-  const cancelDuplicateMasterListReview = () => {
+  function cancelDuplicateMasterListReview() {
     setDuplicateMasterListReview(null);
     setRegisterModalTab('upload');
     setIsRegisterOpen(true);
-  };
+  }
+
+  function closeRegisterModal() {
+    if (!isImporting) setIsRegisterOpen(false);
+  }
 
   const continueWithoutDuplicateMasterListFiles = () => {
     if (!duplicateMasterListReview) return;
@@ -1022,7 +1026,6 @@ export function PartnerCompaniesPage({
           branchCount={partnerCompanies.reduce((total, company) => total + (company.branches?.length ?? 0), 0)}
         />
       </PartnerRegistryOverview>
-      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls,.csv" multiple className="hidden" onChange={handleImportFileSelected} />
       <section className="space-y-3" aria-label="Partner directory workspace">
 
       {importError && (
@@ -2022,7 +2025,8 @@ export function PartnerCompaniesPage({
           <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-transparent dark:bg-slate-950">
             {/* Close Button */}
             <button
-              onClick={() => setIsRegisterOpen(false)}
+              onClick={closeRegisterModal}
+              disabled={isImporting}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer"
               title="Close dialog"
               type="button"
@@ -2044,6 +2048,7 @@ export function PartnerCompaniesPage({
             <div className="mx-6 mt-5 flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/50">
               <button
                 type="button"
+                disabled={isImporting}
                 onClick={() => setRegisterModalTab('manual')}
                 className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                   registerModalTab === 'manual'
@@ -2057,6 +2062,7 @@ export function PartnerCompaniesPage({
               {onPreviewMasterListImport && (
                 <button
                   type="button"
+                  disabled={isImporting}
                   onClick={() => setRegisterModalTab('upload')}
                   className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                     registerModalTab === 'upload'
@@ -2072,62 +2078,13 @@ export function PartnerCompaniesPage({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
             {registerModalTab === 'upload' && onPreviewMasterListImport ? (
-              <div className="mt-6 space-y-4">
-                <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Upload the latest Master List to refresh the registry and all three Active Company Lists. Companies are matched to existing
-                  records by name (fuzzy matching handles minor spelling/casing differences), so re-uploading a
-                  refreshed file is safe: matches are merged as an extra branch/BP Code rather than duplicated, and
-                  only genuinely new or newly-accredited companies are added.
-                </div>
-
-                <ActiveCompanyUploadCards userEmail={currentUserEmail} />
-
-                <label
-                  className={`flex items-start gap-2.5 rounded-xl border p-3 cursor-pointer transition ${
-                    importReplace
-                      ? 'border-rose-300 bg-rose-50/60 dark:border-rose-900/50 dark:bg-rose-950/20'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={importReplace}
-                    onChange={(e) => setImportReplace(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-300"
-                  />
-                  <span className="text-xs">
-                    <span className="font-bold text-slate-700 dark:text-slate-200">Replace the entire registry with these files</span>
-                    <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Clears every existing partner first, so the registry mirrors the selected files. Leave unchecked to merge into the current registry instead.
-                    </span>
-                  </span>
-                </label>
-
-                {importReplace && (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-[#a16207] dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
-                    <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                    <span>This permanently removes all current partner companies before importing. This cannot be undone.</span>
-                  </div>
-                )}
-
-                {importError && (
-                  <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">{importError}</p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => importFileInputRef.current?.click()}
-                  disabled={isImporting}
-                  className="w-full bg-[#2187CD] hover:bg-[#2187CD]/90 text-white flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
-                >
-                  {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                  <span>{isImporting ? 'Reading files…' : importReplace ? 'Choose Files & Replace Registry' : 'Choose Master List Files (.xlsx, .xls, .csv)'}</span>
-                </button>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
-                  Select standard or V4 Master List files. Review each file and choose which companies to skip before applying the update.
-                </p>
-
-              </div>
+              <MasterListUploadPanel
+                busy={isImporting}
+                error={importError}
+                replace={importReplace}
+                onReplaceChange={setImportReplace}
+                onSelectFiles={(files) => { void inspectMasterListFiles(files); }}
+              />
             ) : (
             <form id="register-partner-company-form" onSubmit={handleAdd} className="mt-6 w-full space-y-4">
               <div>
@@ -2256,7 +2213,8 @@ export function PartnerCompaniesPage({
             </div>
             <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-800">
               <button
-                onClick={() => setIsRegisterOpen(false)}
+                onClick={closeRegisterModal}
+                disabled={isImporting}
                 className="secondary-button min-h-10 px-4 py-2 text-xs"
                 type="button"
               >
@@ -2355,7 +2313,7 @@ export function PartnerCompaniesPage({
               <div>
                 <h3 id="master-list-import-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review Master List Import</h3>
                 <p className="text-xs text-slate-500">
-                  {importPreview.files.reduce((total, file) => total + file.rows.length, 0)} companies found in {importPreview.files.length} file{importPreview.files.length === 1 ? '' : 's'} &bull; nothing has been saved yet
+                  {importSourceRowCount} compan{importSourceRowCount === 1 ? 'y' : 'ies'} found in {importPreview.files.length} file{importPreview.files.length === 1 ? '' : 's'} &bull; nothing has been saved yet
                 </p>
               </div>
             </div>

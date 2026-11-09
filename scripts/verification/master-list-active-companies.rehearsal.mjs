@@ -10,17 +10,22 @@ const db = new PGlite();
 try {
   await db.exec(`
     create role anon; create role authenticated;
+    create schema private;
+    revoke all on schema private from public, anon;
+    grant usage on schema private to authenticated;
     create table public.application_records(record_type text, record_id text, payload jsonb,
       updated_at timestamptz default now(), primary key(record_type, record_id));
     alter table public.application_records enable row level security;
     grant select, insert, update, delete on public.application_records to authenticated;
     create function public.is_confirmed_mgenesis_user() returns boolean language sql
       as $$select coalesce(current_setting('test.confirmed', true), '') = 'yes'$$;
-    create function public.is_app_admin() returns boolean language sql
+    create function private.is_app_admin() returns boolean language sql
       as $$select coalesce(current_setting('test.admin', true), '') = 'yes'$$;
-    create function public.my_app_email() returns text language sql as $$select 'synthetic.admin@mgenesis.com'::text$$;
+    create function private.my_app_email() returns text language sql as $$select 'synthetic.admin@mgenesis.com'::text$$;
+    revoke all on function private.is_app_admin(), private.my_app_email() from public, anon;
+    grant execute on function private.is_app_admin(), private.my_app_email() to authenticated;
     create policy admin_write on public.application_records for all to authenticated
-      using (public.is_app_admin()) with check (public.is_app_admin());
+      using (private.is_app_admin()) with check (private.is_app_admin());
     create policy reference_read on public.application_records for select to authenticated
       using (public.is_confirmed_mgenesis_user() and record_type in ('partner_company','survey'));
     create function public.synthetic_normalization() returns trigger language plpgsql as $$begin

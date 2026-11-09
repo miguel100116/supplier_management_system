@@ -172,6 +172,13 @@ function parseSurvey(value: unknown, recordId: string, label: string): JsonObjec
     text(parsed.questionCategory, `${label}.questions[${index}].questionCategory`, { max: 500 });
   });
   optionalStringArray(candidate.accessDepartments, `${label}.accessDepartments`, 100);
+  if (candidate.distributionRecipientEmails !== undefined) {
+    stringArray(candidate.distributionRecipientEmails, `${label}.distributionRecipientEmails`, 10_000);
+  }
+  if (Array.isArray(candidate.distributionRecipientEmails)
+    && candidate.distributionRecipientEmails.some(email => typeof email !== 'string' || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    throw new Error(`${label}.distributionRecipientEmails must contain valid email addresses.`);
+  }
   optionalStringArray(candidate.accessRoles, `${label}.accessRoles`, 20);
   optionalStringArray(candidate.evaluationCompanyIds, `${label}.evaluationCompanyIds`, 10_000);
   // Assignment scope is derived from admin uploads at runtime, never trusted
@@ -243,7 +250,7 @@ function parseSurveyResponse(
   optionalText(candidate.companyId, `${label}.companyId`, 500);
   optionalText(candidate.importBatchId, `${label}.importBatchId`, 2_000);
   if (candidate.dataSource !== undefined && candidate.dataSource !== null) {
-    oneOf(candidate.dataSource, ['client_csv', 'production_submission', 'test_submission'], `${label}.dataSource`);
+    oneOf(candidate.dataSource, ['client_csv', 'app_submission', 'production_submission', 'test_submission'], `${label}.dataSource`);
   }
   if (candidate.submissionDateInferredFrom !== undefined && candidate.submissionDateInferredFrom !== null) {
     oneOf(candidate.submissionDateInferredFrom, ['startTime', 'responseId', 'recordCreatedAt'], `${label}.submissionDateInferredFrom`);

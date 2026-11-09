@@ -33,7 +33,7 @@ export function SendFormConfirmation({ title, surveyType, recipientCount, compan
         <div id={descriptionId} className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           <p>Are you sure you want to make this evaluation form available?</p>
           <p className="mt-2 break-words font-semibold text-slate-900 dark:text-white">{title} · {surveyType}</p>
-          <p className="mt-2">{companyCount} companies to evaluate · {recipientCount} eligible employees</p>
+          <p className="mt-2">{companyCount} companies to evaluate · {recipientCount} selected employee{recipientCount === 1 ? '' : 's'}</p>
         </div>
         {error && <p role="alert" className="mt-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-end">

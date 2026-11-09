@@ -16,12 +16,13 @@ import { SurveyAccessStatus } from '../features/evaluations/components/SurveyAcc
 import { UnsavedChangesDialog } from '../components/UnsavedChangesDialog';
 import { SendFormConfirmation } from '../features/evaluations/components/SendFormConfirmation';
 import { SendFormCompanySelection } from '../features/evaluations/components/SendFormCompanySelection';
+import { SendFormRecipientSelection } from '../features/evaluations/components/SendFormRecipientSelection';
 import { applyDistributionCompanySelection, requiresDistributionCompanySelection } from '../features/evaluations/domain/formDistribution';
 import { parseDDMMYYYY } from '../utils/time';
 import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domain/leaderboardSelection';
 import { CreateSurveyPage } from './CreateSurveyPage';
 import type { PersistedProfile } from '../features/account-management/domain/accountProfile';
-import { getEligibleFormRecipients, type DepartmentSurveyPermissions } from '../features/evaluations/domain/formRecipients';
+import { getEligibleFormRecipients, normalizeRecipientEmail, validateDistributionRecipients, type DepartmentSurveyPermissions } from '../features/evaluations/domain/formRecipients';
 import { getAdminActivity, logAdminActivity, type AdminActivityEntry } from '../features/account-management/services/adminActivityLog';
 
 interface SurveyFormsPageProps {
@@ -135,6 +136,7 @@ export function SurveyFormsPage({
   const [isSendApprovalOpen, setIsSendApprovalOpen] = useState(false);
   const [isDiscardSendOpen, setIsDiscardSendOpen] = useState(false);
   const [sendCompanyIds, setSendCompanyIds] = useState<string[] | null>(null);
+  const [sendRecipientEmails, setSendRecipientEmails] = useState<string[] | null>(null);
   const [distributionFeedback, setDistributionFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [isSavingPreviewEdit, setIsSavingPreviewEdit] = useState(false);
   const [isSendingForm, setIsSendingForm] = useState(false);
@@ -192,7 +194,7 @@ export function SurveyFormsPage({
   };
   const requestCloseSendConfirmation = () => {
     if (isSendingForm) return;
-    if (sendCompanyIds !== null) { setIsDiscardSendOpen(true); return; }
+    if (sendCompanyIds !== null || sendRecipientEmails !== null) { setIsDiscardSendOpen(true); return; }
     setSendConfirmationSurveyId(null);
     setSendCompanyIds(null);
   };
@@ -233,6 +235,12 @@ export function SurveyFormsPage({
   const eligibleRecipients = sendConfirmationSurvey
     ? getEligibleFormRecipients(sendConfirmationSurvey, employeeProfiles, departmentPermissions)
     : [];
+  const eligibleRecipientEmails = eligibleRecipients.map(recipient => normalizeRecipientEmail(recipient.email));
+  const selectedRecipientEmails = sendRecipientEmails ?? (sendConfirmationSurvey?.distributionRecipientEmails
+    ? sendConfirmationSurvey.distributionRecipientEmails.map(normalizeRecipientEmail).filter(email => eligibleRecipientEmails.includes(email))
+    : eligibleRecipientEmails);
+  const selectedRecipientCount = eligibleRecipients.filter(recipient => selectedRecipientEmails.includes(normalizeRecipientEmail(recipient.email))).length;
+  useEffect(() => { setSendRecipientEmails(null); }, [sendConfirmationSurveyId]);
   const sendDeadline = sendConfirmationSurvey?.deadlineDate ? parseDDMMYYYY(sendConfirmationSurvey.deadlineDate) : null;
   const sendDeadlineExpired = Boolean(sendDeadline && new Date(sendDeadline.getFullYear(), sendDeadline.getMonth(), sendDeadline.getDate()).getTime() < new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).getTime());
 
@@ -290,15 +298,16 @@ export function SurveyFormsPage({
 
     setIsSendingForm(true);
     try {
-      await onUpdateSurvey({ ...applyDistributionCompanySelection(sendConfirmationSurvey, sendCompanyIds, partnerCompanies), status: 'Running', manuallyEndedAt: undefined, archivedAt: undefined, distributionId: crypto.randomUUID(), lastDistributedAt: new Date().toISOString() });
+      const distributionRecipientEmails = validateDistributionRecipients(selectedRecipientEmails, eligibleRecipients);
+      await onUpdateSurvey({ ...applyDistributionCompanySelection(sendConfirmationSurvey, sendCompanyIds, partnerCompanies), status: 'Running', manuallyEndedAt: undefined, archivedAt: undefined, distributionId: crypto.randomUUID(), lastDistributedAt: new Date().toISOString(), distributionRecipientEmails });
       logAdminActivity(
         'Made evaluation form available',
-        `${sendConfirmationSurvey.title} (${sendConfirmationSurvey.surveyType}) · ${eligibleRecipients.length} eligible employees · by ${userEmail || 'Admin'}`,
+        `${sendConfirmationSurvey.title} (${sendConfirmationSurvey.surveyType}) · ${distributionRecipientEmails.length} selected employees · by ${userEmail || 'Admin'}`,
       );
       setIsSendApprovalOpen(false);
       setSendConfirmationSurveyId(null);
       setSendCompanyIds(null);
-      setDistributionFeedback({ kind: 'success', text: `${sendConfirmationSurvey.title} is available to ${eligibleRecipients.length} eligible employees. Employee survey reminders are generated from active accessible forms.` });
+      setDistributionFeedback({ kind: 'success', text: `${sendConfirmationSurvey.title} sent to ${distributionRecipientEmails.length} selected employees through in-app reminders.` });
     } catch (error) {
       setDistributionFeedback({ kind: 'error', text: error instanceof Error ? error.message : 'The form could not be made available. No notification success is reported.' });
     } finally {
@@ -1133,7 +1142,7 @@ export function SurveyFormsPage({
         <SendFormConfirmation
           title={sendConfirmationSurvey.title}
           surveyType={sendConfirmationSurvey.surveyType}
-          recipientCount={eligibleRecipients.length}
+          recipientCount={selectedRecipientCount}
           companyCount={getSurveyEvaluationCompanies({ ...sendConfirmationSurvey, ...(sendCompanyIds !== null ? { evaluationCompanyIds: sendCompanyIds } : {}) }, partnerCompanies).length}
           busy={isSendingForm}
           error={distributionFeedback?.kind === 'error' ? distributionFeedback.text : undefined}
@@ -1143,7 +1152,7 @@ export function SurveyFormsPage({
       )}
       {sendConfirmationSurvey && isDiscardSendOpen && (
         <UnsavedChangesDialog
-          description="Discard the company selection and close Send Form?"
+          description="Discard the company and recipient selections and close Send Form?"
           onContinue={() => setIsDiscardSendOpen(false)}
           onDiscard={() => {
             setIsDiscardSendOpen(false);
@@ -1156,7 +1165,7 @@ export function SurveyFormsPage({
       {sendConfirmationSurvey && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="send-form-title">
           <div aria-hidden="true" className="absolute inset-0 bg-slate-950/50" />
-            <section className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><header className="mb-3"><h2 id="send-form-title" className="text-lg font-bold">Confirm form distribution</h2><p className="text-sm text-slate-500">{sendConfirmationSurvey.title} · {sendConfirmationSurvey.surveyType}</p><p className="mt-2 text-sm"><b>{eligibleRecipients.length}</b> eligible employee{eligibleRecipients.length === 1 ? '' : 's'} based on category permissions and this form’s access settings.</p></header><SendFormCompanySelection surveyType={sendConfirmationSurvey.surveyType} companies={sendTopCompanies} selectedIds={sendCompanyIds} busy={isSendingForm || !onUpdateSurvey} onSelect={setSendCompanyIds} usesUploadedList={sendConfirmationSurvey.activeEvaluationCompanyIds !== undefined} />{distributionFeedback?.kind === 'error' && <p role="alert" className="mb-3 text-sm text-rose-600">{distributionFeedback.text}</p>}<div className="max-h-[45vh] overflow-auto rounded-lg border border-slate-200 dark:border-slate-700"><table className="w-full text-left text-sm"><thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-2">Employee</th><th className="p-2">Department</th><th className="p-2">Designation</th></tr></thead><tbody>{eligibleRecipients.map((recipient) => <tr key={recipient.email} className="border-t border-slate-100 dark:border-slate-800"><td className="p-2">{recipient.email}</td><td className="p-2">{recipient.department}</td><td className="p-2">{recipient.designation}</td></tr>)}</tbody></table>{eligibleRecipients.length === 0 && <p className="p-5 text-center text-sm text-slate-500">No eligible employees match the current access settings.</p>}</div>{sendDeadlineExpired && <p className="mt-3 text-sm text-rose-600">The deadline has passed. Update it in Manage Access before sending.</p>}<footer className="mt-4 flex justify-end gap-2"><button onClick={requestCloseSendConfirmation} disabled={isSendingForm} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button><button onClick={() => { setDistributionFeedback(null); setIsSendApprovalOpen(true); }} disabled={isSendingForm || !onUpdateSurvey || !eligibleRecipients.length || sendDeadlineExpired || (sendCompanySelectionRequired && !sendCompanyIds?.length)} className="rounded-lg bg-[#2187CD] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSendingForm ? 'Sending…' : (sendCompanyIds !== null || sendCompanySelectionRequired) ? 'Confirm & Save Selection' : getSurveyStatus(sendConfirmationSurvey) === 'Running' ? 'Confirm & Resend' : 'Confirm & Make Available'}</button></footer></section>
+            <section className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900"><header className="mb-3"><h2 id="send-form-title" className="text-lg font-bold">Confirm form distribution</h2><p className="text-sm text-slate-500">{sendConfirmationSurvey.title} · {sendConfirmationSurvey.surveyType}</p><p className="mt-2 text-sm"><b>{eligibleRecipients.length}</b> eligible employee{eligibleRecipients.length === 1 ? '' : 's'} based on category permissions and this form’s access settings.</p></header><SendFormCompanySelection surveyType={sendConfirmationSurvey.surveyType} companies={sendTopCompanies} selectedIds={sendCompanyIds} busy={isSendingForm || !onUpdateSurvey} onSelect={setSendCompanyIds} usesUploadedList={sendConfirmationSurvey.activeEvaluationCompanyIds !== undefined} />{distributionFeedback?.kind === 'error' && <p role="alert" className="mb-3 text-sm text-rose-600">{distributionFeedback.text}</p>}<SendFormRecipientSelection recipients={eligibleRecipients} selectedEmails={selectedRecipientEmails} busy={isSendingForm || !onUpdateSurvey} onSelect={setSendRecipientEmails} />{sendDeadlineExpired && <p className="mt-3 text-sm text-rose-600">The deadline has passed. Update it in Manage Access before sending.</p>}<footer className="mt-4 flex justify-end gap-2"><button onClick={requestCloseSendConfirmation} disabled={isSendingForm} className="rounded-lg border border-slate-200 px-4 py-2 text-sm">Cancel</button><button onClick={() => { setDistributionFeedback(null); setIsSendApprovalOpen(true); }} disabled={isSendingForm || !onUpdateSurvey || !selectedRecipientCount || sendDeadlineExpired || (sendCompanySelectionRequired && !sendCompanyIds?.length)} className="rounded-lg bg-[#2187CD] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isSendingForm ? 'Sending…' : (sendCompanyIds !== null || sendCompanySelectionRequired) ? 'Confirm & Save Selection' : getSurveyStatus(sendConfirmationSurvey) === 'Running' ? 'Confirm & Resend' : 'Confirm & Make Available'}</button></footer></section>
         </div>
       )}
 

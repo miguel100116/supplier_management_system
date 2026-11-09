@@ -17,7 +17,7 @@ declare
   v_id text;
   v_uploaded_at timestamptz := clock_timestamp();
 begin
-  if not coalesce(public.is_confirmed_mgenesis_user() and public.is_app_admin(), false) then
+  if not coalesce(public.is_confirmed_mgenesis_user() and private.is_app_admin(), false) then
     raise exception 'A confirmed Admin account is required.' using errcode = '42501';
   end if;
   if jsonb_typeof(p_companies) is distinct from 'array' then
@@ -74,7 +74,7 @@ begin
     ) n;
     v_id := lower(v_type) || '-master-list-' || gen_random_uuid()::text;
     v_snapshot := jsonb_build_object('id', v_id, 'surveyType', v_type,
-      'uploadedAt', v_uploaded_at, 'uploadedBy', public.my_app_email(),
+      'uploadedAt', v_uploaded_at, 'uploadedBy', private.my_app_email(),
       'sourceFileName', p_source_file_name, 'companies', v_names);
     insert into public.application_records(record_type, record_id, payload)
       values ('active_company_snapshot', v_id, v_snapshot);

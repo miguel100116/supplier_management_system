@@ -21,6 +21,25 @@ import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 
 const now = '2026-09-24T00:00:00.000Z';
 
+test('app evaluation provenance survives validated database hydration and rejects unknown sources', async () => {
+  const payload = { responseId: 'RESP-app', surveyId: 'courier-form', companyId: 'courier-1',
+    surveyType: 'Courier', respondentType: 'Rank & File', respondentEmail: 'employee@example.test',
+    submissionDate: now, company: 'Synthetic courier', questionId: 'Q01', questionNumber: 1,
+    question: 'Delivery', questionCategory: 'Delivery', rating: 0, comment: '', dataSource: 'app_submission' };
+  const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async input => new Response(JSON.stringify(
+      new URL(String(input)).searchParams.has('record_id') ? []
+        : [{ record_id: 'RESP-app:Q01', created_at: now, payload }],
+    ), { headers: { 'Content-Type': 'application/json' } }) },
+  });
+  const loaded = await loadApplicationRecords<SurveyResponse>('survey_response', undefined, client);
+  assert.equal(loaded[0].dataSource, 'app_submission');
+  assert.equal(loaded[0].rating, 0);
+  assert.throws(() => parseApplicationRecordPayload('survey_response',
+    { ...payload, dataSource: 'untrusted-source' }, 'RESP-app:Q01'), /dataSource/);
+});
+
 test('missing remarks RPC identifies the migration and never falls back to a broad record write', async () => {
   const requests: string[] = [];
   const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {

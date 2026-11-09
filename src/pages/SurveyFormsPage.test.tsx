@@ -75,7 +75,7 @@ test('Send Form persists the Supplier draft only on confirmation, including alre
   assert.match(source, /await onUpdateSurvey\(\{ \.\.\.applyDistributionCompanySelection\(sendConfirmationSurvey, sendCompanyIds, partnerCompanies\)/);
   assert.match(source, /useModalEscape\(Boolean\(sendConfirmationSurveyId\), requestCloseSendConfirmation, 80\)/);
   assert.match(source, /onClick=\{requestCloseSendConfirmation\} disabled=\{isSendingForm\}/);
-  assert.match(source, /sendCompanyIds !== null\) \{ setIsDiscardSendOpen\(true\); return; \}/);
+  assert.match(source, /sendCompanyIds !== null \|\| sendRecipientEmails !== null\) \{ setIsDiscardSendOpen\(true\); return; \}/);
   assert.doesNotMatch(source, /window\.confirm/);
   assert.match(source, /onClick=\{\(\) => \{ setDistributionFeedback\(null\); setIsSendApprovalOpen\(true\); \}\}/);
   assert.match(source, /onConfirm=\{handleConfirmSend\}/);

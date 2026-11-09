@@ -21,7 +21,7 @@ test('preview provides full-row recovery export and rolls back without deleting'
 test('cleanup protects CSV and official records and deletes only complete test groups', () => {
   for (const mode of ['preview', 'delete'] as const) {
     const sql = buildTestEvaluationCleanupSql(mode);
-    for (const protection of ['IMPORT-%', 'client-csv:%', 'client_csv', 'production_submission', 'public.evaluation_submissions', 'default-%']) {
+    for (const protection of ['IMPORT-%', 'client-csv:%', 'client_csv', 'app_submission', 'production_submission', 'public.evaluation_submissions', 'default-%']) {
       assert.ok(sql.includes(protection));
     }
     assert.match(sql, /BOOL_AND\(is_test\) AND NOT BOOL_OR\(is_protected\)/);
