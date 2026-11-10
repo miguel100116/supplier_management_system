@@ -8,6 +8,7 @@ import {
 } from '../features/notifications/domain/notificationReadState';
 import { isSupabaseConfigured, supabase } from './supabaseClient';
 import { parseApplicationRecordPayload } from './applicationRecordSchemas';
+import { loadCachedResponses } from './cachedResponsePage';
 import { parsePersistedProfile, type PersistedProfile } from '../features/account-management/domain/accountProfile';
 export { parsePersistedProfile, type PersistedProfile } from '../features/account-management/domain/accountProfile';
 
@@ -146,9 +147,16 @@ export async function loadApplicationRecords<T>(recordType: ApplicationRecordTyp
     }
   };
 
-  // Seek through the primary key instead of rescanning and discarding growing offsets.
+  let cachedRows: Awaited<ReturnType<typeof loadCachedResponses>> = null;
+  if (recordType === 'survey_response' && client === supabase
+    && typeof window !== 'undefined' && window.__SMS_RUNTIME_CONFIG__?.responseCacheEnabled === true) {
+    cachedRows = await loadCachedResponses(client, options?.ownRecords, options?.signal);
+    options?.signal?.throwIfAborted();
+  }
+  if (cachedRows !== null) appendRows(cachedRows as ApplicationRecordRow<T>[]);
+  // Direct fallback keeps the existing cursor contract and runtime payload validation.
   let cursor: string | undefined;
-  while (true) {
+  while (cachedRows === null) {
     options?.signal?.throwIfAborted();
     let query = client.from('application_records').select('record_id,payload,created_at').eq('record_type', recordType);
     if (ownerId) query = query.eq('owner_id', ownerId);

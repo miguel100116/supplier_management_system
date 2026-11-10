@@ -344,6 +344,7 @@ export default function App() {
   // granting Account Management / full system access.
   const canRenewDocuments = isAdmin || userPermissions.pages.includes('renew-documents');
 
+  // Avoid starting hydration with a temporary role before the persisted profile arrives.
   const {
     responses,
     archivedResponses,
@@ -392,7 +393,7 @@ export default function App() {
     categoryLabels,
     renameCategory,
     restoreDefaultCategories,
-  } = useSurveyData(accounts, account, isAdmin);
+  } = useSurveyData(accounts, isSupabaseConfigured && !accountProfile ? null : account, isAdmin);
 
   const [activePage, setActivePage] = useState<PageKey>(() => getPageKeyFromPathname(window.location.pathname, ROUTE_BASE_PATH));
   const browserHistoryRef = useRef(createBrowserPageHistory());

@@ -36,13 +36,18 @@ test('mode-specific configuration and deployed environment take precedence', () 
 
 test('public runtime configuration never returns server credentials', () => {
   withEnvFiles((root) => {
+    writeFileSync(path.join(root, '.env.development.local'), 'UPSTASH_REDIS_REST_URL=https://synthetic.upstash.io\nUPSTASH_REDIS_REST_TOKEN=synthetic-redis-secret\n');
     const env = loadServerEnvironment('development', root, { SUPABASE_SERVICE_ROLE_KEY: 'synthetic-legacy-secret' });
+    assert.equal(env.UPSTASH_REDIS_REST_TOKEN, 'synthetic-redis-secret');
     const config = publicRuntimeConfig(env);
     assert.equal(config.supabaseUrl, 'https://synthetic.supabase.co');
     assert.equal(config.supabasePublishableKey, 'synthetic-public');
     const output = JSON.stringify(config);
     assert.equal(output.includes('synthetic-server-secret'), false);
     assert.equal(output.includes('synthetic-legacy-secret'), false);
+    assert.equal(output.includes('synthetic-redis-secret'), false);
+    assert.equal(output.includes('synthetic.upstash.io'), false);
+    assert.equal(config.responseCacheEnabled, true);
     assert.equal(Object.keys(config).some((key) => /secret|service.?role/i.test(key)), false);
   });
 });

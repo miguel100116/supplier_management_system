@@ -6,6 +6,43 @@ const email = 'synthetic.admin@mgenesis.com';
 const userId = '00000000-0000-4000-8000-000000000001';
 const createdAt = '2026-01-01T00:00:00.000Z';
 
+for (const cacheAvailable of [true, false]) {
+  test(`Dashboard response cache ${cacheAvailable ? 'loads one complete snapshot' : 'falls back after an API failure'}`, async ({ page }) => {
+    const service = await backend(page);
+    service.records.push({ record_type: 'survey_response', record_id: 'cache-evaluation:Q01', created_at: createdAt, payload: {
+      responseId: 'cache-evaluation', surveyType: 'Courier', companyId: 'synthetic-courier', company: 'Synthetic Courier',
+      respondentType: 'Employee', respondentEmail: email, submissionDate: new Date().toISOString(),
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery',
+      rating: 1, comment: '', dataSource: 'production_submission',
+    } });
+    await page.route('**/api/config', async route => {
+      const response = await route.fetch();
+      await route.fulfill({ json: { ...await response.json(), responseCacheEnabled: true } });
+    });
+    let cacheRequests = 0;
+    await page.route('**/api/survey-responses?*', async route => {
+      cacheRequests++;
+      expect(route.request().headers().authorization).toMatch(/^Bearer /);
+      if (!cacheAvailable) { await route.fulfill({ status: 503, json: { error: 'Synthetic unavailable cache API' } }); return; }
+      expect(new URL(route.request().url()).searchParams.has('after')).toBe(false);
+      const rows = service.records.filter(row => row.record_type === 'survey_response');
+      await route.fulfill({ json: { rows } });
+    });
+    await page.goto('/login'); await signIn(page);
+    const recent = page.getByRole('table', { name: 'Recent evaluation submissions' });
+    await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+    await waitForReadyPage(page);
+    // Sign-in resolves the authorization scope; measure the regular reload after it settles.
+    cacheRequests = 0;
+    await page.reload();
+    await waitForReadyPage(page);
+    await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+    expect(cacheRequests).toBe(1);
+    expect(service.errors).toEqual([]);
+    expect(service.unexpected).toEqual([]);
+  });
+}
+
 test('Master List import previews active lists, cancels safely, retries failures and replaces category scopes', async ({ page }, testInfo) => {
   const service = await backend(page);
   const header: string[] = []; header[0] = '#'; header[5] = 'Status'; header[6] = 'Category'; header[8] = 'BP Code'; header[9] = 'BP Name';

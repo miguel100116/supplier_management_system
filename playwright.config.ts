@@ -26,6 +26,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: 'http://127.0.0.1:4174', SUPABASE_URL: 'http://127.0.0.1:4174',
       VITE_SUPABASE_PUBLISHABLE_KEY: 'synthetic-public-key',
       SUPABASE_SECRET_KEY: '', SUPABASE_SERVICE_ROLE_KEY: '',
+      UPSTASH_REDIS_REST_URL: '', UPSTASH_REDIS_REST_TOKEN: '',
       VITE_AZURE_CLIENT_ID: '', VITE_AZURE_TENANT_ID: '', VITE_AZURE_REDIRECT_URI: '',
       VITE_DEPLOYMENT_ENV: 'staging',
     },
