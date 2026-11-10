@@ -590,6 +590,14 @@ export function mergeRowsIntoCompanies(
     ...c,
     branches: c.branches ? c.branches.map((b) => ({ ...b, documents: { ...b.documents } })) : [],
   }));
+  const repeatedBpCodes = new Set<string>();
+  const bpCodeCounts = new Map<string, number>();
+  rows.forEach(({ bpCode }) => {
+    if (!bpCode) return;
+    const count = (bpCodeCounts.get(bpCode) ?? 0) + 1;
+    bpCodeCounts.set(bpCode, count);
+    if (count > 1) repeatedBpCodes.add(bpCode);
+  });
 
   const exactIndex = new Map<string, PartnerCompany>();
   const bucketIndex = new Map<string, PartnerCompany[]>();
@@ -652,6 +660,7 @@ export function mergeRowsIntoCompanies(
       const beforeOrigin = match.supplierOrigin;
       const existingBranchIdx = (match.branches ?? []).findIndex(
         (b) => b.bpCode && row.bpCode && b.bpCode === row.bpCode
+          && (!repeatedBpCodes.has(row.bpCode) || b.sourceRow === row.sourceRow)
       );
       const isNewBranch = existingBranchIdx < 0;
       const beforeDocs = isNewBranch ? undefined : match.branches![existingBranchIdx].documents;

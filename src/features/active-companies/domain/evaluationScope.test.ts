@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { CustomForm, PartnerCompany } from '../../../types/survey';
 import { scopeSurveysToActiveLists } from './evaluationScope';
+import { reactivateEvaluationCompany } from './companyEligibility';
 import { getSurveyEvaluationCompanies } from '../../analytics/domain/analytics';
 import { getPendingEmployeeEvaluations } from '../../employee-experience/domain/pendingEvaluations';
 import { applyDistributionCompanySelection } from '../../evaluations/domain/formDistribution';
@@ -77,11 +78,35 @@ test('uses the existing exact normalized import identity, does not use fuzzy mat
   assert.match(scoped[0].activeEvaluationListIssue!, /^1 uploaded company name/);
 });
 
+test('full Master List membership shows inactive companies but status alone gates assignment', () => {
+  const companies: PartnerCompany[] = [
+    { ...registry[0], id: 'active-member', name: 'Active Member' },
+    { ...registry[1], id: 'inactive-member', name: 'Inactive Member', branches: [{ id: 'inactive-branch', bpCode: 'I', status: 'Inactive' }] },
+    { ...registry[2], id: 'completed-inactive-member', name: 'Completed Inactive Member', branches: [{ id: 'completed-branch', bpCode: 'C', status: 'Completed', manualStatus: 'Inactive' }] },
+  ];
+  const lists = [{ surveyType: 'Supplier' as const, companies: companies.map(company => company.name), membershipComplete: true }];
+  const [scoped] = scopeSurveysToActiveLists([form], companies, lists);
+  assert.deepEqual(new Set(scoped.uploadedEvaluationCompanyIds), new Set(companies.map(company => company.id)));
+  assert.deepEqual(scoped.activeEvaluationCompanyIds, ['active-member']);
+  assert.equal(scoped.evaluationCompanyMembershipComplete, true);
+  assert.deepEqual(getSurveyEvaluationCompanies(scoped, companies).map(company => company.id), ['active-member']);
+
+  const reactivated = reactivateEvaluationCompany(companies[2]);
+  assert.equal(reactivated.branches?.[0].status, 'Pending');
+  assert.equal(reactivated.branches?.[0].manualStatus, undefined);
+  const nextCompanies = companies.map(company => company.id === reactivated.id ? reactivated : company);
+  const [updatedScope] = scopeSurveysToActiveLists([form], nextCompanies, lists);
+  assert.deepEqual(new Set(updatedScope.activeEvaluationCompanyIds), new Set(['active-member', 'completed-inactive-member']));
+  assert.deepEqual(new Set(getSurveyEvaluationCompanies(updatedScope, nextCompanies).map(company => company.id)), new Set(['active-member', 'completed-inactive-member']));
+});
+
 test('per-form selections can only narrow uploaded scope and runtime scope is never persisted or trusted from stored surveys', () => {
   const scoped = scopeSurveysToActiveLists([{ ...form, evaluationCompanyIds: ['supplier-0', 'supplier-99'] }], registry, [active]);
   assert.deepEqual(getSurveyEvaluationCompanies(scoped[0], registry).map(item => item.id), ['supplier-0']);
   const parsed = parseApplicationRecordPayload('survey', scoped[0], form.id) as Record<string, unknown>;
   assert.equal(parsed.activeEvaluationCompanyIds, undefined);
+  assert.equal(parsed.uploadedEvaluationCompanyIds, undefined);
+  assert.equal(parsed.evaluationCompanyMembershipComplete, undefined);
   assert.equal(parsed.activeEvaluationListIssue, undefined);
   assert.deepEqual(parsed.evaluationCompanyIds, ['supplier-0', 'supplier-99']);
 });

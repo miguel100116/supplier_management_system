@@ -24,7 +24,9 @@ export async function saveMasterListImport(companies: PartnerCompany[], sourceFi
     const snapshots: ActiveCompanySnapshot[] = data.snapshots.map((snapshot: unknown) => parseActiveCompanySnapshot(snapshot));
     if (ids.size !== companies.length || companies.some(company => !ids.has(company.id))
       || new Set(snapshots.map(snapshot => snapshot.surveyType)).size !== 3) throw new Error('Incomplete confirmation.');
-    return { companies: savedCompanies, lists: snapshots.map(snapshot => ({ surveyType: snapshot.surveyType, companies: snapshot.companies })) };
+    return { companies: savedCompanies, lists: snapshots.map(snapshot => ({ surveyType: snapshot.surveyType,
+      companies: snapshot.masterListCompanies ?? snapshot.companies,
+      membershipComplete: Array.isArray(snapshot.masterListCompanies) })) };
   };
   let saved: ReturnType<typeof parseConfirmation>;
   try { saved = parseConfirmation(); }

@@ -230,6 +230,10 @@ export interface CustomForm {
   evaluationCompanyIds?: string[];
   /** Derived from the latest uploaded Active Companies list; never persisted on a survey. */
   activeEvaluationCompanyIds?: string[];
+  /** All names on the latest Master List upload, including currently inactive companies. */
+  uploadedEvaluationCompanyIds?: string[];
+  /** False for legacy category-list snapshots that retained active names only. */
+  evaluationCompanyMembershipComplete?: boolean;
   activeEvaluationListIssue?: string;
   maxRating?: number;
   questions: {

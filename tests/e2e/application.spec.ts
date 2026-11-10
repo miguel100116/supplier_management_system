@@ -114,7 +114,8 @@ test('Master List import previews active lists, cancels safely, retries failures
   await page.getByRole('button', { name: 'Replace Registry', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Master List Import Complete' })).toBeVisible();
   expect(service.records.filter(record => record.record_type === 'partner_company').map(record => record.payload.name)).toEqual(['Replacement Supplier']);
-  expect(service.activeLists.value?.map(list => list.companies)).toEqual([[], [], []]);
+  expect(service.activeLists.value?.map(list => list.companies)).toEqual([[], ['Replacement Supplier'], []]);
+  expect(service.activeLists.value?.every(list => list.membership_complete)).toBe(true);
   expect(service.records.filter(record => record.record_type === 'active_company_snapshot')).toHaveLength(7);
   expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
 });
@@ -171,9 +172,9 @@ test('Master List has one accessible uploader for combined categories and multip
   await review.getByRole('button', { name: 'Apply Update', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Master List Import Complete' })).toBeVisible();
   expect(service.activeLists.value).toEqual([
-    { survey_type: 'Courier', companies: ['Northwind Logistics', 'Synthetic Courier'] },
-    { survey_type: 'Supplier', companies: ['Alpine Equipment'] },
-    { survey_type: 'Subcontractor', companies: ['Redwood Electrical'] },
+    { survey_type: 'Courier', companies: ['Northwind Logistics', 'Synthetic Courier'], membership_complete: true },
+    { survey_type: 'Supplier', companies: ['Alpine Equipment'], membership_complete: true },
+    { survey_type: 'Subcontractor', companies: ['Redwood Electrical'], membership_complete: true },
   ]);
   expect(service.records.filter(record => record.record_type === 'partner_company')).toHaveLength(4);
   expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
@@ -232,9 +233,12 @@ test('Master List validates files and returns duplicate dismissal to the unified
 test('Manage Access saves a complete Courier selection and preserves drafts after rejected writes', async ({ page, browser }, testInfo) => {
   const service = await backend(page);
   const names = Array.from({ length: 7 }, (_, i) => `Assigned Courier ${i + 1}`);
+  const inactiveCompany = { id: 'inactive-courier', name: 'Inactive Courier', type: 'Courier', createdAt,
+    branches: [{ id: 'inactive-courier-branch', bpCode: 'IC', status: 'Inactive' }], isArchived: false };
   service.records.push(...names.map((name, i) => ({ record_type: 'partner_company', record_id: `assigned-${i}`, created_at: createdAt,
-    payload: { id: `assigned-${i}`, name, type: 'Courier', createdAt, isArchived: false } })));
-  service.activeLists.value = [{ survey_type: 'Courier', companies: names }];
+    payload: { id: `assigned-${i}`, name, type: 'Courier', createdAt, isArchived: false } })),
+    { record_type: 'partner_company', record_id: inactiveCompany.id, payload: inactiveCompany, created_at: createdAt });
+  service.activeLists.value = [{ survey_type: 'Courier', companies: [...names, inactiveCompany.name], membership_complete: true }];
   service.records.push({ record_type: 'survey', record_id: evaluationForm.id, payload: { ...evaluationForm }, created_at: createdAt });
   await page.goto('/'); await signIn(page);
   await openReadyPage(page, '/evaluation-workspace');
@@ -242,6 +246,20 @@ test('Manage Access saves a complete Courier selection and preserves drafts afte
   await page.getByRole('button').filter({ hasText: 'Synthetic evaluation' }).last().click();
   await page.getByRole('button', { name: /Modify Companies to Evaluate/ }).click();
   for (const name of names) await expect(page.getByRole('checkbox', { name, exact: true })).toBeChecked();
+  const inactiveCheckbox = page.getByRole('checkbox', { name: inactiveCompany.name, exact: true });
+  await expect(inactiveCheckbox).toBeDisabled();
+  await expect(page.getByText(/7 selected · 7 eligible · 8 Companies Uploaded/)).toBeVisible();
+  await expect(page.getByText('Inactive', { exact: true })).toBeVisible();
+  await inactiveCheckbox.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('manage-access-inactive-company.png') });
+  await page.getByRole('button', { name: `Reactivate ${inactiveCompany.name}`, exact: true }).click();
+  await expect(inactiveCheckbox).toBeEnabled();
+  await expect(inactiveCheckbox).not.toBeChecked();
+  const companySearch = page.getByRole('searchbox', { name: 'Search companies', exact: true });
+  await companySearch.fill(inactiveCompany.name);
+  await page.getByRole('checkbox', { name: 'Select All Eligible (1)', exact: true }).check();
+  await expect(inactiveCheckbox).toBeChecked();
+  await companySearch.fill('');
   await page.screenshot({ path: testInfo.outputPath('manage-access-companies.png') });
   await page.getByRole('checkbox', { name: names[6], exact: true }).uncheck();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
@@ -251,7 +269,8 @@ test('Manage Access saves a complete Courier selection and preserves drafts afte
   expect(service.records.find(row => row.record_type === 'survey')!.payload).not.toHaveProperty('evaluationCompanyIds');
   service.failures.surveyWrites = false;
   await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
-  await expect.poll(() => service.records.find(row => row.record_type === 'survey')!.payload.evaluationCompanyIds).toHaveLength(6);
+  await expect.poll(() => service.records.find(row => row.record_type === 'survey')!.payload.evaluationCompanyIds).toHaveLength(7);
+  expect((service.records.find(row => row.record_id === inactiveCompany.id)!.payload.branches as Array<{ status: string }>)[0].status).toBe('Pending');
   await openReadyPage(page, '/evaluation-workspace');
   await page.getByRole('button', { name: 'Manage Access', exact: true }).click();
   await page.getByRole('button').filter({ hasText: 'Synthetic evaluation' }).last().click();
@@ -263,9 +282,9 @@ test('Manage Access saves a complete Courier selection and preserves drafts afte
     const employeeService = await backend(employeePage, 'Employee', false, { records: service.records });
     employeeService.activeLists.value = service.activeLists.value;
     await employeePage.goto('/'); await signIn(employeePage, 'Employee');
-    await expect(employeePage.getByRole('button', { name: 'Courier: 6 pending', exact: true })).toBeVisible();
+    await expect(employeePage.getByRole('button', { name: 'Courier: 7 pending', exact: true })).toBeVisible();
     await employeePage.reload();
-    await expect(employeePage.getByRole('button', { name: 'Courier: 6 pending', exact: true })).toBeVisible();
+    await expect(employeePage.getByRole('button', { name: 'Courier: 7 pending', exact: true })).toBeVisible();
   } finally { await employeeContext.close(); }
 });
 
@@ -319,7 +338,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
   const unexpected: string[] = [];
   const errors: string[] = [];
   const failures = { surveyWrites: false, responseWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false, activeListReads: false, masterListWrites: false };
-  const activeLists: { value: Array<{ survey_type: string; companies: string[] }> | null } = { value: null };
+  const activeLists: { value: Array<{ survey_type: string; companies: string[]; membership_complete?: boolean }> | null } = { value: null };
   const historyReads: Array<{ select: string; id: string | null }> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
@@ -393,14 +412,18 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
       const body = request.postDataJSON();
       const snapshots = ['Courier', 'Supplier', 'Subcontractor'].map(type => {
         const id = `${type}-master-list-${crypto.randomUUID()}`;
+        const masterListCompanies = body.p_companies.filter((company: { type: string; isArchived?: boolean }) => company.type === type && !company.isArchived)
+          .map((company: { name: string }) => company.name).sort();
         return { id, surveyType: type, uploadedAt: new Date().toISOString(), uploadedBy: email, sourceFileName: body.p_source_file_name,
           companies: body.p_companies.filter((company: { type: string; isArchived?: boolean; branches: Array<{ status?: string }> }) => company.type === type && !company.isArchived
-            && (!company.branches.length || company.branches.some(branch => branch.status !== 'Inactive'))).map((company: { name: string }) => company.name).sort() };
+            && (!company.branches.length || company.branches.some(branch => branch.status !== 'Inactive'
+              && !(branch.status === 'Completed' && (branch as { manualStatus?: string }).manualStatus === 'Inactive')))).map((company: { name: string }) => company.name).sort(),
+          masterListCompanies };
       });
       for (let i = records.length - 1; i >= 0; i--) if (records[i].record_type === 'partner_company') records.splice(i, 1);
       records.push(...body.p_companies.map((company: { id: string }) => ({ record_type: 'partner_company', record_id: company.id, payload: company, created_at: createdAt })),
         ...snapshots.map(snapshot => ({ record_type: 'active_company_snapshot', record_id: snapshot.id, payload: snapshot, created_at: createdAt })));
-      activeLists.value = snapshots.map(snapshot => ({ survey_type: snapshot.surveyType, companies: snapshot.companies }));
+      activeLists.value = snapshots.map(snapshot => ({ survey_type: snapshot.surveyType, companies: snapshot.masterListCompanies, membership_complete: true }));
       return reply({ companies: body.p_companies, snapshots });
     }
     if (url.pathname === '/rest/v1/rpc/get_active_evaluation_lists') {
@@ -410,6 +433,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
       return reply(activeLists.value ?? ['Courier', 'Supplier', 'Subcontractor'].map(type => ({
         survey_type: type,
         companies: records.filter(record => record.record_type === 'partner_company' && record.payload.type === type && !record.payload.isArchived).map(record => String(record.payload.name)),
+        membership_complete: true,
       })));
     }
     if (url.pathname === '/rest/v1/app_profiles' && request.method() === 'GET') {
@@ -2031,16 +2055,41 @@ test('Archived report builders select one item, update the document preview and 
   await openBuilder('Archived Response Report');
   await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-one');
   await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
+  const leaderboard = preview.getByRole('table', { name: 'Company leaderboard', exact: true });
+  await expect(leaderboard.getByRole('row')).toHaveCount(3);
+  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(0)).toHaveText('1');
+  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(1)).toHaveText('Synthetic Courier');
+  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(2)).toHaveText('2');
+  await leaderboard.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('archived-batch-leaderboard.png'), fullPage: true, animations: 'disabled' });
   await page.getByLabel('Include respondent comments', { exact: true }).check();
-  await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption('csv');
-  const csvDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download report', exact: true }).click();
-  const csv = await readFile((await (await csvDownload).path())!, 'utf8');
-  expect(csv).toContain("'=SUM(1,1)");
-  expect(csv).not.toContain('a-three');
-  expect(csv).not.toContain('private@example.test');
+  for (const format of ['pdf', 'docx', 'excel', 'csv']) {
+    await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption(format);
+    const csvDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download report', exact: true }).click();
+    const bytes = await readFile((await (await csvDownload).path())!);
+    if (format === 'excel') {
+      const workbook = XLSX.read(bytes);
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Company leaderboard'], { header: 1 });
+      expect(rows[0]).toEqual(['Rank', 'Company', 'Submissions', 'Score', 'Rating']);
+      expect((rows[1] as unknown[]).slice(0, 3)).toEqual([1, 'Synthetic Courier', 2]);
+    } else if (format === 'docx') {
+      const archive = XLSX.CFB.read(bytes, { type: 'buffer' });
+      const xml = XLSX.CFB.find(archive, '/word/document.xml')!;
+      expect(Buffer.from(xml.content as Uint8Array).toString()).toContain('Company leaderboard');
+    } else if (format === 'pdf') expect(bytes.toString('latin1')).toContain('Company leaderboard');
+    else {
+      const csv = bytes.toString();
+      expect(csv).toContain('Rank,Company,Submissions,Score,Rating');
+      expect(csv).toContain("'=SUM(1,1)");
+      expect(csv).not.toContain('a-three');
+      expect(csv).not.toContain('private@example.test');
+    }
+  }
   await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-two');
   await expect(preview.getByRole('row', { name: 'Stored submissions 1', exact: true })).toBeVisible();
+  await expect(leaderboard.getByRole('row')).toHaveCount(2);
+  await expect(leaderboard).not.toContainText('Second archived courier');
   await page.getByRole('button', { name: 'Back to Reports', exact: true }).click();
   await openBuilder('Archived Company Report');
   await page.getByRole('combobox', { name: 'Archived company', exact: true }).selectOption('synthetic-courier');
@@ -2053,7 +2102,7 @@ test('Archived report builders select one item, update the document preview and 
   await page.screenshot({ path: testInfo.outputPath('archived-company-builder-empty.png'), fullPage: true, animations: 'disabled' });
   await page.reload();
   await page.getByRole('tab', { name: 'History', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(7);
   expect(service.records[0].payload.isArchived).toBe(true);
   expect(service.records.find(record => record.record_type === 'survey')?.payload.status).toBe('Archived');
   expect(service.unexpected).toEqual([]);

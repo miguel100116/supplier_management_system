@@ -1267,6 +1267,7 @@ export default function App() {
         departmentPermissions={departmentPermissions}
         onUpdateSurvey={updateSurvey}
         onUpdateSurveysBulk={updateSurveysBulk}
+        onUpdatePartnerCompany={updatePartnerCompany}
         onArchiveResponses={archiveResponsesForSurveys}
         onArchiveSurveyTypes={archiveResponsesForSurveyTypes}
         onSelectSurvey={(id) => {

@@ -11,6 +11,8 @@ export interface ActiveCompanySnapshot {
   uploadedBy: string;
   sourceFileName: string;
   companies: string[];
+  /** Complete Master List membership; absent on older snapshots and standalone active-list uploads. */
+  masterListCompanies?: string[];
 }
 
 export type ActiveCompanySnapshotDuplicateReason = 'matching-filename' | 'matching-company-list' | 'both';
@@ -186,6 +188,10 @@ export function parseActiveCompanySnapshot(value: unknown): ActiveCompanySnapsho
   const validCompanies = Array.isArray(candidate.companies)
     && candidate.companies.length <= 10_000
     && candidate.companies.every((company) => typeof company === 'string' && company.trim().length > 0 && company.length <= 500);
+  const validMasterListCompanies = candidate.masterListCompanies === undefined
+    || (Array.isArray(candidate.masterListCompanies)
+      && candidate.masterListCompanies.length <= 10_000
+      && candidate.masterListCompanies.every((company) => typeof company === 'string' && company.trim().length > 0 && company.length <= 500));
   const validDate = typeof candidate.uploadedAt === 'string' && !Number.isNaN(Date.parse(candidate.uploadedAt));
 
   if (
@@ -199,6 +205,7 @@ export function parseActiveCompanySnapshot(value: unknown): ActiveCompanySnapsho
     || typeof candidate.sourceFileName !== 'string'
     || candidate.sourceFileName.length > 2_000
     || !validCompanies
+    || !validMasterListCompanies
   ) {
     throw new Error('An active-company snapshot has an invalid stored shape.');
   }

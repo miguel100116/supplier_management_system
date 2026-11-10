@@ -4,14 +4,14 @@ import { ArchiveSeries, CustomForm, FilterState, KpiSummary, PartnerCompany, Rat
 import { getQuestionMaxPoints, isScoredQuestion } from '../../../data/questionWeights';
 
 /**
- * Resolves evaluation scope against the current registry and the latest
- * uploaded Active Companies list projected by useSurveyData:
+ * Resolves evaluation scope against current branch status and the latest
+ * Master List membership projected by useSurveyData:
  * - Document compliance status has no bearing on eligibility - a company
  *   with incomplete/expired documents is still evaluable. Document status
  *   is tracked independently (see computeCompanyDocumentSummary) and shown
  *   in the Document Tracker, it just doesn't gate survey eligibility.
  * - A defined activeEvaluationCompanyIds is an upper bound, including an
- *   empty list. Registry growth never adds assignments outside that scope.
+ *   empty list. Registry growth never adds assignments outside membership.
  * - A custom evaluationCompanyIds selection can narrow the uploaded scope.
  *   Callers without a projected scope retain the legacy registry behavior.
  * - If the survey has a custom selection, only active companies whose ID is

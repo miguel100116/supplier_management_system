@@ -183,7 +183,8 @@ function parseSurvey(value: unknown, recordId: string, label: string): JsonObjec
   optionalStringArray(candidate.evaluationCompanyIds, `${label}.evaluationCompanyIds`, 10_000);
   // Assignment scope is derived from admin uploads at runtime, never trusted
   // from a persisted survey or written back as a competing source of truth.
-  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persisted } = candidate;
+  const { activeEvaluationCompanyIds: _scope, uploadedEvaluationCompanyIds: _uploadedScope,
+    evaluationCompanyMembershipComplete: _membershipComplete, activeEvaluationListIssue: _issue, ...persisted } = candidate;
   return persisted;
 }
 

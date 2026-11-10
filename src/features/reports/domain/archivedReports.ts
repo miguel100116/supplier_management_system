@@ -91,6 +91,9 @@ export function buildArchivedReport(data: ArchivedReportData, selection: Archive
     ['Company', company.name], ['Type', company.type], ['Registry status', 'Archived'], ['Archived at', company.archivedAt ?? 'Not recorded'],
   ] });
   if (kind === 'archived-responses') {
+    tables.push({ title: 'Company leaderboard', columns: ['Rank', 'Company', 'Submissions', 'Score', 'Rating'],
+      rows: rankings.map((row, index) => [index + 1, row.name, row.count, formatAnalyticsScore(category, row.rankScore), getAnalyticsBand(category, row.rankScore).label]),
+    });
     tables.push({ title: 'Response details', columns: ['Submission ID', 'Company', 'Submitted at', 'Question', 'Answer'],
       rows: rows.map(row => [row.responseId, row.company, row.submissionDate, row.question,
         typeof row.rating === 'number' ? row.rating : includeComments ? answerValue(row) : row.rating]),

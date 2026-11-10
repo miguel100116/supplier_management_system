@@ -9,8 +9,10 @@ const company: PartnerCompany = { id: 'synthetic', name: 'Synthetic Partner', ty
 
 test('commits registry and all category lists through one RPC and returns the authoritative saved state', async () => {
   let requests = 0;
-  const snapshots = (['Courier', 'Supplier', 'Subcontractor'] as const).map(type =>
-    createActiveCompanySnapshot(type, 'master.xlsx', type === 'Supplier' ? [company.name] : [], 'admin@mgenesis.com'));
+  const snapshots = (['Courier', 'Supplier', 'Subcontractor'] as const).map(type => ({
+    ...createActiveCompanySnapshot(type, 'master.xlsx', type === 'Supplier' ? [company.name] : [], 'admin@mgenesis.com'),
+    masterListCompanies: type === 'Supplier' ? [company.name, 'Inactive Supplier'] : [],
+  }));
   let payload: unknown = { companies: [company], snapshots };
   let status = 200;
   const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
@@ -23,7 +25,8 @@ test('commits registry and all category lists through one RPC and returns the au
     } },
   });
   assert.deepEqual(await saveMasterListImport([company], 'master.xlsx', client), {
-    companies: [company], lists: snapshots.map(snapshot => ({ surveyType: snapshot.surveyType, companies: snapshot.companies })),
+    companies: [company], lists: snapshots.map(snapshot => ({ surveyType: snapshot.surveyType,
+      companies: snapshot.masterListCompanies ?? snapshot.companies, membershipComplete: true })),
   });
   assert.equal(requests, 1);
   for (const invalid of [null, {}, { companies: [null], snapshots }, { companies: [], snapshots },

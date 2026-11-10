@@ -6,6 +6,7 @@ import { StateMessage } from '../components/StateMessage';
 import { CompletionStatusBar } from '../features/evaluations/components/CompletionStatusBar';
 import { Pagination } from '../components/Pagination';
 import { getSurveyEvaluationCompanies } from '../features/analytics/domain/analytics';
+import { isActiveEvaluationCompany, reactivateEvaluationCompany } from '../features/active-companies/domain/companyEligibility';
 import { getReminderFrequency, saveReminderFrequency } from '../features/notifications/services/reminderSettings';
 import { TableFilterBar } from '../components/TableFilterBar';
 import { SurveyFormsToolbar } from '../features/evaluations/components/SurveyFormsToolbar';
@@ -38,6 +39,7 @@ interface SurveyFormsPageProps {
   onFillForm: (id: string) => void;
   onUpdateSurvey?: (survey: CustomForm) => void | Promise<unknown>;
   onUpdateSurveysBulk?: (updatedSurveysList: CustomForm[]) => void | Promise<unknown>;
+  onUpdatePartnerCompany?: (company: PartnerCompany) => Promise<PartnerCompany>;
   onArchiveResponses?: (surveyIds: string[], seriesLabel?: string) => void;
   onArchiveSurveyTypes?: (surveyTypes: SurveyType[], seriesLabel: string, surveyIds?: string[]) => Promise<void>;
   isAdmin?: boolean;
@@ -114,6 +116,7 @@ export function SurveyFormsPage({
   onFillForm,
   onUpdateSurvey,
   onUpdateSurveysBulk,
+  onUpdatePartnerCompany,
   onArchiveSurveyTypes,
   isAdmin,
   employeeProfiles = [],
@@ -180,6 +183,21 @@ export function SurveyFormsPage({
   const [isCompanyPickerOpen, setIsCompanyPickerOpen] = useState(false);
   const [evaluationCompanyIds, setEvaluationCompanyIds] = useState<string[]>([]);
   const [evaluationCompanyPreset, setEvaluationCompanyPreset] = useState<'within-top-20' | 'active-companies' | null>(null);
+  const [companyPickerSearch, setCompanyPickerSearch] = useState('');
+  const [reactivatingCompanyId, setReactivatingCompanyId] = useState<string | null>(null);
+  const [companyPickerError, setCompanyPickerError] = useState('');
+
+  useEffect(() => {
+    if (!isCompanyPickerOpen) return;
+    const targetSurvey = surveys.find((survey) => selectedSurveyIds.has(survey.id));
+    const activeIds = new Set(targetSurvey
+      ? getSurveyEvaluationCompanies({ ...targetSurvey, evaluationCompanyIds: undefined }, partnerCompanies).map(company => company.id)
+      : []);
+    setEvaluationCompanyIds(current => {
+      const next = current.filter(id => activeIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [isCompanyPickerOpen, partnerCompanies, selectedSurveyIds, surveys]);
 
   // Destructive-action confirmation modals. Authorization is enforced by the
   // authenticated Admin route and Supabase RLS, not a browser-side passcode.
@@ -529,6 +547,8 @@ export function SurveyFormsPage({
       getSurveyEvaluationCompanies(survey, partnerCompanies).map((c) => c.id)
     );
     setEvaluationCompanyPreset(null);
+    setCompanyPickerSearch('');
+    setCompanyPickerError('');
     setIsCompanyPickerOpen(false);
     setIsModifyOpen(true);
   };
@@ -572,6 +592,20 @@ export function SurveyFormsPage({
     );
   };
 
+  const reactivateCompany = async (company: PartnerCompany) => {
+    if (!onUpdatePartnerCompany || !isAdmin) return;
+    setReactivatingCompanyId(company.id);
+    setCompanyPickerError('');
+    setEvaluationCompanyIds(current => current.filter(id => id !== company.id));
+    try {
+      await onUpdatePartnerCompany(reactivateEvaluationCompany(company));
+    } catch (error) {
+      setCompanyPickerError(error instanceof Error ? error.message : 'Unable to reactivate this company.');
+    } finally {
+      setReactivatingCompanyId(null);
+    }
+  };
+
   const handleBulkSaveChanges = async () => {
     if (!onUpdateSurveysBulk && !onUpdateSurvey) return;
     if (selectedSurveyIds.size === 0) return;
@@ -583,10 +617,14 @@ export function SurveyFormsPage({
       alert("Please select at least one department and one role that can answer the survey.");
       return;
     }
+    const surveyForCompanySelection = !isSelectMode ? surveys.find((candidate) => selectedSurveyIds.has(candidate.id)) : undefined;
+    const activeCompaniesForSelection = surveyForCompanySelection
+      ? getSurveyEvaluationCompanies({ ...surveyForCompanySelection, evaluationCompanyIds: undefined }, partnerCompanies)
+      : [];
+    const activeCompanyIds = new Set(activeCompaniesForSelection.map(company => company.id));
+    const selectedActiveCompanyIds = evaluationCompanyIds.filter(id => activeCompanyIds.has(id));
     if (!isSelectMode && overrideAccess) {
-      const survey = surveys.find((candidate) => selectedSurveyIds.has(candidate.id));
-      const activeCompanies = survey ? getSurveyEvaluationCompanies({ ...survey, evaluationCompanyIds: undefined }, partnerCompanies) : [];
-      if (activeCompanies.length > 0 && evaluationCompanyIds.length === 0) {
+      if (activeCompaniesForSelection.length > 0 && selectedActiveCompanyIds.length === 0) {
         alert('Please select at least one active partner company to evaluate.');
         return;
       }
@@ -623,11 +661,11 @@ export function SurveyFormsPage({
             partnerCompanies
           ).map((c) => c.id);
           const isFullSelection =
-            evaluationCompanyIds.length === allIdsOfType.length &&
-            allIdsOfType.every((id) => evaluationCompanyIds.includes(id));
+            selectedActiveCompanyIds.length === allIdsOfType.length &&
+            allIdsOfType.every((id) => selectedActiveCompanyIds.includes(id));
           updated.evaluationCompanyIds = evaluationCompanyPreset === 'within-top-20'
-            ? evaluationCompanyIds
-            : isFullSelection ? undefined : evaluationCompanyIds;
+            ? selectedActiveCompanyIds
+            : isFullSelection ? undefined : selectedActiveCompanyIds;
         }
         updatedSurveysList.push(updated);
       }
@@ -1551,7 +1589,7 @@ export function SurveyFormsPage({
                         <div className="space-y-2 pt-1">
                           <h4 className="text-xs font-bold uppercase text-slate-900 dark:text-slate-100">MODIFY COMPANIES TO EVALUATE</h4>
                           <button
-                            onClick={() => setIsCompanyPickerOpen(true)}
+                            onClick={() => { setCompanyPickerSearch(''); setCompanyPickerError(''); setIsCompanyPickerOpen(true); }}
                             className="w-full inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-left transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/50 dark:hover:bg-slate-800/60 cursor-pointer"
                             type="button"
                           >
@@ -1683,12 +1721,15 @@ export function SurveyFormsPage({
           {/* Modify Companies to Evaluate - full-screen picker (single-survey modify only) */}
           {isCompanyPickerOpen && (() => {
             const targetSurvey = surveys.find((s) => selectedSurveyIds.has(s.id));
-            // The list contains active registered companies only. The Top 20
-            // preset follows this category's volume-weighted Analytics ranking
-            // and fills remaining slots with unscored active companies.
+            // Membership comes from the latest Master List; live status controls eligibility.
             const pickerCompanies = targetSurvey
               ? getSurveyEvaluationCompanies({ ...targetSurvey, evaluationCompanyIds: undefined }, partnerCompanies)
               : [];
+            const uploadedIds = new Set(targetSurvey?.uploadedEvaluationCompanyIds ?? pickerCompanies.map(company => company.id));
+            const uploadedCompanies = partnerCompanies.filter(company => uploadedIds.has(company.id));
+            const eligibleIds = new Set(pickerCompanies.map(company => company.id));
+            const visibleCompanies = uploadedCompanies.filter(company => company.name.toLocaleLowerCase().includes(companyPickerSearch.trim().toLocaleLowerCase()));
+            const visibleEligibleCompanies = visibleCompanies.filter(company => eligibleIds.has(company.id));
             const topTwentyCompanies = targetSurvey
               ? getEvaluationLeaderboardTopTwenty(pickerCompanies, responses, targetSurvey.surveyType)
               : [];
@@ -1697,7 +1738,8 @@ export function SurveyFormsPage({
               companies.length === evaluationCompanyIds.length
               && companies.every((company) => evaluationCompanyIds.includes(company.id));
             const topTwentySelected = topTwentyCompanies.length > 0 && isExactSelection(topTwentyCompanies);
-            const activeCompaniesSelected = pickerCompanies.length > 0 && isExactSelection(pickerCompanies);
+            const allVisibleEligibleSelected = visibleEligibleCompanies.length > 0
+              && visibleEligibleCompanies.every(company => evaluationCompanyIds.includes(company.id));
 
             const toggleCompany = (id: string) => {
               setEvaluationCompanyIds((current) =>
@@ -1706,7 +1748,7 @@ export function SurveyFormsPage({
             };
 
             return (
-              <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
+              <div className="fixed inset-0 z-[55] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modify-evaluation-companies-title">
                 <div
                   className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity"
                 />
@@ -1722,11 +1764,11 @@ export function SurveyFormsPage({
                         <ArrowLeft size={18} />
                       </button>
                       <div>
-                        <h3 className="text-lg font-extrabold text-slate-950 dark:text-white">
+                        <h3 id="modify-evaluation-companies-title" className="text-lg font-extrabold text-slate-950 dark:text-white">
                           Modify Companies to Evaluate
                         </h3>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                          {targetSurvey ? `${targetSurvey.surveyType} partners` : 'Partners'} · {evaluationCompanyIds.length} / {pickerCompanies.length} selected
+                          {targetSurvey ? `${targetSurvey.surveyType} partners` : 'Partners'} · {evaluationCompanyIds.filter(id => eligibleIds.has(id)).length} selected · {pickerCompanies.length} eligible · {uploadedCompanies.length} Companies Uploaded
                         </p>
                       </div>
                     </div>
@@ -1742,9 +1784,13 @@ export function SurveyFormsPage({
 
                   <div className="flex-1 overflow-y-auto p-6 space-y-3">
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Choose companies from the admin-uploaded Active Companies list. Archived companies are excluded. Within the Top 20 ranks only companies in that uploaded list. This selection controls which companies employees can rate.
+                      Active companies can be selected for evaluation. Inactive companies stay visible and can be reactivated here. Archived companies use the Partner Directory restore action.
                     </p>
                     {targetSurvey?.activeEvaluationListIssue && <p role="alert" className="text-xs text-amber-700 dark:text-amber-400">{targetSurvey.activeEvaluationListIssue}</p>}
+                    {targetSurvey && targetSurvey.evaluationCompanyMembershipComplete === false && (
+                      <p role="status" className="text-xs text-amber-700 dark:text-amber-400">This saved upload contains active companies only. Re-upload the Master List once to include inactive companies in Companies Uploaded.</p>
+                    )}
+                    {companyPickerError && <p role="alert" className="text-xs text-rose-700 dark:text-rose-400">{companyPickerError}</p>}
 
                     <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-800 dark:bg-slate-950/30" aria-label="Company selection presets">
                       <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
@@ -1768,36 +1814,54 @@ export function SurveyFormsPage({
                       <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
                         <input
                           type="checkbox"
-                          checked={activeCompaniesSelected}
+                          checked={allVisibleEligibleSelected}
+                          disabled={visibleEligibleCompanies.length === 0}
                           onChange={(event) => {
                             if (event.target.checked) {
-                              setEvaluationCompanyIds(pickerCompanies.map((company) => company.id));
+                              const visibleEligibleIds = new Set(visibleEligibleCompanies.map(company => company.id));
+                              setEvaluationCompanyIds(current => [...new Set([...current.filter(id => !visibleEligibleIds.has(id)), ...visibleEligibleIds])]);
                               setEvaluationCompanyPreset('active-companies');
                             } else {
-                              setEvaluationCompanyIds([]);
+                              const visibleEligibleIds = new Set(visibleEligibleCompanies.map(company => company.id));
+                              setEvaluationCompanyIds(current => current.filter(id => !visibleEligibleIds.has(id)));
                               setEvaluationCompanyPreset(null);
                             }
                           }}
                           className="h-4 w-4 rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]"
                         />
-                        <span>Uploaded Active Companies ({pickerCompanies.length})</span>
+                        <span>Select All Eligible ({visibleEligibleCompanies.length})</span>
                       </label>
                     </div>
 
-                    {pickerCompanies.length === 0 ? (
+                    <label className="relative block">
+                      <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="search"
+                        aria-label="Search companies"
+                        value={companyPickerSearch}
+                        onChange={event => setCompanyPickerSearch(event.target.value)}
+                        placeholder="Search companies"
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-800 outline-none focus:border-[#2187CD] focus:ring-1 focus:ring-[#2187CD] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                      />
+                    </label>
+
+                    {visibleCompanies.length === 0 ? (
                       <div className="text-center py-10 text-sm font-semibold text-slate-400 dark:text-slate-500">
-                        No eligible {targetSurvey?.surveyType.toLowerCase()} companies match the uploaded Active Companies list. Review the upload and registry classifications.
+                        {uploadedCompanies.length ? 'No uploaded companies match your search.' : `No ${targetSurvey?.surveyType.toLowerCase()} companies have been uploaded.`}
                       </div>
                     ) : (
                       <div className="space-y-1.5">
-                        {pickerCompanies.map((company) => (
-                          <label
+                        {visibleCompanies.map((company) => {
+                          const isActive = isActiveEvaluationCompany(company) && eligibleIds.has(company.id);
+                          return <div
                             key={company.id}
-                            className="flex items-center gap-2.5 rounded-lg border border-slate-100 dark:border-slate-800/60 px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
+                            className="flex items-center gap-2.5 rounded-lg border border-slate-100 dark:border-slate-800/60 px-3 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300"
                           >
                             <input
                               type="checkbox"
-                              checked={evaluationCompanyIds.includes(company.id)}
+                              aria-label={company.name}
+                              disabled={!isActive}
+                              checked={isActive && evaluationCompanyIds.includes(company.id)}
                               onChange={() => {
                                 setEvaluationCompanyPreset(null);
                                 toggleCompany(company.id);
@@ -1805,14 +1869,22 @@ export function SurveyFormsPage({
                               className="h-4 w-4 rounded border-slate-300 text-[#2187CD] focus:ring-[#2187CD]"
                             />
                             <Building2 size={14} className="text-slate-400 shrink-0" />
-                            <span className="flex-1">{company.name}</span>
-                            {!topTwentyCompanyIds.has(company.id) && (
+                            <span className="min-w-0 flex-1">{company.name}</span>
+                            {!isActive ? (
+                              <>
+                                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:bg-slate-800 dark:text-slate-400">Inactive</span>
+                                <button type="button" onClick={() => void reactivateCompany(company)} disabled={!onUpdatePartnerCompany || reactivatingCompanyId !== null}
+                                  aria-label={`Reactivate ${company.name}`} className="shrink-0 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                                  {reactivatingCompanyId === company.id ? 'Reactivating…' : 'Reactivate'}
+                                </button>
+                              </>
+                            ) : !topTwentyCompanyIds.has(company.id) && (
                               <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                                 Outside Current Top 20
                               </span>
                             )}
-                          </label>
-                        ))}
+                          </div>;
+                        })}
                       </div>
                     )}
                   </div>

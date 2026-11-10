@@ -74,6 +74,9 @@ test('keeps immutable snapshots ordered newest first for each partner type', () 
 
   assert.deepEqual(snapshotsBySurveyType([older, supplier, newer], 'Courier').map((snapshot) => snapshot.id), [newer.id, older.id]);
   assert.deepEqual(parseActiveCompanySnapshot(newer), newer);
+  assert.deepEqual(parseActiveCompanySnapshot({ ...newer, masterListCompanies: ['New Co', 'Inactive Co'] }).masterListCompanies,
+    ['New Co', 'Inactive Co']);
+  assert.throws(() => parseActiveCompanySnapshot({ ...newer, masterListCompanies: [null] }), /invalid stored shape/);
 });
 
 test('active-list ordering uses actual timestamps and deterministic IDs, matching the employee projection', () => {

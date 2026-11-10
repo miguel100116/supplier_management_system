@@ -6,6 +6,18 @@ export function isActiveEvaluationCompany(company: PartnerCompany): boolean {
     branch.status === 'Inactive' || (branch.status === 'Completed' && branch.manualStatus === 'Inactive')));
 }
 
+export function reactivateEvaluationCompany(company: PartnerCompany): PartnerCompany {
+  return {
+    ...company,
+    branches: (company.branches ?? []).map(branch => {
+      if (branch.status !== 'Inactive' && !(branch.status === 'Completed' && branch.manualStatus === 'Inactive')) return branch;
+      const reactivated = { ...branch, status: 'Pending' as const };
+      delete reactivated.manualStatus;
+      return reactivated;
+    }),
+  };
+}
+
 export function activeListsFromRegistry(companies: PartnerCompany[]) {
   return (['Courier', 'Supplier', 'Subcontractor'] as const).map(surveyType => ({
     surveyType,

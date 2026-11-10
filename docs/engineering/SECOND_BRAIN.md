@@ -1,6 +1,20 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-11-05
+Last verified: 2026-11-10
+
+### 2026-11-10 - Batch-specific leaderboards in Archived Response Reports
+
+The selected response archive now includes a Company leaderboard table before its response details, with ordinal rank, company, countable submissions, formatted score and rating. The existing archive/category selector scopes the input, and `getAnalyticsCompanyRankings` supplies canonical scoring and tie ordering. The preview and PDF/Word/Excel/CSV exporters consume the same table. Numeric zero remains rankable; blank/N/A-only companies receive no fabricated ranking. Existing archive provenance handling, permissions, data and saved export recipes remain unchanged. Regeneration still uses current records and the current rubric rather than a frozen archive-time snapshot. Recovery is a code revert; no migration or remote write is involved. Evidence: `src/features/reports/domain/archivedReports.ts`, its batch-isolation/zero/tie/blank regressions, and the archive-report browser journey covering all four exports and switching batches.
+
+Verification: 524 Node tests, TypeScript checks, production build and diff whitespace checks passed. The full browser suite with two workers produced 90 passes and six timeouts in unchanged journeys; all six passed when rerun using the default single worker without changing assertions or timeouts. Both archive-report journeys passed in the full run and again in a focused single-worker run, checking the preview, all four exports and batch switching. Desktop/mobile leaderboard screenshots were reviewed. Browser services are synthetic; hosted behavior remains unverified. Existing large-bundle warnings remain.
+
+### 2026-11-10 - Complete Master List membership in Manage Access
+
+Manage Access now derives the visible Companies Uploaded list from complete membership on the latest Master List snapshot and derives selectable IDs separately from current branch eligibility. Inactive companies stay visible with a disabled checkbox and an Admin Reactivate action; reactivation sets inactive branches to Pending and clears manual Inactive state. The existing partner-company Realtime path recomputes employee assignments. Search-based Select All changes eligible matches while preserving selections outside the search; archived companies remain on the Directory restore path. Legacy per-form selections remain intact.
+
+Migration `202611100001_master_list_company_membership.sql` adds complete membership to new snapshots while preserving the active-only history and existing authorization boundaries. It is authored locally and is **not applied** to staging or production. Existing snapshots cannot be safely backfilled because source workbooks are not retained; after applying the migration, re-upload the current Master List once. Until then Manage Access warns that its uploaded count reflects legacy active names only. No remote data or schema changes were made. Recovery is to roll back application code and restore the two existing RPC definitions; the extra snapshot JSON field can remain unused.
+
+Verification: 525 Node tests, `npm run lint`, production build, disposable PostgreSQL rehearsal, and the focused desktop/mobile Manage Access journey passed. Screenshots of the inactive-row and selection states were reviewed. The full E2E suite and live staging/production behavior were not checked; existing large-chunk build warnings remain.
 
 ### 2026-11-10 - Explicit account-scoped response cleanup in staging
 

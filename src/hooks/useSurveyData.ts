@@ -170,7 +170,8 @@ function migrateGeneralCategory(form: CustomForm): CustomForm {
 }
 
 function normalizeCustomForm(form: CustomForm): CustomForm {
-  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persistedForm } = form;
+  const { activeEvaluationCompanyIds: _scope, uploadedEvaluationCompanyIds: _uploadedScope,
+    evaluationCompanyMembershipComplete: _membershipComplete, activeEvaluationListIssue: _issue, ...persistedForm } = form;
   const normForm = {
     ...persistedForm,
     surveyType: normalizeSurveyType(form.surveyType),
