@@ -11,6 +11,13 @@ const survey: CustomForm = { id: 'form-1', title: 'Evaluation', surveyType: 'Sup
 const row: SurveyResponse = { responseId: 'response-1', surveyId: survey.id, companyId: company.id, company: company.name, surveyType: 'Supplier', respondentType: 'Rank & File', respondentEmail: email, submissionDate: '2026-10-23T00:00:00Z', questionId: 'Q39', questionNumber: 1, question: 'Quality', questionCategory: 'Quality', rating: 2, comment: '' };
 const pending = (rows: SurveyResponse[] = [], companies = [company], form = survey, forms = [form]) => getEmployeePendingSurveys(email, profile, forms, companies, rows);
 
+test('only selected recipients receive a distributed form reminder and access rules still apply', () => {
+  assert.equal(pending([], [company], { ...survey, distributionRecipientEmails: [email.toUpperCase()] }).length, 1);
+  assert.equal(pending([], [company], { ...survey, distributionRecipientEmails: ['another@mgenesis.com'] }).length, 0);
+  assert.equal(pending([], [company], { ...survey, distributionRecipientEmails: [] }).length, 0);
+  assert.equal(pending([], [company], { ...survey, distributionRecipientEmails: [email], accessDepartments: ['Other'] }).length, 0);
+});
+
 test('unfinished forms notify only eligible employees and selected active companies', () => {
   assert.equal(pending()[0].pendingCompanies[0].id, company.id);
   for (const form of [{ ...survey, status: 'Paused' as const }, { ...survey, status: 'Archived' as const }, { ...survey, deadlineDate: '01/01/2000' }, { ...survey, accessDepartments: ['TASS'] }]) assert.equal(pending([], [company], form).length, 0);

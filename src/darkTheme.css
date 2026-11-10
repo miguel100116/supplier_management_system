@@ -504,7 +504,6 @@
   border-color: var(--border);
   color: var(--foreground);
 }
-.dark .employee-experience #survey-filler-container .rating-option-description { color: var(--muted-foreground); }
 .dark .employee-experience #survey-filler-container .rating-option.not-applicable { color: var(--foreground); }
 .dark .employee-experience #survey-filler-container .rating-option.selected,
 .dark .employee-experience #survey-filler-container .rating-option[aria-checked="true"] {
@@ -512,8 +511,6 @@
   border-color: var(--accent-border);
   color: var(--accent);
 }
-.dark .employee-experience #survey-filler-container .rating-option.selected .rating-option-description,
-.dark .employee-experience #survey-filler-container .rating-option[aria-checked="true"] .rating-option-description { color: var(--muted-foreground); }
 .dark .employee-experience .company-name-button,
 .dark .employee-experience .evaluation-context h1,
 .dark .employee-experience .form-section-heading h2 { color: var(--foreground); }

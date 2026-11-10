@@ -5,6 +5,24 @@ import { getVisibleSurveyForms } from './surveySelection';
 
 export type DepartmentSurveyPermissions = Record<string, { surveyTypes: SurveyType[]; pages?: PageModuleKey[] }>;
 
+export function normalizeRecipientEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export function validateDistributionRecipients(selectedEmails: string[], eligibleRecipients: Pick<PersistedProfile, 'email'>[]): string[] {
+  const emails = [...new Set(selectedEmails.map(normalizeRecipientEmail))];
+  const eligible = new Set(eligibleRecipients.map(recipient => normalizeRecipientEmail(recipient.email)));
+  if (!emails.length || emails.some(email => !email || !eligible.has(email))) {
+    throw new Error('Select at least one eligible employee before sending. Review the recipient selection and try again.');
+  }
+  return emails;
+}
+
+export function isDistributionRecipient(survey: Pick<CustomForm, 'distributionRecipientEmails'>, email: string): boolean {
+  return survey.distributionRecipientEmails === undefined
+    || survey.distributionRecipientEmails.some(recipient => normalizeRecipientEmail(recipient) === normalizeRecipientEmail(email));
+}
+
 export function getEligibleFormRecipients(
   survey: CustomForm,
   profiles: PersistedProfile[],

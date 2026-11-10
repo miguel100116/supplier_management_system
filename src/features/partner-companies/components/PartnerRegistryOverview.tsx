@@ -2,7 +2,7 @@ import React from 'react';
 import { Building, ChevronRight, Plus } from 'lucide-react';
 import type { PartnerCompanyType } from '../../../types/survey';
 
-export type PartnerCategoryTab = PartnerCompanyType | 'All';
+export type PartnerCategoryTab = PartnerCompanyType | 'All' | 'Supplier (Local)' | 'Supplier (Foreign)';
 
 interface PartnerRegistryOverviewProps {
   children?: React.ReactNode;
@@ -16,8 +16,9 @@ interface PartnerRegistryOverviewProps {
 
 const CATEGORY_OPTIONS: Array<{ value: PartnerCategoryTab; label: string }> = [
   { value: 'All', label: 'All Categories' },
+  { value: 'Supplier (Local)', label: 'Supplier (Local)' },
+  { value: 'Supplier (Foreign)', label: 'Supplier (Foreign)' },
   { value: 'Courier', label: 'Courier' },
-  { value: 'Supplier', label: 'Supplier' },
   { value: 'Subcontractor', label: 'Subcontractor' },
   { value: 'Uncategorized', label: 'Uncategorized' },
 ];

@@ -24,7 +24,7 @@ WITH classified AS (
     (
       COALESCE(ar.payload->>'responseId', '') LIKE 'IMPORT-%'
       OR COALESCE(ar.payload->>'importBatchId', '') LIKE 'client-csv:%'
-      OR ar.payload->>'dataSource' IN ('client_csv', 'production_submission')
+      OR ar.payload->>'dataSource' IN ('client_csv', 'app_submission', 'production_submission')
       OR EXISTS (
         SELECT 1 FROM public.evaluation_submissions s
         WHERE s.id::text = ar.payload->>'responseId'

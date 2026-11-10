@@ -37,12 +37,14 @@ export async function loadActiveEvaluationLists(signal?: AbortSignal, client: Su
     const value = row as Record<string, unknown>;
     const type = value.survey_type;
     const companies = value.companies;
+    const membershipComplete = value.membership_complete;
     if ((type !== 'Supplier' && type !== 'Courier' && type !== 'Subcontractor') || seen.has(type)
       || !Array.isArray(companies) || companies.length > 10_000
-      || companies.some(name => typeof name !== 'string' || !name.trim() || name.length > 500)) {
+      || companies.some(name => typeof name !== 'string' || !name.trim() || name.length > 500)
+      || (membershipComplete !== undefined && typeof membershipComplete !== 'boolean')) {
       throw new Error('Invalid active evaluation list.');
     }
     seen.add(type);
-    return { surveyType: type, companies: companies as string[] };
+    return { surveyType: type, companies: companies as string[], membershipComplete: membershipComplete === true };
   });
 }

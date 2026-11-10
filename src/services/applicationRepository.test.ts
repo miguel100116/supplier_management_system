@@ -21,6 +21,25 @@ import { parseApplicationRecordPayload } from './applicationRecordSchemas';
 
 const now = '2026-09-24T00:00:00.000Z';
 
+test('app evaluation provenance survives validated database hydration and rejects unknown sources', async () => {
+  const payload = { responseId: 'RESP-app', surveyId: 'courier-form', companyId: 'courier-1',
+    surveyType: 'Courier', respondentType: 'Rank & File', respondentEmail: 'employee@example.test',
+    submissionDate: now, company: 'Synthetic courier', questionId: 'Q01', questionNumber: 1,
+    question: 'Delivery', questionCategory: 'Delivery', rating: 0, comment: '', dataSource: 'app_submission' };
+  const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async input => new Response(JSON.stringify(
+      new URL(String(input)).searchParams.has('record_id') ? []
+        : [{ record_id: 'RESP-app:Q01', created_at: now, payload }],
+    ), { headers: { 'Content-Type': 'application/json' } }) },
+  });
+  const loaded = await loadApplicationRecords<SurveyResponse>('survey_response', undefined, client);
+  assert.equal(loaded[0].dataSource, 'app_submission');
+  assert.equal(loaded[0].rating, 0);
+  assert.throws(() => parseApplicationRecordPayload('survey_response',
+    { ...payload, dataSource: 'untrusted-source' }, 'RESP-app:Q01'), /dataSource/);
+});
+
 test('missing remarks RPC identifies the migration and never falls back to a broad record write', async () => {
   const requests: string[] = [];
   const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
@@ -399,4 +418,20 @@ test('normalizes inconsistent CORP/SOL classification to unclassified and valida
     ...validApplicationRecords.partner_company.payload as object,
     branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: { DTI: { remarks: 'x'.repeat(2001) } } }],
   }, 'company-1'), /too long/);
+});
+
+test('partner document records accept validated private-file metadata while preserving legacy document shapes', () => {
+  const payload = {
+    ...validApplicationRecords.partner_company.payload as object,
+    branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: {
+      SIF: { provided: true, file: { storagePath: '550e8400-e29b-41d4-a716-446655440000', originalName: 'supplier-form.pdf', contentType: 'application/pdf', fileSize: 123, uploadedAt: now } },
+      AFS: { provided: true, expiryDate: '2026-12-31' },
+    } }],
+  };
+  const parsed = parseApplicationRecordPayload('partner_company', payload, 'company-1') as { branches: Array<{ documents: Record<string, { file?: { originalName: string } }> }> };
+  assert.equal(parsed.branches[0].documents.SIF.file?.originalName, 'supplier-form.pdf');
+  assert.throws(() => parseApplicationRecordPayload('partner_company', {
+    ...payload,
+    branches: [{ id: 'branch-1', bpCode: 'BP-1', documents: { SIF: { provided: true, file: { storagePath: 'x', originalName: 'x.pdf', contentType: 'application/pdf', fileSize: '123', uploadedAt: now } } } }],
+  }, 'company-1'), /fileSize must be a finite number/);
 });

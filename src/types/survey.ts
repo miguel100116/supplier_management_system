@@ -1,6 +1,6 @@
 export type SurveyType = 'Courier' | 'Supplier' | 'Subcontractor';
 export type Rating = number | 'N/A';
-export type SurveyResponseSource = 'client_csv' | 'production_submission' | 'test_submission';
+export type SurveyResponseSource = 'client_csv' | 'app_submission' | 'production_submission' | 'test_submission';
 export type SurveyAccessRole = 'Rank & File' | 'Supervisory' | 'Managerial' | 'Director' | 'Executive';
 
 // A PartnerCompany's type widens SurveyType with 'Uncategorized' — the state
@@ -28,6 +28,13 @@ export interface ComplianceDocument {
   expiryDate?: string;
   remarks?: string;
   description?: string;
+  file?: {
+    storagePath: string;
+    originalName: string;
+    contentType: string;
+    fileSize: number;
+    uploadedAt: string;
+  };
   // status/daysLeft are derived from expiryDate; they may be present on
   // imported rows as a snapshot, but UI should recompute rather than trust
   // a stale value.
@@ -186,6 +193,8 @@ export interface KpiSummary {
 export interface ResponseNotification {
   id: string;
   company: string;
+  companyId?: string;
+  surveyId?: string;
   surveyType: SurveyType;
   respondentType: string;
   submissionDate: string;
@@ -205,6 +214,8 @@ export interface CustomForm {
   /** Explicit successful send/resend; absent on legacy forms. */
   distributionId?: string;
   lastDistributedAt?: string;
+  /** Recipients of the latest in-app distribution; absent on legacy forms. Does not grant form access. */
+  distributionRecipientEmails?: string[];
   archivedAt?: string;
   /** Timestamp when an Admin explicitly ended this survey, independent of its deadline. */
   manuallyEndedAt?: string;
@@ -219,6 +230,10 @@ export interface CustomForm {
   evaluationCompanyIds?: string[];
   /** Derived from the latest uploaded Active Companies list; never persisted on a survey. */
   activeEvaluationCompanyIds?: string[];
+  /** All names on the latest Master List upload, including currently inactive companies. */
+  uploadedEvaluationCompanyIds?: string[];
+  /** False for legacy category-list snapshots that retained active names only. */
+  evaluationCompanyMembershipComplete?: boolean;
   activeEvaluationListIssue?: string;
   maxRating?: number;
   questions: {

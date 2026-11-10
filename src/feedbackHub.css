@@ -25,8 +25,9 @@
   border: 1px solid var(--border-subtle);
   border-radius: 9px;
   background: var(--surface-muted);
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
+.feedback-hub-page .feedback-hub-tabs::-webkit-scrollbar { display: none; }
 .feedback-hub-page .feedback-hub-tabs > button {
   min-height: 37px;
   padding: 0 12px;
@@ -138,6 +139,8 @@
   border-radius: 9px;
   box-shadow: 0 1px 3px #243b580b;
 }
+.feedback-hub-page .feedback-table-surface > .overflow-x-auto { scrollbar-width: none; }
+.feedback-hub-page .feedback-table-surface > .overflow-x-auto::-webkit-scrollbar { display: none; }
 .feedback-hub-page .feedback-data-table { border-collapse: separate; border-spacing: 0; font-size: 12px; }
 .feedback-hub-page .feedback-sent-tab .feedback-data-table { min-width: 1080px; table-layout: fixed; }
 .feedback-hub-page .feedback-sent-tab .feedback-data-table th:nth-child(1) { width: 13%; }

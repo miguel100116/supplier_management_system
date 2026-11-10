@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { X, CheckCircle2, Info } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { X, CheckCircle2, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import { CustomForm, PartnerCompany, SurveyResponse } from '../../../types/survey';
 import { submissionCount, submissionScores } from '../../analytics/domain/analytics';
 import { formatCompositeScore } from '../../../data/questionWeights';
-import { selectSurveyResponses } from '../../evaluations/domain/surveyResponses';
+import { answerValue, groupSurveySubmissions, selectSurveyResponses, type SurveySubmission } from '../../evaluations/domain/surveyResponses';
 import { getSurveyCompletionSummary } from '../../evaluations/domain/surveyCompletion';
 import { useModalEscape } from '../../../hooks/useModalEscape';
 import { SurveyAccount } from '../../../hooks/useSurveyData';
@@ -18,6 +18,7 @@ interface SurveyProgressModalProps {
   onClose: () => void;
   onMarkComplete?: (surveyId: string) => void;
   isAdmin?: boolean;
+  initialResponseId?: string | null;
 }
 
 export function SurveyProgressModal({
@@ -29,12 +30,30 @@ export function SurveyProgressModal({
   onClose,
   onMarkComplete,
   isAdmin,
+  initialResponseId,
 }: SurveyProgressModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const responseCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const [expandedEmployeeEmail, setExpandedEmployeeEmail] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<SurveySubmission | null>(null);
   useModalEscape(true, onClose);
+  useModalEscape(Boolean(selectedSubmission), () => setSelectedSubmission(null), 1);
   useEffect(() => { closeButtonRef.current?.focus(); }, []);
+  useEffect(() => { if (selectedSubmission) responseCloseButtonRef.current?.focus(); }, [selectedSubmission]);
   // Filter responses belonging to this survey
-  const surveyResponses = selectSurveyResponses(survey, surveys, responses).filter((row) => !row.archived);
+  const surveyResponses = useMemo(
+    () => selectSurveyResponses(survey, surveys, responses).filter((row) => !row.archived),
+    [survey, surveys, responses],
+  );
+
+  useEffect(() => {
+    if (!initialResponseId) return;
+    const targetSubmission = groupSurveySubmissions(surveyResponses).find((submission) => submission.id === initialResponseId);
+    if (!targetSubmission) return;
+    const email = targetSubmission.first.respondentEmail?.trim();
+    if (email) setExpandedEmployeeEmail(email);
+    setSelectedSubmission(targetSubmission);
+  }, [initialResponseId, survey.id, surveyResponses]);
 
   // Group unique respondents by email/department
   const uniqueRespondentsMap = new Map<string, { email: string; department?: string; date: string }>();
@@ -50,6 +69,14 @@ export function SurveyProgressModal({
   });
 
   const respondentsList = Array.from(uniqueRespondentsMap.values());
+  const submissionsByEmployee = new Map<string, SurveySubmission[]>();
+  for (const submission of groupSurveySubmissions(surveyResponses)) {
+    const email = submission.first.respondentEmail?.trim().toLowerCase();
+    if (!email) continue;
+    const employeeSubmissions = submissionsByEmployee.get(email) ?? [];
+    employeeSubmissions.push(submission);
+    submissionsByEmployee.set(email, employeeSubmissions);
+  }
   const subScores = submissionScores(surveyResponses);
   const totalCount = submissionCount(surveyResponses);
 
@@ -95,15 +122,34 @@ export function SurveyProgressModal({
         ? 'Due today'
         : `${daysUntilDeadline} day${daysUntilDeadline === 1 ? '' : 's'} remaining`;
 
+  const submissionQuestionRows = selectedSubmission ? (() => {
+    const answersByQuestion = new Map(selectedSubmission.answers.map((answer) => [answer.questionId, answer]));
+    const questions = survey.questions.flatMap((question) => question.subQuestions?.length
+      ? question.subQuestions.map((subQuestion) => ({
+        id: `${question.questionId}-${subQuestion.id}`,
+        number: question.questionNumber,
+        question: subQuestion.label,
+      }))
+      : [{ id: question.questionId, number: question.questionNumber, question: question.question }]);
+    const knownQuestionIds = new Set(questions.map((question) => question.id));
+    for (const answer of selectedSubmission.answers) {
+      if (!knownQuestionIds.has(answer.questionId)) {
+        questions.push({ id: answer.questionId, number: answer.questionNumber, question: answer.question });
+      }
+    }
+    return questions.map((question) => ({ ...question, answer: answersByQuestion.get(question.id) }));
+  })() : [];
+
   return (
-    <div className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
+    <>
+    <div aria-hidden={Boolean(selectedSubmission)} className="feedback-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-fadeIn">
       <section className="feedback-modal-panel feedback-progress-panel w-full rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 overflow-hidden flex flex-col" role="dialog" aria-modal="true" aria-labelledby="feedback-progress-title" aria-describedby="feedback-progress-description">
         {/* Modal Header */}
         <div className="feedback-modal-header feedback-progress-header border-b border-slate-200 dark:border-slate-800">
           <div className="feedback-progress-header-main">
             <h2 id="feedback-progress-title" className="break-words text-base font-bold text-slate-900 dark:text-white">{survey.title}</h2>
             <div className="feedback-progress-header-meta" aria-label="Survey status and category">
-              <span className="feedback-modal-status is-ongoing inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold">Ongoing</span>
+              <span className={`feedback-modal-status ${completion.isComplete ? '' : 'is-ongoing'} inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold`}>{completion.isComplete ? 'Completed' : 'Ongoing'}</span>
               <span className={`feedback-category-badge ${survey.surveyType.toLowerCase()}`}>{survey.surveyType}</span>
             </div>
           </div>
@@ -166,17 +212,63 @@ export function SurveyProgressModal({
                 <caption className="sr-only">Employee evaluation completion</caption>
                 <thead><tr><th scope="col">Employee</th><th scope="col">Evaluations completed</th></tr></thead>
                 <tbody>
-                  {completion.eligibleEmployees.map((emp) => (
-                    <tr key={emp.email}>
-                      <td><span>{emp.email}</span><small>{emp.department}</small></td>
-                      <td>
-                        <div className="feedback-progress-coverage">
-                          {emp.total > 0 && <progress value={emp.completed} max={emp.total} aria-label={`Evaluations completed by ${emp.email}`} />}
-                          <strong>{emp.completed} / {emp.total}</strong>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {completion.eligibleEmployees.map((emp, index) => {
+                    const isExpanded = expandedEmployeeEmail === emp.email;
+                    const employeeSubmissions = submissionsByEmployee.get(emp.email.trim().toLowerCase()) ?? [];
+                    const disclosureId = `employee-responses-${index}`;
+                    return (
+                      <React.Fragment key={emp.email}>
+                        <tr>
+                          <td>
+                            <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              aria-controls={disclosureId}
+                              aria-label={`${isExpanded ? 'Hide' : 'Show'} submitted evaluations for ${emp.email}`}
+                              onClick={() => setExpandedEmployeeEmail(isExpanded ? null : emp.email)}
+                              className="inline-flex max-w-full items-center gap-1.5 rounded-sm text-left text-[#176FAE] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2187CD]"
+                            >
+                              {isExpanded ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+                              <span className="break-all">{emp.email}</span>
+                            </button>
+                            <small>{emp.department}</small>
+                          </td>
+                          <td>
+                            <div className="feedback-progress-coverage">
+                              {emp.total > 0 && <progress value={emp.completed} max={emp.total} aria-label={`Evaluations completed by ${emp.email}`} />}
+                              <strong>{emp.completed} / {emp.total}</strong>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr hidden={!isExpanded}>
+                          <td id={disclosureId} colSpan={2} className="!px-3 !py-3 !bg-slate-50/70 dark:!bg-slate-900/50">
+                              {employeeSubmissions.length === 0 ? (
+                                <p className="feedback-modal-empty-inline">No submitted evaluations from this employee yet.</p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  <p className="mb-2 text-[11px] font-semibold text-slate-500">{employeeSubmissions.length} submitted evaluation{employeeSubmissions.length === 1 ? '' : 's'}</p>
+                                  {employeeSubmissions.map((submission) => (
+                                    <button
+                                      key={submission.id}
+                                      type="button"
+                                      onClick={() => setSelectedSubmission(submission)}
+                                      className="flex w-full min-w-0 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-xs transition hover:border-[#2187CD]/40 hover:bg-[#eef7fc] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#2187CD] dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900"
+                                    >
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block truncate font-semibold text-slate-800 dark:text-slate-100">{submission.first.company}</span>
+                                        <span className="mt-0.5 block text-[10px] text-slate-500">Submitted {formatLogDateTime(submission.first.submissionDate)}</span>
+                                      </span>
+                                      <span className="shrink-0 font-semibold text-[#176FAE]">View answers</span>
+                                      <ChevronRight size={14} className="shrink-0 text-slate-400" aria-hidden="true" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -232,5 +324,43 @@ export function SurveyProgressModal({
         </div>
       </section>
     </div>
+    {selectedSubmission && (
+      <div className="feedback-modal-backdrop fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+        <section className="feedback-modal-panel flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950" role="dialog" aria-modal="true" aria-labelledby="feedback-submission-title" aria-describedby="feedback-submission-description">
+          <header className="feedback-modal-header flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800">
+            <div className="min-w-0">
+              <h2 id="feedback-submission-title" className="truncate text-base font-bold text-slate-900 dark:text-white">Survey responses</h2>
+              <p id="feedback-submission-description" className="mt-1 truncate text-xs text-slate-500">{selectedSubmission.first.company} · {selectedSubmission.first.respondentEmail || 'Anonymous respondent'} · {formatLogDateTime(selectedSubmission.first.submissionDate)}</p>
+            </div>
+            <button type="button" ref={responseCloseButtonRef} onClick={() => setSelectedSubmission(null)} aria-label="Close survey responses" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] dark:hover:bg-slate-800">
+              <X size={19} aria-hidden="true" />
+            </button>
+          </header>
+          <div className="feedback-modal-body min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <ol className="space-y-3">
+              {submissionQuestionRows.map((row) => {
+                  const value = row.answer ? answerValue(row.answer) : '';
+                  const displayValue = String(value).trim();
+                  const comment = row.answer?.comment?.trim() ?? '';
+                  return (
+                    <li key={row.id} className="rounded-lg border border-slate-200 px-3.5 py-3 dark:border-slate-800">
+                      <p className="text-xs font-semibold leading-5 text-slate-800 dark:text-slate-100">Q{row.number}. {row.question}</p>
+                      <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700 dark:text-slate-300">
+                        {displayValue || 'No response recorded'}
+                      </p>
+                      {comment && displayValue !== comment && (
+                        <p className="mt-2 whitespace-pre-wrap break-words border-t border-slate-100 pt-2 text-xs leading-5 text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                          <span className="font-semibold">Comment:</span> {comment}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+            </ol>
+          </div>
+        </section>
+      </div>
+    )}
+    </>
   );
 }

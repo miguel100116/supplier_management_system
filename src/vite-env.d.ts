@@ -8,5 +8,6 @@ interface Window {
     azureTenantId?: string;
     azureRedirectUri?: string;
     deploymentEnvironment?: string;
+    responseCacheEnabled?: boolean;
   };
 }

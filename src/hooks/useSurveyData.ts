@@ -62,6 +62,7 @@ import { createCoalescedTaskRunner, createRefreshGuard } from '../utils/coalesce
 import { scopeSurveysToActiveLists, type ActiveEvaluationList } from '../features/active-companies/domain/evaluationScope';
 import { createActiveEvaluationListRefresh, loadActiveEvaluationLists } from '../features/active-companies/services/activeEvaluationLists';
 import { saveMasterListImport } from '../features/partner-companies/services/commitMasterListImport';
+import { attachForeignSupplierDocumentFile, removeSupplierSupportingDocument as removeSupplierSupportingDocumentRecord } from '../features/document-tracker/services/partnerDocumentFiles';
 
 // Versioned browser cache for the authenticated Partner Company registry.
 // A missing cache starts empty until Supabase hydration completes.
@@ -169,7 +170,8 @@ function migrateGeneralCategory(form: CustomForm): CustomForm {
 }
 
 function normalizeCustomForm(form: CustomForm): CustomForm {
-  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persistedForm } = form;
+  const { activeEvaluationCompanyIds: _scope, uploadedEvaluationCompanyIds: _uploadedScope,
+    evaluationCompanyMembershipComplete: _membershipComplete, activeEvaluationListIssue: _issue, ...persistedForm } = form;
   const normForm = {
     ...persistedForm,
     surveyType: normalizeSurveyType(form.surveyType),
@@ -1937,6 +1939,37 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     return updatedCompany;
   };
 
+  const uploadForeignSupplierDocumentFile = async (
+    companyId: string,
+    branchId: string,
+    documentName: string,
+    expectedDocument: ComplianceDocument,
+    file: File,
+  ): Promise<PartnerCompany> => {
+    const updatedCompany = await attachForeignSupplierDocumentFile(companyId, branchId, documentName, expectedDocument, file);
+    setPartnerCompanies((currentCompanies) => {
+      const updated = currentCompanies.map((company) => company.id === companyId ? updatedCompany : company);
+      safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    return updatedCompany;
+  };
+
+  const removeSupplierSupportingDocument = async (
+    companyId: string,
+    branchId: string,
+    documentName: string,
+    expectedDocument: ComplianceDocument,
+  ): Promise<PartnerCompany> => {
+    const updatedCompany = await removeSupplierSupportingDocumentRecord(companyId, branchId, documentName, expectedDocument);
+    setPartnerCompanies((currentCompanies) => {
+      const updated = currentCompanies.map((company) => company.id === companyId ? updatedCompany : company);
+      safeSetItem(PARTNER_COMPANIES_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    return updatedCompany;
+  };
+
   const updatePartnerDocumentRemarks = async (
     companyId: string,
     branchId: string,
@@ -2401,6 +2434,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         list.push({
           id,
           company: c.name,
+          companyId: c.id,
           surveyType: c.type as SurveyType,
           respondentType,
           // Computed status has no recorded event time; never substitute page-load time.
@@ -2440,6 +2474,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       return {
         id: `document-reminder:${groupKey}:${ids.join(':')}`,
         company: rows[0].company,
+        companyId: rows[0].companyId,
         surveyType: rows[0].surveyType ?? 'Supplier',
         respondentType: 'Document Expiring Soon',
         submissionDate: rows.map((row) => row.deliveredAt).sort((a, b) => compareNotificationDates(a, b))[0] ?? '',
@@ -2480,7 +2515,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
           const doc = branch.documents?.[rule.docName];
           if (!doc || (!doc.provided && !doc.expiryDate)) return [];
 
-          const { status, daysLeft } = computeDocumentStatus(doc, currentDate, rule.docName);
+          const { status, daysLeft } = computeDocumentStatus(doc, currentDate, rule.docName, c);
           if (status !== 'Current' || typeof daysLeft !== 'number') return [];
           // Inside 30 days the standard alert takes over. For longer
           // thresholds, include every matching branch's copy of the document.
@@ -2508,6 +2543,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
         list.push({
           id,
           company: c.name,
+          companyId: c.id,
           surveyType: c.type as SurveyType,
           respondentType: 'Document Expiring Soon',
           submissionDate: '',
@@ -2572,6 +2608,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     addPartnerCompany,
     updatePartnerCompany,
     updatePartnerDocument,
+    uploadForeignSupplierDocumentFile,
+    removeSupplierSupportingDocument,
     updatePartnerDocumentRemarks,
     removePartnerCompany,
     previewMasterListImport,

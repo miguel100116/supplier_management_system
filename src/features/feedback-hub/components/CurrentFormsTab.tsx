@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { QueuedReportEmail } from '../types';
 import { Clock, CheckCircle2, Send, Users, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
@@ -17,6 +17,8 @@ interface CurrentFormsTabProps {
   onSendToPartner: (survey: CustomForm, partnerCompany?: PartnerCompany) => void;
   onMarkSurveyComplete?: (surveyId: string) => void;
   isAdmin?: boolean;
+  initialNotificationTarget?: { surveyId: string; responseId: string } | null;
+  onNotificationTargetOpened?: () => void;
 }
 
 export function CurrentFormsTab({
@@ -28,9 +30,29 @@ export function CurrentFormsTab({
   onSendToPartner,
   onMarkSurveyComplete,
   isAdmin,
+  initialNotificationTarget,
+  onNotificationTargetOpened,
 }: CurrentFormsTabProps) {
   const [selectedSurveyForProgress, setSelectedSurveyForProgress] = useState<CustomForm | null>(null);
+  const [selectedProgressResponseId, setSelectedProgressResponseId] = useState<string | null>(null);
   const [selectedSurveyForDetail, setSelectedSurveyForDetail] = useState<CustomForm | null>(null);
+  const handledNotificationTargetRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!initialNotificationTarget) {
+      handledNotificationTargetRef.current = null;
+      return;
+    }
+    const targetKey = `${initialNotificationTarget.surveyId}:${initialNotificationTarget.responseId}`;
+    if (handledNotificationTargetRef.current === targetKey) return;
+    const targetSurvey = surveys.find((survey) => survey.id === initialNotificationTarget.surveyId);
+    if (!targetSurvey) return;
+
+    handledNotificationTargetRef.current = targetKey;
+    setSelectedProgressResponseId(initialNotificationTarget.responseId);
+    setSelectedSurveyForProgress(targetSurvey);
+    onNotificationTargetOpened?.();
+  }, [initialNotificationTarget, surveys, onNotificationTargetOpened]);
 
   const [typeFilter, setTypeFilter] = useState<SurveyType | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,6 +130,7 @@ export function CurrentFormsTab({
                 tabIndex={0}
                 aria-label={`${survey.title}, ${survey.surveyType}, ${isOngoing ? 'Ongoing' : 'Completed'}. View details`}
                 onClick={() => {
+                  setSelectedProgressResponseId(null);
                   if (isOngoing) {
                     setSelectedSurveyForProgress(survey);
                   } else {
@@ -117,6 +140,7 @@ export function CurrentFormsTab({
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
+                    setSelectedProgressResponseId(null);
                     if (isOngoing) setSelectedSurveyForProgress(survey);
                     else setSelectedSurveyForDetail(survey);
                   }
@@ -221,9 +245,10 @@ export function CurrentFormsTab({
           responses={responses}
           partnerCompanies={partnerCompanies}
           accounts={accounts}
-          onClose={() => setSelectedSurveyForProgress(null)}
+          onClose={() => { setSelectedSurveyForProgress(null); setSelectedProgressResponseId(null); }}
           onMarkComplete={onMarkSurveyComplete}
           isAdmin={isAdmin}
+          initialResponseId={selectedProgressResponseId}
         />
       )}
 

@@ -27,11 +27,9 @@ export interface CategoryRankSummary {
 }
 
 // A branch's own rawCategory (its original sheet value, e.g. "Supplier-Local"
-// or "Courier-NT") decides whether IT counts toward the Category Summary -
-// not the merged company's type. A blank-category row can still get merged
-// as an extra branch onto an already-accredited company (name-matched), and
-// that branch must stay out of the total the same way the Master List's own
-// legend excludes it.
+// or "Courier-NT") decides whether it counts toward the Category Summary -
+// not the merged company's type. Archived company records stay available for
+// history, but do not contribute to current category totals.
 function resolveBranchCategoryKey(rawCategory: string | undefined): string | undefined {
   const cleaned = (rawCategory ?? '').trim().replace(/subcontructor/i, 'Subcontractor');
   if (!cleaned) return undefined;
@@ -57,7 +55,8 @@ export function computeCategoryRankSummary(companies: PartnerCompany[]): Categor
   let major = 0;
   let regular = 0;
 
-  const allBranches: BranchRecord[] = companies.flatMap((c) => c.branches ?? []);
+  const allBranches: BranchRecord[] = companies.filter((company) => !company.isArchived)
+    .flatMap((company) => company.branches ?? []);
   allBranches.forEach((b) => {
     if (/major/i.test(b.supplierRank ?? '')) major++;
     else if (/regular/i.test(b.supplierRank ?? '')) regular++;

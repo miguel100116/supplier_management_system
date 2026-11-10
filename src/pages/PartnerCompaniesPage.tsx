@@ -50,16 +50,17 @@ import {
 } from '../features/partner-companies/services/masterListImport';
 import { isWithinDateRange } from '../utils/tableFilters';
 import { ActiveCompaniesModal } from '../features/active-companies/components/ActiveCompaniesModal';
-import { ActiveCompanyUploadCards } from '../features/active-companies/components/ActiveCompanyUploadCards';
+import { MasterListUploadPanel } from '../features/partner-companies/components/MasterListUploadPanel';
 import { activeListsFromRegistry } from '../features/active-companies/domain/companyEligibility';
 import { DEFAULT_DOCUMENT_MAINTENANCE_SETTINGS, DocumentMaintenanceSettings, loadDocumentMaintenanceSettings } from '../features/notifications/services/documentMaintenanceSettings';
 import { PartnerCompaniesFilterToolbar } from '../features/partner-companies/components/PartnerCompaniesFilterToolbar';
 import { PartnerCompanyDirectoryCard } from '../features/partner-companies/components/PartnerCompanyDirectoryCard';
-import { PartnerRegistryOverview } from '../features/partner-companies/components/PartnerRegistryOverview';
+import { PartnerRegistryOverview, type PartnerCategoryTab } from '../features/partner-companies/components/PartnerRegistryOverview';
 import { PartnerCategoryRankBreakdown } from '../features/partner-companies/components/PartnerCategoryRankBreakdown';
 import { PartnerDirectoryArchiveButton } from '../features/partner-companies/components/PartnerDirectoryArchiveButton';
 import { matchesDirectoryClassificationFilters } from '../features/partner-companies/domain/directoryClassificationFilters';
 import { PartnerRegistrationEditor } from '../features/partner-companies/components/PartnerRegistrationEditor';
+import { PartnerDirectoryStatusPicker, type PartnerDirectoryStatusOption } from '../features/partner-companies/components/PartnerDirectoryStatusPicker';
 
 const MISSING_FIELD_ICONS: Record<MissingProfileField, typeof MapPin> = {
   address: MapPin,
@@ -86,6 +87,14 @@ export function directoryCategoryBadgeClasses(type: PartnerCompanyType, origin?:
   return typeBadgeClasses(type);
 }
 
+const DIRECTORY_CATEGORY_OPTIONS: Array<PartnerDirectoryStatusOption & { type: PartnerCompanyType; origin?: SupplierOrigin }> = [
+  { value: 'Supplier:Local', label: 'Supplier Local', type: 'Supplier', origin: 'Local', className: directoryCategoryBadgeClasses('Supplier', 'Local') },
+  { value: 'Supplier:Foreign', label: 'Supplier Foreign', type: 'Supplier', origin: 'Foreign', className: directoryCategoryBadgeClasses('Supplier', 'Foreign') },
+  { value: 'Courier', label: 'Courier', type: 'Courier', className: directoryCategoryBadgeClasses('Courier') },
+  { value: 'Subcontractor', label: 'Subcontractor', type: 'Subcontractor', className: directoryCategoryBadgeClasses('Subcontractor') },
+  { value: 'Uncategorized', label: 'Uncategorized', type: 'Uncategorized', className: directoryCategoryBadgeClasses('Uncategorized') },
+] as const;
+
 // Toggle options for a branch's Status field - mirrors the Master List's own
 // "Status" column dropdown (Masterlist Database sheet) exactly, so a value
 // picked here round-trips cleanly through a future re-import.
@@ -108,6 +117,12 @@ export function branchStatusBadgeClasses(status: BranchStatus): string {
       return 'bg-blue-50 text-blue-700 border-blue-100 dark:bg-blue-950/20 dark:text-blue-400'; // Pending
   }
 }
+
+const DIRECTORY_BRANCH_STATUS_OPTIONS: PartnerDirectoryStatusOption[] = BRANCH_STATUS_OPTIONS.map((status) => ({
+  value: status,
+  label: status,
+  className: branchStatusBadgeClasses(status),
+}));
 
 // A company can hold more than one branch (e.g. a normal + "-NT" BP Code) -
 // the non-NT branch is treated as the "primary" one for any single-value
@@ -159,6 +174,7 @@ interface PartnerCompaniesPageProps {
   ) => Promise<PartnerCompany>;
   onRemoveCompany: (id: string) => Promise<void>;
   onUpdateCompany: (company: PartnerCompany) => Promise<PartnerCompany>;
+  onOpenPendingDocuments: (companyId: string) => void;
   onRenewDocument: (
     companyId: string,
     branchId: string,
@@ -188,6 +204,7 @@ export function PartnerCompaniesPage({
   onAddCompany,
   onRemoveCompany,
   onUpdateCompany,
+  onOpenPendingDocuments,
   onRenewDocument,
   onPreviewMasterListImport,
   onRebuildMasterListImport,
@@ -201,8 +218,8 @@ export function PartnerCompaniesPage({
   const canRenew = isAdmin || canRenewDocuments;
   const [currentPage, setCurrentPage] = useState(1);
   // Affiliation filter
-  const [activeTab, setActiveTab] = useState<PartnerCompanyType | 'All'>('All');
-  // Local/Foreign sub-filter, only meaningful while activeTab === 'Supplier'
+  const [activeTab, setActiveTab] = useState<PartnerCategoryTab>('All');
+  // Origin remains an additional filter alongside the selected category tab.
   const [originFilter, setOriginFilter] = useState<Array<'Local' | 'Foreign'>>(['Local', 'Foreign']);
   const [businessTypeFilter, setBusinessTypeFilter] = useState<Array<'Trade' | 'Non-Trade'>>(['Trade', 'Non-Trade']);
   const [searchQuery, setSearchQuery] = useState('');
@@ -273,12 +290,12 @@ export function PartnerCompaniesPage({
   const [companyToArchive, setCompanyToArchive] = useState<PartnerCompany | null>(null);
 
   // Master List import state
-  const importFileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   // Parsed + merged result awaiting admin confirmation - nothing is saved
   // until they click "Apply Update" on the review modal below.
   const [importPreview, setImportPreview] = useState<MasterListImportReview | null>(null);
+  const importSourceRowCount = importPreview?.files.reduce((total, file) => total + file.rows.length, 0) ?? 0;
   const [duplicateMasterListReview, setDuplicateMasterListReview] = useState<{ files: File[]; duplicates: MasterListFileDuplicate[] } | null>(null);
   const [isReplaceConfirmationOpen, setIsReplaceConfirmationOpen] = useState(false);
   const [isApplyingImport, setIsApplyingImport] = useState(false);
@@ -289,9 +306,9 @@ export function PartnerCompaniesPage({
   useModalEscape(Boolean(companyToArchive), () => setCompanyToArchive(null), 60);
   useModalEscape(Boolean(importPreview), () => setImportPreview(null), 50);
   useModalEscape(Boolean(importResult), () => setImportResult(null), 50);
-  useModalEscape(Boolean(duplicateMasterListReview), () => setDuplicateMasterListReview(null), 80);
+  useModalEscape(Boolean(duplicateMasterListReview), cancelDuplicateMasterListReview, 80);
   useModalEscape(isReplaceConfirmationOpen, () => setIsReplaceConfirmationOpen(false), 90);
-  useModalEscape(isRegisterOpen, () => setIsRegisterOpen(false), 50);
+  useModalEscape(isRegisterOpen, closeRegisterModal, 50);
   useModalEscape(Boolean(selectedCompany), closePartnerRecord, 50);
   useEffect(() => {
     if (!isAdmin) return;
@@ -497,15 +514,15 @@ export function PartnerCompaniesPage({
       setIsRegisterOpen(false);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Failed to import the Master List file.');
+      setRegisterModalTab('upload');
+      setIsRegisterOpen(true);
     } finally {
       setIsImporting(false);
     }
   };
 
-  const handleImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = ''; // allow re-selecting the same file next time
-    if (!files.length || !onPreviewMasterListImport) return;
+  const inspectMasterListFiles = async (files: File[]) => {
+    if (!files.length || !onPreviewMasterListImport || isImporting) return;
 
     setIsImporting(true);
     setImportError('');
@@ -527,11 +544,15 @@ export function PartnerCompaniesPage({
     }
   };
 
-  const cancelDuplicateMasterListReview = () => {
+  function cancelDuplicateMasterListReview() {
     setDuplicateMasterListReview(null);
     setRegisterModalTab('upload');
     setIsRegisterOpen(true);
-  };
+  }
+
+  function closeRegisterModal() {
+    if (!isImporting) setIsRegisterOpen(false);
+  }
 
   const continueWithoutDuplicateMasterListFiles = () => {
     if (!duplicateMasterListReview) return;
@@ -664,10 +685,6 @@ export function PartnerCompaniesPage({
   const filteredCompanies = useMemo(() => {
     let baseList: PartnerCompany[] = [...classifiedCompanies.active, ...classifiedCompanies.archived];
 
-    if (activeTab !== 'All') {
-      baseList = baseList.filter((c) => c.type === activeTab);
-    }
-
     baseList = baseList.filter((company) => matchesDirectoryClassificationFilters(company, originFilter, businessTypeFilter, activeTab));
 
     if (debouncedSearchQuery.trim()) {
@@ -760,14 +777,18 @@ export function PartnerCompaniesPage({
 
   // Lets an admin toggle a branch's Status directly in the registry, the same
   // field the Master List import populates from its "Status" column dropdown.
-  const updateBranchStatus = (branchId: string, status: BranchStatus) => {
-    if (!selectedCompany || !isAdmin) return;
-    const updatedBranches = (selectedCompany.branches ?? []).map((b) =>
+  const updateBranchStatus = (branchId: string, status: BranchStatus, company = selectedCompany) => {
+    if (!company || !isAdmin) return;
+    setErrorMessage('');
+    const updatedBranches = (company.branches ?? []).map((b) =>
       b.id === branchId ? { ...b, status } : b
     );
-    const updated = { ...selectedCompany, branches: updatedBranches };
-    setSelectedCompany(updated);
-    onUpdateCompany(updated);
+    const updated = { ...company, branches: updatedBranches };
+    void onUpdateCompany(updated).then((saved) => {
+      if (selectedCompany?.id === company.id) setSelectedCompany(saved);
+    }).catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to update branch status.');
+    });
   };
 
   // Deep-link: a caller can request this company's detail panel open on arrival.
@@ -832,13 +853,13 @@ export function PartnerCompaniesPage({
   // category that determines which compliance documents apply. Moving a
   // company out of Uncategorized also accredits and unarchives it, mirroring
   // what a Master List import does when a row's category is recognized.
-  const handleClassifyCompany = async (newType: PartnerCompanyType, newOrigin?: SupplierOrigin) => {
-    if (!selectedCompany || !isAdmin) return;
-    const becomingCategorized = newType !== 'Uncategorized' && selectedCompany.type === 'Uncategorized';
+  const handleClassifyCompany = async (newType: PartnerCompanyType, newOrigin?: SupplierOrigin, company = selectedCompany) => {
+    if (!company || !isAdmin) return;
+    const becomingCategorized = newType !== 'Uncategorized' && company.type === 'Uncategorized';
     const updated: PartnerCompany = {
-      ...selectedCompany,
+      ...company,
       type: newType,
-      supplierOrigin: newType === 'Supplier' ? (newOrigin ?? selectedCompany.supplierOrigin ?? 'Local') : undefined,
+      supplierOrigin: newType === 'Supplier' ? (newOrigin ?? company.supplierOrigin ?? 'Local') : undefined,
       ...(becomingCategorized
         ? { accreditationStatus: 'Accredited' as AccreditationStatus, isArchived: false }
         : {}),
@@ -850,11 +871,16 @@ export function PartnerCompaniesPage({
       setErrorMessage(error instanceof Error ? error.message : 'Unable to classify the partner company.');
       return;
     }
-    setSelectedCompany(updated);
+    if (selectedCompany?.id === company.id) setSelectedCompany(updated);
     setSuccessMessage(
-      `"${selectedCompany.name}" classified as ${newType}${newType === 'Supplier' ? ` (${updated.supplierOrigin})` : ''}.`
+      `"${company.name}" classified as ${newType}${newType === 'Supplier' ? ` (${updated.supplierOrigin})` : ''}.`
     );
     setTimeout(() => setSuccessMessage(''), 4000);
+  };
+
+  const handleDirectoryCategoryChange = (company: PartnerCompany, value: string) => {
+    const option = DIRECTORY_CATEGORY_OPTIONS.find((candidate) => candidate.value === value);
+    if (option) void handleClassifyCompany(option.type, option.origin, company);
   };
 
   const saveBusinessClassification = async () => {
@@ -1000,7 +1026,6 @@ export function PartnerCompaniesPage({
           branchCount={partnerCompanies.reduce((total, company) => total + (company.branches?.length ?? 0), 0)}
         />
       </PartnerRegistryOverview>
-      <input ref={importFileInputRef} type="file" accept=".xlsx,.xls,.csv" multiple className="hidden" onChange={handleImportFileSelected} />
       <section className="space-y-3" aria-label="Partner directory workspace">
 
       {importError && (
@@ -1054,7 +1079,7 @@ export function PartnerCompaniesPage({
             <option value="current">Current</option>
             <option value="expiring">Expiring soon</option>
             <option value="expired">Expired / for update</option>
-            <option value="missing">Missing required docs</option>
+            <option value="missing">Pending required docs</option>
           </select>
         </label>
       </TableFilterBar>
@@ -1118,9 +1143,20 @@ export function PartnerCompaniesPage({
                       </td>
                       <td className="px-5 py-3.5 align-middle">
                         <div className="flex flex-wrap items-center gap-1">
-                          <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold border ${directoryCategoryBadgeClasses(c.type, c.supplierOrigin)}`}>
-                            {c.type === 'Supplier' && c.supplierOrigin ? `Supplier ${c.supplierOrigin}` : c.type}
-                          </span>
+                          {isAdmin ? (
+                            <PartnerDirectoryStatusPicker
+                              label={`Category for ${c.name}`}
+                              value={c.type === 'Supplier' && c.supplierOrigin ? `Supplier ${c.supplierOrigin}` : c.type}
+                              selectedValue={c.type === 'Supplier' ? `Supplier:${c.supplierOrigin ?? 'Local'}` : c.type}
+                              triggerClassName={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold border ${directoryCategoryBadgeClasses(c.type, c.supplierOrigin)}`}
+                              options={DIRECTORY_CATEGORY_OPTIONS}
+                              onChange={(value) => handleDirectoryCategoryChange(c, value)}
+                            />
+                          ) : (
+                            <span className={`inline-flex whitespace-nowrap rounded-md px-2 py-1 text-[10px] font-semibold border ${directoryCategoryBadgeClasses(c.type, c.supplierOrigin)}`}>
+                              {c.type === 'Supplier' && c.supplierOrigin ? `Supplier ${c.supplierOrigin}` : c.type}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-5 py-3.5 align-middle whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs">
@@ -1135,7 +1171,15 @@ export function PartnerCompaniesPage({
                         </td>
                       )}
                       <td className="px-5 py-3.5 align-middle whitespace-nowrap text-xs font-medium">
-                        {branch?.status ? (
+                        {isAdmin && branch ? (
+                          <PartnerDirectoryStatusPicker
+                            label={`Branch status for ${branch.bpCode || c.name}`}
+                            value={branch.status ?? 'Not set'}
+                            triggerClassName={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold border ${branch.status ? branchStatusBadgeClasses(branch.status) : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'}`}
+                            options={DIRECTORY_BRANCH_STATUS_OPTIONS}
+                            onChange={(value) => updateBranchStatus(branch.id, value as BranchStatus, c)}
+                          />
+                        ) : branch?.status ? (
                           <span className={`inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold border ${branchStatusBadgeClasses(branch.status)}`}>
                             {branch.status}
                           </span>
@@ -1145,9 +1189,15 @@ export function PartnerCompaniesPage({
                       </td>
                       <td className="px-5 py-3.5 align-middle">
                         <div className="flex flex-col items-start gap-1">
-                          <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold ${c.isArchived ? 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' : DOCUMENT_STATUS_STYLES[docSummary.status]}`}>
-                            {c.isArchived ? 'Archived' : docSummary.status}
-                          </span>
+                          {c.isArchived || docSummary.status !== 'Missing' ? (
+                            <span className={`inline-flex rounded-md border px-2 py-1 text-[10px] font-semibold ${c.isArchived ? 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' : DOCUMENT_STATUS_STYLES[docSummary.status]}`}>
+                              {c.isArchived ? 'Archived' : docSummary.status}
+                            </span>
+                          ) : (
+                            <button type="button" onClick={() => onOpenPendingDocuments(c.id)} aria-label={`Open pending documents for ${c.name}`} className={`inline-flex cursor-pointer rounded-md border px-2 py-1 text-[10px] font-semibold hover:ring-2 hover:ring-[#2187CD]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2187CD] ${DOCUMENT_STATUS_STYLES[docSummary.status]}`}>
+                              Pending
+                            </button>
+                          )}
                           {!c.isArchived && attentionCount > 0 && <span className="text-[10px] text-slate-400">{attentionCount} follow-up item{attentionCount === 1 ? '' : 's'}</span>}
                         </div>
                       </td>
@@ -1183,10 +1233,15 @@ export function PartnerCompaniesPage({
                 key={company.id}
                 company={company}
                 categoryClassName={directoryCategoryBadgeClasses(company.type, company.supplierOrigin)}
-                documentStatus={summary.status}
+                categoryValue={company.type === 'Supplier' && company.supplierOrigin ? `Supplier ${company.supplierOrigin}` : company.type}
+                categorySelectedValue={company.type === 'Supplier' ? `Supplier:${company.supplierOrigin ?? 'Local'}` : company.type}
+                categoryOptions={DIRECTORY_CATEGORY_OPTIONS}
+                branchStatusOptions={DIRECTORY_BRANCH_STATUS_OPTIONS}
+                documentStatus={summary.status === 'Missing' ? 'Pending' : summary.status}
                 documentStatusClassName={DOCUMENT_STATUS_STYLES[summary.status]}
                 branchStatusClassName={branch?.status ? branchStatusBadgeClasses(branch.status) : undefined}
                 primaryBranchCode={branch?.bpCode}
+                primaryBranchId={branch?.id}
                 primaryBranchStatus={branch?.status}
                 registeredDate={formatDate(company.registeredAt || company.createdAt)}
                 archivedDate={company.isArchived && company.archivedAt ? formatDateTime(company.archivedAt) : undefined}
@@ -1195,6 +1250,9 @@ export function PartnerCompaniesPage({
                 canReviewDocuments={Boolean(canRenew && (summary.status === 'Expired' || summary.status === 'Missing'))}
                 isAdmin={Boolean(isAdmin)}
                 onOpen={() => handleCompanyClick(company)}
+                onCategoryChange={(value) => handleDirectoryCategoryChange(company, value)}
+                onBranchStatusChange={(value) => branch && updateBranchStatus(branch.id, value as BranchStatus, company)}
+                onOpenPendingDocuments={() => onOpenPendingDocuments(company.id)}
                 onReviewDocuments={() => handleCompanyClick(company, 'branches')}
                 onArchiveOrRestore={() => toggleArchive(company)}
               />;
@@ -1409,7 +1467,7 @@ export function PartnerCompaniesPage({
                     </div>
                   ) : selectedCompanyDocSummary.status === 'Missing' ? (
                     <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-lg text-xs font-medium dark:bg-rose-950/20 dark:border-rose-900 dark:text-rose-400">
-                      ⚠️ <strong>{selectedCompanyDocSummary.missingCount} required document{selectedCompanyDocSummary.missingCount === 1 ? ' was' : 's were'} never provided.</strong> Not yet fully compliant - still eligible for audits. Provide the missing document(s) below.
+                      ⚠️ <strong>{selectedCompanyDocSummary.missingCount} required document{selectedCompanyDocSummary.missingCount === 1 ? ' is' : 's are'} pending.</strong> Not yet fully compliant - still eligible for audits. Review the pending document(s) below.
                     </div>
                   ) : selectedCompanyDocSummary.status === 'Expiring Soon' ? (
                     <div className="bg-amber-50 border border-amber-200 text-amber-700 p-3 rounded-lg text-xs font-medium dark:bg-amber-950/20 dark:border-amber-900 dark:text-amber-400">
@@ -1449,7 +1507,7 @@ export function PartnerCompaniesPage({
                       <strong className={`text-base ${selectedCompanyDocSummary.expiringSoonCount > 0 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-200'}`}>{selectedCompanyDocSummary.expiringSoonCount}</strong>
                     </div>
                     <div className="bg-white dark:bg-slate-950 rounded-lg border border-slate-100 dark:border-slate-800 p-2.5">
-                      <span className="text-slate-400 font-medium block">Missing</span>
+                      <span className="text-slate-400 font-medium block">Pending</span>
                       <strong className="text-slate-700 dark:text-slate-200 text-base">{selectedCompanyDocSummary.missingCount}</strong>
                     </div>
                   </div>
@@ -1598,8 +1656,8 @@ export function PartnerCompaniesPage({
                           <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-dashed border-slate-200 dark:border-slate-800">
                             {allKeys.map((docName) => {
                               const doc = (branch.documents?.[docName] ?? {}) as ComplianceDocument;
-                              const { status } = computeDocumentStatus(doc, effectiveNow, docName);
-                              const expiryBased = isExpiryDocument(docName);
+                              const { status } = computeDocumentStatus(doc, effectiveNow, docName, selectedCompany);
+                              const expiryBased = isExpiryDocument(docName, selectedCompany.type, selectedCompany.supplierOrigin);
                               const inactiveClassificationDocument = ['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)
                                 && ((docName === 'DTI (Sole)' && selectedCompany.businessClassification !== 'SOL')
                                   || (docName !== 'DTI (Sole)' && selectedCompany.businessClassification !== 'CORP'));
@@ -1967,7 +2025,8 @@ export function PartnerCompaniesPage({
           <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-transparent dark:bg-slate-950">
             {/* Close Button */}
             <button
-              onClick={() => setIsRegisterOpen(false)}
+              onClick={closeRegisterModal}
+              disabled={isImporting}
               className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-900 cursor-pointer"
               title="Close dialog"
               type="button"
@@ -1989,6 +2048,7 @@ export function PartnerCompaniesPage({
             <div className="mx-6 mt-5 flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/50">
               <button
                 type="button"
+                disabled={isImporting}
                 onClick={() => setRegisterModalTab('manual')}
                 className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                   registerModalTab === 'manual'
@@ -2002,6 +2062,7 @@ export function PartnerCompaniesPage({
               {onPreviewMasterListImport && (
                 <button
                   type="button"
+                  disabled={isImporting}
                   onClick={() => setRegisterModalTab('upload')}
                   className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                     registerModalTab === 'upload'
@@ -2017,62 +2078,13 @@ export function PartnerCompaniesPage({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
             {registerModalTab === 'upload' && onPreviewMasterListImport ? (
-              <div className="mt-6 space-y-4">
-                <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Upload the latest Master List to refresh the registry and all three Active Company Lists. Companies are matched to existing
-                  records by name (fuzzy matching handles minor spelling/casing differences), so re-uploading a
-                  refreshed file is safe: matches are merged as an extra branch/BP Code rather than duplicated, and
-                  only genuinely new or newly-accredited companies are added.
-                </div>
-
-                <ActiveCompanyUploadCards userEmail={currentUserEmail} />
-
-                <label
-                  className={`flex items-start gap-2.5 rounded-xl border p-3 cursor-pointer transition ${
-                    importReplace
-                      ? 'border-rose-300 bg-rose-50/60 dark:border-rose-900/50 dark:bg-rose-950/20'
-                      : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={importReplace}
-                    onChange={(e) => setImportReplace(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-300"
-                  />
-                  <span className="text-xs">
-                    <span className="font-bold text-slate-700 dark:text-slate-200">Replace the entire registry with these files</span>
-                    <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Clears every existing partner first, so the registry mirrors the selected files. Leave unchecked to merge into the current registry instead.
-                    </span>
-                  </span>
-                </label>
-
-                {importReplace && (
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-[#a16207] dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-400">
-                    <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                    <span>This permanently removes all current partner companies before importing. This cannot be undone.</span>
-                  </div>
-                )}
-
-                {importError && (
-                  <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300">{importError}</p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => importFileInputRef.current?.click()}
-                  disabled={isImporting}
-                  className="w-full bg-[#2187CD] hover:bg-[#2187CD]/90 text-white flex items-center justify-center gap-2 py-3 px-4 text-xs font-bold rounded-lg shadow-xs transition duration-150 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
-                >
-                  {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                  <span>{isImporting ? 'Reading files…' : importReplace ? 'Choose Files & Replace Registry' : 'Choose Master List Files (.xlsx, .xls, .csv)'}</span>
-                </button>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
-                  Select standard or V4 Master List files. Review each file and choose which companies to skip before applying the update.
-                </p>
-
-              </div>
+              <MasterListUploadPanel
+                busy={isImporting}
+                error={importError}
+                replace={importReplace}
+                onReplaceChange={setImportReplace}
+                onSelectFiles={(files) => { void inspectMasterListFiles(files); }}
+              />
             ) : (
             <form id="register-partner-company-form" onSubmit={handleAdd} className="mt-6 w-full space-y-4">
               <div>
@@ -2201,7 +2213,8 @@ export function PartnerCompaniesPage({
             </div>
             <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-800">
               <button
-                onClick={() => setIsRegisterOpen(false)}
+                onClick={closeRegisterModal}
+                disabled={isImporting}
                 className="secondary-button min-h-10 px-4 py-2 text-xs"
                 type="button"
               >
@@ -2300,7 +2313,7 @@ export function PartnerCompaniesPage({
               <div>
                 <h3 id="master-list-import-review-title" className="text-lg font-bold text-slate-900 dark:text-white">Review Master List Import</h3>
                 <p className="text-xs text-slate-500">
-                  {importPreview.files.reduce((total, file) => total + file.rows.length, 0)} companies found in {importPreview.files.length} file{importPreview.files.length === 1 ? '' : 's'} &bull; nothing has been saved yet
+                  {importSourceRowCount} compan{importSourceRowCount === 1 ? 'y' : 'ies'} found in {importPreview.files.length} file{importPreview.files.length === 1 ? '' : 's'} &bull; nothing has been saved yet
                 </p>
               </div>
             </div>

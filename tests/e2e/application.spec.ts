@@ -6,6 +6,43 @@ const email = 'synthetic.admin@mgenesis.com';
 const userId = '00000000-0000-4000-8000-000000000001';
 const createdAt = '2026-01-01T00:00:00.000Z';
 
+for (const cacheAvailable of [true, false]) {
+  test(`Dashboard response cache ${cacheAvailable ? 'loads one complete snapshot' : 'falls back after an API failure'}`, async ({ page }) => {
+    const service = await backend(page);
+    service.records.push({ record_type: 'survey_response', record_id: 'cache-evaluation:Q01', created_at: createdAt, payload: {
+      responseId: 'cache-evaluation', surveyType: 'Courier', companyId: 'synthetic-courier', company: 'Synthetic Courier',
+      respondentType: 'Employee', respondentEmail: email, submissionDate: new Date().toISOString(),
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery',
+      rating: 1, comment: '', dataSource: 'production_submission',
+    } });
+    await page.route('**/api/config', async route => {
+      const response = await route.fetch();
+      await route.fulfill({ json: { ...await response.json(), responseCacheEnabled: true } });
+    });
+    let cacheRequests = 0;
+    await page.route('**/api/survey-responses?*', async route => {
+      cacheRequests++;
+      expect(route.request().headers().authorization).toMatch(/^Bearer /);
+      if (!cacheAvailable) { await route.fulfill({ status: 503, json: { error: 'Synthetic unavailable cache API' } }); return; }
+      expect(new URL(route.request().url()).searchParams.has('after')).toBe(false);
+      const rows = service.records.filter(row => row.record_type === 'survey_response');
+      await route.fulfill({ json: { rows } });
+    });
+    await page.goto('/login'); await signIn(page);
+    const recent = page.getByRole('table', { name: 'Recent evaluation submissions' });
+    await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+    await waitForReadyPage(page);
+    // Sign-in resolves the authorization scope; measure the regular reload after it settles.
+    cacheRequests = 0;
+    await page.reload();
+    await waitForReadyPage(page);
+    await expect(recent.getByText('Synthetic Courier', { exact: true })).toBeVisible();
+    expect(cacheRequests).toBe(1);
+    expect(service.errors).toEqual([]);
+    expect(service.unexpected).toEqual([]);
+  });
+}
+
 test('Master List import previews active lists, cancels safely, retries failures and replaces category scopes', async ({ page }, testInfo) => {
   const service = await backend(page);
   const header: string[] = []; header[0] = '#'; header[5] = 'Status'; header[6] = 'Category'; header[8] = 'BP Code'; header[9] = 'BP Name';
@@ -27,6 +64,7 @@ test('Master List import previews active lists, cancels safely, retries failures
     await page.getByRole('button', { name: /Register.*Partner/i }).click();
     await page.getByRole('button', { name: 'Upload Master List', exact: true }).click();
     if (replace) await page.getByRole('checkbox', { name: /Replace the entire registry/ }).check();
+    if (!replace) await page.screenshot({ path: testInfo.outputPath('master-list-upload.png'), fullPage: true });
     await page.locator('input[type=file][multiple]').setInputFiles(selectedFile);
     await expect(page.getByRole('heading', { name: 'Review Master List Import' })).toBeVisible();
   };
@@ -76,17 +114,131 @@ test('Master List import previews active lists, cancels safely, retries failures
   await page.getByRole('button', { name: 'Replace Registry', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Master List Import Complete' })).toBeVisible();
   expect(service.records.filter(record => record.record_type === 'partner_company').map(record => record.payload.name)).toEqual(['Replacement Supplier']);
-  expect(service.activeLists.value?.map(list => list.companies)).toEqual([[], [], []]);
+  expect(service.activeLists.value?.map(list => list.companies)).toEqual([[], ['Replacement Supplier'], []]);
+  expect(service.activeLists.value?.every(list => list.membership_complete)).toBe(true);
   expect(service.records.filter(record => record.record_type === 'active_company_snapshot')).toHaveLength(7);
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
+});
+
+test('Master List has one accessible uploader for combined categories and multiple files', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  const importRecords = () => service.records.filter(record => ['partner_company', 'active_company_snapshot', 'survey', 'survey_response'].includes(record.record_type));
+  const before = structuredClone(importRecords());
+  const csv = (name: string, rows: string[][]) => ({ name, mimeType: 'text/csv', buffer: Buffer.from(XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet([
+    ['#', '', '', '', '', 'Status', 'Category', '', 'BP Code', 'BP Name'],
+    ...rows.map(([code, company, category], index) => [String(index + 1), '', '', '', '', 'Pending', category, '', code, company]),
+  ]))) });
+  const files = [csv('combined-master.csv', [['NW', 'Northwind Logistics', 'Courier'], ['AL', 'Alpine Equipment', 'Supplier-Local']]),
+    csv('other-partners.csv', [['RW', 'Redwood Electrical', 'Subcontructor']])];
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/partner-companies');
+  await page.getByRole('button', { name: /Register.*Partner/i }).click();
+  await page.getByRole('button', { name: 'Upload Master List', exact: true }).click();
+  const upload = page.getByRole('region', { name: 'Master List file upload', exact: true });
+  const choose = upload.getByRole('button', { name: 'Choose Master List files', exact: true });
+  await expect(upload.locator('input[type=file]')).toHaveCount(1);
+  await expect(page.getByText('Upload Active Company Lists', { exact: true })).toHaveCount(0);
+  for (const legacyName of ['courier.csv', 'supplier.csv', 'subcontractor.csv']) await expect(page.getByText(legacyName, { exact: true })).toHaveCount(0);
+  await choose.focus(); await expect(choose).toBeFocused();
+  expect(await upload.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('generalized-master-list-upload.png'), fullPage: true, animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.add('dark'));
+  await page.screenshot({ path: testInfo.outputPath('generalized-master-list-upload-dark.png'), fullPage: true, animations: 'disabled' });
+  await page.evaluate(() => document.body.classList.remove('dark'));
+  // Hold only file I/O to exercise the actual parser's loading state.
+  await page.evaluate(() => {
+    const original = File.prototype.arrayBuffer;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    (window as unknown as { releaseMasterListRead: () => void }).releaseMasterListRead = () => { File.prototype.arrayBuffer = original; release(); };
+    File.prototype.arrayBuffer = async function () { await gate; return original.call(this); };
+  });
+  await upload.locator('input[type=file]').setInputFiles(files);
+  await expect(upload.getByRole('status')).toHaveText('Reading Master List files...');
+  await expect(choose).toBeDisabled();
+  await expect(upload.getByRole('checkbox')).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(upload).toBeVisible();
+  await page.locator('.fixed.inset-0').filter({ has: upload }).dispatchEvent('pointerdown');
+  await expect(upload).toBeVisible();
+  expect(importRecords()).toEqual(before);
+  await page.evaluate(() => (window as unknown as { releaseMasterListRead: () => void }).releaseMasterListRead());
+  const review = page.getByRole('dialog', { name: 'Review Master List Import', exact: true });
+  await expect(review).toBeVisible();
+  await expect(review).toContainText('3 companies found in 2 files');
+  for (const file of files) await expect(review.getByText(file.name, { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Resulting active company counts')).toHaveText('Courier: 2 · Supplier: 1 · Subcontractor: 1');
+  expect(importRecords()).toEqual(before);
+  await review.getByRole('button', { name: 'Apply Update', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Master List Import Complete' })).toBeVisible();
+  expect(service.activeLists.value).toEqual([
+    { survey_type: 'Courier', companies: ['Northwind Logistics', 'Synthetic Courier'], membership_complete: true },
+    { survey_type: 'Supplier', companies: ['Alpine Equipment'], membership_complete: true },
+    { survey_type: 'Subcontractor', companies: ['Redwood Electrical'], membership_complete: true },
+  ]);
+  expect(service.records.filter(record => record.record_type === 'partner_company')).toHaveLength(4);
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
+});
+
+test('Master List validates files and returns duplicate dismissal to the unified uploader', async ({ page }, testInfo) => {
+  const service = await backend(page);
+  const importRecords = () => service.records.filter(record => ['partner_company', 'active_company_snapshot', 'survey', 'survey_response'].includes(record.record_type));
+  const before = structuredClone(importRecords());
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/partner-companies');
+  await page.getByRole('button', { name: /Register.*Partner/i }).click();
+  await page.getByRole('button', { name: 'Upload Master List', exact: true }).click();
+  const upload = page.getByRole('region', { name: 'Master List file upload', exact: true });
+  const input = upload.locator('input[type=file]');
+  await input.setInputFiles({ name: 'empty.csv', mimeType: 'text/csv', buffer: Buffer.alloc(0) });
+  await expect(upload.getByRole('alert')).toContainText('between 1 byte and 25 MB');
+  await input.setInputFiles({ name: 'wrong.txt', mimeType: 'text/plain', buffer: Buffer.from('not a master list') });
+  await expect(upload.getByRole('alert')).toContainText('must be a Master List file');
+  await input.setInputFiles({ name: 'unknown.csv', mimeType: 'text/csv', buffer: Buffer.from('Company Name\nUnmapped Company') });
+  await expect(upload.getByRole('alert')).toContainText('Unrecognized Master List layout');
+  await page.screenshot({ path: testInfo.outputPath('master-list-upload-validation.png'), fullPage: true });
+  const contents = XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet([
+    ['#', '', '', '', '', 'Status', 'Category', '', 'BP Code', 'BP Name'],
+    ['1', '', '', '', '', 'Pending', 'Supplier-Local', '', 'AL', 'Alpine Equipment'],
+  ]));
+  const dropCopies = async () => {
+    const transfer = await page.evaluateHandle(text => {
+      const data = new DataTransfer();
+      for (const name of ['master.csv', 'copy.csv']) data.items.add(new File([text], name, { type: 'text/csv' }));
+      return data;
+    }, contents);
+    await upload.getByRole('button', { name: 'Choose Master List files' }).dispatchEvent('drop', { dataTransfer: transfer });
+    await transfer.dispose();
+  };
+  const duplicate = page.getByRole('dialog', { name: 'Duplicate Master List file selected', exact: true });
+  await dropCopies(); await expect(duplicate).toBeVisible();
+  await duplicate.getByRole('heading').dispatchEvent('pointerdown');
+  await expect(duplicate).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('master-list-duplicate-review.png') });
+  await page.keyboard.press('Escape'); await expect(upload).toBeVisible();
+  expect(importRecords()).toEqual(before);
+  await dropCopies(); await expect(duplicate).toBeVisible();
+  await duplicate.locator('..').dispatchEvent('pointerdown');
+  await expect(upload).toBeVisible(); expect(importRecords()).toEqual(before);
+  await dropCopies(); await expect(duplicate).toBeVisible();
+  await duplicate.getByRole('button', { name: 'Continue Without Duplicates', exact: true }).click();
+  const review = page.getByRole('dialog', { name: 'Review Master List Import', exact: true });
+  await expect(review).toContainText('1 company found in 1 file');
+  await expect(review.getByText('copy.csv', { exact: true })).toHaveCount(0);
+  await review.getByRole('button', { name: 'Cancel', exact: true }).click();
+  expect(importRecords()).toEqual(before);
   expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
 });
 
 test('Manage Access saves a complete Courier selection and preserves drafts after rejected writes', async ({ page, browser }, testInfo) => {
   const service = await backend(page);
   const names = Array.from({ length: 7 }, (_, i) => `Assigned Courier ${i + 1}`);
+  const inactiveCompany = { id: 'inactive-courier', name: 'Inactive Courier', type: 'Courier', createdAt,
+    branches: [{ id: 'inactive-courier-branch', bpCode: 'IC', status: 'Inactive' }], isArchived: false };
   service.records.push(...names.map((name, i) => ({ record_type: 'partner_company', record_id: `assigned-${i}`, created_at: createdAt,
-    payload: { id: `assigned-${i}`, name, type: 'Courier', createdAt, isArchived: false } })));
-  service.activeLists.value = [{ survey_type: 'Courier', companies: names }];
+    payload: { id: `assigned-${i}`, name, type: 'Courier', createdAt, isArchived: false } })),
+    { record_type: 'partner_company', record_id: inactiveCompany.id, payload: inactiveCompany, created_at: createdAt });
+  service.activeLists.value = [{ survey_type: 'Courier', companies: [...names, inactiveCompany.name], membership_complete: true }];
   service.records.push({ record_type: 'survey', record_id: evaluationForm.id, payload: { ...evaluationForm }, created_at: createdAt });
   await page.goto('/'); await signIn(page);
   await openReadyPage(page, '/evaluation-workspace');
@@ -94,6 +246,20 @@ test('Manage Access saves a complete Courier selection and preserves drafts afte
   await page.getByRole('button').filter({ hasText: 'Synthetic evaluation' }).last().click();
   await page.getByRole('button', { name: /Modify Companies to Evaluate/ }).click();
   for (const name of names) await expect(page.getByRole('checkbox', { name, exact: true })).toBeChecked();
+  const inactiveCheckbox = page.getByRole('checkbox', { name: inactiveCompany.name, exact: true });
+  await expect(inactiveCheckbox).toBeDisabled();
+  await expect(page.getByText(/7 selected · 7 eligible · 8 Companies Uploaded/)).toBeVisible();
+  await expect(page.getByText('Inactive', { exact: true })).toBeVisible();
+  await inactiveCheckbox.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('manage-access-inactive-company.png') });
+  await page.getByRole('button', { name: `Reactivate ${inactiveCompany.name}`, exact: true }).click();
+  await expect(inactiveCheckbox).toBeEnabled();
+  await expect(inactiveCheckbox).not.toBeChecked();
+  const companySearch = page.getByRole('searchbox', { name: 'Search companies', exact: true });
+  await companySearch.fill(inactiveCompany.name);
+  await page.getByRole('checkbox', { name: 'Select All Eligible (1)', exact: true }).check();
+  await expect(inactiveCheckbox).toBeChecked();
+  await companySearch.fill('');
   await page.screenshot({ path: testInfo.outputPath('manage-access-companies.png') });
   await page.getByRole('checkbox', { name: names[6], exact: true }).uncheck();
   await page.getByRole('button', { name: 'Done', exact: true }).click();
@@ -103,7 +269,8 @@ test('Manage Access saves a complete Courier selection and preserves drafts afte
   expect(service.records.find(row => row.record_type === 'survey')!.payload).not.toHaveProperty('evaluationCompanyIds');
   service.failures.surveyWrites = false;
   await page.getByRole('button', { name: 'Save Changes', exact: true }).click();
-  await expect.poll(() => service.records.find(row => row.record_type === 'survey')!.payload.evaluationCompanyIds).toHaveLength(6);
+  await expect.poll(() => service.records.find(row => row.record_type === 'survey')!.payload.evaluationCompanyIds).toHaveLength(7);
+  expect((service.records.find(row => row.record_id === inactiveCompany.id)!.payload.branches as Array<{ status: string }>)[0].status).toBe('Pending');
   await openReadyPage(page, '/evaluation-workspace');
   await page.getByRole('button', { name: 'Manage Access', exact: true }).click();
   await page.getByRole('button').filter({ hasText: 'Synthetic evaluation' }).last().click();
@@ -115,9 +282,9 @@ test('Manage Access saves a complete Courier selection and preserves drafts afte
     const employeeService = await backend(employeePage, 'Employee', false, { records: service.records });
     employeeService.activeLists.value = service.activeLists.value;
     await employeePage.goto('/'); await signIn(employeePage, 'Employee');
-    await expect(employeePage.getByRole('button', { name: 'Courier: 6 pending', exact: true })).toBeVisible();
+    await expect(employeePage.getByRole('button', { name: 'Courier: 7 pending', exact: true })).toBeVisible();
     await employeePage.reload();
-    await expect(employeePage.getByRole('button', { name: 'Courier: 6 pending', exact: true })).toBeVisible();
+    await expect(employeePage.getByRole('button', { name: 'Courier: 7 pending', exact: true })).toBeVisible();
   } finally { await employeeContext.close(); }
 });
 
@@ -170,8 +337,8 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
   ];
   const unexpected: string[] = [];
   const errors: string[] = [];
-  const failures = { surveyWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false, activeListReads: false, masterListWrites: false };
-  const activeLists: { value: Array<{ survey_type: string; companies: string[] }> | null } = { value: null };
+  const failures = { surveyWrites: false, responseWrites: false, historyBulkReads: false, historyFileReads: false, reminderReads: false, activeListReads: false, masterListWrites: false };
+  const activeLists: { value: Array<{ survey_type: string; companies: string[]; membership_complete?: boolean }> | null } = { value: null };
   const historyReads: Array<{ select: string; id: string | null }> = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/*', async route => {
@@ -192,20 +359,71 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
     }
     if (url.pathname === '/auth/v1/user') return reply(user);
     if (url.pathname === '/auth/v1/logout') return reply({});
+    if (url.pathname === '/rest/v1/rpc/renew_partner_document') {
+      const body = request.postDataJSON();
+      const recordIndex = records.findIndex(record => record.record_type === 'partner_company' && record.record_id === body.p_company_id);
+      if (recordIndex < 0) return reply({ message: 'Synthetic partner not found' }, 404);
+      const record = records[recordIndex];
+      const branches = record.payload.branches as Array<{ id: string; documents?: Record<string, Record<string, unknown>> }>;
+      const branchIndex = branches.findIndex(branch => branch.id === body.p_branch_id);
+      if (branchIndex < 0) return reply({ message: 'Synthetic branch not found' }, 404);
+      const branch = branches[branchIndex];
+      const documents = branch.documents ?? {};
+      const current = documents[String(body.p_document_name)] ?? {};
+      if (JSON.stringify(current) !== JSON.stringify(body.p_expected_document)) return reply({ message: 'Synthetic document changed' }, 409);
+      const nextPayload = structuredClone(record.payload);
+      const nextBranches = nextPayload.branches as typeof branches;
+      nextBranches[branchIndex] = { ...branch, documents: { ...documents, [String(body.p_document_name)]: { ...current, ...(body.p_next_document as Record<string, unknown>) } } };
+      records[recordIndex] = { ...record, payload: nextPayload };
+      records.push({ record_type: 'document_modification', record_id: `DOC-MOD-${crypto.randomUUID()}`,
+        created_at: new Date().toISOString(), payload: { id: `DOC-MOD-${crypto.randomUUID()}`, actorEmail: email,
+          category: 'Supplier', companyName: record.payload.name, docName: body.p_document_name,
+          change: 'Synthetic supporting document added', timestamp: new Date().toISOString() } });
+      return reply(nextPayload);
+    }
+    if (url.pathname === '/rest/v1/rpc/remove_supplier_supporting_document') {
+      const body = request.postDataJSON();
+      const recordIndex = records.findIndex(record => record.record_type === 'partner_company' && record.record_id === body.p_company_id);
+      if (recordIndex < 0) return reply({ message: 'Synthetic partner not found' }, 404);
+      const record = records[recordIndex];
+      const branches = record.payload.branches as Array<{ id: string; documents?: Record<string, Record<string, unknown>> }>;
+      const branchIndex = branches.findIndex(branch => branch.id === body.p_branch_id);
+      if (branchIndex < 0) return reply({ message: 'Synthetic branch not found' }, 404);
+      const branch = branches[branchIndex];
+      const documents = branch.documents ?? {};
+      const documentName = String(body.p_document_name);
+      const current = documents[documentName];
+      if (!current || JSON.stringify(current) !== JSON.stringify(body.p_expected_document)) return reply({ message: 'Synthetic document changed' }, 409);
+      const nextPayload = structuredClone(record.payload);
+      const nextBranches = nextPayload.branches as typeof branches;
+      const nextDocuments = { ...documents };
+      delete nextDocuments[documentName];
+      nextBranches[branchIndex] = { ...branch, documents: nextDocuments };
+      records[recordIndex] = { ...record, payload: nextPayload };
+      records.push({ record_type: 'document_modification', record_id: `DOC-MOD-${crypto.randomUUID()}`,
+        created_at: new Date().toISOString(), payload: { id: `DOC-MOD-${crypto.randomUUID()}`, actorEmail: email,
+          category: 'Supplier', companyName: record.payload.name, docName: documentName,
+          change: 'Synthetic supporting document removed', timestamp: new Date().toISOString() } });
+      return reply(nextPayload);
+    }
     if (url.pathname === '/rest/v1/rpc/import_partner_master_list') {
       if (role !== 'Admin') return reply({ message: 'Admin required' }, 403);
       if (failures.masterListWrites) return reply({ message: 'Synthetic master-list write rejected' }, 500);
       const body = request.postDataJSON();
       const snapshots = ['Courier', 'Supplier', 'Subcontractor'].map(type => {
         const id = `${type}-master-list-${crypto.randomUUID()}`;
+        const masterListCompanies = body.p_companies.filter((company: { type: string; isArchived?: boolean }) => company.type === type && !company.isArchived)
+          .map((company: { name: string }) => company.name).sort();
         return { id, surveyType: type, uploadedAt: new Date().toISOString(), uploadedBy: email, sourceFileName: body.p_source_file_name,
           companies: body.p_companies.filter((company: { type: string; isArchived?: boolean; branches: Array<{ status?: string }> }) => company.type === type && !company.isArchived
-            && (!company.branches.length || company.branches.some(branch => branch.status !== 'Inactive'))).map((company: { name: string }) => company.name).sort() };
+            && (!company.branches.length || company.branches.some(branch => branch.status !== 'Inactive'
+              && !(branch.status === 'Completed' && (branch as { manualStatus?: string }).manualStatus === 'Inactive')))).map((company: { name: string }) => company.name).sort(),
+          masterListCompanies };
       });
       for (let i = records.length - 1; i >= 0; i--) if (records[i].record_type === 'partner_company') records.splice(i, 1);
       records.push(...body.p_companies.map((company: { id: string }) => ({ record_type: 'partner_company', record_id: company.id, payload: company, created_at: createdAt })),
         ...snapshots.map(snapshot => ({ record_type: 'active_company_snapshot', record_id: snapshot.id, payload: snapshot, created_at: createdAt })));
-      activeLists.value = snapshots.map(snapshot => ({ survey_type: snapshot.surveyType, companies: snapshot.companies }));
+      activeLists.value = snapshots.map(snapshot => ({ survey_type: snapshot.surveyType, companies: snapshot.masterListCompanies, membership_complete: true }));
       return reply({ companies: body.p_companies, snapshots });
     }
     if (url.pathname === '/rest/v1/rpc/get_active_evaluation_lists') {
@@ -215,6 +433,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
       return reply(activeLists.value ?? ['Courier', 'Supplier', 'Subcontractor'].map(type => ({
         survey_type: type,
         companies: records.filter(record => record.record_type === 'partner_company' && record.payload.type === type && !record.payload.isArchived).map(record => String(record.payload.name)),
+        membership_complete: true,
       })));
     }
     if (url.pathname === '/rest/v1/app_profiles' && request.method() === 'GET') {
@@ -251,6 +470,7 @@ async function backend(page: Page, role: 'Admin' | 'Employee' = 'Admin', rejectP
       if (request.method() === 'POST') {
         const body = request.postDataJSON();
         if (failures.surveyWrites && (Array.isArray(body) ? body : [body]).some(row => row.record_type === 'survey')) return reply({ message: 'Synthetic survey write rejected' }, 500);
+        if (failures.responseWrites && (Array.isArray(body) ? body : [body]).some(row => row.record_type === 'survey_response')) return reply({ message: 'Synthetic evaluation save rejected' }, 500);
         for (const row of Array.isArray(body) ? body : [body]) {
           const existing = records.findIndex(record => record.record_type === row.record_type && record.record_id === row.record_id);
           const saved = { ...row, created_at: row.created_at ?? createdAt };
@@ -385,11 +605,11 @@ test('Supplier Local attention containers filter only the expanded company and t
   const openFirst = () => expandTrigger().click();
   await openFirst();
   const attention = company.getByLabel('Required document attention summary', { exact: true });
-  const missing = attention.getByRole('button', { name: '4 missing', exact: true });
+  const missing = attention.getByRole('button', { name: '4 pending', exact: true });
   const expired = attention.getByRole('button', { name: '1 expired', exact: true });
   const forUpdate = attention.getByRole('button', { name: '1 for update', exact: true });
   const summary = await attention.textContent() ?? '';
-  const checkScope = async (count: number, showHistory = count === 14) => {
+  const checkScope = async (count: number, showHistory = count === 13) => {
     await expect(required.getByRole('listitem')).toHaveCount(count);
     await expect(attention).toHaveText(summary);
     if (showHistory) {
@@ -403,14 +623,14 @@ test('Supplier Local attention containers filter only the expanded company and t
       expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
     }
   };
-  await checkScope(14, true);
+  await checkScope(13, true);
   await missing.click();
   await expect(missing).toHaveAttribute('aria-pressed', 'true');
   await expect(missing.locator('svg.lucide-x')).toBeVisible();
   await expect(expired.locator('svg.lucide-x')).toHaveCount(0);
   await checkScope(4, false);
-  await expect(required.getByRole('listitem')).toHaveText([/SIF.*Missing/, /BIR2303.*Missing/, /Articles of Incorporation.*Missing/, /Product Profile.*Missing/]);
-  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 14');
+  await expect(required.getByRole('listitem')).toHaveText([/SIF.*Pending/, /BIR2303.*Pending/, /Articles of Incorporation.*Pending/, /Product Profile.*Pending/]);
+  await expect(required.getByRole('heading')).toHaveText('Required documents4 / 13');
   const sifCard = required.getByRole('listitem').filter({ has: page.getByText('SIF', { exact: true }) });
   const actionsBox = await sifCard.getByRole('button', { name: 'Actions for SIF', exact: true }).boundingBox();
   const remarksBox = await sifCard.getByRole('button', { name: 'View admin remarks for SIF', exact: true }).boundingBox();
@@ -441,22 +661,90 @@ test('Supplier Local attention containers filter only the expanded company and t
   await page.keyboard.press('Space');
   await expect(forUpdate).toHaveAttribute('aria-pressed', 'false');
   await expect(forUpdate.locator('svg.lucide-x')).toHaveCount(0);
-  await checkScope(14, true);
+  await checkScope(13, true);
   await expired.click();
   await checkScope(1, false);
   await page.getByRole('button', { name: 'Review documents for Second Local Supplier (LOCAL-TWO)', exact: true }).first().click();
   const second = page.getByRole('region', { name: 'Required documents', exact: true });
-  await expect(second.getByRole('listitem')).toHaveCount(14);
-  await expect(page.getByRole('button', { name: '1 missing', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(second.getByRole('listitem')).toHaveCount(13);
+  await expect(page.getByRole('button', { name: '1 pending', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await openFirst();
-  await checkScope(14, true);
+  await checkScope(13, true);
   await expect(expired).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: 'Hide documents for First Local Supplier (LOCAL-ONE)', exact: true }).first().click();
   await openFirst();
-  await checkScope(14, true);
+  await checkScope(13, true);
   expect(JSON.stringify(service.records.filter(record => record.record_type === 'partner_company'))).toBe(originalPartners);
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
+});
+
+test('Foreign Supplier checklist keeps seven requirements, retains legacy history and adds supplier-specific documents', async ({ page }) => {
+  const service = await backend(page);
+  const legacyDocuments = {
+    'DTI (Sole)': { provided: true, expiryDate: '2027-12-31' },
+    'GIS (Corp)': { provided: true, expiryDate: '2027-12-31' },
+    'Business Permit': { provided: true, expiryDate: '2027-12-31' },
+    'Import Permit': { provided: true, expiryDate: '2027-12-31' },
+  };
+  for (const [id, name, bpCode] of [['foreign-primary', 'Foreign Supplier One', 'FOR-1'], ['foreign-secondary', 'Foreign Supplier Two', 'FOR-2']] as const) {
+    service.records.push({ record_type: 'partner_company', record_id: id, created_at: createdAt,
+      payload: { id, name, type: 'Supplier', supplierOrigin: 'Foreign', createdAt,
+        branches: [{ id: `${id}-branch`, bpCode, documents: id === 'foreign-primary' ? structuredClone(legacyDocuments) : {} }] } });
+  }
+
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/document-tracker?category=supplier-foreign');
+  const first = page.getByRole('article').filter({ hasText: 'Foreign Supplier One' });
+  const second = page.getByRole('article').filter({ hasText: 'Foreign Supplier Two' });
+  await first.getByRole('button', { name: 'Expand documents for Foreign Supplier One (FOR-1)' }).click();
+  const required = first.getByRole('region', { name: 'Required documents', exact: true });
+  await expect(required.getByRole('listitem')).toHaveCount(7);
+  const addOtherDocument = first.getByRole('region', { name: 'Supplier document actions', exact: true });
+  await expect(addOtherDocument.getByText('Other Supporting Documents (as applicable)', { exact: true })).toHaveCount(0);
+  const attentionSummary = first.getByLabel('Required document attention summary');
+  await expect(attentionSummary).toContainText('7 pending');
+  const attentionBox = await attentionSummary.boundingBox();
+  const addButtonBox = await addOtherDocument.getByRole('button', { name: 'Add Other Document', exact: true }).boundingBox();
+  const requiredHeadingBox = await required.locator('h3').boundingBox();
+  expect(attentionBox && addButtonBox && requiredHeadingBox).not.toBeNull();
+  expect(Math.abs(attentionBox!.y - addButtonBox!.y)).toBeLessThan(5);
+  expect(requiredHeadingBox!.y).toBeGreaterThan(attentionBox!.y + attentionBox!.height);
+  await expect(required.getByRole('listitem')).toContainText([
+    'Supplier Information Form (SIF)', 'Audited Financial Statements (AFS)',
+    'Certificate of Incorporation / Registration', 'Articles of Incorporation',
+    'Business Permit / Licenses', "Owner's Government-Issued Identification (ID)", 'Product Profile',
+  ]);
+  for (const removedRequirement of ['DTI (Sole)', 'GIS (Corp)', 'Business Permit', 'Import Permit']) {
+    await expect(required.getByText(removedRequirement, { exact: true })).toHaveCount(0);
+  }
+  const additional = first.getByRole('region', { name: 'Additional', exact: true });
+  for (const savedDocument of Object.keys(legacyDocuments)) {
+    await expect(required.getByText(savedDocument, { exact: true })).toHaveCount(0);
+    await expect(additional.getByText(savedDocument, { exact: true })).toHaveCount(0);
+  }
+  await expect(required.getByText('Completed and signed form containing company profile, contact details, banking information, and authorized representatives.', { exact: true })).toHaveCount(0);
+  await expect(required.getByText('Renewable annually; accept the current fiscal or calendar year.', { exact: true })).toHaveCount(0);
+  await expect(required.getByText('Must be valid at the time of submission.', { exact: true })).toHaveCount(0);
+
+  await addOtherDocument.getByRole('button', { name: 'Add Other Document', exact: true }).click();
+  await addOtherDocument.getByLabel('Document name').fill('Industry Permit');
+  await addOtherDocument.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(additional.getByRole('listitem').filter({ hasText: 'Other: Industry Permit' })).toHaveCount(1);
+  await expect(additional.getByRole('listitem')).toHaveCount(1);
+  const savedPartner = service.records.find(record => record.record_id === 'foreign-primary')!;
+  const savedBranch = (savedPartner.payload.branches as Array<{ documents: Record<string, unknown> }>)[0];
+  expect(savedBranch.documents).toMatchObject(legacyDocuments);
+  expect(savedBranch.documents['Other: Industry Permit']).toMatchObject({ provided: false, description: 'Industry Permit' });
+  expect(service.records.filter(record => record.record_type === 'document_modification')).toHaveLength(1);
+
+  await second.getByRole('button', { name: 'Expand documents for Foreign Supplier Two (FOR-2)' }).click();
+  await expect(second.getByRole('region', { name: 'Required documents', exact: true }).getByRole('listitem')).toHaveCount(7);
+  await expect(second.getByRole('region', { name: 'Additional', exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await expect(second.getByRole('region', { name: 'Required documents', exact: true }).getByRole('listitem')).toHaveCount(7);
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
 });
 
 test('local registration cards render only applicable documents and hide excluded history', async ({ page }) => {
@@ -491,13 +779,61 @@ test('local registration cards render only applicable documents and hide exclude
       expect(allCardText).not.toContain(documentName);
       await expect(company.getByRole('button', { name: `Actions for ${documentName}`, exact: true })).toHaveCount(0);
     }
-    await expect(required.getByRole('listitem')).toHaveCount(classification === 'CORP' ? 14 : 13);
+    await expect(required.getByRole('listitem')).toHaveCount(classification === 'CORP' ? 13 : 12);
+    await expect(required.getByRole('listitem').filter({ hasText: 'Other Documents' })).toHaveCount(0);
+    const history = company.getByRole('region', { name: 'Historical & additional', exact: true });
+    await expect(history.getByRole('listitem').filter({ hasText: 'Other Documents' })).toHaveCount(1);
     const actionButtons = required.getByRole('button', { name: /^Actions for / });
-    await expect(actionButtons).toHaveCount(classification === 'CORP' ? 14 : 13);
+    await expect(actionButtons).toHaveCount(classification === 'CORP' ? 13 : 12);
     for (const action of await actionButtons.all()) await expect(action).toBeEnabled();
   }
   expect(service.errors).toEqual([]);
   expect(service.unexpected).toEqual([]);
+});
+
+test('Local Supplier can add and remove optional supporting documents without requiring Other Documents', async ({ page }) => {
+  const service = await backend(page, 'Admin', false, { records: [
+    { record_type: 'document_maintenance', record_id: 'default', created_at: createdAt, payload: { id: 'default', validityYears: {}, reminderDays: [60, 30], dailyFinalDays: 30 } },
+    { record_type: 'partner_company', record_id: 'local-supporting', created_at: createdAt,
+      payload: { id: 'local-supporting', name: 'Local Supporting Supplier', type: 'Supplier', supplierOrigin: 'Local', businessClassification: 'CORP', createdAt,
+        branches: [{ id: 'local-supporting-branch', bpCode: 'LOC-1', documents: { 'Other Documents': { provided: false } } }] } },
+  ] });
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/document-tracker?category=supplier-local');
+  const company = page.getByRole('article').filter({ hasText: 'Local Supporting Supplier' });
+  await company.getByRole('button', { name: 'Expand documents for Local Supporting Supplier (LOC-1)' }).click();
+  const required = company.getByRole('region', { name: 'Required documents', exact: true });
+  await expect(required.getByRole('listitem')).toHaveCount(13);
+  await expect(required.getByText('Other Documents', { exact: true })).toHaveCount(0);
+  const history = company.getByRole('region', { name: 'Historical & additional', exact: true });
+  await expect(history.getByRole('listitem').filter({ hasText: 'Other Documents' })).toHaveCount(1);
+  const actions = company.getByRole('region', { name: 'Supplier document actions', exact: true });
+  const attentionSummary = actions.getByLabel('Required document attention summary');
+  const attentionBox = await attentionSummary.boundingBox();
+  const addButtonBox = await actions.getByRole('button', { name: 'Add Other Document', exact: true }).boundingBox();
+  const requiredHeadingBox = await required.locator('h3').boundingBox();
+  expect(attentionBox && addButtonBox && requiredHeadingBox).not.toBeNull();
+  expect(attentionBox!.x + attentionBox!.width).toBeLessThan(addButtonBox!.x);
+  expect(Math.abs(attentionBox!.y - addButtonBox!.y)).toBeLessThan(5);
+  expect(requiredHeadingBox!.y).toBeGreaterThan(attentionBox!.y + attentionBox!.height);
+  await actions.getByRole('button', { name: 'Add Other Document', exact: true }).click();
+  await actions.getByLabel('Document name').fill('Safety Certificate');
+  await actions.getByRole('button', { name: 'Add', exact: true }).click();
+  const addedDocument = history.getByRole('listitem').filter({ hasText: 'Other: Safety Certificate' });
+  await expect(addedDocument).toHaveCount(1);
+  const menuButton = addedDocument.getByRole('button', { name: 'Actions for Other: Safety Certificate', exact: true });
+  await menuButton.click();
+  const verifyAction = page.getByRole('menuitem', { name: 'Verify and mark current' });
+  await expect(verifyAction).toBeVisible();
+  await verifyAction.click();
+  await expect(page.getByText('Verify Other: Safety Certificate', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Remove supporting document' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Remove supporting document' }).click();
+  await page.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(history.getByRole('listitem').filter({ hasText: 'Other: Safety Certificate' })).toHaveCount(0);
+  expect(service.records.filter(record => record.record_type === 'document_modification')).toHaveLength(2);
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
 });
 
 test('Document reminder failures and missing setup stay visible and recover through Retry', async ({ page }) => {
@@ -911,6 +1247,7 @@ test('Dashboard separates official submissions, scores and evaluation progress a
   }
   await page.goto('/login');
   await signIn(page);
+  await waitForReadyPage(page);
   const forms = page.getByRole('table', { name: 'Evaluation forms in progress' });
   const results = page.getByRole('table', { name: 'Average partner evaluation score by type' });
   await expect(forms.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();
@@ -1459,6 +1796,161 @@ const evaluationForm = {
   questions: [{ questionId: 'Q1', questionNumber: 1, question: 'Service quality?', questionCategory: 'Quality' }],
 };
 
+test('Send Form selects recipients with search and select all, and persists only after approval', async ({ page, browser }, testInfo) => {
+  const service = await backend(page);
+  const chosen = 'chosen.employee@mgenesis.com';
+  const other = 'other.employee@mgenesis.com';
+  for (const recipientEmail of [chosen, other, 'third.employee@mgenesis.com']) {
+    service.profiles.push({ ...service.profiles[0], email: recipientEmail, role: 'Employee' });
+  }
+  service.records[0].payload.type = 'Subcontractor';
+  service.records.push({ record_type: 'survey', record_id: evaluationForm.id, created_at: createdAt,
+    payload: { ...evaluationForm, surveyType: 'Subcontractor', status: 'Paused' } });
+  const saved = () => service.records.find(row => row.record_type === 'survey')!.payload;
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/evaluation-workspace');
+  await page.getByTitle('Preview and send form', { exact: true }).click();
+  await page.getByRole('button', { name: 'Send Form', exact: true }).click();
+  const review = page.getByRole('dialog', { name: 'Confirm form distribution' });
+  const all = review.getByRole('checkbox', { name: 'Select all eligible employees', exact: true });
+  const search = review.getByRole('searchbox', { name: 'Search recipients', exact: true });
+  await expect(all).toBeChecked();
+  await all.uncheck();
+  await expect(review.getByRole('button', { name: 'Confirm & Make Available' })).toBeDisabled();
+  await search.fill('no-matching-employee');
+  await expect(review.getByText('No employees match your search.')).toBeVisible();
+  await search.fill('chosen.employee');
+  await review.getByRole('checkbox', { name: `Send to ${chosen}`, exact: true }).check();
+  await search.fill('other.employee');
+  await review.getByRole('checkbox', { name: `Send to ${other}`, exact: true }).check();
+  await expect(review.getByText('2 of 3 employees selected')).toBeVisible();
+  // Select all means every eligible employee, even while a search is active.
+  await all.check();
+  await expect(review.getByText('3 of 3 employees selected')).toBeVisible();
+  await all.uncheck();
+  await search.fill('chosen.employee');
+  await review.getByRole('checkbox', { name: `Send to ${chosen}`, exact: true }).check();
+  await search.fill('');
+  expect(saved()).not.toHaveProperty('distributionRecipientEmails');
+  if (page.viewportSize()!.width < 640) {
+    await expect(review.getByRole('columnheader', { name: 'Department', exact: true })).toHaveCount(0);
+    await expect(review.getByText('TASS · Rank & File', { exact: true }).first()).toBeVisible();
+  }
+  expect(await review.getByRole('table').evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('send-form-recipient-selection.png'), fullPage: true });
+  const bounds = await review.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await review.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toBeVisible();
+  await page.getByRole('button', { name: /Continue Editing/i }).click();
+  await expect(review.getByRole('checkbox', { name: `Send to ${chosen}`, exact: true })).toBeChecked();
+  await review.getByRole('button', { name: 'Confirm & Make Available' }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Proceed with sending?' });
+  await expect(confirmation).toContainText('1 selected employee');
+  service.failures.surveyWrites = true;
+  await confirmation.getByRole('button', { name: 'Yes, proceed' }).click();
+  await expect(confirmation.getByRole('alert')).toContainText('Synthetic survey write rejected');
+  expect(saved()).not.toHaveProperty('distributionRecipientEmails');
+  service.failures.surveyWrites = false;
+  await confirmation.getByRole('button', { name: 'Yes, proceed' }).click();
+  await expect(confirmation).toHaveCount(0);
+  expect(saved().distributionRecipientEmails).toEqual([chosen]);
+  await page.reload();
+  expect(saved().distributionRecipientEmails).toEqual([chosen]);
+  await page.getByTitle('Preview and send form', { exact: true }).click();
+  await page.getByRole('button', { name: 'Send Form', exact: true }).click();
+  await expect(review.getByRole('checkbox', { name: `Send to ${chosen}`, exact: true })).toBeChecked();
+  await expect(review.getByRole('checkbox', { name: `Send to ${other}`, exact: true })).not.toBeChecked();
+  const employeeContext = await browser.newContext();
+  try {
+    const employeePage = await employeeContext.newPage();
+    await backend(employeePage, 'Employee', false, { records: service.records });
+    await employeePage.goto('/login'); await signIn(employeePage, 'Employee');
+    await employeePage.getByRole('button', { name: 'Pending Survey Reminders', exact: true }).click();
+    await expect(employeePage.getByText('No pending surveys', { exact: true })).toBeVisible();
+  } finally { await employeeContext.close(); }
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
+});
+
+test('completed employee evaluations enter the open Admin leaderboard immediately and survive reload', async ({ page, browser }, testInfo) => {
+  test.setTimeout(90_000);
+  const sockets: Array<{ ws: WebSocketRoute; topic: string; joinRef: string; id: number }> = [];
+  const connect = async (clientPage: Page) => clientPage.routeWebSocket('**/realtime/v1/**', ws => {
+    ws.onClose(() => {
+      for (let i = sockets.length - 1; i >= 0; i--) if (sockets[i].ws === ws) sockets.splice(i, 1);
+    });
+    ws.onMessage(message => {
+      const [joinRef, ref, topic, event, payload] = JSON.parse(String(message));
+      if (event === 'phx_join') {
+        const filters = (payload.config?.postgres_changes ?? []).map((filter: Record<string, unknown>, i: number) => ({ ...filter, id: i + 1 }));
+        const id = filters.find((filter: Record<string, unknown>) => filter.table === 'application_records')?.id;
+        if (id) sockets.push({ ws, topic, joinRef, id });
+        ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', { status: 'ok', response: { postgres_changes: filters } }]));
+      } else if (event === 'heartbeat' || event === 'phx_leave') {
+        ws.send(JSON.stringify([joinRef, ref, topic, 'phx_reply', { status: 'ok', response: {} }]));
+      }
+    });
+  });
+  const publish = (record: SyntheticRecord) => sockets.forEach(socket => socket.ws.send(JSON.stringify([
+    socket.joinRef, null, socket.topic, 'postgres_changes', { ids: [socket.id], data: {
+      schema: 'public', table: 'application_records', type: 'INSERT', commit_timestamp: new Date().toISOString(),
+      columns: [], record, old_record: {}, errors: [],
+    } },
+  ])));
+  await connect(page);
+  const admin = await backend(page, 'Admin', false, { onWrite: publish });
+  const form = { ...evaluationForm, questions: [{ questionId: 'Q01', questionNumber: 1,
+    question: 'Delivery reliability', questionCategory: 'Delivery' }] };
+  admin.records.push({ record_type: 'survey', record_id: form.id, created_at: createdAt, payload: form });
+  admin.records.push({ record_type: 'survey_response', record_id: 'RESP-old-test:Q01', created_at: createdAt,
+    payload: { responseId: 'RESP-old-test', surveyId: form.id, company: 'Excluded test partner', surveyType: 'Courier',
+      respondentType: 'Rank & File', respondentEmail: email, department: 'TASS', submissionDate: createdAt,
+      questionId: 'Q01', questionNumber: 1, question: 'Delivery', questionCategory: 'Delivery', rating: 15,
+      comment: '', dataSource: 'test_submission' } });
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/analytics');
+  await expect(page.getByRole('heading', { name: 'No analytics available' })).toBeVisible();
+  const employeeContext = await browser.newContext({ baseURL: 'http://127.0.0.1:4173', viewport: page.viewportSize()!, isMobile: Boolean(testInfo.project.use.isMobile) });
+  try {
+    const employee = await employeeContext.newPage();
+    await connect(employee);
+    const employeeService = await backend(employee, 'Employee', false, { records: admin.records, onWrite: publish });
+    await employee.goto('/login'); await signIn(employee, 'Employee');
+    await expect.poll(() => sockets.length).toBe(2);
+    await employee.getByRole('button', { name: 'Start courier evaluation for Synthetic Courier', exact: true }).first().click();
+    await employee.getByRole('button', { name: 'Proceed to Form Questions', exact: true }).click();
+    await employee.getByRole('radiogroup', { name: 'Rating for question 1' }).getByRole('radio', { name: '0', exact: true }).click();
+    await employee.getByPlaceholder('Enter your answer', { exact: true }).fill('Delivery needs improvement.');
+    await employee.getByRole('button', { name: 'Review answers', exact: true }).click();
+    await expect(employee.getByRole('region', { name: 'Evaluation answers' })).toBeVisible();
+    employeeService.failures.responseWrites = true;
+    await employee.getByRole('button', { name: 'Submit evaluation', exact: true }).click();
+    await expect(employee.getByText('Unable to save survey_response records: Synthetic evaluation save rejected', { exact: true })).toBeVisible();
+    await expect(employee.getByRole('heading', { name: 'Thank you for your feedback' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'No analytics available' })).toBeVisible();
+    expect(admin.records.filter(record => record.record_type === 'survey_response')).toHaveLength(1);
+    employeeService.failures.responseWrites = false;
+    await employee.getByRole('button', { name: 'Submit evaluation', exact: true }).click();
+    await expect(employee.getByRole('heading', { name: 'Thank you for your feedback' })).toBeVisible();
+    const saved = admin.records.filter(record => record.record_type === 'survey_response' && record.payload.dataSource === 'app_submission');
+    expect(saved).toHaveLength(2);
+    expect(saved.find(record => record.payload.questionId === 'Q01')?.payload).toMatchObject({ companyId: 'synthetic-courier', respondentEmail: email, rating: 0 });
+    const leaderboard = page.locator('section[aria-labelledby="company-leaderboard-heading"]');
+    await expect(leaderboard.getByRole('button', { name: /Synthetic Courier/ })).toBeVisible();
+    await expect(leaderboard).not.toContainText('Excluded test partner');
+    await page.screenshot({ path: testInfo.outputPath('employee-evaluation-admin-leaderboard.png'), fullPage: true });
+    await employee.getByRole('button', { name: 'My submissions', exact: true }).click();
+    await expect(employee.getByRole('main')).toContainText('Synthetic Courier');
+    await page.reload();
+    await expect(leaderboard.getByRole('button', { name: /Synthetic Courier/ })).toBeVisible();
+    expect(admin.unexpected).toEqual([]); expect(admin.errors).toEqual([]);
+    expect(employeeService.unexpected).toEqual([]); expect(employeeService.errors).toEqual([]);
+  } finally {
+    await employeeContext.close();
+  }
+});
+
 test('Archived report builders select one item, update the document preview and retain export scope', async ({ page }, testInfo) => {
   test.setTimeout(90_000);
   const service = await backend(page);
@@ -1564,16 +2056,41 @@ test('Archived report builders select one item, update the document preview and 
   await openBuilder('Archived Response Report');
   await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-one');
   await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
+  const leaderboard = preview.getByRole('table', { name: 'Company leaderboard', exact: true });
+  await expect(leaderboard.getByRole('row')).toHaveCount(3);
+  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(0)).toHaveText('1');
+  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(1)).toHaveText('Synthetic Courier');
+  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(2)).toHaveText('2');
+  await leaderboard.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('archived-batch-leaderboard.png'), fullPage: true, animations: 'disabled' });
   await page.getByLabel('Include respondent comments', { exact: true }).check();
-  await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption('csv');
-  const csvDownload = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download report', exact: true }).click();
-  const csv = await readFile((await (await csvDownload).path())!, 'utf8');
-  expect(csv).toContain("'=SUM(1,1)");
-  expect(csv).not.toContain('a-three');
-  expect(csv).not.toContain('private@example.test');
+  for (const format of ['pdf', 'docx', 'excel', 'csv']) {
+    await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption(format);
+    const csvDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download report', exact: true }).click();
+    const bytes = await readFile((await (await csvDownload).path())!);
+    if (format === 'excel') {
+      const workbook = XLSX.read(bytes);
+      const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Company leaderboard'], { header: 1 });
+      expect(rows[0]).toEqual(['Rank', 'Company', 'Submissions', 'Score', 'Rating']);
+      expect((rows[1] as unknown[]).slice(0, 3)).toEqual([1, 'Synthetic Courier', 2]);
+    } else if (format === 'docx') {
+      const archive = XLSX.CFB.read(bytes, { type: 'buffer' });
+      const xml = XLSX.CFB.find(archive, '/word/document.xml')!;
+      expect(Buffer.from(xml.content as Uint8Array).toString()).toContain('Company leaderboard');
+    } else if (format === 'pdf') expect(bytes.toString('latin1')).toContain('Company leaderboard');
+    else {
+      const csv = bytes.toString();
+      expect(csv).toContain('Rank,Company,Submissions,Score,Rating');
+      expect(csv).toContain("'=SUM(1,1)");
+      expect(csv).not.toContain('a-three');
+      expect(csv).not.toContain('private@example.test');
+    }
+  }
   await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-two');
   await expect(preview.getByRole('row', { name: 'Stored submissions 1', exact: true })).toBeVisible();
+  await expect(leaderboard.getByRole('row')).toHaveCount(2);
+  await expect(leaderboard).not.toContainText('Second archived courier');
   await page.getByRole('button', { name: 'Back to Reports', exact: true }).click();
   await openBuilder('Archived Company Report');
   await page.getByRole('combobox', { name: 'Archived company', exact: true }).selectOption('synthetic-courier');
@@ -1586,7 +2103,7 @@ test('Archived report builders select one item, update the document preview and 
   await page.screenshot({ path: testInfo.outputPath('archived-company-builder-empty.png'), fullPage: true, animations: 'disabled' });
   await page.reload();
   await page.getByRole('tab', { name: 'History', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(7);
   expect(service.records[0].payload.isArchived).toBe(true);
   expect(service.records.find(record => record.record_type === 'survey')?.payload.status).toBe('Archived');
   expect(service.unexpected).toEqual([]);

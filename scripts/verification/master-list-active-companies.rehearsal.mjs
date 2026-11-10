@@ -10,17 +10,22 @@ const db = new PGlite();
 try {
   await db.exec(`
     create role anon; create role authenticated;
+    create schema private;
+    revoke all on schema private from public, anon;
+    grant usage on schema private to authenticated;
     create table public.application_records(record_type text, record_id text, payload jsonb,
       updated_at timestamptz default now(), primary key(record_type, record_id));
     alter table public.application_records enable row level security;
     grant select, insert, update, delete on public.application_records to authenticated;
     create function public.is_confirmed_mgenesis_user() returns boolean language sql
       as $$select coalesce(current_setting('test.confirmed', true), '') = 'yes'$$;
-    create function public.is_app_admin() returns boolean language sql
+    create function private.is_app_admin() returns boolean language sql
       as $$select coalesce(current_setting('test.admin', true), '') = 'yes'$$;
-    create function public.my_app_email() returns text language sql as $$select 'synthetic.admin@mgenesis.com'::text$$;
+    create function private.my_app_email() returns text language sql as $$select 'synthetic.admin@mgenesis.com'::text$$;
+    revoke all on function private.is_app_admin(), private.my_app_email() from public, anon;
+    grant execute on function private.is_app_admin(), private.my_app_email() to authenticated;
     create policy admin_write on public.application_records for all to authenticated
-      using (public.is_app_admin()) with check (public.is_app_admin());
+      using (private.is_app_admin()) with check (private.is_app_admin());
     create policy reference_read on public.application_records for select to authenticated
       using (public.is_confirmed_mgenesis_user() and record_type in ('partner_company','survey'));
     create function public.synthetic_normalization() returns trigger language plpgsql as $$begin
@@ -37,6 +42,7 @@ try {
   `);
   await db.exec(await readFile(new URL('../../supabase/migrations/202610300001_active_evaluation_lists.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../../supabase/migrations/202611060001_master_list_active_companies.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../../supabase/migrations/202611100001_master_list_company_membership.sql', import.meta.url), 'utf8'));
   await db.exec(`insert into public.application_records values
     ('partner_company','old','{"id":"old"}',now()),
     ('survey','survey','{"surveyType":"Supplier","evaluationCompanyIds":["retained"]}',now()),
@@ -69,10 +75,10 @@ try {
   assert.deepEqual(await readAll(), before, 'snapshot failure rolls back registry upserts and deletions');
   await db.exec(`set test.fail_snapshot='no'`);
   const saved = (await call(companies)).rows[0].result;
-  assert.deepEqual(saved.snapshots.map(({ surveyType, companies }) => ({ surveyType, companies })), [
-    { surveyType: 'Courier', companies: ['Partner legacy'] },
-    { surveyType: 'Supplier', companies: ['Partner empty-branches', 'Partner mixed', 'Partner pending'] },
-    { surveyType: 'Subcontractor', companies: [] },
+  assert.deepEqual(saved.snapshots.map(({ surveyType, companies, masterListCompanies }) => ({ surveyType, companies, masterListCompanies })), [
+    { surveyType: 'Courier', companies: ['Partner legacy'], masterListCompanies: ['Partner legacy', 'Partner normalized'] },
+    { surveyType: 'Supplier', companies: ['Partner empty-branches', 'Partner mixed', 'Partner pending'], masterListCompanies: ['Partner empty-branches', 'Partner inactive', 'Partner mixed', 'Partner pending'] },
+    { surveyType: 'Subcontractor', companies: [], masterListCompanies: [] },
   ]);
   assert.equal(saved.companies.find(c => c.id === 'normalized').branches[0].status, 'Completed');
   assert.equal((await db.query(`select * from public.application_records where record_type='partner_company' and record_id='old'`)).rows.length, 0);
@@ -81,9 +87,14 @@ try {
   assert.deepEqual((await db.query(`select payload from public.application_records where record_type='survey'`)).rows[0].payload.evaluationCompanyIds, ['retained']);
   await db.query(`insert into public.application_records(record_type, record_id, payload) values
     ('active_company_snapshot','manual-override', jsonb_build_object('surveyType','Supplier','companies','["Manual Supplier"]'::jsonb,'uploadedAt',clock_timestamp()))`);
-  assert.deepEqual((await db.query(`select companies from public.get_active_evaluation_lists() where survey_type='Supplier'`)).rows[0].companies, ['Manual Supplier']);
+  assert.deepEqual((await db.query(`select companies, membership_complete from public.get_active_evaluation_lists() where survey_type='Supplier'`)).rows[0],
+    { companies: ['Manual Supplier'], membership_complete: false });
   await call([company('all-inactive','Supplier',['Inactive'])]);
-  assert.deepEqual((await db.query(`select companies from public.get_active_evaluation_lists()`)).rows.map(row => row.companies), [[], [], []]);
+  assert.deepEqual((await db.query(`select survey_type, companies, membership_complete from public.get_active_evaluation_lists()`)).rows, [
+    { survey_type: 'Courier', companies: [], membership_complete: true },
+    { survey_type: 'Subcontractor', companies: [], membership_complete: true },
+    { survey_type: 'Supplier', companies: ['Partner all-inactive'], membership_complete: true },
+  ]);
   await db.exec(`set test.admin='no'`);
   assert.equal((await db.query(`select * from public.get_active_evaluation_lists()`)).rows.length, 3);
   assert.equal((await db.query(`select * from public.application_records where record_type='active_company_snapshot'`)).rows.length, 0);

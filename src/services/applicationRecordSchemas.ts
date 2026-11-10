@@ -132,6 +132,18 @@ function parsePartnerCompany(value: unknown, recordId: string, label: string): J
           optionalDate(parsedDocument.expiryDate, `${label}.documents.${name}.expiryDate`);
           optionalText(parsedDocument.remarks, `${label}.documents.${name}.remarks`, 2_000);
           optionalText(parsedDocument.description, `${label}.documents.${name}.description`, 500);
+          if (parsedDocument.file !== undefined) {
+            const file = object(parsedDocument.file, `${label}.documents.${name}.file`);
+            text(file.storagePath, `${label}.documents.${name}.file.storagePath`, { max: 500 });
+            text(file.originalName, `${label}.documents.${name}.file.originalName`, { max: 255 });
+            text(file.contentType, `${label}.documents.${name}.file.contentType`, { max: 150 });
+            const fileSize = finiteNumber(file.fileSize, `${label}.documents.${name}.file.fileSize`);
+            if (!/^[0-9a-f-]{36}$/i.test(String(file.storagePath)) || !Number.isInteger(fileSize) || fileSize < 1 || fileSize > 10 * 1024 * 1024
+              || !['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/jpeg', 'image/png'].includes(String(file.contentType))) {
+              throw new Error(`${label}.documents.${name}.file has unsupported metadata.`);
+            }
+            isoDate(file.uploadedAt, `${label}.documents.${name}.file.uploadedAt`);
+          }
         });
       }
     });
@@ -160,11 +172,19 @@ function parseSurvey(value: unknown, recordId: string, label: string): JsonObjec
     text(parsed.questionCategory, `${label}.questions[${index}].questionCategory`, { max: 500 });
   });
   optionalStringArray(candidate.accessDepartments, `${label}.accessDepartments`, 100);
+  if (candidate.distributionRecipientEmails !== undefined) {
+    stringArray(candidate.distributionRecipientEmails, `${label}.distributionRecipientEmails`, 10_000);
+  }
+  if (Array.isArray(candidate.distributionRecipientEmails)
+    && candidate.distributionRecipientEmails.some(email => typeof email !== 'string' || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+    throw new Error(`${label}.distributionRecipientEmails must contain valid email addresses.`);
+  }
   optionalStringArray(candidate.accessRoles, `${label}.accessRoles`, 20);
   optionalStringArray(candidate.evaluationCompanyIds, `${label}.evaluationCompanyIds`, 10_000);
   // Assignment scope is derived from admin uploads at runtime, never trusted
   // from a persisted survey or written back as a competing source of truth.
-  const { activeEvaluationCompanyIds: _scope, activeEvaluationListIssue: _issue, ...persisted } = candidate;
+  const { activeEvaluationCompanyIds: _scope, uploadedEvaluationCompanyIds: _uploadedScope,
+    evaluationCompanyMembershipComplete: _membershipComplete, activeEvaluationListIssue: _issue, ...persisted } = candidate;
   return persisted;
 }
 
@@ -231,7 +251,7 @@ function parseSurveyResponse(
   optionalText(candidate.companyId, `${label}.companyId`, 500);
   optionalText(candidate.importBatchId, `${label}.importBatchId`, 2_000);
   if (candidate.dataSource !== undefined && candidate.dataSource !== null) {
-    oneOf(candidate.dataSource, ['client_csv', 'production_submission', 'test_submission'], `${label}.dataSource`);
+    oneOf(candidate.dataSource, ['client_csv', 'app_submission', 'production_submission', 'test_submission'], `${label}.dataSource`);
   }
   if (candidate.submissionDateInferredFrom !== undefined && candidate.submissionDateInferredFrom !== null) {
     oneOf(candidate.submissionDateInferredFrom, ['startTime', 'responseId', 'recordCreatedAt'], `${label}.submissionDateInferredFrom`);

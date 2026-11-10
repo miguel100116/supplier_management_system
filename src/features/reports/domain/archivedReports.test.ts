@@ -64,6 +64,29 @@ test('empty, missing, restored or wrong-category selections fail closed without 
   assert.throws(() => buildArchivedReport(input, selection), /Select an available/);
 });
 
+test('response archive leaderboards rank only the selected batch using canonical scores and ties', () => {
+  const selected = [row('a'), row('b', { companyId: 'b', company: 'Beta', rating: 0 }),
+    row('c', { companyId: 'c', company: 'Alpha', rating: 0, dataSource: 'test_submission' }),
+    row('blank', { companyId: 'blank', company: 'Blank', rating: 'N/A' })];
+  const input = data([...selected, row('other-batch', { seriesId: 'half-two', companyId: 'b', company: 'Beta' }),
+    row('active', { archived: false, companyId: 'b', company: 'Beta' }), row('other-category', { surveyType: 'Supplier' })]);
+  const before = JSON.stringify(input);
+  const report = buildArchivedReport(input, { ...selection, kind: 'archived-responses', itemId: 'half-one' });
+  const leaderboard = report.tables.find(table => table.title === 'Company leaderboard')!;
+  assert.deepEqual(leaderboard.columns, ['Rank', 'Company', 'Submissions', 'Score', 'Rating']);
+  const expected = getAnalyticsCompanyRankings(selected, ['Courier']);
+  assert.deepEqual(leaderboard.rows.map(cells => cells.slice(0, 4)), expected.map((r, i) => [i + 1, r.name, r.count, formatAnalyticsScore('Courier', r.rankScore)]));
+  assert.deepEqual(leaderboard.rows.map(cells => cells[1]), ['Sample Courier', 'Alpha', 'Beta']);
+  assert.equal(JSON.stringify(input), before);
+});
+
+test('blank-only response batches remain exportable without fabricated leaderboard ranks', () => {
+  const report = buildArchivedReport(data([row('blank', { rating: 'N/A' })]), { ...selection, kind: 'archived-responses', itemId: 'half-one' });
+  assert.deepEqual(report.tables.find(table => table.title === 'Company leaderboard')?.rows, []);
+  assert.equal(report.canExport, true);
+  assert.equal(report.rowCount, 1);
+});
+
 test('legacy attribution uses original IDs, archive IDs and all known forms to prevent ambiguity', () => {
   const input = data([row('archive-link', { surveyId: undefined, archivedBySurveyId: survey.id }), row('ambiguous', { surveyId: undefined })]);
   input.surveys = [survey];

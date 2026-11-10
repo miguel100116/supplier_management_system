@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, ClipboardCheck, FileText, Inbox } from 'lucide-react';
+import { Bell, CheckCheck, ClipboardCheck, FileText, Inbox } from 'lucide-react';
 import { ResponseNotification } from '../../../types/survey';
 import { isDocumentNotification, notificationAge } from '../domain/notificationPresentation';
 import { useNotificationClock } from '../hooks/useNotificationClock';
@@ -11,6 +11,8 @@ interface NotificationBellProps {
   unreadNotificationIds: ReadonlySet<string>;
   onOpen: () => void;
   onViewAll: () => void;
+  onMarkAllRead: () => void;
+  onSelectNotification: (notification: ResponseNotification) => void;
   appearance?: 'brand' | 'neutral';
 }
 
@@ -27,7 +29,7 @@ function formatExpiryDate(date?: string): string {
   return Number.isNaN(parsed.getTime()) ? 'date unavailable' : parsed.toLocaleDateString();
 }
 
-export function NotificationBell({ notifications, unreadCount, unreadNotificationIds, onOpen, onViewAll, appearance = 'brand' }: NotificationBellProps) {
+export function NotificationBell({ notifications, unreadCount, unreadNotificationIds, onOpen, onViewAll, onMarkAllRead, onSelectNotification, appearance = 'brand' }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const now = useNotificationClock(isOpen);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,7 +82,16 @@ export function NotificationBell({ notifications, unreadCount, unreadNotificatio
               <Bell size={16} className="text-[#2187CD]" aria-hidden="true" />
               <span>Recent activity</span>
             </p>
-            <span className="shrink-0 rounded-md bg-blue-50 px-2 py-1 text-[10px] font-medium text-[#2187CD] dark:bg-blue-950/50">{unreadCount} unread</span>
+            <button
+              type="button"
+              onClick={onMarkAllRead}
+              disabled={unreadCount === 0}
+              className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-[#2187CD] transition hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2187CD] disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-blue-950/50"
+              aria-label="Mark all notifications as read"
+            >
+              <CheckCheck size={13} aria-hidden="true" />
+              <span>Mark all as read</span>
+            </button>
           </div>
 
           {notifications.length === 0 ? (
@@ -115,7 +126,15 @@ export function NotificationBell({ notifications, unreadCount, unreadNotificatio
 
                 return (
                   <li key={item.id} className="transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <div className="flex items-start gap-3 px-4 py-3.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOpen(false);
+                        onSelectNotification(item);
+                      }}
+                      className="flex w-full items-start gap-3 px-4 py-3.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2187CD]"
+                      aria-label={`Open ${isDocumentAlert ? 'documents' : 'feedback'} for ${item.company}`}
+                    >
                       <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${iconClass}`} aria-hidden="true">
                         {isDocumentAlert ? <FileText size={15} /> : <ClipboardCheck size={15} />}
                       </div>
@@ -135,7 +154,7 @@ export function NotificationBell({ notifications, unreadCount, unreadNotificatio
                           {!isDocumentAlert && ` · ${item.questionCount} question${item.questionCount === 1 ? '' : 's'} answered`}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   </li>
                 );
               })}

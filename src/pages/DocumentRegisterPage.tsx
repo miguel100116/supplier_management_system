@@ -3,14 +3,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useModalEscape } from '../hooks/useModalEscape';
 import { Pagination } from '../components/Pagination';
-import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, Filter, ChevronRight, MoreHorizontal, FilePlus2, ArrowDownUp, CalendarClock, CircleAlert, MessageSquareText } from 'lucide-react';
+import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Users, ShieldCheck, Clock, XCircle, Gauge, LayoutGrid, Settings2, RotateCcw, AlertTriangle, History, ChevronUp, ChevronDown, BellPlus, Plus, Filter, ChevronRight, MoreHorizontal, FilePlus2, ArrowDownUp, CalendarClock, CircleAlert, MessageSquareText, Upload, Download, Trash2 } from 'lucide-react';
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin, SurveyResponse } from '../types/survey';
 import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domain/leaderboardSelection';
 import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isBranchDocumentCompliant, isNTBranch, summarizeDocumentAttention } from '../features/document-tracker/domain/compliance';
-import { COMMON_DOCUMENTS, getAvailableDocumentKeys, getRequiredDocumentKeys, isDocumentApplicableToClassification, isExpiryDocument, shouldShowHistoricalDocument } from '../features/document-tracker/domain/documentRequirements';
+import { COMMON_DOCUMENTS, getAvailableDocumentKeys, getForeignSupplierRequirement, getRequiredDocumentKeys, isDocumentApplicableToClassification, isExpiryDocument, shouldShowHistoricalDocument } from '../features/document-tracker/domain/documentRequirements';
 import { companyDocumentRemarksError } from '../features/document-tracker/domain/documentValidation';
 import { RequiredDocumentAttention, type RequiredDocumentAttentionStatus } from '../features/document-tracker/components/RequiredDocumentAttention';
+import { downloadForeignSupplierDocumentFile } from '../features/document-tracker/services/partnerDocumentFiles';
 import { DocumentModificationEntry, getDocumentModifications, logDocumentModification } from '../features/document-tracker/services/documentModificationLog';
 import { ComplianceSnapshot, getComplianceHistory, saveComplianceHistory } from '../features/document-tracker/services/complianceHistory';
 import {
@@ -35,6 +36,8 @@ interface DocumentRegisterPageProps {
   responses?: SurveyResponse[];
   categoryFromUrl?: string | null;
   onCategoryChange?: (category: string) => void;
+  initialFocusCompanyId?: string | null;
+  onInitialFocusConsumed?: () => void;
   onUpdateCompany: (company: PartnerCompany) => void;
   onRenewDocument: (
     companyId: string,
@@ -43,6 +46,8 @@ interface DocumentRegisterPageProps {
     expectedDocument: ComplianceDocument,
     nextDocument: Pick<ComplianceDocument, 'provided'> & Partial<Pick<ComplianceDocument, 'expiryDate' | 'remarks' | 'description'>>,
   ) => Promise<PartnerCompany>;
+  onUploadForeignDocumentFile?: (companyId: string, branchId: string, documentName: string, expectedDocument: ComplianceDocument, file: File) => Promise<PartnerCompany>;
+  onRemoveSupportingDocument?: (companyId: string, branchId: string, documentName: string, expectedDocument: ComplianceDocument) => Promise<PartnerCompany>;
   onUpdateDocumentRemarks?: (
     companyId: string,
     branchId: string,
@@ -178,7 +183,7 @@ const DOCUMENT_STATUS_FILTER_OPTIONS: Array<{ value: DocumentStatusFilter; label
   { value: 'Current', label: 'Current' },
   { value: 'Expiring Soon', label: 'Expiring soon' },
   { value: 'Expired', label: 'Expired' },
-  { value: 'Missing', label: 'Missing' },
+  { value: 'Missing', label: 'Pending' },
   { value: 'For Update', label: 'For update' },
 ];
 
@@ -281,12 +286,12 @@ const STATUS_CHART_COLORS: Record<string, string> = {
 // These persisted lifecycle states imply full compliance, so keep them
 // unavailable until the branch's applicable document checklist is current.
 const STATUS_STYLES: Record<string, string> = {
-  Current: 'bg-[#edf5f1] text-[#397661] border-[#d7e8df] dark:bg-[#20312b] dark:text-[#a6c9b8] dark:border-[#365246]',
+  Current: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800',
   'Expiring Soon': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
   Expired: 'bg-[#f8eeee] text-[#a45655] border-[#ecd9d7] dark:bg-[#352322] dark:text-[#dda09a] dark:border-[#69403e]',
-  'For Update': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
+  'For Update': 'bg-yellow-50 text-yellow-900 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-200 dark:border-yellow-700',
   'For Renewal': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
-  Missing: 'bg-[#f8eeee] text-rose-700 border-[#ecd9d7] dark:bg-[#352322] dark:text-rose-300 dark:border-[#69403e]',
+  Missing: 'bg-orange-50 text-orange-900 border-orange-300 dark:bg-orange-950/40 dark:text-orange-200 dark:border-orange-700',
   'Needs classification': 'bg-[#f8f3e8] text-[#896a35] border-[#eadfc8] dark:bg-[#342d21] dark:text-[#d5bd8a] dark:border-[#5b4d31]',
   'No branch': 'bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700',
 };
@@ -296,7 +301,7 @@ const DOCUMENT_STATUS_ICONS: Record<string, typeof Check> = {
   'Expiring Soon': Clock,
   Expired: AlertTriangle,
   'For Update': RefreshCw,
-  Missing: XCircle,
+  Missing: CircleAlert,
   'Needs classification': CircleAlert,
   'No branch': CircleAlert,
 };
@@ -306,8 +311,8 @@ const DOCUMENT_STATUS_DOTS: Record<string, string> = {
   Current: 'bg-[#4b8f79]',
   'Expiring Soon': 'bg-[#c3a76e]',
   Expired: 'bg-[#c86e77]',
-  Missing: 'bg-[#c86e77]',
-  'For Update': 'bg-[#ad8443]',
+  Missing: 'bg-orange-500',
+  'For Update': 'bg-yellow-500',
 };
 
 // Ordering used by the document-status sort control.
@@ -468,7 +473,7 @@ function formatShortDate(dateString?: string): string {
   }
 }
 
-export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange, partnerCompanies, responses = [], onUpdateCompany, onRenewDocument, onUpdateDocumentRemarks, canRenewDocuments, currentUserEmail = '', isAdmin = false }: DocumentRegisterPageProps) {
+export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange, initialFocusCompanyId = null, onInitialFocusConsumed, partnerCompanies, responses = [], onUpdateCompany, onRenewDocument, onUploadForeignDocumentFile, onRemoveSupportingDocument, onUpdateDocumentRemarks, canRenewDocuments, currentUserEmail = '', isAdmin = false }: DocumentRegisterPageProps) {
   const isMobile = useIsMobile();
   const [categoryKey, setCategoryKey] = useState(() => resolveDocumentCategory(categoryFromUrl));
   useEffect(() => { setCategoryKey(resolveDocumentCategory(categoryFromUrl)); }, [categoryFromUrl]);
@@ -522,7 +527,12 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isSortPopoverOpen, setIsSortPopoverOpen] = useState(false);
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [addingSupportingFor, setAddingSupportingFor] = useState<string | null>(null);
+  const [supportingDocumentName, setSupportingDocumentName] = useState('');
+  const [supportingDocumentError, setSupportingDocumentError] = useState('');
+  const [pendingFocusCompanyId, setPendingFocusCompanyId] = useState<string | null>(null);
   const [requiredDocumentStatus, setRequiredDocumentStatus] = useState<RequiredDocumentAttentionStatus | null>(null);
+  const preservePendingStatusOnNextExpandRef = useRef(false);
   const [openDocumentPopoverKey, setOpenDocumentPopoverKey] = useState<string | null>(null);
   const rowExpandHoverTimerRef = useRef<number | null>(null);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
@@ -766,7 +776,13 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   };
   useEffect(() => () => cancelRowExpandHover(), []);
   useEffect(() => { setOpenDocumentPopoverKey(null); }, [expandedRowKey]);
-  useEffect(() => { setRequiredDocumentStatus(null); }, [categoryKey, expandedRowKey]);
+  useEffect(() => {
+    if (preservePendingStatusOnNextExpandRef.current) {
+      preservePendingStatusOnNextExpandRef.current = false;
+      return;
+    }
+    setRequiredDocumentStatus(null);
+  }, [categoryKey, expandedRowKey]);
 
   const toggleDocumentStatusFilter = (status: DocumentStatusFilter) => {
     const next = documentStatusFilters.includes(status)
@@ -884,8 +900,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         getRequiredDocumentKeys(row.company.type, row.company.supplierOrigin, row.company.businessClassification).map((docName) => {
           const branch = row.branch;
           const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
-          const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName);
-          return { docName, status, daysLeft, doc, branch, expiryBased: isExpiryDocument(docName), inactiveClassification: false };
+          const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName, row.company);
+          return { docName, status, daysLeft, doc, branch, expiryBased: isExpiryDocument(docName, row.company.type, row.company.supplierOrigin), inactiveClassification: false };
         })
       );
     });
@@ -909,6 +925,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         row.branch?.bpCode?.toLowerCase().includes(q)
       );
     }
+    if (initialFocusCompanyId) list = list.filter((row) => row.company.id === initialFocusCompanyId);
     if (documentStatusFilters.length > 0) {
       list = list.filter((row) => matchesDocumentFilters(
         matrixCellData.get(row.key) ?? [],
@@ -1022,7 +1039,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       const cmp = primary !== 0 ? primary : fallback(a, b);
       return sortDirection === 'asc' ? cmp : -cmp;
     });
-  }, [displayRows, searchQuery, documentStatusFilters, customFilterRows, matrixCellData, sortKeys, sortDirection]);
+  }, [displayRows, searchQuery, documentStatusFilters, customFilterRows, matrixCellData, sortKeys, sortDirection, initialFocusCompanyId]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const paginatedRows = useMemo(() => {
@@ -1033,6 +1050,37 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   useEffect(() => {
     setCurrentPage(1);
   }, [categoryKey, searchQuery, documentStatusFilters, customFilterRows, sortKeys, sortDirection, includeInactiveCompanies, withinTop20]);
+
+  useEffect(() => {
+    if (!initialFocusCompanyId) return;
+    const company = partnerCompanies.find((item) => item.id === initialFocusCompanyId);
+    if (!company) return;
+    const companyCategory = DOCUMENT_CATEGORIES.find((category) =>
+      category.type === company.type && (category.type !== 'Supplier' || (company.supplierOrigin ?? 'Local') === category.origin)
+    )?.key ?? 'all';
+    setCategoryKey(companyCategory);
+    onCategoryChange?.(companyCategory);
+    setSearchQuery(company.name);
+    setDocumentStatusFilters(['Missing']);
+    setIncludeInactiveCompanies(true);
+    setWithinTop20(false);
+    setCustomFilterRows([]);
+    setCurrentPage(1);
+    setPendingFocusCompanyId(company.id);
+  }, [initialFocusCompanyId, partnerCompanies]);
+
+  useEffect(() => {
+    if (!pendingFocusCompanyId) return;
+    const targetRow = rows.find((row) => row.company.id === pendingFocusCompanyId);
+    if (!targetRow) return;
+    if (isAdmin && categoryKey === 'supplier-local') {
+      preservePendingStatusOnNextExpandRef.current = true;
+      setRequiredDocumentStatus('Missing');
+    }
+    setExpandedRowKey(targetRow.key);
+    setPendingFocusCompanyId(null);
+    onInitialFocusConsumed?.();
+  }, [rows, pendingFocusCompanyId, onInitialFocusConsumed, isAdmin, categoryKey]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, pageCount));
@@ -1080,11 +1128,11 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       expiringSoonDocs += summary.expiringSoonCount;
       expiredDocs += summary.expiredCount + summary.forUpdateCount;
 
-      getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification).filter(isExpiryDocument).forEach((docName) => {
+      getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification).filter((docName) => isExpiryDocument(docName, c.type, c.supplierOrigin)).forEach((docName) => {
         const branches = visibleBranches.length ? visibleBranches : [undefined];
         branches.forEach((branch) => {
           const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
-          const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName);
+          const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName, c);
 
           if (status === 'Expiring Soon' || status === 'Expired' || status === 'For Update') {
             attentionStatuses.push({ documentName: docName, status });
@@ -1174,6 +1222,21 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     const suggested = new Date(effectiveNow);
     if (!doc?.expiryDate && typeof validityYears === 'number') suggested.setFullYear(suggested.getFullYear() + validityYears);
     return doc?.expiryDate || (Number.isFinite(suggested.getTime()) ? suggested.toISOString().slice(0, 10) : currentDateStr);
+  };
+
+  const saveSupportingDocument = async (company: PartnerCompany, branch: BranchRecord) => {
+    const label = supportingDocumentName.trim();
+    if (!label || label.length > 120) { setSupportingDocumentError('Enter a name up to 120 characters.'); return; }
+    const documentName = `Other: ${label}`;
+    if (branch.documents?.[documentName]) { setSupportingDocumentError('A supporting document with that name already exists for this branch.'); return; }
+    setSupportingDocumentError('');
+    try {
+      await onRenewDocument(company.id, branch.id, documentName, {}, { provided: false, description: label });
+      setSupportingDocumentName('');
+      setAddingSupportingFor(null);
+    } catch {
+      setSupportingDocumentError('Could not add the supporting document. Please try again.');
+    }
   };
 
   const renewDocument = async (company: PartnerCompany, branch: BranchRecord, docName: string, expiryDate: string): Promise<string | void> => {
@@ -2021,6 +2084,8 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             const missingCount = cells.filter((cell) => cell.status === 'Missing').length;
             const requiredAttention = { missing: missingCount, expired: expiredCount, forUpdate: updateCount };
             const classificationRequired = row.company.type !== 'Uncategorized' && !(row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign') && !row.company.businessClassification;
+            const isForeignSupplier = row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign';
+            const isLocalSupplier = row.company.type === 'Supplier' && (row.company.supplierOrigin ?? 'Local') === 'Local';
             const needsAttention = expiredCount + expiringCount + updateCount + missingCount + Number(classificationRequired);
             const isExpanded = expandedRowKey === row.key;
             const canFilterRequiredDocuments = isAdmin && categoryKey === 'supplier-local';
@@ -2030,13 +2095,14 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               : row.company.type;
             const groups = [
               { label: 'Required documents', isRequired: true, documents: requiredStatusFilter ? cells.filter(cell => cell.status === requiredStatusFilter) : cells },
-              { label: 'Historical & additional', isRequired: false, documents: Object.entries(row.branch?.documents ?? {})
+              { label: isForeignSupplier ? 'Additional' : 'Historical & additional', isRequired: false, documents: Object.entries(row.branch?.documents ?? {})
                 .filter(([name]) => !cells.some((cell) => cell.docName === name))
+                .filter(([name]) => !isForeignSupplier || name.startsWith('Other: '))
                 .filter(([name]) => shouldShowHistoricalDocument(name, row.company.type, row.company.supplierOrigin, row.company.businessClassification))
-                .map(([docName, doc]) => ({ docName, doc, branch: row.branch, expiryBased: isExpiryDocument(docName),
+                .map(([docName, doc]) => ({ docName, doc, branch: row.branch, expiryBased: isExpiryDocument(docName, row.company.type, row.company.supplierOrigin),
                   inactiveClassification: !(row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign')
                     && !isDocumentApplicableToClassification(docName, row.company.businessClassification),
-                  ...computeDocumentStatus(doc, effectiveNow, docName) })) },
+                  ...computeDocumentStatus(doc, effectiveNow, docName, row.company) })) },
             ].filter((group) => group.isRequired || (!requiredStatusFilter && group.documents.length > 0));
             return (
               <article key={row.key} className="rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.025] dark:border-slate-800 dark:bg-slate-950">
@@ -2048,7 +2114,15 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     <ChevronRight size={17} className={'transition-transform duration-150 ' + (isExpanded ? 'rotate-90' : '')} aria-hidden="true" />
                   </button>
                   <div className="col-start-2 row-start-1 min-w-0 xl:col-start-2 xl:row-auto">
-                    <div title={row.company.name} className="block w-full break-words text-left text-sm !font-bold leading-5 text-[#1c2f4b] dark:text-slate-100 xl:truncate">{row.company.name}</div>
+                    <button
+                      type="button"
+                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} documents for ${row.company.name}${row.branch?.bpCode ? ` (${row.branch.bpCode})` : ''}`}
+                      title={isExpanded ? 'Collapse documents' : 'Expand documents'}
+                      aria-expanded={isExpanded}
+                      aria-controls={isExpanded ? 'documents-' + row.key : undefined}
+                      onClick={() => { cancelRowExpandHover(); setExpandedRowKey(isExpanded ? null : row.key); }}
+                      className="block w-full break-words rounded-sm text-left text-sm !font-bold leading-5 text-[#1c2f4b] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#346f91] dark:text-slate-100 xl:truncate"
+                    >{row.company.name}</button>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400 xl:flex-nowrap">
                       <span className="whitespace-nowrap font-mono">{row.branch?.bpCode || 'No BP Code'}</span>
                       {row.isSplit && <span className="whitespace-nowrap">{row.isNT ? 'Non-Trade branch' : 'Trade branch'}</span>}
@@ -2084,7 +2158,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                   </div>
                   <div className="col-span-2 row-start-4 flex min-h-12 min-w-0 w-full flex-col items-start justify-center gap-y-1 text-xs xl:col-span-1 xl:col-start-7 xl:row-auto" aria-label={needsAttention + ' compliance items need attention'}>
                     {needsAttention === 0 ? (
-                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-emerald-700 dark:text-emerald-400"><Check size={14} /> All current</span>
+                      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap font-medium text-emerald-800 dark:text-emerald-300 ${isForeignSupplier ? 'min-h-7 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 dark:border-emerald-800 dark:bg-emerald-950/30' : ''}`}><span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white dark:bg-emerald-500"><Check size={11} strokeWidth={3} aria-hidden="true" /></span>All current</span>
                     ) : (
                       <div className="w-full">
                         {classificationRequired && (
@@ -2094,7 +2168,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                           </span>
                         )}
                         {(expiredCount > 0 || expiringCount > 0 || updateCount > 0 || missingCount > 0) && (
-                          <div className={`ml-auto grid w-[15rem] grid-cols-[max-content_max-content] items-center justify-start gap-x-6 gap-y-1.5 ${classificationRequired ? 'mt-1.5' : ''}`}>
+                          <div className={`flex w-full flex-wrap items-center justify-start gap-x-6 gap-y-1.5 ${classificationRequired ? 'mt-1.5' : ''}`}>
                             {expiredCount > 0 && (
                               <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-rose-700 dark:text-rose-300">
                                 <AlertTriangle size={12} strokeWidth={1.8} aria-hidden="true" />
@@ -2102,25 +2176,25 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                                 <span className="font-normal">expired</span>
                               </span>
                             )}
-                            {expiringCount > 0 && (
-                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-amber-700 dark:text-amber-300">
-                                <Clock size={12} strokeWidth={1.8} aria-hidden="true" />
-                                <strong className="font-semibold tabular-nums">{expiringCount}</strong>
-                                <span className="font-normal">expiring</span>
+                            {missingCount > 0 && (
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-orange-800 dark:text-orange-200">
+                                <CircleAlert size={12} strokeWidth={1.8} aria-hidden="true" />
+                                <strong className="font-semibold tabular-nums">{missingCount}</strong>
+                                <span className="font-normal">pending</span>
                               </span>
                             )}
                             {updateCount > 0 && (
-                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-amber-700 dark:text-amber-300">
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-yellow-900 dark:text-yellow-200">
                                 <RefreshCw size={12} strokeWidth={1.8} aria-hidden="true" />
                                 <strong className="font-semibold tabular-nums">{updateCount}</strong>
                                 <span className="font-normal">for update</span>
                               </span>
                             )}
-                            {missingCount > 0 && (
-                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-rose-600 dark:text-rose-300">
-                                <XCircle size={12} strokeWidth={1.8} aria-hidden="true" />
-                                <strong className="font-semibold tabular-nums">{missingCount}</strong>
-                                <span className="font-normal">missing</span>
+                            {expiringCount > 0 && (
+                              <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-amber-700 dark:text-amber-300">
+                                <Clock size={12} strokeWidth={1.8} aria-hidden="true" />
+                                <strong className="font-semibold tabular-nums">{expiringCount}</strong>
+                                <span className="font-normal">expiring</span>
                               </span>
                             )}
                           </div>
@@ -2132,12 +2206,31 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                 {isExpanded && (
                   <div id={'documents-' + row.key} className="rounded-b-lg border-t border-slate-100 bg-slate-50/60 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/30">
                     {classificationRequired && (
-                      <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                      <p className="mb-2 rounded-md border border-[#b8d8ed] bg-[#edf7fd] px-2.5 py-2 text-[11px] text-[#155f8b] dark:border-[#28526d] dark:bg-[#102b3d] dark:text-[#a8d8f1]">
                         CORP/SOL is not set. Registration document history remains available below; set classification in Partner Details to activate the applicable requirements.
                       </p>
                     )}
-                    <RequiredDocumentAttention counts={requiredAttention} value={requiredStatusFilter}
-                      onChange={canFilterRequiredDocuments ? (status) => { setRequiredDocumentStatus(status); setOpenDocumentPopoverKey(null); } : undefined} />
+                    {!isForeignSupplier && !isLocalSupplier && <RequiredDocumentAttention counts={requiredAttention} value={requiredStatusFilter}
+                      onChange={canFilterRequiredDocuments ? (status) => { setRequiredDocumentStatus(status); setOpenDocumentPopoverKey(null); } : undefined} />}
+                    {(isForeignSupplier || isLocalSupplier) && (
+                      <section aria-label="Supplier document actions" className="mb-3">
+                        <div className="flex min-h-10 items-center justify-between gap-3 py-1">
+                          <RequiredDocumentAttention counts={requiredAttention} value={requiredStatusFilter}
+                            showStaticContainers={isForeignSupplier} className="mb-0"
+                            onChange={canFilterRequiredDocuments ? (status) => { setRequiredDocumentStatus(status); setOpenDocumentPopoverKey(null); } : undefined} />
+                          {canRenewDocuments && row.branch && !requiredStatusFilter && <button type="button" aria-expanded={addingSupportingFor === row.key} onClick={() => { setAddingSupportingFor(addingSupportingFor === row.key ? null : row.key); setSupportingDocumentName(''); setSupportingDocumentError(''); }} className="secondary-button min-h-10 shrink-0 px-3 text-xs sm:min-h-8">{addingSupportingFor === row.key ? 'Cancel' : <><Plus size={14} aria-hidden="true" />Add Other Document</>}</button>}
+                        </div>
+                        {addingSupportingFor === row.key && row.branch && (
+                          <form className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={(event) => { event.preventDefault(); void saveSupportingDocument(row.company, row.branch!); }}>
+                            <label className="min-w-0 flex-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">Document name
+                              <input autoFocus maxLength={120} value={supportingDocumentName} onChange={(event) => { setSupportingDocumentName(event.target.value); setSupportingDocumentError(''); }} placeholder="e.g. Product safety certificate" className="field mt-1 h-9 text-xs" />
+                            </label>
+                            <button type="submit" disabled={!supportingDocumentName.trim()} className="primary-button min-h-9 px-3 text-xs disabled:opacity-50">Add</button>
+                          </form>
+                        )}
+                        {supportingDocumentError && addingSupportingFor === row.key && <p role="alert" className="text-[11px] text-rose-700 dark:text-rose-300">{supportingDocumentError}</p>}
+                      </section>
+                    )}
                     <div className="grid gap-x-8 gap-y-5 xl:grid-cols-2">
                       {groups.map((group) => (
                         <section key={group.label} aria-label={group.label} className="min-w-0">
@@ -2145,27 +2238,37 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                           {group.documents.length === 0 && <p role="status" className="py-3 text-xs text-slate-500 dark:text-slate-400">No {requiredStatusFilter?.toLowerCase()} required documents.</p>}
                           <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                             {group.documents.map(({ docName, status, daysLeft, doc, branch, expiryBased, inactiveClassification }) => {
+                              const foreignRequirement = row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign' ? getForeignSupplierRequirement(docName) : undefined;
                               const Icon = DOCUMENT_STATUS_ICONS[status];
                               const dateLine = getCellDateLine(status, doc.expiryDate, daysLeft);
                               const interactive = canRenewDocuments && !!branch;
-                              const statusColor = status === 'Missing' ? 'text-rose-700 dark:text-rose-300' : status === 'Expired' ? 'text-rose-800 dark:text-rose-200' : status === 'For Update' || status === 'Expiring Soon' ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300';
-                              const statusAccent = status === 'Missing' ? 'border-l-2 border-l-rose-300 dark:border-l-rose-800' : status === 'Expired' ? 'border-l-2 border-l-rose-500 dark:border-l-rose-700' : status === 'For Update' ? 'border-l-2 border-l-amber-300 dark:border-l-amber-800' : '';
+                              const statusColor = status === 'Missing' ? 'text-orange-800 dark:text-orange-200' : status === 'Expired' ? 'text-rose-800 dark:text-rose-200' : status === 'For Update' ? 'text-yellow-900 dark:text-yellow-200' : status === 'Current' ? 'text-emerald-800 dark:text-emerald-300' : status === 'Expiring Soon' ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300';
+                              const statusAccent = status === 'Missing' ? 'border-l-2 border-l-orange-500 dark:border-l-orange-600' : status === 'Expired' ? 'border-l-2 border-l-rose-600 dark:border-l-rose-600' : status === 'For Update' ? 'border-l-2 border-l-yellow-500 dark:border-l-yellow-600' : '';
                               const canDeleteRemarks = !companyDocumentRemarksError(row.company, docName, { provided: doc.provided, expiryDate: doc.expiryDate, remarks: '' });
                               return (
                                 <li key={docName} className={`flex min-h-[76px] min-w-0 items-start justify-between gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 dark:border-slate-800 dark:bg-slate-950 ${statusAccent}`}>
                                   <div className="min-w-0 flex-1">
-                                    <div className="break-words text-xs font-medium leading-4 text-slate-800 dark:text-slate-200">{docName}</div>
+                                    <div className="break-words text-xs font-medium leading-4 text-slate-800 dark:text-slate-200">{foreignRequirement?.name ?? docName}</div>
                                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px]">
-                                      <span className={`inline-flex items-center gap-1 font-medium ${statusColor}`}><Icon size={11} strokeWidth={2.3} aria-hidden="true" />{status}</span>
+                                      <span className={`inline-flex items-center gap-1 font-medium ${statusColor}`}>{status === 'Current' ? <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white dark:bg-emerald-500"><Check size={9} strokeWidth={3} aria-hidden="true" /></span> : <Icon size={11} strokeWidth={status === 'Missing' ? 2 : 2.3} aria-hidden="true" />}{status === 'Missing' ? 'Pending' : status}</span>
                                       {dateLine && <span className="text-slate-500 dark:text-slate-400">{dateLine}</span>}
                                       {inactiveClassification && <span className="text-slate-500 dark:text-slate-400">Historical · classification inactive</span>}
                                     </div>
                                   </div>
                                   {!inactiveClassification && <DocumentQuickActions docName={docName} document={doc} status={status} companyName={row.company.name} branchName={branch?.bpCode || 'Branch'} disabled={!interactive} canDeleteRemarks={canDeleteRemarks} expiryBased={expiryBased}
+                                    foreignSupplier={row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign'}
+                                    optionalExpiryAllowed={(isForeignSupplier || isLocalSupplier) && docName.startsWith('Other: ')}
+                                    onUploadFile={onUploadForeignDocumentFile && row.company.type === 'Supplier' && row.company.supplierOrigin === 'Foreign'
+                                      && (getForeignSupplierRequirement(docName) || docName.startsWith('Other: '))
+                                      ? (file) => onUploadForeignDocumentFile(row.company.id, branch!.id, docName, doc, file)
+                                      : undefined}
+                                    onRemoveSupportingDocument={onRemoveSupportingDocument && (isForeignSupplier || isLocalSupplier) && docName.startsWith('Other: ')
+                                      ? () => onRemoveSupportingDocument(row.company.id, branch!.id, docName, doc)
+                                      : undefined}
                                     remarksAtBottom={categoryKey === 'supplier-local'}
                                     popoverKey={`${row.key}::${docName}`} openPopoverKey={openDocumentPopoverKey} onOpenPopover={setOpenDocumentPopoverKey}
                                     requireRemarks={['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)}
-                                    renewalDate={branch ? getSuggestedRenewalDate(branch, docName) : ''}
+                                    renewalDate={branch && !docName.startsWith('Other: ') ? getSuggestedRenewalDate(branch, docName) : ''}
                                     onRenew={(expiryDate) => branch ? renewDocument(row.company, branch, docName, expiryDate) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
                                     onStatus={(provided, remarks, expiryDate) => branch ? updateDocumentStatus(row.company, branch, docName, provided, remarks, expiryDate) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
                                     onRemarks={(remarks) => branch ? updateDocumentRemarks(row.company, branch, docName, remarks) : Promise.resolve('Branch no longer exists. Refresh and retry.')}
@@ -2258,7 +2361,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700'
                 }`}
               >
-                <span className="block text-xs font-bold text-slate-700 dark:text-slate-200">Missing</span>
+                <span className="block text-xs font-bold text-slate-700 dark:text-slate-200">Pending</span>
               </button>
               <button
                 type="button"
@@ -2361,11 +2464,11 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
           Missing flips this same popup into its own warning step before it applies. */}
       {expiryStatusTarget && (() => {
         const doc: ComplianceDocument = (expiryStatusTarget.branch.documents?.[expiryStatusTarget.docName] ?? {}) as ComplianceDocument;
-        const { status } = computeDocumentStatus(doc, effectiveNow, expiryStatusTarget.docName);
+        const { status } = computeDocumentStatus(doc, effectiveNow, expiryStatusTarget.docName, expiryStatusTarget.company);
         const isMissing = status === 'Missing';
         const isActive = status === 'Current' || status === 'Expiring Soon';
         const missingRemarkRequired = Boolean(companyDocumentRemarksError(expiryStatusTarget.company, expiryStatusTarget.docName, { provided: false, expiryDate: doc.expiryDate, remarks: expiryStatusTarget.missingRemarks }));
-        const statusText = isMissing ? 'Missing' : isActive ? `Active till ${formatShortDate(doc.expiryDate)}` : status === 'For Update' ? 'For Update' : 'Expired';
+        const statusText = isMissing ? 'Pending' : isActive ? `Active till ${formatShortDate(doc.expiryDate)}` : status === 'For Update' ? 'For Update' : 'Expired';
         const statusStyle = isMissing ? STATUS_STYLES.Missing : status === 'For Update' ? STATUS_STYLES['For Update'] : isActive ? STATUS_STYLES.Current : STATUS_STYLES.Expired;
 
         return createPortal(
@@ -2399,7 +2502,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     && ((expiryStatusTarget.docName === 'DTI (Sole)' && expiryStatusTarget.company.businessClassification === 'SOL')
                       || (expiryStatusTarget.docName !== 'DTI (Sole)' && expiryStatusTarget.company.businessClassification === 'CORP')) && !isMissing && (
                     <label className="mt-4 block text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                      Remarks <span className="text-rose-600">Required if marked missing</span>
+                      Remarks <span className="text-rose-600">Required if marked pending</span>
                       <textarea value={expiryStatusTarget.missingRemarks} maxLength={2000}
                         onChange={(event) => setExpiryStatusTarget((current) => current ? { ...current, missingRemarks: event.target.value } : current)}
                         rows={2} placeholder="Why is this document not provided?" className="field mt-1 resize-y py-1.5 text-xs" />
@@ -2425,13 +2528,13 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                         void markDocumentMissing(expiryStatusTarget.company, expiryStatusTarget.branch, expiryStatusTarget.docName, expiryStatusTarget.missingRemarks);
                         setExpiryStatusTarget(null);
                       }}
-                      title={isMissing ? 'Already marked as missing' : missingRemarkRequired ? 'Add required remarks first' : undefined}
-                      aria-label={`Mark ${expiryStatusTarget.docName} as missing`}
+                      title={isMissing ? 'Already marked as pending' : missingRemarkRequired ? 'Add required remarks first' : undefined}
+                      aria-label={`Mark ${expiryStatusTarget.docName} as pending`}
                       aria-disabled={missingRemarkRequired}
                       className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent px-4 py-2.5 text-xs font-bold text-slate-600 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-900 transition cursor-pointer"
                     >
                       <XCircle size={13} />
-                      <span>Mark as Missing</span>
+                      <span>Mark as Pending</span>
                     </button>
                   </div>
                 </>
@@ -2441,7 +2544,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     <span className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-amber-50 text-[#a16207] dark:bg-amber-950/40 dark:text-amber-400">
                       <AlertTriangle size={18} />
                     </span>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Confirm Mark as Missing</h3>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Confirm Mark as Pending</h3>
                   </div>
 
                   <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60 divide-y divide-slate-100 dark:divide-slate-800">
@@ -2456,12 +2559,12 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                     <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">New Status</span>
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold border ${STATUS_STYLES.Missing}`}>
-                        Missing
+                        Pending
                       </span>
                     </div>
                   </div>
 
-                  <p className="mt-3 text-center text-[11px] text-slate-400">This marks the document as missing and retains its recorded expiry for history.</p>
+                  <p className="mt-3 text-center text-[11px] text-slate-400">This marks the document as pending and retains its recorded expiry for history.</p>
 
                   <div className="flex items-center gap-2 mt-5">
                     <button onClick={() => setExpiryStatusTarget(null)} className="secondary-button flex-1 py-2 text-xs" type="button">
@@ -2723,6 +2826,10 @@ function DocumentQuickActions({
   onStatus,
   onRemarks,
   onClearRemarks,
+  foreignSupplier = false,
+  optionalExpiryAllowed = false,
+  onUploadFile,
+  onRemoveSupportingDocument,
 }: {
   docName: string;
   document: ComplianceDocument;
@@ -2742,6 +2849,10 @@ function DocumentQuickActions({
   onStatus: (provided: boolean, remarks: string, expiryDate?: string) => Promise<string | void>;
   onRemarks: (remarks: string) => Promise<string | void>;
   onClearRemarks: () => Promise<string | void>;
+  foreignSupplier?: boolean;
+  optionalExpiryAllowed?: boolean;
+  onUploadFile?: (file: File) => Promise<PartnerCompany>;
+  onRemoveSupportingDocument?: () => Promise<PartnerCompany>;
 }) {
   const [remarks, setRemarks] = useState(document.remarks ?? '');
   const [verificationRemarks, setVerificationRemarks] = useState('');
@@ -2753,9 +2864,11 @@ function DocumentQuickActions({
   const [isRemarksOpen, setIsRemarksOpen] = useState(false);
   const [isViewingRemarks, setIsViewingRemarks] = useState(false);
   const [confirmingRemarkDelete, setConfirmingRemarkDelete] = useState(false);
+  const [confirmingSupportingDocumentRemoval, setConfirmingSupportingDocumentRemoval] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [saving, setSaving] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const isOpen = openPopoverKey === popoverKey;
   const setIsOpen = (open: boolean) => onOpenPopover(open ? popoverKey : openPopoverKey === popoverKey ? null : openPopoverKey);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -2763,6 +2876,7 @@ function DocumentQuickActions({
   const remarkTriggerRef = useRef<HTMLButtonElement>(null);
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const remarkContentRef = useRef<HTMLParagraphElement>(null);
   const canEditRemark = !disabled;
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2772,11 +2886,12 @@ function DocumentQuickActions({
   };
   const scheduleHoverClose = () => {
     clearHoverClose();
+    if (window.matchMedia('(hover: none)').matches) return;
     // The panel is portalled and may move when it switches from the compact
     // menu to the remarks editor. Keep active work open across that move;
     // the outside-pointer and Escape handlers still provide dismissal.
-    if (isRemarksOpen || isViewingRemarks || confirmingRemarkDelete || isVerifying || isRenewing || saving) return;
-    hoverCloseTimer.current = setTimeout(() => { setIsOpen(false); setIsRemarksOpen(false); setIsViewingRemarks(false); setConfirmingRemarkDelete(false); }, 180);
+    if (isRemarksOpen || isViewingRemarks || confirmingRemarkDelete || confirmingSupportingDocumentRemoval || isVerifying || isRenewing || saving) return;
+    hoverCloseTimer.current = setTimeout(() => { setIsOpen(false); setIsRemarksOpen(false); setIsViewingRemarks(false); setConfirmingRemarkDelete(false); setConfirmingSupportingDocumentRemoval(false); }, 180);
   };
   useEffect(() => {
     if (!isRemarksOpen) setRemarks(document.remarks ?? '');
@@ -2810,7 +2925,7 @@ function DocumentQuickActions({
       window.removeEventListener('resize', positionPanel);
       window.removeEventListener('scroll', positionPanel, true);
     };
-  }, [isOpen, isRemarksOpen, isViewingRemarks, isVerifying, isRenewing, error, feedback, saving]);
+  }, [isOpen, isRemarksOpen, isViewingRemarks, isVerifying, isRenewing, confirmingSupportingDocumentRemoval, error, feedback, saving]);
 
   useEffect(() => {
     if (!isOpen || !isVerifying) return;
@@ -2833,6 +2948,7 @@ function DocumentQuickActions({
         setIsViewingRemarks(false);
         setIsRenewing(false);
         setConfirmingRemarkDelete(false);
+        setConfirmingSupportingDocumentRemoval(false);
       }
     };
     const dismissOnEscape = (event: KeyboardEvent) => {
@@ -2843,6 +2959,7 @@ function DocumentQuickActions({
       setIsViewingRemarks(false);
       setIsRenewing(false);
       setConfirmingRemarkDelete(false);
+      setConfirmingSupportingDocumentRemoval(false);
       (anchorRef.current ?? triggerRef.current)?.focus();
     };
     window.document.addEventListener('pointerdown', dismissOutside);
@@ -2915,7 +3032,7 @@ function DocumentQuickActions({
     if (!reviewConfirmed) return;
     if (expiryBased) {
       if (!verificationDate) { setError('Enter the verified document expiry date.'); return; }
-      if (computeDocumentStatus({ provided: true, expiryDate: verificationDate }, new Date(), docName).status !== 'Current') {
+      if (computeDocumentStatus({ provided: true, expiryDate: verificationDate }, new Date(), docName, foreignSupplier ? { type: 'Supplier', supplierOrigin: 'Foreign' } : undefined).status !== 'Current') {
         setError('The expiry date must make this document current. Use the renewal workflow for an expired document.');
         return;
       }
@@ -2956,22 +3073,80 @@ function DocumentQuickActions({
     }
   };
 
+  const uploadFile = async (file: File) => {
+    if (!onUploadFile) return;
+    setIsUploadingFile(true);
+    setError('');
+    setFeedback('');
+    try {
+      await onUploadFile(file);
+      setFeedback('File uploaded and audit recorded.');
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Could not upload the document. Please try again.');
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
+  const downloadFile = async () => {
+    if (!document.file) return;
+    setSaving(true);
+    setError('');
+    try {
+      const blob = await downloadForeignSupplierDocumentFile(document.file.storagePath);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      link.href = url;
+      link.download = document.file.originalName;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : 'Could not download the document.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeSupportingDocument = async () => {
+    if (!onRemoveSupportingDocument) return;
+    setSaving(true);
+    setError('');
+    try {
+      await onRemoveSupportingDocument();
+      setConfirmingSupportingDocumentRemoval(false);
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : 'Could not remove the supporting document. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const trigger = (
-    <button ref={triggerRef} type="button" disabled={disabled} onMouseEnter={() => { clearHoverClose(); anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsRenewing(false); setIsOpen(true); }} onClick={() => { anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsRenewing(false); setIsOpen(true); setPosition(null); }} aria-haspopup="menu" aria-expanded={isOpen && !isViewingRemarks && !isRemarksOpen && !isRenewing} aria-label={`Actions for ${docName}`} title={`Actions for ${docName}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800">
+    <button ref={triggerRef} type="button" disabled={disabled} onMouseEnter={() => { clearHoverClose(); anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsRenewing(false); setConfirmingSupportingDocumentRemoval(false); setIsOpen(true); }} onClick={() => { anchorRef.current = triggerRef.current; setIsViewingRemarks(false); setIsRemarksOpen(false); setIsRenewing(false); setConfirmingSupportingDocumentRemoval(false); setIsOpen(true); setPosition(null); }} aria-haspopup="menu" aria-expanded={isOpen && !isViewingRemarks && !isRemarksOpen && !isRenewing && !confirmingSupportingDocumentRemoval} aria-label={`Actions for ${docName}`} title={`Actions for ${docName}`} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-400 dark:hover:bg-slate-800">
       <MoreHorizontal size={17} aria-hidden="true" />
     </button>
   );
   return (
     <div className={remarksAtBottom ? 'flex shrink-0 flex-col items-end justify-between gap-1 self-stretch' : 'flex max-w-[min(18rem,55vw)] shrink-0 items-start gap-0.5'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose}>
       {remarksAtBottom && trigger}
-      {document.remarks?.trim() && <button ref={remarkTriggerRef} type="button" onClick={() => { anchorRef.current = remarkTriggerRef.current; setRemarks(document.remarks ?? ''); setIsRemarksOpen(false); setIsViewingRemarks(true); setConfirmingRemarkDelete(false); setError(''); setFeedback(''); setIsOpen(true); setPosition(null); }} aria-label={`View admin remarks for ${docName}`} title="View remarks" aria-haspopup="dialog" aria-expanded={isOpen && isViewingRemarks} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#536b80] hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-400 dark:hover:bg-slate-800"><MessageSquareText size={15} aria-hidden="true" /></button>}
+      {document.remarks?.trim() && <button ref={remarkTriggerRef} type="button" onClick={() => { anchorRef.current = remarkTriggerRef.current; setRemarks(document.remarks ?? ''); setIsRemarksOpen(false); setIsViewingRemarks(true); setConfirmingRemarkDelete(false); setConfirmingSupportingDocumentRemoval(false); setError(''); setFeedback(''); setIsOpen(true); setPosition(null); }} aria-label={`View admin remarks for ${docName}`} title="View remarks" aria-haspopup="dialog" aria-expanded={isOpen && isViewingRemarks} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[#536b80] hover:bg-slate-100 hover:text-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-400 dark:hover:bg-slate-800"><MessageSquareText size={15} aria-hidden="true" /></button>}
       {!remarksAtBottom && trigger}
       {isOpen && createPortal(
-        <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen || isVerifying || isRenewing ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isVerifying ? 'Verify document' : isRenewing ? 'Renew document' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] box-border min-w-0 max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-x-hidden overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
-          {isRenewing ? <div className="p-2">
-            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Renew {docName}</p>
-            <p className="mt-1 text-[11px] leading-4 text-slate-600 dark:text-slate-300">Choose the new expiry date for {companyName} · {branchName}.</p>
-            <label htmlFor={`renewal-date-${popoverKey}`} className="mt-3 block text-[11px] font-medium text-slate-700 dark:text-slate-200">New expiry date
+        <div ref={panelRef} role={isViewingRemarks ? 'dialog' : isRemarksOpen || isVerifying || isRenewing || confirmingSupportingDocumentRemoval ? 'group' : 'menu'} aria-label={isViewingRemarks ? 'Saved document remark' : isVerifying ? 'Verify document' : isRenewing ? 'Renew document' : confirmingSupportingDocumentRemoval ? 'Remove supporting document' : isRemarksOpen ? 'Edit document remarks' : 'Document actions'} onMouseEnter={clearHoverClose} onMouseLeave={scheduleHoverClose} className="fixed z-[180] box-border min-w-0 max-h-[calc(100vh-24px)] w-[min(16rem,calc(100vw-24px))] overflow-x-hidden overflow-y-auto rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-950" style={{ top: position?.top ?? 0, left: position?.left ?? 0, visibility: position ? 'visible' : 'hidden' }}>
+          {confirmingSupportingDocumentRemoval ? <div className="p-2">
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">Remove supporting document?</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-600 dark:text-slate-300">“{docName.slice(7)}” will be removed from {companyName} · {branchName}{document.file ? ', including its uploaded file' : ''}.</p>
+            {error && <p role="alert" className="mt-1.5 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
+            <div className="mt-2 flex justify-end gap-1.5">
+              <button type="button" disabled={saving} onClick={() => { setConfirmingSupportingDocumentRemoval(false); setError(''); }} className="rounded px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+              <button type="button" disabled={saving} onClick={() => void removeSupportingDocument()} className="rounded px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30">{saving ? 'Removing…' : 'Remove'}</button>
+            </div>
+          </div> : isRenewing ? <div className="p-2">
+            <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">{optionalExpiryAllowed ? `Set validity for ${docName}` : `Renew ${docName}`}</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-600 dark:text-slate-300">{optionalExpiryAllowed ? `Add an expiry date only when this supporting document specifies one · ${companyName} · ${branchName}.` : `Choose the new expiry date for ${companyName} · ${branchName}.`}</p>
+            <label htmlFor={`renewal-date-${popoverKey}`} className="mt-3 block text-[11px] font-medium text-slate-700 dark:text-slate-200">{optionalExpiryAllowed ? 'Expiry date (optional)' : 'New expiry date'}
               <input id={`renewal-date-${popoverKey}`} type="date" value={renewalDraft} onChange={(event) => { setRenewalDraft(event.target.value); setError(''); }} className="field mt-1 h-8 text-xs" />
             </label>
             <p className="mt-2 text-[11px] leading-4 text-slate-500 dark:text-slate-400">This updates the compliance record immediately.</p>
@@ -2998,11 +3173,11 @@ function DocumentQuickActions({
               </div>
             </div> : <div className="mt-2 flex justify-end gap-1.5 border-t border-slate-100 pt-2 dark:border-slate-800">
               {canEditRemark && <button type="button" onClick={() => { clearHoverClose(); setRemarks(document.remarks ?? ''); setIsViewingRemarks(false); setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="rounded px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">Edit</button>}
-              {canEditRemark && <button type="button" disabled={!canDeleteRemarks || saving} title={!canDeleteRemarks ? 'Remarks are required while this document is missing.' : undefined} onClick={() => setConfirmingRemarkDelete(true)} className="rounded px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-rose-300 dark:hover:bg-rose-950/30">Delete</button>}
+              {canEditRemark && <button type="button" disabled={!canDeleteRemarks || saving} title={!canDeleteRemarks ? 'Remarks are required while this document is pending.' : undefined} onClick={() => setConfirmingRemarkDelete(true)} className="rounded px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-45 dark:text-rose-300 dark:hover:bg-rose-950/30">Delete</button>}
             </div>}
           </div> : isRemarksOpen ? <div className="p-2">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-200">Admin Remarks{requireRemarks && <span className="ml-1 text-rose-600">Required when missing</span>}
-              <textarea autoFocus value={remarks} maxLength={2000} onChange={(event) => { setRemarks(event.target.value); setFeedback(''); setError(''); }} rows={4} placeholder={requireRemarks ? 'Reason this document is missing' : 'Add an admin remark'} className="field mt-1.5 resize-y py-2 text-xs leading-5" />
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-200">Admin Remarks{requireRemarks && <span className="ml-1 text-rose-600">Required when pending</span>}
+              <textarea autoFocus value={remarks} maxLength={2000} onChange={(event) => { setRemarks(event.target.value); setFeedback(''); setError(''); }} rows={4} placeholder={requireRemarks ? 'Reason this document is pending' : 'Add an admin remark'} className="field mt-1.5 resize-y py-2 text-xs leading-5" />
             </label>
             {error && <p role="alert" className="mt-1.5 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
             {feedback && <p role="status" className="mt-1.5 text-[11px] text-emerald-700 dark:text-emerald-300">{feedback}</p>}
@@ -3011,12 +3186,26 @@ function DocumentQuickActions({
               <button type="button" disabled={saving || remarks === (document.remarks ?? '')} onClick={() => void saveRemarks()} className="rounded bg-[#2187CD] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#176fae] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2187CD] disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving...' : 'Save'}</button>
             </div>
           </div> : <>
-            {document.provided === true && status !== 'Missing' && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(false)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><XCircle size={15} aria-hidden="true" />{expiryBased ? 'Mark as Missing' : 'Mark missing'}</button>}
-            {(status === 'Missing' || status === 'For Update') && <button role="menuitem" type="button" disabled={saving} onClick={() => { clearHoverClose(); setIsVerifying(true); setVerificationRemarks(''); setVerificationDate(''); setReviewConfirmed(false); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-medium text-[#155f8b] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950/30"><Check size={15} aria-hidden="true" />Verify and mark current</button>}
+            {foreignSupplier && onUploadFile && <>
+              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" className="sr-only" aria-label={`Upload file for ${docName}`} onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = '';
+                if (file) void uploadFile(file);
+              }} />
+              {document.file && <button role="menuitem" type="button" disabled={saving || isUploadingFile} onClick={() => void downloadFile()} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><Download size={15} aria-hidden="true" />Download {document.file.originalName}</button>}
+              <button role="menuitem" type="button" disabled={saving || isUploadingFile} onClick={() => fileInputRef.current?.click()} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><Upload size={15} aria-hidden="true" />{isUploadingFile ? 'Uploading…' : document.file ? 'Replace uploaded file' : 'Upload document file'}</button>
+              {document.file && <p className="px-2.5 py-1 text-[10px] text-slate-500">Uploaded {new Date(document.file.uploadedAt).toLocaleDateString()}</p>}
+            </>}
+            {document.provided === true && status !== 'Missing' && <button role="menuitem" type="button" disabled={saving} onClick={() => void submit(false)} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><XCircle size={15} aria-hidden="true" />Mark as Pending</button>}
+            {(status === 'Missing' || status === 'Expired' || status === 'For Update') && <button role="menuitem" type="button" disabled={saving} onClick={() => { clearHoverClose(); setIsVerifying(true); setVerificationRemarks(''); setVerificationDate(''); setReviewConfirmed(false); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs font-medium text-[#155f8b] hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-sky-300 dark:hover:bg-sky-950/30"><Check size={15} aria-hidden="true" />Verify and mark current</button>}
             <button role="menuitem" type="button" onClick={() => { clearHoverClose(); setIsRemarksOpen(true); setError(''); setFeedback(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] dark:text-slate-200 dark:hover:bg-slate-800"><FilePlus2 size={15} aria-hidden="true" />{document.remarks ? 'Edit remarks' : 'Add remarks'}</button>
-            {expiryBased && <>
+            {docName.startsWith('Other: ') && onRemoveSupportingDocument && <>
               <div role="separator" className="my-1 border-t border-slate-100 dark:border-slate-800" />
-              <button role="menuitem" type="button" disabled={saving} onClick={() => { clearHoverClose(); setRenewalDraft(renewalDate); setIsRenewing(true); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><RefreshCw size={15} aria-hidden="true" />{status === 'Missing' ? 'Add document or expiry' : status === 'Expired' || status === 'For Update' ? 'Renew Document' : 'Renew / set expiry'}</button>
+              <button role="menuitem" type="button" disabled={saving || isUploadingFile} onClick={() => { clearHoverClose(); setConfirmingSupportingDocumentRemoval(true); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/30"><Trash2 size={15} aria-hidden="true" />Remove supporting document</button>
+            </>}
+            {(expiryBased || optionalExpiryAllowed) && <>
+              <div role="separator" className="my-1 border-t border-slate-100 dark:border-slate-800" />
+              <button role="menuitem" type="button" disabled={saving} onClick={() => { clearHoverClose(); setRenewalDraft(renewalDate); setIsRenewing(true); setError(''); }} className="flex min-h-9 w-full items-center gap-2 rounded px-2.5 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"><RefreshCw size={15} aria-hidden="true" />{optionalExpiryAllowed ? 'Set optional expiry date' : status === 'Missing' ? 'Add document or expiry' : status === 'Expired' || status === 'For Update' ? 'Renew Document' : 'Renew / set expiry'}</button>
             </>}
             {error && <p role="alert" className="px-2.5 py-1 text-[11px] text-rose-700 dark:text-rose-300">{error}</p>}
             {feedback && <p role="status" className="px-2.5 py-1 text-[11px] text-emerald-700 dark:text-emerald-300">{feedback}</p>}

@@ -154,8 +154,8 @@ test('Progress modal formats raw submission timestamps and separates footer acti
 
   assert.match(markup, new RegExp(`dateTime="${submittedAt}"`, 'i'));
   assert.ok(markup.includes(`>${formatLogDateTime(submittedAt)}<`));
-  assert.ok(markup.indexOf('Supplier performance review') < markup.indexOf('>Ongoing<'));
-  assert.ok(markup.indexOf('>Ongoing<') < markup.indexOf('>Supplier<'));
+  assert.ok(markup.indexOf('Supplier performance review') < markup.indexOf('>Completed<'));
+  assert.ok(markup.indexOf('>Completed<') < markup.indexOf('>Supplier<'));
   assert.match(markup, /feedback-progress-header-main/);
   assert.match(markup, /aria-label="Close survey progress"/);
   assert.ok(markup.indexOf('feedback-progress-close"') < markup.indexOf('Complete survey'));

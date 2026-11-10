@@ -7,7 +7,9 @@ export function parseDeploymentEnvironment(value: unknown): DeploymentEnvironmen
 }
 
 export function submissionSourceForEnvironment(environment: DeploymentEnvironment): SurveyResponseSource {
-  return environment === 'production' ? 'production_submission' : 'test_submission';
+  // Completing an evaluation is business input in staging as well as production.
+  // Keep the legacy production source, but never label a normal app save as a test.
+  return environment === 'production' ? 'production_submission' : 'app_submission';
 }
 
 /**
@@ -28,5 +30,5 @@ export function getResponseDataSource(response: SurveyResponse): SurveyResponseS
 
 export function isOfficialAnalyticsResponse(response: SurveyResponse): boolean {
   const source = getResponseDataSource(response);
-  return source === 'client_csv' || source === 'production_submission';
+  return source === 'client_csv' || source === 'app_submission' || source === 'production_submission';
 }

@@ -15,6 +15,7 @@ import { SlideDeck } from '../features/presentation/components/SlideDeck';
 import { StateMessage } from '../components/StateMessage';
 import { PartnerCompany, SurveyResponse, SurveyType } from '../types/survey';
 import { submissionCount } from '../features/analytics/domain/analytics';
+import { getLeaderboard } from '../features/evaluations/domain/scoring';
 import {
   buildSlides,
   DATE_RANGE_OPTIONS,
@@ -51,6 +52,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
     'sections',
   ]);
   const [surveyTypes, setSurveyTypes] = useState<SurveyType[]>(allSurveyTypes);
+  const [selectedCompanyKey, setSelectedCompanyKey] = useState('');
   const [dateRangeId, setDateRangeId] = useState<DateRangeId>('all');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -83,6 +85,16 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
     return filterByDateRange(scopedResponses, { id: dateRangeId, from: customFrom, to: customTo });
   }, [scopedResponses, dateRangeId, customFrom, customTo, isCustomInvalid]);
 
+  const leaderboardCompanyOptions = useMemo(() => {
+    const activeTypes = surveyTypes.length ? surveyTypes : allSurveyTypes;
+    return activeTypes.flatMap((surveyType) => getLeaderboard(dateFiltered, surveyType).map((company) => ({
+      key: `${surveyType}:${company.company}`,
+      company: company.company,
+      surveyType,
+    })));
+  }, [dateFiltered, surveyTypes]);
+  const selectedCompany = leaderboardCompanyOptions.find((option) => option.key === selectedCompanyKey) ?? null;
+
   const previousPeriodResponses = useMemo(() => {
     if (!currentPeriod || isCustomInvalid) return [];
     return filterByPeriod(scopedResponses, previousEqualDurationPeriod(currentPeriod));
@@ -103,6 +115,7 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
       currentPeriod,
       previousPeriodResponses,
       surveyTypes: activeTypes,
+      selectedCompany: selectedCompany ? { company: selectedCompany.company, surveyType: selectedCompany.surveyType } : null,
       presentationTitle: finalTitle,
     });
     setDeckTitle(finalTitle);
@@ -251,6 +264,21 @@ export function PresentPage({ responses, partnerCompanies }: PresentPageProps) {
             </button>
           ))}
         </div>
+        <label className="mt-4 block max-w-lg text-xs font-semibold text-slate-600 dark:text-slate-300">
+          Company to highlight in the leaderboard <span className="font-normal text-slate-400">(optional)</span>
+          <select
+            value={selectedCompany?.key ?? ''}
+            onChange={(event) => setSelectedCompanyKey(event.target.value)}
+            disabled={leaderboardCompanyOptions.length === 0}
+            className="mt-1.5 block w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-700 focus:border-[#2187CD] focus:outline-none focus:ring-2 focus:ring-[#2187CD]/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <option value="">No company selected</option>
+            {leaderboardCompanyOptions.map((option) => (
+              <option key={option.key} value={option.key}>{option.company} · {option.surveyType}</option>
+            ))}
+          </select>
+          <span className="mt-1 block font-normal text-slate-400">Choose a company from the current time window to mark it in the top 20 or show its overall category rank.</span>
+        </label>
       </section>
       </div>
       </div>

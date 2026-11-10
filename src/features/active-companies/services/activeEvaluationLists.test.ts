@@ -5,7 +5,7 @@ import { createActiveEvaluationListRefresh, loadActiveEvaluationLists } from './
 import { loadActiveCompanySnapshots } from './activeCompanySnapshotService';
 
 test('reads only the authenticated projection, validates external lists, and makes failures visible', async () => {
-  let payload: unknown = [{ survey_type: 'Supplier', companies: ['Supplier One'] }];
+  let payload: unknown = [{ survey_type: 'Supplier', companies: ['Supplier One'], membership_complete: true }];
   let status = 200;
   const client = createClient('https://synthetic.supabase.co', 'synthetic-key', {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -14,9 +14,12 @@ test('reads only the authenticated projection, validates external lists, and mak
       return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } });
     } },
   });
-  assert.deepEqual(await loadActiveEvaluationLists(undefined, client), [{ surveyType: 'Supplier', companies: ['Supplier One'] }]);
+  assert.deepEqual(await loadActiveEvaluationLists(undefined, client), [{ surveyType: 'Supplier', companies: ['Supplier One'], membershipComplete: true }]);
+  payload = [{ survey_type: 'Supplier', companies: ['Legacy Supplier'] }];
+  assert.deepEqual(await loadActiveEvaluationLists(undefined, client), [{ surveyType: 'Supplier', companies: ['Legacy Supplier'], membershipComplete: false }]);
   for (const invalid of [null, {}, [{ survey_type: 'Other', companies: [] }], [{ survey_type: 'Supplier', companies: [null] }],
-    [{ survey_type: 'Supplier', companies: [''] }], [{ survey_type: 'Supplier', companies: [] }, { survey_type: 'Supplier', companies: [] }]]) {
+    [{ survey_type: 'Supplier', companies: [''] }], [{ survey_type: 'Supplier', companies: [], membership_complete: 'yes' }],
+    [{ survey_type: 'Supplier', companies: [] }, { survey_type: 'Supplier', companies: [] }]]) {
     payload = invalid;
     await assert.rejects(loadActiveEvaluationLists(undefined, client), /Invalid active evaluation list/);
   }

@@ -1,6 +1,7 @@
 import { CustomForm, PartnerCompany, SurveyResponse, SurveyType } from '../../../types/survey';
 import { getPendingEvaluationCompanies } from '../../evaluations/domain/evaluationProgress';
 import { getSurveyStatus } from '../../evaluations/domain/surveyStatus';
+import { isDistributionRecipient } from '../../evaluations/domain/formRecipients';
 import { getDefaultPermissions } from '../../../utils/rbac';
 
 export interface EmployeeNotification {
@@ -29,7 +30,7 @@ export function getEmployeePendingSurveys(
 
   // Filter for active (running or un-set status) surveys
   const activeSurveys = surveys.filter(
-    (s) => getSurveyStatus(s) === 'Running'
+    (s) => getSurveyStatus(s) === 'Running' && isDistributionRecipient(s, userEmail)
   );
 
   const pendingReminders: EmployeeNotification[] = [];

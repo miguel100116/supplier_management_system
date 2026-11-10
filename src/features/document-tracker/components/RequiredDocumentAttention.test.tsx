@@ -16,7 +16,7 @@ test('only the selected attention filter remains available after its count becom
   const html = renderToStaticMarkup(<RequiredDocumentAttention counts={{ missing: 0, expired: 0, forUpdate: 0 }} value="Missing" onChange={() => {}} />);
   assert.equal((html.match(/<button/g) ?? []).length, 1);
   assert.match(html, /aria-pressed="true"/);
-  assert.match(html, />0<\/strong> missing/);
+  assert.match(html, />0<\/strong> pending/);
 });
 
 test('an empty attention summary adds no controls or empty container', () => {
