@@ -1247,6 +1247,7 @@ test('Dashboard separates official submissions, scores and evaluation progress a
   }
   await page.goto('/login');
   await signIn(page);
+  await waitForReadyPage(page);
   const forms = page.getByRole('table', { name: 'Evaluation forms in progress' });
   const results = page.getByRole('table', { name: 'Average partner evaluation score by type' });
   await expect(forms.getByRole('cell', { name: 'Active', exact: true })).toBeVisible();

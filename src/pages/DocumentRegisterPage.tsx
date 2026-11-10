@@ -2886,6 +2886,7 @@ function DocumentQuickActions({
   };
   const scheduleHoverClose = () => {
     clearHoverClose();
+    if (window.matchMedia('(hover: none)').matches) return;
     // The panel is portalled and may move when it switches from the compact
     // menu to the remarks editor. Keep active work open across that move;
     // the outside-pointer and Escape handlers still provide dismissal.
