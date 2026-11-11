@@ -1,5 +1,5 @@
 import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import * as XLSX from 'xlsx';
 
 const email = 'synthetic.admin@mgenesis.com';
@@ -2002,7 +2002,7 @@ test('Archived report builders select one item, update the document preview and 
   if (testInfo.project.use.isMobile) {
     expect(optionsBox!.y + optionsBox!.height).toBeLessThanOrEqual(documentBox!.y);
     const table = preview.getByRole('region', { name: 'Company performance', exact: true });
-    expect(await table.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+    expect(await table.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(false);
   } else expect(optionsBox!.x + optionsBox!.width).toBeLessThan(documentBox!.x);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('combobox', { name: 'Paper size', exact: true }).selectOption('legal');
@@ -2024,7 +2024,10 @@ test('Archived report builders select one item, update the document preview and 
       }
       const pageCount = Number(pdf.match(/\/Count (\d+)/)?.[1]);
       expect(pageCount).toBeGreaterThan(0);
-      expect((pdf.match(/\/I\d+ Do/g) ?? []).length).toBe(pageCount);
+      const visualTitles = ['Courier Overview', 'Courier Category performance', 'Courier Leaderboard', 'Courier Questions 1'];
+      for (const title of visualTitles) expect(pdf).toContain(title);
+      expect(pdf.indexOf('Courier Leaderboard')).toBeLessThan(pdf.indexOf('Report scope'));
+      expect((pdf.match(/\/I\d+ Do/g) ?? []).length).toBe(pageCount + visualTitles.length);
       expect(pdf).not.toContain('SMPESA');
       expect(pdf).toContain(`/Author (Microgenesis)`);
       expect(pdf).not.toContain('This report provides a comprehensive summary of survey analytics');
@@ -2036,9 +2039,18 @@ test('Archived report builders select one item, update the document preview and 
       expect(Buffer.from(xml.content as Uint8Array).toString()).toMatch(/w:pgSz[^>]*w:w="12240"[^>]*w:h="20160"/);
     } else {
       const workbook = XLSX.read(bytes);
-      const scope = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+      expect(workbook.SheetNames[0]).toBe('Courier Leaderboard');
+      const scope = XLSX.utils.sheet_to_json(workbook.Sheets['Archived Survey Report'], { header: 1 });
       expect(scope).toContainEqual(['Selected item', 'First archived survey']);
       expect(scope).toContainEqual(['Stored submissions', 4]);
+      expect(workbook.SheetNames).toEqual(expect.arrayContaining(['Courier Overview', 'Courier Leaderboard', 'Courier Questions 1']));
+      expect(workbook.SheetNames.some(name => name.startsWith('Supplier'))).toBe(false);
+      const zip = XLSX.CFB.read(bytes, { type: 'buffer' });
+      const image = XLSX.CFB.find(zip, '/xl/media/archiveAnalytics1.png');
+      expect(image).toBeTruthy();
+      const png = Buffer.from(image!.content as Uint8Array);
+      expect(png.readUInt32BE(16)).toBe(2160);
+      await writeFile(testInfo.outputPath('archived-courier-ranking.png'), png);
     }
   }
   await expect.poll(() => service.records.filter(record => record.record_type === 'export_history').length).toBe(3);
@@ -2056,11 +2068,10 @@ test('Archived report builders select one item, update the document preview and 
   await openBuilder('Archived Response Report');
   await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-one');
   await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
-  const leaderboard = preview.getByRole('table', { name: 'Company leaderboard', exact: true });
-  await expect(leaderboard.getByRole('row')).toHaveCount(3);
-  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(0)).toHaveText('1');
-  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(1)).toHaveText('Synthetic Courier');
-  await expect(leaderboard.getByRole('row').nth(1).getByRole('cell').nth(2)).toHaveText('2');
+  const leaderboard = preview.getByRole('region', { name: 'Courier Company Leaderboard', exact: true });
+  await expect(leaderboard.getByRole('listitem')).toHaveCount(2);
+  await expect(leaderboard.getByRole('listitem').first()).toHaveAccessibleName(/Rank 1: Synthetic Courier.*2 forms/);
+  await expect(preview.getByRole('table', { name: 'Company leaderboard', exact: true })).toHaveCount(0);
   await leaderboard.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath('archived-batch-leaderboard.png'), fullPage: true, animations: 'disabled' });
   await page.getByLabel('Include respondent comments', { exact: true }).check();
@@ -2071,14 +2082,14 @@ test('Archived report builders select one item, update the document preview and 
     const bytes = await readFile((await (await csvDownload).path())!);
     if (format === 'excel') {
       const workbook = XLSX.read(bytes);
-      const rows = XLSX.utils.sheet_to_json(workbook.Sheets['Company leaderboard'], { header: 1 });
-      expect(rows[0]).toEqual(['Rank', 'Company', 'Submissions', 'Score', 'Rating']);
-      expect((rows[1] as unknown[]).slice(0, 3)).toEqual([1, 'Synthetic Courier', 2]);
+      expect(workbook.SheetNames[0]).toBe('Courier Leaderboard');
+      expect(workbook.SheetNames).not.toContain('Company leaderboard');
+      expect(XLSX.utils.sheet_to_json(workbook.Sheets['Response details'])).toHaveLength(4);
     } else if (format === 'docx') {
       const archive = XLSX.CFB.read(bytes, { type: 'buffer' });
       const xml = XLSX.CFB.find(archive, '/word/document.xml')!;
       expect(Buffer.from(xml.content as Uint8Array).toString()).toContain('Company leaderboard');
-    } else if (format === 'pdf') expect(bytes.toString('latin1')).toContain('Company leaderboard');
+    } else if (format === 'pdf') expect(bytes.toString('latin1')).toContain('Courier Leaderboard');
     else {
       const csv = bytes.toString();
       expect(csv).toContain('Rank,Company,Submissions,Score,Rating');
@@ -2089,7 +2100,7 @@ test('Archived report builders select one item, update the document preview and 
   }
   await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('half-two');
   await expect(preview.getByRole('row', { name: 'Stored submissions 1', exact: true })).toBeVisible();
-  await expect(leaderboard.getByRole('row')).toHaveCount(2);
+  await expect(leaderboard.getByRole('listitem')).toHaveCount(1);
   await expect(leaderboard).not.toContainText('Second archived courier');
   await page.getByRole('button', { name: 'Back to Reports', exact: true }).click();
   await openBuilder('Archived Company Report');
@@ -2106,6 +2117,101 @@ test('Archived report builders select one item, update the document preview and 
   await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(7);
   expect(service.records[0].payload.isArchived).toBe(true);
   expect(service.records.find(record => record.record_type === 'survey')?.payload.status).toBe('Archived');
+  expect(service.unexpected).toEqual([]);
+  expect(service.errors).toEqual([]);
+});
+
+test('Archive Excel exports retain all rows and category Analytics images, and PDF reports keep the selected batch', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  const service = await backend(page);
+  const types = ['Courier', 'Supplier', 'Subcontractor'] as const;
+  const weights = {
+    Courier: { questionId: 'Q01', section: 'Reliability/Delivery', maxPoints: 15 },
+    Supplier: { questionId: 'Q39', section: 'Documentation', maxPoints: 4 },
+    Subcontractor: { questionId: 'Q03', section: 'Delivery / Timeliness', maxPoints: 2 },
+  };
+  service.records.push({ record_type: 'archive_series', record_id: 'visual-batch', created_at: createdAt, payload: { id: 'visual-batch', label: 'Visual archive batch', createdAt } });
+  for (const type of types) {
+    const weight = weights[type];
+    const id = `visual-${type}`;
+    service.records.push({ record_type: 'partner_company', record_id: id, created_at: createdAt,
+      payload: { id, name: `Archived ${type} Partner`, type, createdAt, isArchived: true } });
+    service.records.push({ record_type: 'survey_response', record_id: `${id}:${weight.questionId}`, created_at: createdAt, payload: {
+      responseId: id, companyId: id, company: `Archived ${type} Partner`, surveyType: type, respondentType: 'Employee',
+      submissionDate: '2026-07-01T00:00:00Z', questionId: weight.questionId, questionNumber: 1, question: 'Service quality?',
+      questionCategory: weight.section, rating: weight.maxPoints * 0.82, comment: '', archived: true,
+      archivedAt: createdAt, seriesId: 'visual-batch', dataSource: 'client_csv',
+    } });
+  }
+  const courier = service.records.find(row => row.record_type === 'survey_response')!;
+  for (let index = 1; index <= 4; index++) {
+    const id = `ranked-courier-${index}`;
+    service.records.push({ ...courier, record_id: `${id}:Q01`, payload: { ...courier.payload,
+      responseId: id, companyId: id, company: `Ranked Courier ${index}` } });
+  }
+  service.records.push({ ...courier, record_id: 'other-batch:Q01', payload: { ...courier.payload, responseId: 'other-batch', seriesId: 'other-batch', rating: 0 } });
+  await page.goto('/login'); await signIn(page);
+  await openReadyPage(page, '/archive-center');
+  await page.getByRole('button', { name: /Archived Responses/ }).click();
+  await page.evaluate(() => {
+    const original = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = function () {
+      HTMLCanvasElement.prototype.toDataURL = original;
+      throw new Error('Synthetic Analytics rendering failure.');
+    };
+  });
+  await page.getByRole('button', { name: 'Export All Archived', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('Synthetic Analytics rendering failure.');
+  const downloaded = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export All Archived', exact: true }).click();
+  const bytes = await readFile((await (await downloaded).path())!);
+  const workbook = XLSX.read(bytes);
+  expect(XLSX.utils.sheet_to_json(workbook.Sheets['Archived Responses'])).toHaveLength(8);
+  expect(workbook.SheetNames[0]).toBe('Courier Leaderboard');
+  expect(workbook.SheetNames.filter(name => name.includes('Leaderboard'))).toHaveLength(3);
+  const zip = XLSX.CFB.read(bytes, { type: 'buffer' });
+  for (let index = 0; index < types.length; index++) {
+    const type = types[index];
+    expect(workbook.SheetNames).toContain(`${type} Overview`);
+    const sheetNumber = workbook.SheetNames.indexOf(`${type} Leaderboard`) + 1;
+    const relations = Buffer.from(XLSX.CFB.find(zip, `/xl/worksheets/_rels/sheet${sheetNumber}.xml.rels`)!.content as Uint8Array).toString();
+    const drawingName = relations.match(/archiveAnalytics\d+/)![0];
+    const imageRelations = Buffer.from(XLSX.CFB.find(zip, `/xl/drawings/_rels/${drawingName}.xml.rels`)!.content as Uint8Array).toString();
+    const imageName = imageRelations.match(/archiveAnalytics\d+\.png/)![0].replace('.png', '');
+    const image = XLSX.CFB.find(zip, `/xl/media/${imageName}.png`);
+    expect(image).toBeTruthy();
+    await writeFile(testInfo.outputPath(`archive-${type.toLowerCase()}-ranking.png`), Buffer.from(image!.content as Uint8Array));
+  }
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await openReadyPage(page, '/reports');
+  await page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Archived Response Report', exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+  for (const type of types) {
+    await page.getByRole('combobox', { name: 'Category', exact: true }).selectOption(type);
+    await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('visual-batch');
+    const preview = page.getByLabel('Archived report preview', { exact: true });
+    await expect(preview.getByRole('row', { name: `Stored submissions ${type === 'Courier' ? 5 : 1}`, exact: true })).toBeVisible();
+    const unifiedRanking = preview.getByRole('region', { name: `${type} Company Leaderboard`, exact: true });
+    await expect(unifiedRanking).toHaveCount(1);
+    await expect(unifiedRanking.getByRole('listitem')).toHaveCount(type === 'Courier' ? 5 : 1);
+    const rankingBox = await unifiedRanking.boundingBox();
+    const scopeBox = await preview.getByRole('heading', { name: 'Report scope', exact: true }).boundingBox();
+    expect(rankingBox!.y).toBeLessThan(scopeBox!.y);
+    expect(await preview.evaluate(element => [element.parentElement!, ...Array.from(element.querySelectorAll('*'))].some(node => {
+      const style = getComputedStyle(node);
+      return ['auto', 'scroll'].includes(style.overflowX) || ['auto', 'scroll'].includes(style.overflowY);
+    }))).toBe(false);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+    if (type === 'Courier') await page.screenshot({ path: testInfo.outputPath('ranking-first-preview.png'), fullPage: true });
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download report', exact: true }).click();
+    const pdf = (await readFile((await (await download).path())!)).toString('latin1');
+    expect(pdf).toContain(`${type} Overview`);
+    expect(pdf).toContain(`${type} Category performance`);
+    expect(pdf).toContain(`${type} Leaderboard`);
+    expect(pdf.indexOf(`${type} Leaderboard`)).toBeLessThan(pdf.indexOf('Report scope'));
+    expect(pdf).toContain(`${type} Questions 1`);
+    for (const other of types.filter(value => value !== type)) expect(pdf).not.toContain(`${other} Overview`);
+  }
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
 });

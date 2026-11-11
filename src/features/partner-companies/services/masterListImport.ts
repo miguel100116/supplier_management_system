@@ -659,8 +659,10 @@ export function mergeRowsIntoCompanies(
       const beforeType = match.type;
       const beforeOrigin = match.supplierOrigin;
       const existingBranchIdx = (match.branches ?? []).findIndex(
-        (b) => b.bpCode && row.bpCode && b.bpCode === row.bpCode
-          && (!repeatedBpCodes.has(row.bpCode) || b.sourceRow === row.sourceRow)
+        (b) => row.bpCode
+          ? b.bpCode === row.bpCode && (!repeatedBpCodes.has(row.bpCode) || b.sourceRow === row.sourceRow)
+          // shortcut: blank codes use source-row IDs; assign BP codes before moving rows.
+          : !b.bpCode && b.id === branch.id
       );
       const isNewBranch = existingBranchIdx < 0;
       const beforeDocs = isNewBranch ? undefined : match.branches![existingBranchIdx].documents;

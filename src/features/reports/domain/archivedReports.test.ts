@@ -35,6 +35,8 @@ test('one whole survey includes its stored evaluations and identifies staging da
   const before = JSON.stringify(input);
   const report = buildArchivedReport(input, selection);
   assert.equal(report.count, 3);
+  assert.equal(report.analytics[0].category, 'Courier');
+  assert.equal(report.analytics[0].summary.totalSubmissions, report.count);
   assert.ok(report.tables[0].rows.some(cells => cells[0] === 'Staging/test answer rows' && cells[1] === 1));
   const ranks = getAnalyticsCompanyRankings([...responses.slice(0, 3), responses[4]], ['Courier']);
   assert.deepEqual(report.tables.find(table => table.title === 'Company performance')?.rows.map(cells => cells[2]), ranks.map(item => formatAnalyticsScore('Courier', item.rankScore)));

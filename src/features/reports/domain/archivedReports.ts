@@ -6,6 +6,7 @@ import { getCompanyComposites } from '../../evaluations/domain/scoring';
 import { selectSurveyResponses, answerValue } from '../../evaluations/domain/surveyResponses';
 import { describeArchiveResponseGroup } from '../../archives/domain/archiveResponseGroup';
 import type { ExportTable } from '../services/exporters';
+import { buildArchiveAnalyticsData } from './archiveAnalyticsVisuals';
 
 export const ARCHIVED_REPORT_TITLES = {
   'archived-survey': 'Archived Survey Report',
@@ -111,5 +112,5 @@ export function buildArchivedReport(data: ArchivedReportData, selection: Archive
   if (includeComments) tables.push({ title: 'Respondent comments', columns: ['Company', 'Question', 'Comment'],
     rows: rows.filter(row => hasAnsweredItem(row) && row.comment.trim() && row.comment !== 'Submitted successfully.').map(row => [row.company, row.question, row.comment]),
   });
-  return { title, itemLabel: item.label, tables, count, rowCount: rows.length, canExport: true };
+  return { title, itemLabel: item.label, tables, count, rowCount: rows.length, canExport: true, analytics: buildArchiveAnalyticsData(rows, data.series) };
 }

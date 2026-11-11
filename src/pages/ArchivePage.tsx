@@ -324,6 +324,8 @@ export function ArchivePage({
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<ArchiveImportResult | null>(null);
   const [importError, setImportError] = useState('');
+  const [exportError, setExportError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   useModalEscape(Boolean(confirmBulkRestoreState), () => setConfirmBulkRestoreState(null), 53);
   useModalEscape(confirmDeleteState.isOpen, () => setConfirmDeleteState({ isOpen: false }), 52);
   useModalEscape(Boolean(confirmResponseGroup), () => setConfirmResponseGroup(null), 51);
@@ -331,9 +333,13 @@ export function ArchivePage({
   useModalEscape(Boolean(confirmPartnerCompany), () => setConfirmPartnerCompany(null), 49);
   useModalEscape(Boolean(importResult), () => setImportResult(null), 50);
 
-  const handleExportAll = () => {
-    if (archivedResponses.length === 0) return;
-    exportArchivedResponsesAsExcel(archivedResponses, 'archived_responses_all', archiveSeries);
+  const handleExportAll = async () => {
+    if (archivedResponses.length === 0 || isExporting) return;
+    setIsExporting(true);
+    setExportError('');
+    try { await exportArchivedResponsesAsExcel(archivedResponses, 'archived_responses_all', archiveSeries); }
+    catch (error) { setExportError(error instanceof Error ? error.message : 'Unable to export the archive. Please retry.'); }
+    finally { setIsExporting(false); }
   };
 
   const handleImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -496,12 +502,12 @@ export function ArchivePage({
                 <button
                   type="button"
                   onClick={handleExportAll}
-                  disabled={archivedResponses.length === 0}
+                  disabled={archivedResponses.length === 0 || isExporting}
                   className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-60 cursor-pointer"
                   title="Export every archived response to Excel"
                 >
                   <Download size={14} />
-                  <span>Export All Archived</span>
+                  <span>{isExporting ? 'Exporting…' : 'Export All Archived'}</span>
                 </button>
             </div>
           )}
@@ -577,6 +583,7 @@ export function ArchivePage({
           {filteredResultCount} archived {archiveItemLabel}{filteredResultCount === 1 ? '' : 's'}
         </p>
 
+        {exportError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{exportError}</p>}
         {importError && (
           <div className="rounded-xl bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 text-xs font-semibold flex items-center gap-2 dark:bg-rose-950/20 dark:border-rose-900">
             <span>{importError}</span>
@@ -1076,7 +1083,7 @@ export function ArchivePage({
                   Are you sure you want to permanently delete {selectedGroups.size} archived logs? This action cannot be undone.
                 </p>
                 <p className="text-xs text-slate-400 dark:text-slate-500 pt-1">
-                  Tip: use "Export Selected" first if you want an Excel backup you can re-import later.
+                  Tip: use "Export All Archived" first if you want an Excel backup you can re-import later.
                 </p>
               </div>
             </div>

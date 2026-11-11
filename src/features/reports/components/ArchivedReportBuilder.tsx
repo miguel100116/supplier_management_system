@@ -7,6 +7,8 @@ import { ARCHIVED_REPORT_TITLES, buildArchivedReport, getArchivedReportItems, ty
 import type { ReportParameters } from '../domain/reportHistory';
 import { exportTablesAsCSV, exportTablesAsExcel, exportTablesAsWord } from '../services/exporters';
 import { exportArchivedReportAsPDF } from '../services/archivedReportExport';
+import { createArchiveAnalyticsImages } from '../services/archiveAnalyticsImages';
+import { ArchivedLeaderboard } from './ArchivedLeaderboard';
 import { PaperSizeSelect } from './PaperSizeSelect';
 import { paperSizePoints, type PaperSize } from '../domain/paperSize';
 
@@ -50,8 +52,8 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
     try {
       const recipe = { kind, parameters: { paperSize, category, archivedItemId: itemId, archivedItemLabel: report.itemLabel, includeComments } };
       if (format === 'docx') await exportTablesAsWord(title, report.tables, 'archived_report', recipe);
-      else if (format === 'pdf') await exportArchivedReportAsPDF(title, report.itemLabel, category, report.tables, recipe);
-      else if (format === 'excel') await exportTablesAsExcel(report.tables, 'archived_report', recipe);
+      else if (format === 'pdf') await exportArchivedReportAsPDF(title, report.itemLabel, category, report.tables, recipe, report.analytics);
+      else if (format === 'excel') await exportTablesAsExcel(report.tables.filter(table => table.title !== 'Company leaderboard'), 'archived_report', recipe, await createArchiveAnalyticsImages(report.analytics));
       else await exportTablesAsCSV(report.tables, 'archived_report', recipe);
       setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Unable to export this report. Please try again.'); }
@@ -93,7 +95,7 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
           </div>
         </div>
         {error || selectionError ? <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">{error || selectionError}</p> : null}
-        <div className="max-h-[75vh] min-w-0 overflow-y-auto rounded-lg border border-slate-200 bg-slate-200/70 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-6">
+        <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-200/70 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-6">
           {!report ? <StateMessage compact title="Select an archived item" message="Choose a category and one archived item on the left to generate its preview." /> : <>
             {!report.count ? <div className="mb-3"><StateMessage compact title={report.rowCount ? 'No countable responses' : 'No response data'} message={report.rowCount ? 'Stored answers are included, but none contain a countable response.' : kind === 'archived-company' ? 'Only this company profile is available for export.' : 'Only this archived survey’s details are available for export.'} /></div> : null}
             <div aria-label="Archived report preview" className="mx-auto w-full max-w-[640px] rounded-sm bg-white p-4 shadow-xl ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 sm:p-6" style={{ minHeight: 640 * paperSizePoints(paperSize)[1] / paperSizePoints(paperSize)[0] }}>
@@ -101,13 +103,14 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
                 <img src="/microgenesis_logo.png" alt="Microgenesis" className="h-6 w-auto" />
                 <div className="min-w-0"><h3 className="text-sm font-bold text-[#0063a9] dark:text-sky-300">{title}</h3><p className="mt-1 break-words text-xs text-slate-500">{report.itemLabel}</p></div>
               </div>
-              {report.tables.filter(table => table.rows.length).map((table, index) => <section key={table.title} className="mb-6 min-w-0">
+              <ArchivedLeaderboard analytics={report.analytics} />
+              {report.tables.filter(table => table.rows.length && table.title !== 'Company leaderboard').map((table, index) => <section key={table.title} className="mb-6 min-w-0">
                 <h4 id={`archived-section-${index}`} className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">{index === 0 ? 'Report scope' : table.title}</h4>
-                <div className="overflow-x-auto" tabIndex={0} role="region" aria-labelledby={`archived-section-${index}`}>
-                  <table className={`w-full text-left text-xs ${index > 0 && table.title !== 'Company profile' ? 'min-w-[480px]' : ''}`} aria-labelledby={`archived-section-${index}`}>
-                    <thead className="bg-slate-50 dark:bg-slate-800"><tr>{table.columns.map(column => <th key={column} scope="col" className="px-2 py-2 font-semibold">{column}</th>)}</tr></thead>
+                <div className="min-w-0" role="region" aria-labelledby={`archived-section-${index}`}>
+                  <table className="w-full table-fixed text-left text-[11px]" aria-labelledby={`archived-section-${index}`}>
+                    <thead className="bg-slate-50 dark:bg-slate-800"><tr>{table.columns.map(column => <th key={column} scope="col" className="break-words px-2 py-2 font-semibold [overflow-wrap:anywhere]">{column}</th>)}</tr></thead>
                     {/* shortcut: cap preview sections at 50 rows; add pagination if full browser inspection is needed. */}
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{table.rows.slice(0, 50).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} className="max-w-sm break-words px-2 py-2 align-top text-slate-700 dark:text-slate-200">{cell}</td>)}</tr>)}</tbody>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{table.rows.slice(0, 50).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} className="break-words px-2 py-2 align-top text-slate-700 [overflow-wrap:anywhere] dark:text-slate-200">{cell}</td>)}</tr>)}</tbody>
                   </table>
                 </div>
                 {table.rows.length > 50 ? <p className="mt-2 text-[11px] text-slate-500">First 50 of {table.rows.length} rows shown. Downloads include all rows.</p> : null}

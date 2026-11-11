@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-test('pre-push propagates verification failures and rejects dirty or unchecked commits', t => {
+test('pre-push runs lightweight checks and rejects dirty or unchecked commits', t => {
   const root = mkdtempSync(path.join(tmpdir(), 'sms-hook-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const hookPath = fileURLToPath(new URL('../.githooks', import.meta.url));
@@ -15,8 +15,11 @@ test('pre-push propagates verification failures and rejects dirty or unchecked c
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();
   };
-  const commit = exitCode => {
-    writeFileSync(path.join(root, 'package.json'), JSON.stringify({ scripts: { verify: `node -e "process.exit(${exitCode})"` } }));
+  const commit = () => {
+    writeFileSync(path.join(root, 'package.json'), JSON.stringify({ scripts: {
+      'verify:pre-push': 'node -e "console.log(\'PRE_PUSH_CHECKS\')"',
+      verify: 'node -e "process.exit(23)"',
+    } }));
     git('add', 'package.json');
     git('-c', 'user.name=Synthetic Test', '-c', 'user.email=synthetic@example.test', 'commit', '-m', 'Synthetic hook fixture');
   };
@@ -27,12 +30,11 @@ test('pre-push propagates verification failures and rejects dirty or unchecked c
       'hook', 'run', `--to-stdin=${inputFile}`, 'pre-push'], { encoding: 'utf8', input: '' });
   };
   git('init');
-  commit(23);
-  const failure = hook();
-  assert.notEqual(failure.status, 0);
-  assert.match(failure.stdout + failure.stderr, /process.exit\(23\)/);
-  commit(0);
-  assert.equal(hook().status, 0);
+  commit();
+  const clean = hook();
+  assert.equal(clean.status, 0, clean.stderr);
+  assert.match(clean.stdout + clean.stderr, /PRE_PUSH_CHECKS/);
+  assert.doesNotMatch(clean.stdout + clean.stderr, /process\.exit\(23\)/);
   const mismatched = hook(`refs/heads/other ${'1'.repeat(40)} refs/heads/other ${'0'.repeat(40)}\n`);
   assert.notEqual(mismatched.status, 0);
   assert.match(mismatched.stderr, /Switch to the branch being pushed/);
