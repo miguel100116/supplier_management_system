@@ -169,3 +169,16 @@ test('SMS-56 keeps the admin controls in one responsive toolbar and exposes sort
   assert.equal(countActiveFormFilters('title-asc', '2026-10-01', '2026-10-31'), 1);
   assert.equal(countActiveFormFilters('deadline-desc', '2026-10-01', '2026-10-31'), 2);
 });
+
+test('SurveyFormsToolbar sort and date popovers reveal on hover and provide single Reset for date', () => {
+  const toolbarSource = readFileSync(
+    new URL('../features/evaluations/components/SurveyFormsToolbar.tsx', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(toolbarSource, /onPointerEnter=\{[\s\S]*?openPopoverOnHover\('sort'\)/);
+  assert.match(toolbarSource, /onPointerEnter=\{[\s\S]*?openPopoverOnHover\('date'\)/);
+  assert.match(toolbarSource, /<button[^>]*className="admin-directory-popover-reset"[^>]*>[\s\S]*?Reset[\s\S]*?<\/button>/);
+  assert.doesNotMatch(toolbarSource, /Reset date range/);
+  assert.doesNotMatch(toolbarSource, /Reset filters/);
+});

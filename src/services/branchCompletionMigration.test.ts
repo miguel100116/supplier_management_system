@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const migration = readFileSync(new URL('../../supabase/migrations/202611050001_enforce_completed_partner_branch_status.sql', import.meta.url), 'utf8');
 const foreignRulesMigration = readFileSync(new URL('../../supabase/migrations/202611090001_foreign_supplier_document_files_and_rules.sql', import.meta.url), 'utf8');
-const currentForeignRulesMigration = readFileSync(new URL('../../supabase/migrations/202611090003_foreign_supplier_requirement_rules.sql', import.meta.url), 'utf8');
+const currentForeignRulesMigration = readFileSync(new URL('../../supabase/migrations/202611110001_foreign_supplier_ten_required_documents.sql', import.meta.url), 'utf8');
 const optionalSupportingDocumentsMigration = readFileSync(new URL('../../supabase/migrations/202611090004_supplier_optional_supporting_documents.sql', import.meta.url), 'utf8');
 
 test('branch completion is enforced on shared partner records and restores saved manual status', () => {
@@ -27,14 +27,16 @@ test('Foreign Supplier branch completion uses only mandatory Foreign requirement
   assert.match(foreignRulesMigration, /Document file uploaded:/i);
 });
 
-test('latest Foreign completion rule uses the exact seven requirements and preserves legacy documents', () => {
+test('latest Foreign completion rule uses the exact ten requirements and preserves legacy documents', () => {
   const foreignRequirements = currentForeignRulesMigration.match(/foreign_documents text\[\] := array\[([\s\S]*?)\];/i)?.[1] ?? '';
   assert.deepEqual([...foreignRequirements.matchAll(/'((?:''|[^'])+)'/g)].map((match) => match[1].split("''").join("'")), [
-    'SIF', 'AFS', 'Certificate of Incorporation', 'Articles of Incorporation',
-    'Business Permit/License', "Owner's ID", 'Product Profile',
+    'Confidentiality and Non-Disclosure Agreement', 'Letter of Accreditation',
+    'Supplier Code of Business Conduct and Ethics', 'SIF', 'AFS', 'Certificate of Incorporation',
+    'Articles of Incorporation', 'Business Permit/License', "Owner's ID", 'Product Profile',
   ]);
   assert.match(currentForeignRulesMigration, /extract\(year from expiry_date\) <> extract\(year from current_date\)/i);
   assert.match(currentForeignRulesMigration, /Owner''s ID[\s\S]*?if days_left < 0 then/i);
+  assert.match(currentForeignRulesMigration, /branch_required_documents := required_documents[\s\S]*?jsonb_object_keys[\s\S]*?document_name like 'Other: %'[\s\S]*?for i in 1\.\.coalesce\(array_length\(branch_required_documents/i);
   assert.match(currentForeignRulesMigration, /local_documents text\[\] := array\[[\s\S]*?'GIS \(Corp\)'[\s\S]*?'DTI \(Sole\)'[\s\S]*?'Business Permit'/i);
   assert.doesNotMatch(currentForeignRulesMigration, /delete from public\.application_records|delete from storage\.objects/i);
 });

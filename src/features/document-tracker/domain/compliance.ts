@@ -81,7 +81,7 @@ export function getBranchDocumentComplianceStatus(
   const classificationRequired = company.type !== 'Uncategorized'
     && !(company.type === 'Supplier' && company.supplierOrigin === 'Foreign')
     && !['CORP', 'SOL'].includes(company.businessClassification ?? '');
-  const documentStatuses = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification)
+  const documentStatuses = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification, branch.documents)
     .map((docName) => computeDocumentStatus(branch.documents?.[docName] ?? {}, referenceDate, docName, company).status);
 
   if (documentStatuses.includes('Expired')) return 'Expired';
@@ -154,17 +154,19 @@ export function computeCompanyDocumentSummary(
   company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification' | 'branches'>,
   referenceDate: Date = new Date()
 ): CompanyDocumentSummary {
-  const requiredKeys = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification);
   const branches = company.branches ?? [];
 
   let expiredCount = 0;
   let expiringSoonCount = 0;
   let forUpdateCount = 0;
   let missingCount = 0;
+  let totalRequired = 0;
   const issues: DocumentAlertDetail[] = [];
   const branchesToCheck: Array<BranchRecord | undefined> = branches.length > 0 ? branches : [undefined];
 
   branchesToCheck.forEach((branch) => {
+    const requiredKeys = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification, branch?.documents);
+    totalRequired += requiredKeys.length;
     requiredKeys.forEach((key) => {
       const doc: ComplianceDocument | undefined = branch?.documents?.[key];
       const { status, daysLeft } = computeDocumentStatus(doc ?? {}, referenceDate, key, company);
@@ -200,7 +202,7 @@ export function computeCompanyDocumentSummary(
     expiringSoonCount,
     forUpdateCount,
     missingCount,
-    totalRequired: requiredKeys.length * branchesToCheck.length,
+    totalRequired,
     issues,
     classificationRequired: company.type !== 'Uncategorized' && !(company.type === 'Supplier' && company.supplierOrigin === 'Foreign') && !['CORP', 'SOL'].includes(company.businessClassification ?? ''),
   };

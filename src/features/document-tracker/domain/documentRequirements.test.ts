@@ -31,18 +31,40 @@ test('CORP and SOL are mutually exclusive and unset classification does not coun
 
 test('foreign suppliers keep their separate checklist regardless of domestic classification', () => {
   const foreign = getRequiredDocumentKeys('Supplier', 'Foreign', 'CORP');
-  assert.deepEqual(FOREIGN_SUPPLIER_REQUIREMENTS.map((item) => item.key), ['SIF', 'AFS', 'Certificate of Incorporation', 'Articles of Incorporation', 'Business Permit/License', "Owner's ID", 'Product Profile']);
-  for (const name of ['SIF', 'AFS', 'Certificate of Incorporation', 'Articles of Incorporation', 'Business Permit/License', "Owner's ID", 'Product Profile']) {
+  const expectedOrder = ['Confidentiality and Non-Disclosure Agreement', 'Letter of Accreditation', 'Supplier Code of Business Conduct and Ethics', 'SIF', 'AFS', 'Certificate of Incorporation', 'Articles of Incorporation', 'Business Permit/License', "Owner's ID", 'Product Profile'];
+  assert.deepEqual(FOREIGN_SUPPLIER_REQUIREMENTS.map((item) => item.key), expectedOrder);
+  for (const name of expectedOrder) {
     assert.ok(foreign.includes(name), `${name} remains required`);
   }
-  assert.equal(foreign.length, 7);
+  assert.equal(foreign.length, 10);
+  assert.equal(FOREIGN_SUPPLIER_REQUIREMENTS.find((item) => item.key === 'Confidentiality and Non-Disclosure Agreement')?.name, 'Confidentiality and Non-Disclosure Agreement (NDA)');
   assert.deepEqual(getAvailableDocumentKeys('Supplier', 'Foreign'), FOREIGN_SUPPLIER_REQUIREMENTS.map((item) => item.key));
   assert.equal(getRequiredDocumentKeys('Supplier', 'Foreign').includes('BIR2303'), false);
-  assert.equal(getRequiredDocumentKeys('Supplier', 'Foreign').includes('Confidentiality and Non-Disclosure Agreement'), false);
+  assert.equal(getRequiredDocumentKeys('Supplier', 'Foreign').includes('Confidentiality and Non-Disclosure Agreement'), true);
   assert.equal(foreign.includes('GIS (Corp)'), false);
   assert.equal(foreign.includes('SEC (Corp)'), false);
   assert.equal(foreign.includes('DTI (Sole)'), false);
   assert.equal(foreign.includes("Sole Proprietorship (Owner's ID)"), false);
+});
+
+test('Foreign Supplier added documents increase the branch total and disappear when removed', () => {
+  const base = { type: 'Supplier' as const, supplierOrigin: 'Foreign' as const, createdAt: '2026-01-01', id: 'foreign', name: 'Foreign Supplier' };
+  const branch = { id: 'branch', bpCode: 'FOR-1', documents: { 'Other: Test': { provided: false } } };
+  const withAddedDocument = { ...base, branches: [branch] };
+  const withAddedSummary = computeCompanyDocumentSummary(withAddedDocument);
+
+  assert.equal(withAddedSummary.totalRequired, 11);
+  assert.equal(withAddedSummary.missingCount, 11);
+  assert.equal(getRequiredDocumentKeys('Supplier', 'Foreign', undefined, branch.documents).at(-1), 'Other: Test');
+  assert.equal(computeCompanyDocumentSummary({ ...base, branches: [branch, { ...branch, id: 'branch-2', bpCode: 'FOR-2', documents: {} }] }).totalRequired, 21);
+  const providedSummary = computeCompanyDocumentSummary({ ...base, branches: [{ ...branch, documents: { 'Other: Test': { provided: true } } }] });
+  assert.equal(providedSummary.totalRequired, 11);
+  assert.equal(providedSummary.missingCount, 10);
+
+  const withoutAddedDocument = { ...base, branches: [{ ...branch, documents: {} }] };
+  const withoutAddedSummary = computeCompanyDocumentSummary(withoutAddedDocument);
+  assert.equal(withoutAddedSummary.totalRequired, 10);
+  assert.equal(withoutAddedSummary.missingCount, 10);
 });
 
 test('foreign validity rules match the reference and do not change local AFS renewal behavior', () => {
@@ -61,10 +83,10 @@ test('foreign validity rules match the reference and do not change local AFS ren
   assert.equal(computeDocumentStatus({ provided: true }, referenceDate, "Owner's ID", { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Missing');
   assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2027-12-31' }, referenceDate, "Owner's ID", { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Current');
   assert.equal(computeDocumentStatus({ provided: true, expiryDate: '2026-10-31' }, referenceDate, "Owner's ID", { type: 'Supplier', supplierOrigin: 'Foreign' }).status, 'Expired');
-  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[0].description, /Completed and signed form/);
-  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[1].validity, /current fiscal or calendar year/);
-  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[2].validity, /One-time submission/);
-  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS[5].validity, /valid at the time of submission/);
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS.find((item) => item.key === 'SIF')!.description, /Completed and signed form/);
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS.find((item) => item.key === 'AFS')!.validity, /current fiscal or calendar year/);
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS.find((item) => item.key === 'Certificate of Incorporation')!.validity, /One-time submission/);
+  assert.match(FOREIGN_SUPPLIER_REQUIREMENTS.find((item) => item.key === "Owner's ID")!.validity, /valid at the time of submission/);
 });
 
 test('classified local partners hide inapplicable history while unclassified and foreign records retain it', () => {

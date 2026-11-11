@@ -44,6 +44,7 @@ import {
 import { Slide, SLIDE_EYEBROWS } from '../domain/presentation';
 import { exportSlidesAsPDF } from '../services/presentationPdf';
 import { exportSlidesAsPPTX } from '../services/presentationPptx';
+import { capturePresentationSlides } from '../services/presentationCanvasExport';
 import { SurveyResponse, SurveyType } from '../../../types/survey';
 import { surveyTypeDisplayLabel } from '../../../data/questionWeights';
 import { getScoreAxisDomain } from '../../analytics/domain/analytics';
@@ -230,7 +231,7 @@ function TitleSlide({ slide }: { slide: Extract<Slide, { kind: 'title' }> }) {
   );
 }
 
-function AgendaSlide({ slide }: { slide: Extract<Slide, { kind: 'agenda' }> }) {
+function AgendaSlide({ slide, exportMode = false }: { slide: Extract<Slide, { kind: 'agenda' }>; exportMode?: boolean }) {
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-white px-8 py-8 sm:px-14 sm:py-10">
 
@@ -240,7 +241,7 @@ function AgendaSlide({ slide }: { slide: Extract<Slide, { kind: 'agenda' }> }) {
           {slide.items.map((item, index) => (
             <motion.div
               key={item.label}
-              initial={{ opacity: 0, x: -12 }}
+              initial={exportMode ? false : { opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: index * 0.05 }}
               className="flex min-h-14 items-center gap-4 border-b border-slate-200 px-3"
@@ -263,9 +264,11 @@ function AgendaSlide({ slide }: { slide: Extract<Slide, { kind: 'agenda' }> }) {
 function OverviewSlide({
   slide,
   responses = [],
+  exportMode = false,
 }: {
   slide: Extract<Slide, { kind: 'overview' }>;
   responses?: SurveyResponse[];
+  exportMode?: boolean;
 }) {
   const isSingleSurveyType = slide.surveyTypes?.length === 1;
 
@@ -324,7 +327,7 @@ function OverviewSlide({
             return (
               <motion.div
                 key={kpi.label}
-                initial={{ opacity: 0, y: 10 }}
+                initial={exportMode ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: i * 0.06 }}
                 className="border-l-4 border-[#0063a9] bg-[#10243a] p-4 text-white"
@@ -344,7 +347,7 @@ function OverviewSlide({
           return (
             <motion.div
               key={kpi.label}
-              initial={{ opacity: 0, y: 10 }}
+              initial={exportMode ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: i * 0.06 }}
               className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 pt-3.5 shadow-sm"
@@ -401,7 +404,7 @@ function OverviewSlide({
                       className="stroke-[#0063a9] fill-none"
                       strokeWidth="5"
                       strokeDasharray="201.06"
-                      initial={{ strokeDashoffset: 201.06 }}
+                      initial={exportMode ? false : { strokeDashoffset: 201.06 }}
                       animate={{ strokeDashoffset: 201.06 - (201.06 * scorePercent) / 100 }}
                       key={slide.standout.name}
                       transition={{ duration: 1.5, ease: 'easeOut' }}
@@ -524,7 +527,7 @@ function OverviewSlide({
                       className="stroke-[#0063a9] fill-none"
                       strokeWidth="8"
                       strokeDasharray="314.16"
-                      initial={{ strokeDashoffset: 314.16 }}
+                      initial={exportMode ? false : { strokeDashoffset: 314.16 }}
                       animate={{ strokeDashoffset: 314.16 - (314.16 * scorePercent) / 100 }}
                       key={slide.standout.name}
                       transition={{ duration: 1.5, ease: 'easeOut' }}
@@ -870,8 +873,9 @@ function SectionsSlide({ slide }: { slide: Extract<Slide, { kind: 'sections' }> 
   );
 }
 
-function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { kind: 'leaderboard' }>; responses?: SurveyResponse[] }) {
+function LeaderboardSlide({ slide, responses = [], exportMode = false }: { slide: Extract<Slide, { kind: 'leaderboard' }>; responses?: SurveyResponse[]; exportMode?: boolean }) {
   const [selectedCompany, setSelectedCompany] = useState<{ company: string; surveyType: SurveyType } | null>(null);
+  const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
 
   const composite = useMemo(() => {
     if (!selectedCompany) return null;
@@ -900,57 +904,19 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
     return getCompanyTrend(responses, selectedCompany.company, selectedCompany.surveyType);
   }, [selectedCompany, responses]);
 
-  // numGroups/layoutConfig must be computed before any early return below -
-  // this component previously called this useMemo AFTER the `if
-  // (selectedCompany)` branch's return, which meant the number of hooks
-  // called differed between "showing the list" and "showing a company's
-  // detail view" renders. React detects that hook-count mismatch and throws,
-  // which crashed this slide (and unmounted it) the instant a company was
-  // clicked. Hooks must run unconditionally, in the same order, every render.
-  const numGroups = slide.groups.length;
-
   const layoutConfig = useMemo(() => {
-    if (numGroups === 1) {
-      return {
-        containerClass: "mt-4 max-w-2xl mx-auto w-full min-h-0 flex-1 flex flex-col",
-        gridClass: "grid min-h-0 flex-1 grid-cols-1",
-        groupBlockClass: "flex min-h-0 flex-col rounded-2xl border-2 border-slate-100 p-8 bg-slate-50/40 shadow-md",
-        titleClass: "mb-6 text-lg sm:text-2xl font-black uppercase tracking-[0.2em] text-center block",
-        listSpacingClass: "min-h-0 flex-1 overflow-y-auto space-y-1.5",
-        buttonPaddingClass: "py-1.5 px-2.5",
-        rankClass: "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-sm font-bold text-slate-800 group-hover:text-[#0063a9] group-hover:underline transition-all",
-        scoreClass: "shrink-0 text-xs sm:text-sm font-extrabold transition-all group-hover:scale-105",
-        noDataClass: "text-base sm:text-lg text-slate-400 text-center py-6",
-      };
-    } else if (numGroups === 2) {
-      return {
-        containerClass: "mt-4 max-w-5xl mx-auto w-full min-h-0 flex-1 flex flex-col",
-        gridClass: "grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-8",
-        groupBlockClass: "flex min-h-0 flex-col rounded-xl border-2 border-slate-100 p-6 bg-slate-50/30 shadow-sm",
-        titleClass: "mb-3 shrink-0 text-sm sm:text-lg font-extrabold uppercase tracking-wider text-center block",
-        listSpacingClass: "min-h-0 flex-1 overflow-y-auto space-y-1",
-        buttonPaddingClass: "py-1.5 px-2.5",
-        rankClass: "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-xs sm:text-sm font-semibold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
-        scoreClass: "shrink-0 text-xs sm:text-sm font-bold transition-all group-hover:scale-105",
-        noDataClass: "text-xs sm:text-sm text-slate-400 text-center py-4",
-      };
-    } else {
-      return {
-        containerClass: "mt-4 w-full min-h-0 flex-1",
-        gridClass: "grid h-full min-h-0 grid-cols-1 gap-4 sm:grid-cols-3",
-        groupBlockClass: "flex min-h-0 flex-col rounded-xl border border-slate-100 p-4 bg-slate-50/30",
-        titleClass: "mb-2 shrink-0 text-xs sm:text-sm font-extrabold uppercase tracking-wider text-center block",
-        listSpacingClass: "min-h-0 flex-1 overflow-y-auto space-y-0.5",
-        buttonPaddingClass: "py-1 px-2",
-        rankClass: "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
-        companyClass: "min-w-0 flex-1 truncate text-[11px] sm:text-xs font-bold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
-        scoreClass: "shrink-0 text-[11px] sm:text-xs font-bold transition-all group-hover:scale-105",
-        noDataClass: "text-xs text-slate-400 text-center py-2",
-      };
-    }
-  }, [numGroups]);
+    return {
+      containerClass: "mt-4 max-w-5xl mx-auto w-full min-h-0 flex-1 flex flex-col",
+      groupBlockClass: "flex min-h-0 flex-1 flex-col rounded-xl border border-slate-100 p-4 bg-slate-50/30",
+      listSpacingClass: "min-h-0 flex-1 overflow-hidden space-y-0.5",
+      buttonPaddingClass: "py-0.5 px-2",
+      rankClass: "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 group-hover:bg-[#0063a9]/10 group-hover:text-[#0063a9] transition-colors",
+      companyClass: "min-w-0 flex-1 truncate text-[11px] sm:text-xs font-bold text-slate-700 group-hover:text-[#0063a9] group-hover:underline transition-all",
+      scoreClass: "shrink-0 text-[11px] sm:text-xs font-bold transition-all group-hover:scale-105",
+      noDataClass: "text-xs text-slate-400 text-center py-2",
+    };
+  }, []);
+  const activeGroup = slide.groups[selectedGroupIndex];
 
   if (selectedCompany) {
     return (
@@ -1127,37 +1093,58 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
       <div className="shrink-0">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-[#0063a9]">{SLIDE_EYEBROWS.leaderboard}</p>
         <h2 className="mt-1 text-2xl font-bold text-slate-900 sm:text-3xl">Company Leaderboard</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Top-ranked partners within each survey type. Click a company to view interactive breakdown & trends.
+      <p className="mt-1 text-sm text-slate-500">
+          {exportMode ? 'Top-ranked partners within the selected survey type.' : 'Top-ranked partners by survey type. Switch categories with the arrows, or click a company to view its breakdown and trends.'}
         </p>
       </div>
       <div className={layoutConfig.containerClass}>
-        <div className={layoutConfig.gridClass}>
-          {slide.groups.map((group) => (
-            <div key={group.surveyType} className={layoutConfig.groupBlockClass}>
-              <p
-                className={layoutConfig.titleClass}
-                style={{ color: surveyTypeColors[group.surveyType] }}
-              >
-                {group.surveyType}
-              </p>
-              {group.selectedCompanyOutsideTopTwenty && (
+        {activeGroup ? (
+            <div key={activeGroup.surveyType} className={layoutConfig.groupBlockClass}>
+              <div className={`mb-3 flex shrink-0 items-center gap-4 ${exportMode ? 'justify-center' : 'justify-between'}`}>
+                {!exportMode ? <button
+                  type="button"
+                  aria-label="Previous leaderboard category"
+                  title="Previous category"
+                  disabled={selectedGroupIndex === 0}
+                  onClick={() => setSelectedGroupIndex((current) => Math.max(0, current - 1))}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={18} aria-hidden="true" />
+                </button> : null}
+                <div className="min-w-0 text-center" aria-live="polite">
+                  <p className="text-sm font-extrabold uppercase tracking-wider sm:text-base" style={{ color: surveyTypeColors[activeGroup.surveyType] }}>
+                    {activeGroup.surveyType}
+                  </p>
+                  {!exportMode ? <p className="mt-0.5 text-[10px] font-medium text-slate-400">Category {selectedGroupIndex + 1} of {slide.groups.length}</p> : null}
+                </div>
+                {!exportMode ? <button
+                  type="button"
+                  aria-label="Next leaderboard category"
+                  title="Next category"
+                  disabled={selectedGroupIndex >= slide.groups.length - 1}
+                  onClick={() => setSelectedGroupIndex((current) => Math.min(slide.groups.length - 1, current + 1))}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0063a9] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight size={18} aria-hidden="true" />
+                </button> : null}
+              </div>
+              {activeGroup.selectedCompanyOutsideTopTwenty && (
                 <p className="mb-2 rounded-md bg-[#eef7fc] px-2.5 py-2 text-[11px] leading-4 text-slate-600">
-                  <span className="font-semibold text-[#176FAE]">{group.selectedCompanyOutsideTopTwenty.company}</span> is not included in the top 20 and is ranked{' '}
-                  <span className="font-semibold text-slate-800">{group.selectedCompanyOutsideTopTwenty.rank}</span> out of{' '}
-                  <span className="font-semibold text-slate-800">{group.selectedCompanyOutsideTopTwenty.total}</span> {group.surveyType.toLowerCase()} companies.
+                  <span className="font-semibold text-[#176FAE]">{activeGroup.selectedCompanyOutsideTopTwenty.company}</span> is not included in the top 20 and is ranked{' '}
+                  <span className="font-semibold text-slate-800">{activeGroup.selectedCompanyOutsideTopTwenty.rank}</span> out of{' '}
+                  <span className="font-semibold text-slate-800">{activeGroup.selectedCompanyOutsideTopTwenty.total}</span> {activeGroup.surveyType.toLowerCase()} companies.
                 </p>
               )}
-              {group.rows.length ? (
-                <ol className={`${layoutConfig.listSpacingClass} presentation-leaderboard-scroll`}>
-                  {group.rows.map((row) => (
+              {activeGroup.rows.length ? (
+                <ol className={layoutConfig.listSpacingClass}>
+                  {activeGroup.rows.map((row) => (
                     <li key={row.company}>
                       <button
                         type="button"
                         onClick={() =>
                           setSelectedCompany({
                             company: row.company,
-                            surveyType: group.surveyType,
+                            surveyType: activeGroup.surveyType,
                           })
                         }
                         title={`Click to view detailed metrics for ${row.company}`}
@@ -1184,8 +1171,7 @@ function LeaderboardSlide({ slide, responses = [] }: { slide: Extract<Slide, { k
                 <p className={layoutConfig.noDataClass}>No data for this window.</p>
               )}
             </div>
-          ))}
-        </div>
+        ) : <p className={layoutConfig.noDataClass}>No leaderboard categories available.</p>}
       </div>
       </div>
     </div>
@@ -1368,7 +1354,7 @@ function SpotlightSlide({ slide }: { slide: Extract<Slide, { kind: 'spotlight' }
  * every survey type's differently-scaled ratings in one chart) with a
  * single, actionable question: which partners are trailing their own peer
  * group, and in which specific category. */
-function NeedsAttentionSlide({ slide }: { slide: Extract<Slide, { kind: 'distribution' }> }) {
+function NeedsAttentionSlide({ slide, exportMode = false }: { slide: Extract<Slide, { kind: 'distribution' }>; exportMode?: boolean }) {
   const gridColsClass = slide.atRisk.length <= 1 ? 'lg:grid-cols-1' : slide.atRisk.length <= 4 ? 'lg:grid-cols-2' : 'lg:grid-cols-3';
 
   return (
@@ -1393,7 +1379,7 @@ function NeedsAttentionSlide({ slide }: { slide: Extract<Slide, { kind: 'distrib
             {slide.atRisk.map((c, i) => (
               <motion.div
                 key={`${c.company}-${c.surveyType}`}
-                initial={{ opacity: 0, y: 12 }}
+                initial={exportMode ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: i * 0.05 }}
                 className="flex flex-col justify-between rounded-2xl border border-amber-100 bg-amber-50/30 p-4"
@@ -1538,20 +1524,20 @@ function PortfolioSpreadSlide({ slide }: { slide: Extract<Slide, { kind: 'portfo
   );
 }
 
-function SlideContent({ slide, responses = [] }: { slide: Slide; responses?: SurveyResponse[] }) {
+function SlideContent({ slide, responses = [], exportMode = false }: { slide: Slide; responses?: SurveyResponse[]; exportMode?: boolean }) {
   switch (slide.kind) {
     case 'title':
       return <TitleSlide slide={slide} />;
     case 'agenda':
-      return <AgendaSlide slide={slide} />;
+      return <AgendaSlide slide={slide} exportMode={exportMode} />;
     case 'overview':
-      return <OverviewSlide slide={slide} responses={responses} />;
+      return <OverviewSlide slide={slide} responses={responses} exportMode={exportMode} />;
     case 'comparison':
       return <ComparisonSlide slide={slide} responses={responses} />;
     case 'sections':
       return <SectionsSlide slide={slide} />;
     case 'leaderboard':
-      return <LeaderboardSlide slide={slide} responses={responses} />;
+      return <LeaderboardSlide slide={slide} responses={responses} exportMode={exportMode} />;
     case 'trends':
       return <TrendsSlide slide={slide} />;
     case 'questions':
@@ -1559,7 +1545,7 @@ function SlideContent({ slide, responses = [] }: { slide: Slide; responses?: Sur
     case 'spotlight':
       return <SpotlightSlide slide={slide} />;
     case 'distribution':
-      return <NeedsAttentionSlide slide={slide} />;
+      return <NeedsAttentionSlide slide={slide} exportMode={exportMode} />;
     case 'period-change':
       return <PeriodChangeSlide slide={slide} />;
     case 'focus':
@@ -1578,14 +1564,16 @@ export function PresentationSlideCanvas({
   slide,
   responses = [],
   reportingPeriod,
+  exportMode = false,
 }: {
   slide: Slide;
   responses?: SurveyResponse[];
   reportingPeriod?: string;
+  exportMode?: boolean;
 }) {
   return (
     <div className="relative h-full w-full">
-      <SlideContent slide={slide} responses={responses} />
+      <SlideContent slide={slide} responses={responses} exportMode={exportMode} />
       {slide.kind !== 'title' && reportingPeriod ? (
         <div className="pointer-events-none absolute bottom-2 right-5 z-20 text-[9px] font-medium text-slate-400">
           Reporting period: {reportingPeriod}
@@ -1605,6 +1593,7 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
   const [direction, setDirection] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isExporting, setIsExporting] = useState<'pdf' | 'pptx' | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -1713,9 +1702,17 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
   const handleExport = async (format: 'pdf' | 'pptx') => {
     setExportMenuOpen(false);
     setIsExporting(format);
+    setExportError(null);
     try {
-      if (format === 'pdf') await exportSlidesAsPDF(slides, title);
-      else exportSlidesAsPPTX(slides, title);
+      if (!shellRef.current) throw new Error('Presentation canvas is unavailable.');
+      const slideImages = await capturePresentationSlides(slides, (slide) => (
+        <PresentationSlideCanvas slide={slide} responses={responses} reportingPeriod={reportingPeriod} exportMode />
+      ), shellRef.current);
+      if (format === 'pdf') await exportSlidesAsPDF(slideImages, title);
+      else await exportSlidesAsPPTX(slideImages, title);
+    } catch (error) {
+      console.error('Presentation export failed', error);
+      setExportError('The presentation export failed. Please try again.');
     } finally {
       setIsExporting(null);
     }
@@ -1767,6 +1764,8 @@ export function SlideDeck({ slides, title, onExit, responses = [] }: SlideDeckPr
           </button>
         </div>
       </div>
+
+      {exportError ? <p className="text-right text-sm text-rose-700" role="alert">{exportError}</p> : null}
 
       <div
         ref={shellRef}

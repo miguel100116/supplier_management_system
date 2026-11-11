@@ -2687,3 +2687,56 @@ test('password recovery remains available at a role-specific entry URL', async (
   await expect(page.getByRole('heading', { name: 'Welcome back', exact: true })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
+
+test('presentation PDF and PowerPoint exports download from the rendered slide canvas', async ({ page }, testInfo) => {
+  test.skip(Boolean(testInfo.project.use.isMobile), 'The presentation export surface is desktop-only.');
+  test.setTimeout(180_000);
+  const service = await backend(page);
+  for (const surveyType of ['Courier', 'Supplier', 'Subcontractor']) {
+    const responseId = `presentation-export-${surveyType.toLowerCase()}`;
+    service.records.push({
+      record_type: 'survey_response',
+      record_id: `${responseId}:Q01`,
+      created_at: createdAt,
+      payload: {
+        responseId,
+        surveyType,
+        companyId: `presentation-${surveyType.toLowerCase()}`,
+        company: `${surveyType} Export Partner`,
+        respondentType: 'Employee',
+        respondentEmail: email,
+        submissionDate: '2026-11-10T12:00:00.000Z',
+        questionId: 'Q01',
+        questionNumber: 1,
+        question: 'How would you rate service quality?',
+        questionCategory: 'Delivery',
+        rating: 90,
+        comment: '',
+        dataSource: 'production_submission',
+      },
+    });
+  }
+
+  await page.goto('/login');
+  await signIn(page);
+  await openReadyPage(page, '/present-mode');
+  await page.getByRole('button', { name: 'Generate Presentation', exact: true }).click();
+  await expect(page.getByText('Slide 1 of', { exact: false })).toBeVisible();
+
+  for (const [format, extension] of [['PDF Document', '.pdf'], ['PowerPoint (PPTX)', '.pptx']] as const) {
+    await page.getByRole('button', { name: 'Export As', exact: true }).click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: format, exact: true }).click();
+    const outcome = await Promise.race([
+      downloadPromise.then((download) => ({ download })),
+      page.getByRole('alert').waitFor({ state: 'visible' }).then(async () => ({ error: await page.getByRole('alert').innerText() })),
+    ]);
+    if ('error' in outcome) throw new Error(`Export error: ${outcome.error}`);
+    const download = outcome.download;
+    expect(download.suggestedFilename()).toMatch(new RegExp(`${extension.replace('.', '\\.')}$$`, 'i'));
+    await download.saveAs(testInfo.outputPath(`presentation-export${extension}`));
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  }
+  expect(service.errors).toEqual([]);
+  expect(service.unexpected).toEqual([]);
+});

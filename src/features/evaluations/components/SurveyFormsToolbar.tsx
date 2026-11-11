@@ -12,7 +12,7 @@ interface SurveyFormsToolbarProps {
   deadlineTo: string;
   onDeadlineFromChange: (value: string) => void;
   onDeadlineToChange: (value: string) => void;
-  onResetFilters: () => void;
+  onResetFilters?: () => void;
   onCreateForm: () => void;
   onManageAccess: () => void;
 }
@@ -40,17 +40,53 @@ export function SurveyFormsToolbar({
   const filtersRef = useRef<HTMLDivElement>(null);
   const sortTriggerRef = useRef<HTMLButtonElement>(null);
   const dateTriggerRef = useRef<HTMLButtonElement>(null);
+  const datePopoverRef = useRef<HTMLDivElement>(null);
+  const hoverCloseTimerRef = useRef<number | null>(null);
   const hasActiveSort = sort !== 'title-asc';
   const hasActiveDateRange = Boolean(deadlineFrom || deadlineTo);
+
+  const clearHoverClose = () => {
+    if (hoverCloseTimerRef.current !== null) {
+      window.clearTimeout(hoverCloseTimerRef.current);
+      hoverCloseTimerRef.current = null;
+    }
+  };
+
+  const openPopoverOnHover = (kind: Exclude<OpenFilterPopover, null>) => {
+    clearHoverClose();
+    setOpenPopover(kind);
+  };
+
+  const schedulePopoverClose = (kind: Exclude<OpenFilterPopover, null>) => {
+    clearHoverClose();
+    hoverCloseTimerRef.current = window.setTimeout(() => {
+      if (
+        kind === 'date' &&
+        datePopoverRef.current &&
+        datePopoverRef.current.contains(document.activeElement) &&
+        document.activeElement !== dateTriggerRef.current
+      ) {
+        return;
+      }
+      setOpenPopover((current) => (current === kind ? null : current));
+      hoverCloseTimerRef.current = null;
+    }, 180);
+  };
+
+  useEffect(() => () => clearHoverClose(), []);
 
   useEffect(() => {
     if (!openPopover) return;
     const dismissOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !filtersRef.current?.contains(event.target)) setOpenPopover(null);
+      if (event.target instanceof Node && !filtersRef.current?.contains(event.target)) {
+        clearHoverClose();
+        setOpenPopover(null);
+      }
     };
     const dismissOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
+      clearHoverClose();
       const trigger = openPopover === 'sort' ? sortTriggerRef.current : dateTriggerRef.current;
       setOpenPopover(null);
       trigger?.focus();
@@ -73,6 +109,7 @@ export function SurveyFormsToolbar({
     { value: 'created-desc', label: 'Created: newest first' },
   ];
   const selectSort = (value: SurveyFormSort) => {
+    clearHoverClose();
     onSortChange(value);
     setOpenPopover(null);
     sortTriggerRef.current?.focus();
@@ -112,7 +149,15 @@ export function SurveyFormsToolbar({
       </div>
 
       <div ref={filtersRef} className="survey-forms-filters flex shrink-0 items-center gap-1" aria-label="Form filters">
-        <div className="admin-directory-popover-anchor">
+        <div
+          className="admin-directory-popover-anchor"
+          onPointerEnter={(event) => {
+            if (event.pointerType !== 'touch') openPopoverOnHover('sort');
+          }}
+          onPointerLeave={(event) => {
+            if (event.pointerType !== 'touch') schedulePopoverClose('sort');
+          }}
+        >
           <button
             ref={sortTriggerRef}
             type="button"
@@ -121,13 +166,24 @@ export function SurveyFormsToolbar({
             title="Sort forms"
             aria-expanded={openPopover === 'sort'}
             aria-haspopup="dialog"
-            onClick={() => setOpenPopover((current) => current === 'sort' ? null : 'sort')}
+            onClick={() => {
+              clearHoverClose();
+              setOpenPopover((current) => current === 'sort' ? null : 'sort');
+            }}
           >
             <ArrowDownUp size={16} aria-hidden="true" />
             {hasActiveSort && <span className="admin-directory-active-dot" aria-hidden="true" />}
           </button>
           {openPopover === 'sort' && (
-            <div className="admin-directory-compact-popover" role="dialog" aria-label="Sort forms" style={{ width: 'min(270px, calc(100vw - 28px))' }}>
+            <div
+              className="admin-directory-compact-popover"
+              role="dialog"
+              aria-label="Sort forms"
+              style={{ width: 'min(270px, calc(100vw - 28px))' }}
+              onPointerEnter={(event) => {
+                if (event.pointerType !== 'touch') clearHoverClose();
+              }}
+            >
               <div role="group" aria-label="Sort options" className="grid gap-1">
                 {sortOptions.map((option) => {
                   const selected = sort === option.value;
@@ -145,14 +201,26 @@ export function SurveyFormsToolbar({
                   );
                 })}
               </div>
-              <button type="button" className="admin-directory-popover-reset border-t border-slate-100 pt-2 dark:border-slate-800" onClick={() => selectSort('title-asc')}>
+              <button
+                type="button"
+                className="admin-directory-popover-reset border-t border-slate-100 pt-2 dark:border-slate-800"
+                onClick={() => selectSort('title-asc')}
+              >
                 Reset sorting
               </button>
             </div>
           )}
         </div>
 
-        <div className="admin-directory-popover-anchor">
+        <div
+          className="admin-directory-popover-anchor"
+          onPointerEnter={(event) => {
+            if (event.pointerType !== 'touch') openPopoverOnHover('date');
+          }}
+          onPointerLeave={(event) => {
+            if (event.pointerType !== 'touch') schedulePopoverClose('date');
+          }}
+        >
           <button
             ref={dateTriggerRef}
             type="button"
@@ -161,13 +229,25 @@ export function SurveyFormsToolbar({
             title="Filter by deadline date"
             aria-expanded={openPopover === 'date'}
             aria-haspopup="dialog"
-            onClick={() => setOpenPopover((current) => current === 'date' ? null : 'date')}
+            onClick={() => {
+              clearHoverClose();
+              setOpenPopover((current) => current === 'date' ? null : 'date');
+            }}
           >
             <CalendarDays size={16} aria-hidden="true" />
             {hasActiveDateRange && <span className="admin-directory-active-dot" aria-hidden="true" />}
           </button>
           {openPopover === 'date' && (
-            <div className="admin-directory-compact-popover" role="dialog" aria-label="Filter forms by deadline date" style={{ width: 'min(320px, calc(100vw - 28px))' }}>
+            <div
+              ref={datePopoverRef}
+              className="admin-directory-compact-popover"
+              role="dialog"
+              aria-label="Filter forms by deadline date"
+              style={{ width: 'min(320px, calc(100vw - 28px))' }}
+              onPointerEnter={(event) => {
+                if (event.pointerType !== 'touch') clearHoverClose();
+              }}
+            >
               <fieldset className="admin-directory-date-popover grid grid-cols-2 gap-2">
                 <legend>Deadline range</legend>
                 <label className="admin-directory-popover-field">
@@ -193,14 +273,16 @@ export function SurveyFormsToolbar({
                   />
                 </label>
               </fieldset>
-              <div className="flex items-center justify-between gap-2">
-                <button type="button" className="admin-directory-popover-reset !justify-self-start" onClick={() => { onDeadlineFromChange(''); onDeadlineToChange(''); }}>
-                  Reset date range
-                </button>
-                <button type="button" className="admin-directory-popover-reset" onClick={onResetFilters}>
-                  Reset filters
-                </button>
-              </div>
+              <button
+                type="button"
+                className="admin-directory-popover-reset"
+                onClick={() => {
+                  onDeadlineFromChange('');
+                  onDeadlineToChange('');
+                }}
+              >
+                Reset
+              </button>
             </div>
           )}
         </div>

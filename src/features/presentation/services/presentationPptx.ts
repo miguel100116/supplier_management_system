@@ -1,5 +1,6 @@
 import PptxGenJS from 'pptxgenjs';
 import { Slide, SLIDE_EYEBROWS } from '../domain/presentation';
+import { PRESENTATION_CANVAS_HEIGHT, PRESENTATION_CANVAS_WIDTH } from './presentationCanvasExport';
 
 // 16:9 widescreen, matching the on-screen deck's 1280x720 design canvas
 // (SlideDeck.tsx) so the two stay visually consistent.
@@ -50,30 +51,22 @@ function addHeader(slide: PptxGenJS.Slide, eyebrow: string, title: string, subti
   return y + 0.2;
 }
 
-export function exportSlidesAsPPTX(slides: Slide[], deckTitle: string) {
+export async function exportSlidesAsPPTX(slideImages: string[], deckTitle: string) {
   const pres = new PptxGenJS();
-  pres.defineLayout({ name: 'DECK_16x9', width: SLIDE_W, height: SLIDE_H });
+  const exportWidth = PRESENTATION_CANVAS_WIDTH / 96;
+  const exportHeight = PRESENTATION_CANVAS_HEIGHT / 96;
+  pres.defineLayout({ name: 'DECK_16x9', width: exportWidth, height: exportHeight });
   pres.layout = 'DECK_16x9';
   pres.title = deckTitle;
-
-  let pdfMaxRating = 4;
-  const questionsSlide = slides.find((s) => s.kind === 'questions') as Extract<Slide, { kind: 'questions' }> | undefined;
-  if (questionsSlide?.maxRating) {
-    pdfMaxRating = questionsSlide.maxRating;
-  } else {
-    const overviewSlide = slides.find((s) => s.kind === 'overview') as Extract<Slide, { kind: 'overview' }> | undefined;
-    const avgRatingKpi = overviewSlide?.kpis.find((k) => k.label === 'Average Rating');
-    const match = avgRatingKpi?.value.match(/\/ ([\d.]+)/);
-    if (match) pdfMaxRating = parseFloat(match[1]);
-  }
-
-  const reportingPeriod = slides.find((slide) => slide.kind === 'title')?.meta[0];
-  slides.forEach((slide) => renderPptxSlide(pres, slide, pdfMaxRating, reportingPeriod));
+  slideImages.forEach((data) => {
+    const slide = pres.addSlide();
+    slide.addImage({ data, x: 0, y: 0, w: exportWidth, h: exportHeight });
+  });
 
   const filename = `${deckTitle.replace(/[^a-z0-9]+/gi, '_').toLowerCase() || 'presentation'}_${new Date()
     .toISOString()
     .slice(0, 10)}.pptx`;
-  pres.writeFile({ fileName: filename });
+  await pres.writeFile({ fileName: filename });
 }
 
 export function renderPptxSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: number, reportingPeriod?: string) {
@@ -277,43 +270,63 @@ export function renderPptxSlide(pres: PptxGenJS, slide: Slide, pdfMaxRating: num
     }
 
     case 'leaderboard': {
+      const group = slide.groups[0];
       const contentTop = addHeader(pptxSlide, SLIDE_EYEBROWS.leaderboard, 'Company Leaderboard');
-      const groups = slide.groups;
-      const colGap = 0.2;
-      const colW = (CONTENT_W - colGap * (groups.length - 1)) / groups.length;
-      const colH = CONTENT_BOTTOM - contentTop;
-      groups.forEach((group, gi) => {
-        const x = MARGIN + gi * (colW + colGap);
-        pptxSlide.addShape('roundRect', {
-          x, y: contentTop, w: colW, h: colH, rectRadius: 0.06,
-          fill: { color: SURFACE }, line: { color: BORDER, width: 1 },
+      if (!group) {
+        pptxSlide.addText('No leaderboard categories are available.', {
+          x: MARGIN, y: contentTop + 0.2, w: CONTENT_W, h: 0.3, fontSize: 10, italic: true, color: MUTED, fontFace: FONT,
         });
-        pptxSlide.addText(group.surveyType.toUpperCase(), {
-          x: x + 0.12, y: contentTop + 0.1, w: colW - 0.24, h: 0.26,
-          fontSize: 11, bold: true, color: surveyTypeHex[group.surveyType] ?? BRAND, fontFace: FONT,
-        });
-        const rows = group.rows;
-        const rowTop = contentTop + 0.42;
-        const rowH = rows.length > 0 ? Math.min(0.42, (colH - 0.52) / rows.length) : 0;
-        if (rows.length === 0) {
-          pptxSlide.addText('No data for this window.', {
-            x: x + 0.12, y: rowTop, w: colW - 0.24, h: 0.3, fontSize: 9, italic: true, color: MUTED, fontFace: FONT,
-          });
-        } else {
-          rows.forEach((row, ri) => {
-            const y = rowTop + ri * rowH;
-            pptxSlide.addText(`${row.rank}.`, {
-              x: x + 0.12, y, w: 0.3, h: rowH, fontSize: 9.5, bold: true, color: MUTED, fontFace: FONT, valign: 'middle',
-            });
-            pptxSlide.addText(row.company, {
-              x: x + 0.42, y, w: colW - 1.1, h: rowH, fontSize: 9.5, color: INK, fontFace: FONT, valign: 'middle',
-            });
-            pptxSlide.addText(row.score.toFixed(0), {
-              x: x + colW - 0.6, y, w: 0.5, h: rowH, align: 'right', fontSize: 10, bold: true, color: row.hex.replace('#', ''), fontFace: FONT, valign: 'middle',
-            });
-          });
-        }
+        break;
+      }
+
+      const panelH = CONTENT_BOTTOM - contentTop;
+      const panelX = MARGIN;
+      const panelW = CONTENT_W;
+      pptxSlide.addShape('roundRect', {
+        x: panelX, y: contentTop, w: panelW, h: panelH, rectRadius: 0.06,
+        fill: { color: SURFACE }, line: { color: BORDER, width: 1 },
       });
+      pptxSlide.addText(group.surveyType.toUpperCase(), {
+        x: panelX + 0.18, y: contentTop + 0.1, w: panelW - 0.36, h: 0.25,
+        align: 'center', fontSize: 11, bold: true, color: surveyTypeHex[group.surveyType] ?? BRAND, fontFace: FONT,
+      });
+
+      const rowsTop = contentTop + 0.43;
+      const rowsH = panelH - 0.52;
+      const rowH = group.rows.length ? rowsH / group.rows.length : 0;
+      if (group.rows.length === 0) {
+        pptxSlide.addText('No data for this window.', {
+          x: panelX + 0.18, y: rowsTop, w: panelW - 0.36, h: 0.3, fontSize: 9, italic: true, color: MUTED, fontFace: FONT,
+        });
+      } else {
+        group.rows.forEach((row, index) => {
+          const y = rowsTop + index * rowH;
+          const medal = row.rank <= 3 ? ({
+            1: { bg: 'FBBF24', text: '78350F' },
+            2: { bg: 'CBD5E1', text: '334155' },
+            3: { bg: 'FB923C', text: '7C2D12' },
+          } as Record<number, { bg: string; text: string }>)[row.rank] : undefined;
+          const rankX = panelX + 0.18;
+          const badgeSize = Math.min(0.19, rowH - 0.015);
+          pptxSlide.addShape('ellipse', {
+            x: rankX + 0.075, y: y + (rowH - badgeSize) / 2, w: badgeSize, h: badgeSize,
+            fill: { color: medal?.bg ?? 'F1F5F9' }, line: { type: 'none' },
+          });
+          pptxSlide.addText(String(row.rank), {
+            x: rankX, y, w: 0.34, h: rowH, fontSize: 8.5, bold: true,
+            color: medal?.text ?? MUTED, fontFace: FONT, valign: 'middle', align: 'center', margin: 0,
+          });
+          pptxSlide.addText(row.company, {
+            x: panelX + 0.56, y, w: panelW - 1.42, h: rowH,
+            fontSize: group.rows.length > 14 ? 8 : 9.5, color: INK, fontFace: FONT,
+            valign: 'middle', margin: 0, breakLine: false, fit: 'shrink',
+          });
+          pptxSlide.addText(row.score.toFixed(0), {
+            x: panelX + panelW - 0.74, y, w: 0.52, h: rowH, align: 'right',
+            fontSize: 9, bold: true, color: row.hex.replace('#', ''), fontFace: FONT, valign: 'middle', margin: 0,
+          });
+        });
+      }
       break;
     }
 

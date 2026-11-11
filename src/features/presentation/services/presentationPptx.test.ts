@@ -3,15 +3,23 @@ import test from 'node:test';
 import type PptxGenJS from 'pptxgenjs';
 import type { SurveyResponse } from '../../../types/survey';
 import { buildSlides, type Slide } from '../domain/presentation';
+import { expandSlidesForExport } from './presentationCanvasExport';
 import { renderPptxSlide } from './presentationPptx';
 
 type ChartCall = { type: unknown; data: Array<{ name: string; labels: string[]; values: number[] }>; options: Record<string, unknown> };
+type TextCall = { text: string; options: Record<string, unknown> };
 
 function render(slide: Slide, reportingPeriod = 'Jan 1 – Mar 31, 2026') {
   const text: string[] = [];
+  const textCalls: TextCall[] = [];
   const charts: ChartCall[] = [];
   const slideMock = {
-    addText: (content: unknown) => { if (typeof content === 'string') text.push(content); },
+    addText: (content: unknown, options: Record<string, unknown> = {}) => {
+      if (typeof content === 'string') {
+        text.push(content);
+        textCalls.push({ text: content, options });
+      }
+    },
     addShape: () => undefined,
     addChart: (type: unknown, data: ChartCall['data'], options: ChartCall['options']) => { charts.push({ type, data, options }); },
     addImage: () => undefined,
@@ -22,7 +30,7 @@ function render(slide: Slide, reportingPeriod = 'Jan 1 – Mar 31, 2026') {
   } as unknown as PptxGenJS;
 
   renderPptxSlide(presentation, slide, 100, reportingPeriod);
-  return { text, charts };
+  return { text, textCalls, charts };
 }
 
 function response(responseId: string, questionId: string, submissionDate: string): SurveyResponse {
@@ -40,6 +48,52 @@ function response(responseId: string, questionId: string, submissionDate: string
     comment: '',
   };
 }
+
+test('PPTX expands the leaderboard into Courier, Supplier, and Subcontractor slides in order', () => {
+  const overview: Slide = { kind: 'questions', top: [], bottom: [] };
+  const leaderboard: Slide = {
+    kind: 'leaderboard',
+    groups: ['Subcontractor', 'Courier', 'Supplier'].map((surveyType) => ({
+      surveyType: surveyType as 'Courier' | 'Supplier' | 'Subcontractor',
+      rows: [],
+    })),
+  };
+  const closing: Slide = { kind: 'closing', takeaways: [] };
+
+  const expanded = expandSlidesForExport([overview, leaderboard, closing]);
+
+  assert.deepEqual(expanded.map((slide) => slide.kind), ['questions', 'leaderboard', 'leaderboard', 'leaderboard', 'closing']);
+  assert.deepEqual(expanded.filter((slide) => slide.kind === 'leaderboard').map((slide) =>
+    slide.kind === 'leaderboard' ? slide.groups[0]?.surveyType : undefined), ['Courier', 'Supplier', 'Subcontractor']);
+  assert.deepEqual(leaderboard.groups.map((group) => group.surveyType), ['Subcontractor', 'Courier', 'Supplier']);
+});
+
+test('PPTX leaderboard uses full-width rows with shrink-to-fit company labels', () => {
+  const slide: Slide = {
+    kind: 'leaderboard',
+    groups: [{
+      surveyType: 'Supplier',
+      rows: Array.from({ length: 20 }, (_, index) => ({
+        rank: index + 1,
+        company: `Supplier Partner ${index + 1} with a deliberately long company name`,
+        score: 90 - index,
+        band: 'Good',
+        hex: '#10b981',
+      })),
+    }],
+  };
+
+  const rendered = render(slide);
+  const companies = rendered.textCalls.filter(({ text }) => text.startsWith('Supplier Partner'));
+  const rankTen = rendered.textCalls.find(({ text }) => text === '10');
+
+  assert.equal(companies.length, 20);
+  assert.ok(companies.every(({ options }) => options.fit === 'shrink' && options.breakLine === false));
+  assert.ok(companies.every(({ options }) => Number(options.w) > 7));
+  assert.ok(companies.every(({ options }) => Number(options.h) > 0.15));
+  assert.ok(rankTen && Number(rankTen.options.w) >= 0.34);
+  assert.ok(rendered.text.includes('SUPPLIER'));
+});
 
 test('PPTX comparison includes countable submissions beside averages and does not chart zero-response scores', () => {
   const rendered = render({

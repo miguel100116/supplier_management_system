@@ -55,6 +55,36 @@ test('Feedback Hub filter bar keeps search and count visible and discloses filte
   }
 });
 
+test('Feedback Hub filter bar reveals options on hover and removes nested select dropdowns', () => {
+  const defaults = {
+    searchValue: '',
+    searchPlaceholder: 'Search results',
+    searchLabel: 'Search results by title',
+    onSearchChange: noop,
+    resultCount: 4,
+    resultLabel: 'results',
+    sortOptions: [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }],
+    sortValue: 'newest',
+    defaultSortValue: 'newest',
+    onSortChange: noop,
+    dateFrom: '',
+    dateTo: '',
+    dateLabel: 'Created date',
+    onDateFromChange: noop,
+    onDateToChange: noop,
+    categoryValue: 'All',
+    categoryLabel: 'Partner type',
+    categoryOptions: [{ value: 'All', label: 'All partner types' }, { value: 'Supplier', label: 'Supplier' }],
+    onCategoryChange: noop,
+    onReset: noop,
+  };
+  const markup = renderToStaticMarkup(createElement(FeedbackHubFilterBar, defaults));
+  assert.doesNotMatch(markup, /<select/);
+  assert.match(markup, /aria-label="Partner type"/);
+  assert.match(markup, />All partner types<\/span>/);
+  assert.match(markup, />Supplier<\/span>/);
+});
+
 function response(index: number, surveyType: SurveyResponse['surveyType'] = 'Supplier'): SurveyResponse {
   return {
     responseId: `response-${index}`,

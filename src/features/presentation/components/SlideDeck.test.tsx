@@ -40,6 +40,38 @@ test('preview category slides do not show a score when there are no countable su
   assert.doesNotMatch(markup, /Delivery: average/);
 });
 
+test('leaderboard keeps categories within the slide and starts on Courier without a scroll list', () => {
+  const slide: Slide = {
+    kind: 'leaderboard',
+    groups: [
+      { surveyType: 'Courier', rows: [{ rank: 1, company: 'Courier Partner', score: 92, band: 'Good', hex: '#16a34a' }] },
+      { surveyType: 'Supplier', rows: [{ rank: 1, company: 'Supplier Partner', score: 88, band: 'Good', hex: '#16a34a' }] },
+      { surveyType: 'Subcontractor', rows: [{ rank: 1, company: 'Subcontractor Partner', score: 84, band: 'Good', hex: '#16a34a' }] },
+    ],
+  };
+
+  const markup = renderToStaticMarkup(createElement(PresentationSlideCanvas, { slide }));
+
+  assert.match(markup, /Courier Partner/);
+  assert.match(markup, /Category 1 of 3/);
+  assert.match(markup, /aria-label="Next leaderboard category"/);
+  assert.match(markup, /aria-label="Previous leaderboard category"[^>]*disabled=""/);
+  assert.match(markup, /overflow-hidden space-y-0\.5/);
+  assert.doesNotMatch(markup, /Supplier Partner|Subcontractor Partner|overflow-y-auto/);
+});
+
+test('export leaderboard pages show one category without presentation-only navigation controls', () => {
+  const slide: Slide = {
+    kind: 'leaderboard',
+    groups: [{ surveyType: 'Supplier', rows: [{ rank: 1, company: 'Supplier Partner', score: 88, band: 'Good', hex: '#10b981' }] }],
+  };
+
+  const markup = renderToStaticMarkup(createElement(PresentationSlideCanvas, { slide, exportMode: true }));
+
+  assert.match(markup, /Supplier Partner/);
+  assert.doesNotMatch(markup, /Previous leaderboard category|Next leaderboard category|Category 1 of 1|Switch categories with the arrows/);
+});
+
 test('preview trend slides present average and monthly response volume together', () => {
   const slide: Slide = {
     kind: 'trends',

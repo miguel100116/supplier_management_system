@@ -30,6 +30,7 @@ export const LOCAL_SUPPLIER_DOCUMENTS = [
 ] as const;
 
 export const FOREIGN_SUPPLIER_DOCUMENTS = [
+  ...COMMON_DOCUMENTS,
   'SIF',
   'AFS',
   'Certificate of Incorporation',
@@ -40,6 +41,9 @@ export const FOREIGN_SUPPLIER_DOCUMENTS = [
 ] as const;
 
 export const FOREIGN_SUPPLIER_REQUIREMENTS = [
+  { key: 'Confidentiality and Non-Disclosure Agreement', name: 'Confidentiality and Non-Disclosure Agreement (NDA)', description: 'Signed agreement governing confidential information shared with the supplier.', validity: 'One-time submission; renew if the agreement expires or is replaced.' },
+  { key: 'Letter of Accreditation', name: 'Letter of Accreditation', description: 'Formal accreditation confirmation issued by Microgenesis.', validity: 'One-time submission; update if amended.' },
+  { key: 'Supplier Code of Business Conduct and Ethics', name: 'Supplier Code of Business Conduct and Ethics', description: 'Acknowledged supplier code covering expected business conduct and ethical standards.', validity: 'Update when the applicable code changes.' },
   { key: 'SIF', name: 'Supplier Information Form (SIF)', description: 'Completed and signed form containing company profile, contact details, banking information, and authorized representatives.', validity: 'Update as necessary.' },
   { key: 'AFS', name: 'Audited Financial Statements (AFS)', description: "Latest audited financial statements showing the supplier's financial standing and capability. Accept current fiscal or calendar year AFS.", validity: 'Renewable annually; accept the current fiscal or calendar year.' },
   { key: 'Certificate of Incorporation', name: 'Certificate of Incorporation / Registration', description: 'Proof of legal registration issued by the appropriate government agency or foreign equivalent.', validity: 'One-time submission; update if amended.' },
@@ -93,16 +97,21 @@ export function shouldShowHistoricalDocument(
   return isDocumentApplicableToClassification(docName, businessClassification);
 }
 
-// Full ordered list of mandatory document keys for a partner category.
-// Foreign Supplier supporting documents are conditional and therefore remain
-// available to add, but are not included in this required list.
+// Full ordered list of required document keys. A Foreign Supplier's added
+// Other: documents become requirements for that branch only.
 export function getRequiredDocumentKeys(
   type: PartnerCompanyType,
   origin: SupplierOrigin | undefined,
-  businessClassification?: BusinessClassification
+  businessClassification?: BusinessClassification,
+  branchDocuments?: Record<string, unknown>,
 ): string[] {
   if (type === 'Uncategorized') return [...COMMON_DOCUMENTS];
-  if (type === 'Supplier' && origin === 'Foreign') return [...FOREIGN_SUPPLIER_DOCUMENTS];
+  if (type === 'Supplier' && origin === 'Foreign') {
+    const addedDocuments = Object.keys(branchDocuments ?? {})
+      .filter((name) => name.startsWith('Other: ') && name.slice(7).trim().length > 0)
+      .sort((a, b) => a.localeCompare(b));
+    return [...FOREIGN_SUPPLIER_DOCUMENTS, ...addedDocuments];
+  }
   const originDocs = LOCAL_SUPPLIER_DOCUMENTS;
   const applicable = originDocs.filter((name) => {
     if (type === 'Supplier' && name === 'Other Documents') return false;

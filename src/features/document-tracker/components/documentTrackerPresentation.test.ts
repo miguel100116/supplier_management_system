@@ -170,3 +170,24 @@ test('pinned category strip keeps all categories reachable and exposes the selec
     assert.match(strip, new RegExp(`aria-pressed="true"[^>]*>[\\s\\S]*?<span>${category === 'courier' ? 'Courier' : 'All Categories'}</span>`));
   }
 });
+
+test('document sort and filter icon triggers share the hover and open-state styling', () => {
+  const toolbar = DOCUMENT_TRACKER_SOURCE.slice(
+    DOCUMENT_TRACKER_SOURCE.indexOf('aria-label="Sort companies"'),
+    DOCUMENT_TRACKER_SOURCE.indexOf('aria-label="Active filters"'),
+  );
+
+  assert.equal((toolbar.match(/className="admin-directory-icon-trigger"/g) ?? []).length, 2);
+  assert.match(toolbar, /aria-label="Sort companies"[\s\S]*?aria-expanded=\{isSortPopoverOpen\}/);
+  assert.match(toolbar, /aria-label="Filter documents"[\s\S]*?aria-expanded=\{isFilterPopoverOpen\}/);
+});
+
+test('document filter trigger reveals selections popover on hover and coordinates closing', () => {
+  const filterSection = DOCUMENT_TRACKER_SOURCE.slice(
+    DOCUMENT_TRACKER_SOURCE.indexOf('ref={filterPopoverRef}'),
+    DOCUMENT_TRACKER_SOURCE.indexOf('id="document-filter-popover"'),
+  );
+
+  assert.match(filterSection, /onPointerEnter=\{[\s\S]*?setIsFilterPopoverOpen\(true\)/);
+  assert.match(filterSection, /onPointerLeave=\{[\s\S]*?scheduleFilterMenuClose\(\)/);
+});

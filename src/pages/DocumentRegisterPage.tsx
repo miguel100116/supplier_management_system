@@ -517,6 +517,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const filterPopoverRef = useRef<HTMLDivElement>(null);
   const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const filterCloseTimerRef = useRef<number | null>(null);
   const moreFiltersCloseTimerRef = useRef<number | null>(null);
   const sortPopoverRef = useRef<HTMLDivElement>(null);
   const sortTriggerRef = useRef<HTMLButtonElement>(null);
@@ -761,6 +762,28 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
 
   useEffect(() => () => cancelMoreFiltersClose(), []);
 
+  const cancelFilterMenuClose = () => {
+    if (filterCloseTimerRef.current !== null) {
+      window.clearTimeout(filterCloseTimerRef.current);
+      filterCloseTimerRef.current = null;
+    }
+  };
+
+  const scheduleFilterMenuClose = () => {
+    cancelFilterMenuClose();
+    filterCloseTimerRef.current = window.setTimeout(() => {
+      if (filterPopoverRef.current && filterPopoverRef.current.contains(document.activeElement) && document.activeElement !== filterTriggerRef.current) {
+        return;
+      }
+      setIsFilterPopoverOpen(false);
+      setIsMoreFiltersOpen(false);
+      cancelMoreFiltersClose();
+      filterCloseTimerRef.current = null;
+    }, 180);
+  };
+
+  useEffect(() => () => cancelFilterMenuClose(), []);
+
   const cancelRowExpandHover = () => {
     if (rowExpandHoverTimerRef.current !== null) {
       window.clearTimeout(rowExpandHoverTimerRef.current);
@@ -796,18 +819,24 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     const closeOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target as Node;
       if (filterPopoverRef.current && !filterPopoverRef.current.contains(target)) {
+        cancelFilterMenuClose();
         setIsFilterPopoverOpen(false);
         setIsMoreFiltersOpen(false);
         cancelMoreFiltersClose();
       }
-      if (sortPopoverRef.current && !sortPopoverRef.current.contains(target)) setIsSortPopoverOpen(false);
+      if (sortPopoverRef.current && !sortPopoverRef.current.contains(target)) {
+        cancelSortMenuClose();
+        setIsSortPopoverOpen(false);
+      }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
+      cancelFilterMenuClose();
       setIsFilterPopoverOpen(false);
       setIsMoreFiltersOpen(false);
       cancelMoreFiltersClose();
+      cancelSortMenuClose();
       setIsSortPopoverOpen(false);
       if (isSortPopoverOpen) sortTriggerRef.current?.focus();
       else filterTriggerRef.current?.focus();
@@ -897,7 +926,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
     displayRows.forEach((row) => {
       map.set(
         row.key,
-        getRequiredDocumentKeys(row.company.type, row.company.supplierOrigin, row.company.businessClassification).map((docName) => {
+        getRequiredDocumentKeys(row.company.type, row.company.supplierOrigin, row.company.businessClassification, row.branch?.documents).map((docName) => {
           const branch = row.branch;
           const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
           const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName, row.company);
@@ -1128,9 +1157,10 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       expiringSoonDocs += summary.expiringSoonCount;
       expiredDocs += summary.expiredCount + summary.forUpdateCount;
 
-      getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification).filter((docName) => isExpiryDocument(docName, c.type, c.supplierOrigin)).forEach((docName) => {
-        const branches = visibleBranches.length ? visibleBranches : [undefined];
-        branches.forEach((branch) => {
+      const branches = visibleBranches.length ? visibleBranches : [undefined];
+      branches.forEach((branch) => {
+        getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification, branch?.documents)
+          .filter((docName) => isExpiryDocument(docName, c.type, c.supplierOrigin)).forEach((docName) => {
           const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
           const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName, c);
 
@@ -1157,7 +1187,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
               daysLeft,
             });
           }
-        });
+          });
       });
     });
 
@@ -1934,16 +1964,24 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
             <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
               <span className="whitespace-nowrap text-xs font-semibold text-slate-500 dark:text-slate-400">{rows.length} result{rows.length === 1 ? '' : 's'}</span>
               <div className="relative" ref={sortPopoverRef}
-                onPointerEnter={(event) => { if (event.pointerType !== 'touch') { cancelSortMenuClose(); setIsSortPopoverOpen(true); } }}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== 'touch') {
+                    cancelSortMenuClose();
+                    cancelFilterMenuClose();
+                    setIsFilterPopoverOpen(false);
+                    setIsSortPopoverOpen(true);
+                  }
+                }}
                 onPointerLeave={(event) => { if (event.pointerType !== 'touch') scheduleSortMenuClose(); }}>
-                <button ref={sortTriggerRef} type="button" aria-label="Sort companies" title={`Sort by ${sortKeys.map(describeDocumentSort).join(', ')}, ${sortDirection === 'asc' ? 'ascending' : 'descending'}`} aria-haspopup="menu" aria-expanded={isSortPopoverOpen} aria-controls="document-sort-popover" onClick={() => { setIsFilterPopoverOpen(false); cancelSortMenuClose(); setIsSortPopoverOpen((open) => !open); }} onKeyDown={(event) => {
+                <button ref={sortTriggerRef} type="button" aria-label="Sort companies" title={`Sort by ${sortKeys.map(describeDocumentSort).join(', ')}, ${sortDirection === 'asc' ? 'ascending' : 'descending'}`} aria-haspopup="menu" aria-expanded={isSortPopoverOpen} aria-controls="document-sort-popover" onClick={() => { setIsFilterPopoverOpen(false); cancelFilterMenuClose(); cancelSortMenuClose(); setIsSortPopoverOpen((open) => !open); }} onKeyDown={(event) => {
                   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                     event.preventDefault();
                     setIsFilterPopoverOpen(false);
+                    cancelFilterMenuClose();
                     setIsSortPopoverOpen(true);
                     requestAnimationFrame(() => sortPopoverRef.current?.querySelector<HTMLInputElement>('input[data-sort-selected="true"]')?.focus());
                   }
-                }} className={`inline-flex h-9 w-9 items-center justify-center rounded-md border focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2187CD] ${isSortPopoverOpen ? 'border-[#8bbbd7] bg-[#eff6fa] text-[#155f8b]' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200'}`}>
+                }} className="admin-directory-icon-trigger">
                   <ArrowDownUp size={16} aria-hidden="true" />
                 </button>
                 {isSortPopoverOpen && <div id="document-sort-popover" role="menu" aria-label="Sort document register" className="absolute right-0 top-full z-50 mt-1 max-h-[min(70vh,32rem)] w-max min-w-48 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg shadow-slate-900/15 dark:border-slate-700 dark:bg-slate-900">
@@ -1976,12 +2014,35 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
                   </div>
                 </div>}
               </div>
-              <div className="relative" ref={filterPopoverRef}>
-                <button ref={filterTriggerRef} type="button" aria-label="Filter documents" title="Filter documents" aria-haspopup="dialog" aria-expanded={isFilterPopoverOpen} aria-controls="document-filter-popover" onClick={() => { if (isFilterPopoverOpen) { setIsMoreFiltersOpen(false); cancelMoreFiltersClose(); } setIsSortPopoverOpen(false); setIsFilterPopoverOpen(!isFilterPopoverOpen); }} className="admin-directory-icon-trigger">
+              <div className="relative" ref={filterPopoverRef}
+                onPointerEnter={(event) => {
+                  if (event.pointerType !== 'touch') {
+                    cancelFilterMenuClose();
+                    cancelSortMenuClose();
+                    setIsSortPopoverOpen(false);
+                    setIsFilterPopoverOpen(true);
+                  }
+                }}
+                onPointerLeave={(event) => {
+                  if (event.pointerType !== 'touch') scheduleFilterMenuClose();
+                }}>
+                <button ref={filterTriggerRef} type="button" aria-label="Filter documents" title="Filter documents" aria-haspopup="dialog" aria-expanded={isFilterPopoverOpen} aria-controls="document-filter-popover" onClick={() => {
+                  cancelFilterMenuClose();
+                  if (isFilterPopoverOpen) {
+                    setIsMoreFiltersOpen(false);
+                    cancelMoreFiltersClose();
+                  }
+                  setIsSortPopoverOpen(false);
+                  cancelSortMenuClose();
+                  setIsFilterPopoverOpen(!isFilterPopoverOpen);
+                }} className="admin-directory-icon-trigger">
                   <Filter size={16} aria-hidden="true" />
                   {hasAppliedFilters && <span className="admin-directory-active-dot" aria-hidden="true" />}
                 </button>
-                {isFilterPopoverOpen && <div id="document-filter-popover" role="dialog" aria-label="Document filters" className="absolute right-0 top-full z-40 mt-2 max-h-[min(75vh,40rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900">
+                {isFilterPopoverOpen && <div id="document-filter-popover" role="dialog" aria-label="Document filters" className="absolute right-0 top-full z-40 mt-2 max-h-[min(75vh,40rem)] w-[min(28rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-white shadow-lg shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900"
+                  onPointerEnter={(event) => {
+                    if (event.pointerType !== 'touch') cancelFilterMenuClose();
+                  }}>
                   <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5 dark:border-slate-800"><h3 className="text-sm font-semibold text-slate-900 dark:text-white">Filter documents</h3>{hasAppliedFilters && <button type="button" onClick={clearAppliedFilters} className="text-xs font-medium text-[#176b9a] hover:underline dark:text-sky-300">Clear all</button>}</div>
                   <div className="space-y-3 p-3">
                     {isAdmin && <label className={`flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 text-xs ${withinTop20 ? 'bg-[#eff6fa] text-[#155f8b] dark:bg-sky-950/30 dark:text-sky-200' : 'text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'}`}>

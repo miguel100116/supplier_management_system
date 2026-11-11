@@ -8,37 +8,6 @@
 
 @custom-variant hover (&:hover);
 
-/* Keep long presentation leaderboards scrollable without a prominent browser scrollbar. */
-.presentation-leaderboard-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
-  scrollbar-gutter: stable;
-}
-
-.presentation-leaderboard-scroll::-webkit-scrollbar {
-  width: 5px;
-}
-
-.presentation-leaderboard-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.presentation-leaderboard-scroll::-webkit-scrollbar-thumb {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: #cbd5e1;
-  background-clip: padding-box;
-}
-
-.presentation-leaderboard-scroll:hover {
-  scrollbar-color: #94a3b8 transparent;
-}
-
-.presentation-leaderboard-scroll:hover::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  background-clip: padding-box;
-}
-
 @theme {
   --default-ring-width: 3px;
   --default-ring-color: #2187cd;

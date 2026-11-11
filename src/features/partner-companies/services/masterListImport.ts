@@ -387,7 +387,7 @@ function buildDocuments(
   // those categories have the same list of requirements, except the foreign
   // one", and there's no Courier-Foreign/Subcontractor-Foreign category).
   if (type === 'Supplier' && origin === 'Foreign') {
-    const [sif, afs, cert, articles, bpLicense, ownersId, productProfile] = FOREIGN_SUPPLIER_DOCUMENTS;
+    const [sif, afs, cert, articles, bpLicense, ownersId, productProfile] = FOREIGN_SUPPLIER_DOCUMENTS.slice(COMMON_DOCUMENTS.length);
     setFlag(sif, COL.foreign.sif);
     setExpiry(afs, COL.foreign.afs);
     setFlag(cert, COL.foreign.certOfIncorporation);
