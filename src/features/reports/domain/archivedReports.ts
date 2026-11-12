@@ -7,6 +7,7 @@ import { selectSurveyResponses, answerValue } from '../../evaluations/domain/sur
 import { describeArchiveResponseGroup } from '../../archives/domain/archiveResponseGroup';
 import type { ExportTable } from '../services/exporters';
 import { buildArchiveAnalyticsData } from './archiveAnalyticsVisuals';
+import { ARCHIVED_LEADERBOARD_LIMIT, buildArchivedReportLayout } from './archivedReportLayout';
 
 export const ARCHIVED_REPORT_TITLES = {
   'archived-survey': 'Archived Survey Report',
@@ -73,7 +74,7 @@ export function buildArchivedReport(data: ArchivedReportData, selection: Archive
   const title = ARCHIVED_REPORT_TITLES[kind];
   const count = submissionCount(rows);
   const composites = getCompanyComposites(rows, category).filter(composite => composite.evaluationCount > 0);
-  const rankings = getAnalyticsCompanyRankings(rows, [category]);
+  const rankings = getAnalyticsCompanyRankings(rows, [category]).slice(0, ARCHIVED_LEADERBOARD_LIMIT);
   const scores = submissionScores(scoredResponses(rows));
   const dates = rows.map(row => row.submissionDate).sort((left, right) => Date.parse(left) - Date.parse(right));
   const officialRows = rows.filter(isOfficialAnalyticsResponse).length;
@@ -103,7 +104,7 @@ export function buildArchivedReport(data: ArchivedReportData, selection: Archive
     tables.push({ title: 'Company performance', columns: ['Company', 'Submissions', 'Score', 'Rating'], rows: [
       ...rankings.map(row => [row.name, row.count, formatAnalyticsScore(category, row.rankScore), getAnalyticsBand(category, row.rankScore).label]),
       ...composites.filter(row => !row.hasScore).map(row => [row.company, row.evaluationCount, 'No Score Yet', 'No Score Yet']),
-    ] }, { title: 'Category performance', columns: ['Company', 'Category', 'Score (%)'],
+    ].slice(0, ARCHIVED_LEADERBOARD_LIMIT) }, { title: 'Category performance', columns: ['Company', 'Category', 'Score (%)'],
       rows: composites.flatMap(row => row.sections.filter(section => section.responses > 0).map(section => [row.company, section.section, formatNumber(section.percent)])),
     }, { title: 'Question results', columns: ['Question', 'Average score (%)', 'Answers (including N/A)'],
       rows: questionPerformance(rows).map(row => [row.question, formatNumber(row.average), row.responses]),
@@ -112,5 +113,12 @@ export function buildArchivedReport(data: ArchivedReportData, selection: Archive
   if (includeComments) tables.push({ title: 'Respondent comments', columns: ['Company', 'Question', 'Comment'],
     rows: rows.filter(row => hasAnsweredItem(row) && row.comment.trim() && row.comment !== 'Submitted successfully.').map(row => [row.company, row.question, row.comment]),
   });
-  return { title, itemLabel: item.label, tables, count, rowCount: rows.length, canExport: true, analytics: buildArchiveAnalyticsData(rows, data.series) };
+  const analytics = buildArchiveAnalyticsData(rows, data.series).map(item => ({ ...item, leaderboardLimit: ARCHIVED_LEADERBOARD_LIMIT }));
+  const layout = buildArchivedReportLayout(category, tables, analytics);
+  if (kind === 'archived-survey') {
+    const questionIndex = tables.findIndex(table => table.title === 'Question results');
+    tables[questionIndex] = layout.questionTable;
+    tables.push(layout.categoryTable);
+  }
+  return { title, itemLabel: item.label, tables, count, rowCount: rows.length, canExport: true, analytics, layout };
 }

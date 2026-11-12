@@ -1979,7 +1979,10 @@ test('Archived report builders select one item, update the document preview and 
       comment: '=SUM(1,1)', archived: true, archivedAt: '2026-07-01T00:00:00Z', seriesId, dataSource: source,
     } });
   }
-  const openBuilder = async (title: string) => page.getByRole('article').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+  const openBuilder = async (title: string) => {
+    await page.getByRole('tab', { name: title === 'Archived Survey Report' ? 'Archived Surveys' : title === 'Archived Response Report' ? 'Archived Responses' : 'Archived Companies', exact: true }).click();
+    await page.getByRole('article').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+  };
   await page.goto('/login');
   await signIn(page);
   await openReadyPage(page, '/reports');
@@ -1992,8 +1995,8 @@ test('Archived report builders select one item, update the document preview and 
   await page.getByRole('combobox', { name: 'Archived survey', exact: true }).selectOption('archive-a');
   const preview = page.getByLabel('Archived report preview', { exact: true });
   await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
-  await expect(preview.getByRole('row', { name: 'Staging/test answer rows 1', exact: true })).toBeVisible();
-  await expect(preview.getByRole('row', { name: 'Evaluated companies 2', exact: true })).toBeVisible();
+  await expect(preview.getByRole('row', { name: 'Stored answer rows 4 (3 official; 1 staging/test)', exact: true })).toBeVisible();
+  await expect(preview.getByText('Companies evaluated', { exact: true }).locator('..').locator('dd')).toHaveText('2');
   await expect(preview).not.toContainText('private@example.test');
   await expect(preview).not.toContainText('=SUM(1,1)');
   await expect(page.getByRole('option', { name: 'All companies', exact: true })).toHaveCount(0);
@@ -2001,8 +2004,10 @@ test('Archived report builders select one item, update the document preview and 
   const documentBox = await page.getByRole('region', { name: 'Archived report document', exact: true }).boundingBox();
   if (testInfo.project.use.isMobile) {
     expect(optionsBox!.y + optionsBox!.height).toBeLessThanOrEqual(documentBox!.y);
-    const table = preview.getByRole('region', { name: 'Company performance', exact: true });
-    expect(await table.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(false);
+    const sheet = preview.locator('[data-paper-page]').first();
+    await expect(sheet).toBeVisible();
+    const ratio = await sheet.evaluate(element => element.clientHeight / element.clientWidth);
+    expect(ratio).toBeCloseTo(792 / 612, 1);
   } else expect(optionsBox!.x + optionsBox!.width).toBeLessThan(documentBox!.x);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('combobox', { name: 'Paper size', exact: true }).selectOption('legal');
@@ -2019,15 +2024,16 @@ test('Archived report builders select one item, update the document preview and 
       const pdf = bytes.toString('latin1');
       expect(pdf).toMatch(/^%PDF-/);
       expect(pdf).toMatch(/\/MediaBox \[0 0 612(?:\.0*)? 1008(?:\.0*)?\]/);
-      for (const text of ['Archived Survey Report', 'First archived survey', 'current rubric', 'Report scope', 'Supplier Management System']) {
+      for (const text of ['Archived Survey Report', 'First archived survey', 'current rubric', 'Report details', 'Supplier Management System']) {
         expect(pdf).toContain(text);
       }
       const pageCount = Number(pdf.match(/\/Count (\d+)/)?.[1]);
       expect(pageCount).toBeGreaterThan(0);
-      const visualTitles = ['Courier Overview', 'Courier Category performance', 'Courier Leaderboard', 'Courier Questions 1'];
+      const visualTitles = ['Courier Leaderboard', 'Report summary', 'Key findings', 'Question results', 'Category averages'];
       for (const title of visualTitles) expect(pdf).toContain(title);
-      expect(pdf.indexOf('Courier Leaderboard')).toBeLessThan(pdf.indexOf('Report scope'));
-      expect((pdf.match(/\/I\d+ Do/g) ?? []).length).toBe(pageCount + visualTitles.length);
+      expect(pdf.indexOf('Courier Leaderboard')).toBeLessThan(pdf.indexOf('Report details'));
+      expect((pdf.match(/\/I\d+ Do/g) ?? []).length).toBe(pageCount);
+      await writeFile(testInfo.outputPath('archived-survey.pdf'), bytes);
       expect(pdf).not.toContain('SMPESA');
       expect(pdf).toContain(`/Author (Microgenesis)`);
       expect(pdf).not.toContain('This report provides a comprehensive summary of survey analytics');
@@ -2060,7 +2066,7 @@ test('Archived report builders select one item, update the document preview and 
   await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('archive-a');
   await expect(page.getByRole('combobox', { name: 'Paper size', exact: true })).toHaveValue('legal');
   await expect(preview.getByRole('row', { name: 'Stored submissions 4', exact: true })).toBeVisible();
-  await page.getByRole('combobox', { name: 'Category', exact: true }).selectOption('Supplier');
+  await page.getByRole('tab', { name: /^Supplier \(/ }).click();
   await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('');
   await expect(preview).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Download report', exact: true })).toBeDisabled();
@@ -2184,22 +2190,19 @@ test('Archive Excel exports retain all rows and category Analytics images, and P
   }
   await expect(page.getByRole('alert')).toHaveCount(0);
   await openReadyPage(page, '/reports');
+  await page.getByRole('tab', { name: 'Archived Responses', exact: true }).click();
   await page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Archived Response Report', exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
   for (const type of types) {
-    await page.getByRole('combobox', { name: 'Category', exact: true }).selectOption(type);
+    await page.getByRole('tab', { name: new RegExp(`^${type} \\(`) }).click();
     await page.getByRole('combobox', { name: 'Response archive', exact: true }).selectOption('visual-batch');
     const preview = page.getByLabel('Archived report preview', { exact: true });
-    await expect(preview.getByRole('row', { name: `Stored submissions ${type === 'Courier' ? 5 : 1}`, exact: true })).toBeVisible();
     const unifiedRanking = preview.getByRole('region', { name: `${type} Company Leaderboard`, exact: true });
     await expect(unifiedRanking).toHaveCount(1);
     await expect(unifiedRanking.getByRole('listitem')).toHaveCount(type === 'Courier' ? 5 : 1);
-    const rankingBox = await unifiedRanking.boundingBox();
-    const scopeBox = await preview.getByRole('heading', { name: 'Report scope', exact: true }).boundingBox();
-    expect(rankingBox!.y).toBeLessThan(scopeBox!.y);
-    expect(await preview.evaluate(element => [element.parentElement!, ...Array.from(element.querySelectorAll('*'))].some(node => {
-      const style = getComputedStyle(node);
-      return ['auto', 'scroll'].includes(style.overflowX) || ['auto', 'scroll'].includes(style.overflowY);
-    }))).toBe(false);
+    await expect(preview.getByRole('row', { name: `Stored submissions ${type === 'Courier' ? 5 : 1}`, exact: true })).toBeVisible();
+    await expect(unifiedRanking).toHaveCount(1);
+    // This waits for real PDF composition/worker loading inside the existing 120s journey deadline.
+    await expect(preview.locator('[data-paper-page]').first()).toBeVisible({ timeout: 20_000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
     if (type === 'Courier') await page.screenshot({ path: testInfo.outputPath('ranking-first-preview.png'), fullPage: true });
     const download = page.waitForEvent('download');
@@ -2234,8 +2237,16 @@ test('a staging-only Supplier response archive matches Archive Center and all re
   await page.getByRole('button', { name: /Archived Responses/ }).click();
   await expect(page.getByLabel('Archived survey forms', { exact: true }).getByText(archiveLabel, { exact: true })).toBeVisible();
   await page.goto('/reports');
+  await page.evaluate(() => {
+    const original = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = function () {
+      HTMLCanvasElement.prototype.toDataURL = original;
+      throw new Error('Synthetic preview preparation failure');
+    };
+  });
+  await page.getByRole('tab', { name: 'Archived Responses', exact: true }).click();
   await page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Archived Response Report', exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
-  await expect(page.getByRole('combobox', { name: 'Category', exact: true })).toHaveValue('Supplier');
+  await expect(page.getByRole('tab', { name: /^Supplier \(/ })).toHaveAttribute('aria-selected', 'true');
   const selector = page.getByRole('combobox', { name: 'Response archive', exact: true });
   await expect(selector).toHaveValue('staged-only');
   await expect(selector.getByRole('option', { name: archiveLabel, exact: true })).toHaveCount(1);
@@ -2245,6 +2256,10 @@ test('a staging-only Supplier response archive matches Archive Center and all re
   await expect(preview.getByRole('row', { name: 'Staging/test answer rows 1', exact: true })).toBeVisible();
   const downloadButton = page.getByRole('button', { name: 'Download report', exact: true });
   await expect(downloadButton).toBeEnabled();
+  await expect(preview.getByRole('alert')).toContainText('Unable to prepare the paper preview');
+  expect(service.records.filter(record => record.record_type === 'export_history')).toHaveLength(0);
+  await preview.getByRole('button', { name: 'Retry preview', exact: true }).click();
+  await expect(preview.locator('[data-paper-page]').first()).toHaveAttribute('data-rendered', 'true');
   await page.evaluate(() => {
     const original = URL.createObjectURL;
     URL.createObjectURL = () => { URL.createObjectURL = original; throw new Error('Synthetic download blocked'); };
@@ -2278,11 +2293,131 @@ test('a staging-only Supplier response archive matches Archive Center and all re
   await page.getByRole('tab', { name: 'History', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Download again', exact: true })).toHaveCount(3);
   await page.getByRole('button', { name: 'Regenerate', exact: true }).first().click();
-  await expect(page.getByRole('combobox', { name: 'Category', exact: true })).toHaveValue('Supplier');
+  await expect(page.getByRole('tab', { name: /^Supplier \(/ })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('combobox', { name: 'Response archive', exact: true })).toHaveValue('staged-only');
   expect(service.records.find(record => record.record_type === 'survey_response')?.payload.archived).toBe(true);
   expect(service.unexpected).toEqual([]);
   expect(service.errors).toEqual([]);
+});
+
+test('Archived report tabs keep Top 20 rankings and full cohort totals across categories and downloads', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  const service = await backend(page);
+  const types = ['Courier', 'Supplier', 'Subcontractor'] as const;
+  const archiveQuestions = {
+    Courier: [{ questionId: 'Q01', section: 'Delivery', maxPoints: 15 }],
+    Supplier: ['39', '40', '41', '42', '43', '05', '06', '07', '14', '15', '16', '33', '34', '35', '25', '26', '27'].map((id, index) => ({ questionId: `Q${id}`, section: index < 5 ? 'Documentation' : index < 8 ? 'Delivery' : index < 11 ? 'Price' : index < 14 ? 'Quality' : 'Communication', maxPoints: 4 })),
+    Subcontractor: [{ questionId: 'Q03', section: 'Delivery / Timeliness', maxPoints: 2 }],
+  };
+  service.records.push({ record_type: 'archive_series', record_id: 'top-20', created_at: createdAt, payload: { id: 'top-20', label: 'Selected full period', createdAt } });
+  for (const type of types) {
+    const surveyId = `top-${type}`;
+    const weights = archiveQuestions[type];
+    service.records.push({ record_type: 'survey', record_id: surveyId, created_at: createdAt, payload: {
+      ...evaluationForm, id: surveyId, title: `${type} archived evaluation`, status: 'Archived', surveyType: type,
+      questions: weights.map((weight, index) => ({ questionId: weight.questionId, questionNumber: index + 1, question: `${weight.section} evaluation question ${index + 1}`, questionCategory: weight.section })),
+    } });
+    for (let index = 0; index < 25; index++) {
+      const id = `${type}-${index}`;
+      const name = `${type} Company ${String(index + 1).padStart(2, '0')} with complete registered business name`;
+      service.records.push({ record_type: 'partner_company', record_id: id, created_at: createdAt, payload: { id, name, type, createdAt, isArchived: true } });
+      weights.forEach((weight, questionIndex) => service.records.push({ record_type: 'survey_response', record_id: `${id}:${weight.questionId}`, created_at: createdAt, payload: {
+        responseId: id, companyId: id, company: name, surveyId, surveyType: type, respondentType: 'Employee',
+        submissionDate: '2026-07-01T00:00:00Z', questionId: weight.questionId, questionNumber: questionIndex + 1,
+        question: `${weight.section} evaluation question ${questionIndex + 1}`, questionCategory: weight.section,
+        rating: weight.maxPoints * (1 - index / 50), comment: '', archived: true, archivedAt: createdAt, seriesId: 'top-20', dataSource: 'client_csv',
+      } }));
+    }
+  }
+  await page.goto('/login'); await signIn(page); await openReadyPage(page, '/reports');
+  const reportTabs = page.getByRole('tablist', { name: 'Archived reports', exact: true });
+  await reportTabs.getByRole('tab', { name: 'Archived Surveys', exact: true }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(reportTabs.getByRole('tab', { name: 'Archived Responses', exact: true })).toBeFocused();
+  await page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Archived Response Report', exact: true }) }).getByRole('button', { name: 'Build report', exact: true }).click();
+  const preview = page.getByLabel('Archived report preview', { exact: true });
+  for (const type of types) {
+    await page.getByRole('tab', { name: new RegExp(`^${type} \\(`) }).click();
+    await expect(page.getByRole('combobox', { name: 'Response archive', exact: true })).toHaveValue('top-20');
+    await expect(preview.getByRole('listitem')).toHaveCount(20);
+    await expect(preview.getByRole('row', { name: 'Countable responses 25', exact: true })).toBeVisible();
+    await expect(preview.getByRole('listitem').last()).toHaveAccessibleName(new RegExp(`Rank 20: ${type} Company 20`));
+    if (type === 'Subcontractor') await expect(preview.getByRole('listitem').first()).toHaveAccessibleName(/2.00 \/ 2.0/);
+  }
+  await page.getByRole('tab', { name: 'Archived Surveys', exact: true }).click();
+  await page.getByRole('tab', { name: /^Supplier \(/ }).click();
+  await expect(page.getByRole('combobox', { name: 'Archived survey', exact: true })).toHaveValue('top-Supplier');
+  await expect(page.getByRole('combobox', { name: 'Paper size', exact: true })).toHaveValue('letter');
+  await expect(preview.getByRole('region', { name: 'Supplier Company Leaderboard', exact: true }).getByRole('listitem')).toHaveCount(20);
+  await expect(preview.getByRole('region', { name: 'Question results', exact: true }).getByRole('row')).toHaveCount(archiveQuestions.Supplier.length + 1);
+  await expect(preview.getByRole('row', { name: 'Stored submissions 25', exact: true })).toBeVisible();
+  for (const format of ['pdf', 'excel', 'docx', 'csv']) {
+    await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption(format);
+    const downloaded = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Download report', exact: true }).click();
+    const bytes = await readFile((await (await downloaded).path())!);
+    if (format === 'pdf') {
+      const pdf = bytes.toString('latin1');
+      expect(pdf).toContain('/Count 3');
+      expect(pdf).toContain('Supplier Company 20');
+      expect(pdf).not.toContain('Supplier Company 21');
+      expect(pdf.indexOf('Supplier Leaderboard')).toBeLessThan(pdf.indexOf('Report summary'));
+      expect(pdf.indexOf('Report summary')).toBeLessThan(pdf.indexOf('Question results'));
+      await writeFile(testInfo.outputPath('top-20-survey.pdf'), bytes);
+    } else if (format === 'excel') {
+      const workbook = XLSX.read(bytes);
+      expect(XLSX.utils.sheet_to_json(workbook.Sheets['Company performance'])).toHaveLength(20);
+      expect(XLSX.utils.sheet_to_json(workbook.Sheets['Question results'])).toHaveLength(archiveQuestions.Supplier.length);
+      expect(XLSX.utils.sheet_to_json(workbook.Sheets['Archived Survey Report'], { header: 1 })).toContainEqual(['Countable responses', 25]);
+    } else if (format === 'docx') {
+      const zip = XLSX.CFB.read(bytes, { type: 'buffer' });
+      const xml = Buffer.from(XLSX.CFB.find(zip, '/word/document.xml')!.content as Uint8Array).toString();
+      const ranking = xml.slice(xml.indexOf('Company performance'), xml.indexOf('Category performance'));
+      expect(ranking).toContain('Supplier Company 20');
+      expect(ranking).not.toContain('Supplier Company 21');
+    } else {
+      const ranking = bytes.toString().split('Company performance')[1].split('Category performance')[0];
+      expect(ranking).toContain('Supplier Company 20');
+      expect(ranking).not.toContain('Supplier Company 21');
+    }
+  }
+  await page.getByRole('combobox', { name: 'File format', exact: true }).selectOption('pdf');
+  await expect(page.getByRole('combobox', { name: 'Preview page', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Next preview page', exact: true })).toHaveCount(0);
+  const sheets = preview.locator('[data-paper-page]');
+  for (const [size, width, height] of [['letter', 612, 792], ['legal', 612, 1008], ['a4', 595.28, 841.89], ['long-bond', 612, 936]] as const) {
+    await page.getByRole('combobox', { name: 'Paper size', exact: true }).selectOption(size);
+    await expect(sheets.first()).toHaveAttribute('data-paper-height', String(height));
+    await expect(sheets.first()).toHaveAttribute('data-rendered', 'true');
+    const ratios = await sheets.evaluateAll(nodes => nodes.map(element => { const box = element.getBoundingClientRect(); return box.height / box.width; }));
+    expect(ratios.length).toBeGreaterThan(1);
+    for (const ratio of ratios) expect(ratio).toBeCloseTo(height / width, 2);
+    expect(await sheets.first().evaluate(element => element.scrollHeight <= element.clientHeight + 1)).toBe(true);
+    if (!testInfo.project.use.isMobile) await page.screenshot({ path: testInfo.outputPath(`paper-${size}.png`), fullPage: true });
+  }
+  // Rapid changes must not publish a stale document or a rejected worker promise.
+  await page.getByRole('combobox', { name: 'Paper size', exact: true }).selectOption('legal');
+  await page.getByRole('combobox', { name: 'Paper size', exact: true }).selectOption('letter');
+  await expect(sheets.first()).toHaveAttribute('data-paper-height', '792');
+  await expect(sheets.first()).toHaveAttribute('data-rendered', 'true');
+  await sheets.last().scrollIntoViewIfNeeded();
+  await expect(sheets.last()).toHaveAttribute('data-rendered', 'true');
+  await page.screenshot({ path: testInfo.outputPath('paper-last-page.png'), fullPage: false });
+  if (testInfo.project.use.isMobile) {
+    const viewport = page.viewportSize()!;
+    await page.setViewportSize({ width: 320, height: viewport.height });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(preview.locator('[data-paper-page]').first()).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('top-20-survey-320.png'), fullPage: true });
+    await page.setViewportSize(viewport);
+  }
+  await page.screenshot({ path: testInfo.outputPath('top-20-survey-preview.png'), fullPage: true });
+  await page.evaluate(() => document.body.classList.add('dark'));
+  await page.screenshot({ path: testInfo.outputPath('top-20-survey-dark.png'), fullPage: true });
+  await page.evaluate(() => document.body.classList.remove('dark'));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(service.records.filter(record => record.record_type === 'survey_response')).toHaveLength(types.reduce((count, type) => count + archiveQuestions[type].length * 25, 0));
+  expect(service.unexpected).toEqual([]); expect(service.errors).toEqual([]);
 });
 
 test('History retains saved files across recipe versions without quarantine warnings', async ({ page }, testInfo) => {

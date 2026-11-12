@@ -148,3 +148,54 @@ test('saved recipes require one item and category and display its human-readable
   }
   assert.match(describeReportParameters({ kind: 'archived-survey', parameters: { category: 'Courier', archivedItemId: survey.id, archivedItemLabel: survey.title } }), /Courier \| Archived courier survey/);
 });
+
+test('Top 20 limits only ranked companies, retaining the complete selected survey and batch metrics', () => {
+  const responses = Array.from({ length: 25 }, (_, index) => row(`form-${index}`, {
+    companyId: `company-${index}`, company: `Courier ${String(index).padStart(2, '0')}`, rating: 15 - index / 2,
+  }));
+  const input = data(responses);
+  const before = JSON.stringify(input);
+  for (const chosen of [selection, { ...selection, kind: 'archived-responses' as const, itemId: 'half-one' }]) {
+    const report = buildArchivedReport(input, chosen);
+    const table = report.tables.find(table => table.title === (chosen.kind === 'archived-survey' ? 'Company performance' : 'Company leaderboard'))!;
+    assert.equal(table.rows.length, 20);
+    assert.equal(report.count, 25);
+    assert.equal(report.rowCount, 25);
+    assert.equal(report.analytics[0].summary.companies.length, 25);
+    assert.equal(report.analytics[0].leaderboardLimit, 20);
+    assert.equal(report.layout.metrics.find(metric => metric.label === 'Companies evaluated')?.value, '25');
+    assert.equal(report.layout.questionTable.rows[0][3], 25);
+    assert.equal(table.rows.some(row => row.includes('Courier 24')), false);
+    if (chosen.kind === 'archived-responses') assert.equal(report.tables.find(table => table.title === 'Response details')?.rows.length, 25);
+  }
+  assert.equal(JSON.stringify(input), before);
+});
+
+test('reference layout sorts every question and category and derives findings without sample text', () => {
+  const input = data([row('one'), row('one', { questionId: 'Q02', question: 'Second question', rating: 0 })]);
+  const report = buildArchivedReport(input, selection);
+  assert.deepEqual(report.layout.questionTable.rows.map(row => row[1]), ['Delivery reliability', 'Second question']);
+  assert.match(report.layout.findings.join(' '), /Sample Courier/);
+  assert.doesNotMatch(report.layout.findings.join(' '), /VSTECS|Wordtext|SoftwareOne/);
+  const empty = buildArchivedReport(data([]), selection);
+  assert.deepEqual(empty.layout.findings, []);
+  assert.equal(empty.layout.metrics[0].value, 'No Score Yet');
+});
+
+test('findings use the largest sample even when its company falls outside the Top 20', () => {
+  const responses = Array.from({ length: 24 }, (_, index) => row(`ranked-${index}`, { companyId: `ranked-${index}`, company: `Ranked ${index}` }));
+  responses.push(row('low-one', { companyId: 'low', company: 'Largest sample outside Top 20', rating: 0 }), row('low-two', { companyId: 'low', company: 'Largest sample outside Top 20', rating: 0 }));
+  const report = buildArchivedReport(data(responses), selection);
+  assert.equal(report.count, 26);
+  assert.ok(report.layout.findings.some(finding => finding.startsWith('Largest sample: Largest sample outside Top 20, 2 submissions')));
+  assert.ok(!report.tables.find(table => table.title === 'Company performance')?.rows.some(cells => cells[0] === 'Largest sample outside Top 20'));
+  assert.ok(!report.layout.findings.some(finding => /Strongest area|Weakest area/.test(finding)), 'One scored category has no invented category comparison');
+});
+
+test('unscored company profiles cannot expand a full Top 20 export table', () => {
+  const responses = Array.from({ length: 21 }, (_, index) => row(`ranked-${index}`, { companyId: `ranked-${index}`, company: `Ranked ${index}` }));
+  responses.push(row('comment-only', { companyId: 'unscored', company: 'Unscored', questionId: 'remark', question: 'Remarks', rating: 'N/A', comment: 'Evaluation remark' }));
+  const report = buildArchivedReport(data(responses), selection);
+  assert.equal(report.count, 22);
+  assert.equal(report.tables.find(table => table.title === 'Company performance')?.rows.length, 20);
+});

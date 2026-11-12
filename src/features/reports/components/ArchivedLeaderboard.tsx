@@ -3,16 +3,17 @@ import { analyticsBands, formatAnalyticsScore, getAnalyticsBand, getAnalyticsSco
 import { formatNumber } from '../../analytics/domain/analytics';
 
 export function ArchivedLeaderboard({ analytics }: { analytics: ArchiveAnalyticsData[] }) {
-  return <>{analytics.map(({ category, summary }) => {
-    const companies = summary.companies;
+  return <>{analytics.map(({ category, summary, leaderboardLimit }) => {
+    const companies = summary.companies.slice(0, leaderboardLimit);
     if (!companies.length) return null;
     const split = Math.ceil(companies.length / 2);
     return <section key={category} aria-label={`${category} Company Leaderboard`} className="mb-5 min-w-0">
       <h4 className="text-balance text-xs font-semibold text-slate-700 dark:text-slate-200">{category} Company Leaderboard</h4>
+      {leaderboardLimit ? <p className="mt-1 text-[10px] text-slate-500">Top {leaderboardLimit} by score. Forms = submitted evaluations.</p> : null}
       <div className="my-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
         {analyticsBands[category].map(band => <span key={band.label} className="inline-flex items-center gap-1"><span aria-hidden="true" className="size-1.5 rounded-full" style={{ backgroundColor: band.hex }} />{band.label}</span>)}
       </div>
-      <div className="grid min-w-0 grid-cols-2 gap-x-3">
+      <div className="grid min-w-0 grid-cols-1 gap-x-3 sm:grid-cols-2">
         {[companies.slice(0, split), companies.slice(split)].map((column, columnIndex) => <div key={columnIndex} className="min-w-0">
           <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_2.75rem_1.5rem] gap-x-1 border-b border-slate-200 pb-1 text-[9px] leading-3 text-slate-500"><span>Rank</span><span>Company</span><span className="text-right">Rank score</span><span className="text-right">Forms</span></div>
           <ol start={columnIndex * split + 1} className="min-w-0">

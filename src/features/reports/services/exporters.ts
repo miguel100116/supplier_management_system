@@ -104,7 +104,7 @@ export function exportTablesAsExcel(tables: ExportTable[], filenameBase: string,
 }
 
 /** One PDF, one heading + table per section, stacked vertically (auto page-breaks via autoTable). */
-export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, introduction?: string, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4', visuals: ExportVisual[] = []) {
+export async function createTablesPdf(reportTitle: string, tables: ExportTable[], introduction?: string, paperSize: PaperSize = 'a4', visuals: ExportVisual[] = []) {
   const doc = new jsPDF({ unit: 'pt', format: paperSizePoints(paperSize) });
   const branding = await loadPdfBranding();
   const marginLeft = 40;
@@ -215,5 +215,9 @@ export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable
     drawVisual(visual, PDF_CONTENT_TOP);
   }
   applyPdfBranding(doc, branding, { title: reportTitle, margin: marginLeft });
-  return saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
+  return doc.output('blob');
+}
+
+export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, introduction?: string, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4', visuals: ExportVisual[] = []) {
+  return saveReportDownload(await createTablesPdf(reportTitle, tables, introduction, paperSize, visuals), reportTitle, 'pdf', recipe);
 }

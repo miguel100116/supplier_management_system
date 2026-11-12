@@ -1,7 +1,7 @@
 import { buildArchiveAnalyticsVisuals, type ArchiveAnalyticsData } from '../domain/archiveAnalyticsVisuals';
 import type { ExportVisual } from './workbookVisuals';
 
-export async function createArchiveAnalyticsImages(analytics: ArchiveAnalyticsData[]): Promise<ExportVisual[]> {
+export async function createArchiveAnalyticsImages(analytics: ArchiveAnalyticsData[], resolution: 1.25 | 2 = 2): Promise<ExportVisual[]> {
   const images: ExportVisual[] = [];
   for (const page of buildArchiveAnalyticsVisuals(analytics)) {
     const url = URL.createObjectURL(new Blob([page.svg], { type: 'image/svg+xml;charset=utf-8' }));
@@ -13,8 +13,8 @@ export async function createArchiveAnalyticsImages(analytics: ArchiveAnalyticsDa
         image.src = url;
       });
       const canvas = document.createElement('canvas');
-      canvas.width = page.width * 2;
-      canvas.height = page.height * 2;
+      canvas.width = Math.ceil(page.width * resolution);
+      canvas.height = Math.ceil(page.height * resolution);
       const context = canvas.getContext('2d');
       if (!context) throw new Error('This browser cannot render the archive charts.');
       context.drawImage(image, 0, 0, canvas.width, canvas.height);

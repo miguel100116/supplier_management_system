@@ -30,6 +30,7 @@ export function applyPdfBranding(doc: jsPDF, branding: PdfBranding, options: {
   compact?: boolean;
   confidentiality?: 'Confidential' | 'Strictly Confidential';
   pageSubject?: (page: number) => string;
+  layout?: 'archive-reference';
 }) {
   const margin = options.margin ?? 40;
   const pages = doc.getNumberOfPages();
@@ -40,13 +41,14 @@ export function applyPdfBranding(doc: jsPDF, branding: PdfBranding, options: {
     doc.setPage(page);
     doc.saveGraphicsState();
     const compact = options.compact;
-    const logoY = compact ? 5 : 21;
-    const companyWidth = compact ? 76 : 112;
-    const ruleY = compact ? 31 : 74;
+    const reference = options.layout === 'archive-reference';
+    const logoY = compact ? 5 : reference ? 28.8 : 21;
+    const companyWidth = compact ? 76 : reference ? 104.4 : 112;
+    const ruleY = compact ? 31 : reference ? 61.2 : 74;
     doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, width, ruleY + 3, 'F');
     const companyX = margin;
-    if (branding.companyLogo) doc.addImage(branding.companyLogo, 'PNG', companyX, logoY + (compact ? 0 : 3), companyWidth, companyWidth * 498 / 1921, undefined, 'FAST');
+    if (branding.companyLogo) doc.addImage(branding.companyLogo, 'PNG', companyX, logoY + (compact || reference ? 0 : 3), companyWidth, companyWidth * 498 / 1921, undefined, 'FAST');
     else {
       doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30, 41, 59);
       doc.text('Microgenesis', companyX, logoY + 15);
@@ -58,20 +60,20 @@ export function applyPdfBranding(doc: jsPDF, branding: PdfBranding, options: {
       const lines = doc.splitTextToSize(subject, textWidth) as string[];
       // Ellipsis makes truncation explicit while keeping the letterhead bounded.
       if (lines.length > 2) lines[1] = lines[1].slice(0, -3) + '...';
-      doc.text(lines.slice(0, 2), width - margin, 30, { align: 'right', lineHeightFactor: 1.1 });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 116, 139);
+      doc.text(lines.slice(0, 2), width - margin, reference ? 36 : 30, { align: 'right', lineHeightFactor: 1.1 });
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(reference ? 8 : 7.5); doc.setTextColor(reference ? '#5f6b7a' : '#64748b');
       const subtitle = doc.splitTextToSize(options.subject || options.pageSubject ? options.title : 'Supplier Management System', textWidth) as string[];
-      doc.text(subtitle.slice(0, 2), width - margin, 53, { align: 'right', lineHeightFactor: 1.1 });
+      doc.text(subtitle.slice(0, 2), width - margin, reference ? 46.8 : 53, { align: 'right', lineHeightFactor: 1.1 });
     }
-    doc.setDrawColor(0, 99, 169); doc.setLineWidth(0.7);
+    doc.setDrawColor(reference ? '#0060a8' : '#0063a9'); doc.setLineWidth(0.7);
     doc.line(margin, ruleY, width - margin, ruleY);
     doc.setFillColor(255, 255, 255);
-    doc.rect(0, height - 38, width, 38, 'F');
-    doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.5);
-    doc.line(margin, height - 34, width - margin, height - 34);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 116, 139);
-    doc.text(`Microgenesis | Supplier Management System | ${options.confidentiality ?? 'Confidential'}`, margin, height - 20);
-    doc.text(`Page ${page} of ${pages}`, width - margin, height - 20, { align: 'right' });
+    doc.rect(0, height - (reference ? 43.36 : 38), width, reference ? 43.36 : 38, 'F');
+    doc.setDrawColor(reference ? '#d9dee5' : '#e2e8f0'); doc.setLineWidth(0.5);
+    doc.line(margin, height - (reference ? 39.36 : 34), width - margin, height - (reference ? 39.36 : 34));
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(reference ? 8 : 7.5); doc.setTextColor(reference ? '#5f6b7a' : '#64748b');
+    doc.text(`Microgenesis | Supplier Management System | ${options.confidentiality ?? 'Confidential'}`, margin, height - (reference ? 27.36 : 20));
+    doc.text(`Page ${page} of ${pages}`, width - margin, height - (reference ? 27.36 : 20), { align: 'right' });
     doc.restoreGraphicsState();
   }
 }

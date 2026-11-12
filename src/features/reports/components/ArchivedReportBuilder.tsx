@@ -1,16 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import type { SurveyType } from '../../../types/survey';
-import { surveyTypeDisplayLabel } from '../../../data/questionWeights';
 import { StateMessage } from '../../../components/StateMessage';
 import { ARCHIVED_REPORT_TITLES, buildArchivedReport, getArchivedReportItems, type ArchivedReportData, type ArchivedReportKind } from '../domain/archivedReports';
 import type { ReportParameters } from '../domain/reportHistory';
 import { exportTablesAsCSV, exportTablesAsExcel, exportTablesAsWord } from '../services/exporters';
 import { exportArchivedReportAsPDF } from '../services/archivedReportExport';
 import { createArchiveAnalyticsImages } from '../services/archiveAnalyticsImages';
-import { ArchivedLeaderboard } from './ArchivedLeaderboard';
+import { ArchivedRecordPreview } from './ArchivedRecordPreview';
 import { PaperSizeSelect } from './PaperSizeSelect';
-import { paperSizePoints, type PaperSize } from '../domain/paperSize';
+import type { PaperSize } from '../domain/paperSize';
+import { ArchiveTabs } from './ArchivedReportTabs';
+import { ARCHIVED_SURVEY_PAPER } from '../domain/archivedReportLayout';
+import { ArchivedSurveyPreview } from './ArchivedSurveyPreview';
+import { ArchivedPaperPreview } from './ArchivedPaperPreview';
 
 interface Props {
   kind: ArchivedReportKind;
@@ -25,7 +28,7 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
   const [selectedItemId, setItemId] = useState<string | undefined>(initialSettings.archivedItemId);
   const [includeComments, setIncludeComments] = useState(initialSettings.includeComments ?? false);
   const [format, setFormat] = useState<'pdf' | 'excel' | 'csv' | 'docx'>('pdf');
-  const [paperSize, setPaperSize] = useState<PaperSize>(initialSettings.paperSize ?? 'a4');
+  const [paperSize, setPaperSize] = useState<PaperSize>(initialSettings.paperSize ?? (kind === 'archived-survey' ? ARCHIVED_SURVEY_PAPER : 'a4'));
   const [error, setError] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
   const title = ARCHIVED_REPORT_TITLES[kind];
@@ -40,12 +43,11 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
       setItemId(itemId);
     }
   }, [category, itemId, items.length, selectedItemId]);
-  let report: ReturnType<typeof buildArchivedReport> | undefined;
-  let selectionError = '';
-  if (itemId) {
-    try { report = buildArchivedReport(data, { kind, category, itemId, includeComments }); }
-    catch (failure) { selectionError = failure instanceof Error ? failure.message : 'Unable to prepare this archived report.'; }
-  }
+  const { report, selectionError } = useMemo(() => {
+    if (!itemId) return { report: undefined, selectionError: '' };
+    try { return { report: buildArchivedReport(data, { kind, category, itemId, includeComments }), selectionError: '' }; }
+    catch (failure) { return { report: undefined, selectionError: failure instanceof Error ? failure.message : 'Unable to prepare this archived report.' }; }
+  }, [data.responses, data.surveys, data.knownSurveys, data.companies, data.series, kind, category, itemId, includeComments]);
   const download = async () => {
     if (!canExport || !report?.canExport || isDownloading) return;
     setIsDownloading(true);
@@ -65,21 +67,17 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
       <button type="button" className="ghost-button inline-flex items-center gap-2" onClick={onBack}><ArrowLeft size={16} />Back to Reports</button>
       <h2 className="text-base font-semibold">{title} Builder</h2>
     </div>
-    <div className="grid min-w-0 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <ArchiveTabs label="Archive categories" options={categories.map(({ type, items: options }) => ({ value: type, label: `${type} (${options.length})` }))} value={category} onChange={type => { setCategory(type); setItemId(undefined); setError(''); }}>
+    <div className="grid min-w-0 gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
       <aside aria-label="Archived report options" className="panel h-fit min-w-0 space-y-6 lg:sticky lg:top-4">
-        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">1. Category
-          <select aria-label="Category" className="field mt-2" value={category} onChange={event => { setCategory(event.target.value as SurveyType); setItemId(undefined); setError(''); }}>
-            {categories.map(({ type, items: options }) => <option key={type} value={type}>{surveyTypeDisplayLabel[type]} ({options.length})</option>)}
-          </select>
-        </label>
-        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">2. {itemLabel}
+        <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">1. {itemLabel}
           <select aria-label={itemLabel} className="field mt-2" value={itemId} onChange={event => { setCategory(category); setItemId(event.target.value); setError(''); }}>
             <option value="">{items.length ? `Select ${itemLabel.toLowerCase()}` : 'No archived items in this category'}</option>
             {items.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select>
         </label>
         <div>
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">3. Comments</h3>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">2. Comments</h3>
           <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300"><input type="checkbox" checked={includeComments} onChange={event => { setIncludeComments(event.target.checked); setError(''); }} />Include respondent comments</label>
         </div>
         <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">Only the selected item is included. A survey report contains its related companies and responses. Records remain archived.</p>
@@ -98,28 +96,13 @@ export function ArchivedReportBuilder({ kind, data, canExport, initialSettings =
         <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-200/70 p-3 dark:border-slate-800 dark:bg-slate-950/60 sm:p-6">
           {!report ? <StateMessage compact title="Select an archived item" message="Choose a category and one archived item on the left to generate its preview." /> : <>
             {!report.count ? <div className="mb-3"><StateMessage compact title={report.rowCount ? 'No countable responses' : 'No response data'} message={report.rowCount ? 'Stored answers are included, but none contain a countable response.' : kind === 'archived-company' ? 'Only this company profile is available for export.' : 'Only this archived survey’s details are available for export.'} /></div> : null}
-            <div aria-label="Archived report preview" className="mx-auto w-full max-w-[640px] rounded-sm bg-white p-4 shadow-xl ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 sm:p-6" style={{ minHeight: 640 * paperSizePoints(paperSize)[1] / paperSizePoints(paperSize)[0] }}>
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
-                <img src="/microgenesis_logo.png" alt="Microgenesis" className="h-6 w-auto" />
-                <div className="min-w-0"><h3 className="text-sm font-bold text-[#0063a9] dark:text-sky-300">{title}</h3><p className="mt-1 break-words text-xs text-slate-500">{report.itemLabel}</p></div>
-              </div>
-              <ArchivedLeaderboard analytics={report.analytics} />
-              {report.tables.filter(table => table.rows.length && table.title !== 'Company leaderboard').map((table, index) => <section key={table.title} className="mb-6 min-w-0">
-                <h4 id={`archived-section-${index}`} className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">{index === 0 ? 'Report scope' : table.title}</h4>
-                <div className="min-w-0" role="region" aria-labelledby={`archived-section-${index}`}>
-                  <table className="w-full table-fixed text-left text-[11px]" aria-labelledby={`archived-section-${index}`}>
-                    <thead className="bg-slate-50 dark:bg-slate-800"><tr>{table.columns.map(column => <th key={column} scope="col" className="break-words px-2 py-2 font-semibold [overflow-wrap:anywhere]">{column}</th>)}</tr></thead>
-                    {/* shortcut: cap preview sections at 50 rows; add pagination if full browser inspection is needed. */}
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">{table.rows.slice(0, 50).map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex} className="break-words px-2 py-2 align-top text-slate-700 [overflow-wrap:anywhere] dark:text-slate-200">{cell}</td>)}</tr>)}</tbody>
-                  </table>
-                </div>
-                {table.rows.length > 50 ? <p className="mt-2 text-[11px] text-slate-500">First 50 of {table.rows.length} rows shown. Downloads include all rows.</p> : null}
-              </section>)}
-              <p className="mt-8 border-t border-slate-100 pt-3 text-[10px] text-slate-400 dark:border-slate-800">Microgenesis Supplier Management System — Confidential</p>
-            </div>
+            <ArchivedPaperPreview key={`${kind}:${category}:${itemId}:${includeComments}:${paperSize}`} report={report} kind={kind} category={category} paperSize={paperSize} includeComments={includeComments}>
+              {kind === 'archived-survey' ? <ArchivedSurveyPreview report={report} category={category} paperSize={paperSize} /> : <ArchivedRecordPreview report={report} />}
+            </ArchivedPaperPreview>
           </>}
         </div>
       </section>
     </div>
+    </ArchiveTabs>
   </div>;
 }

@@ -63,6 +63,18 @@ test('empty archives and unscored answers never invent company ranks or a score'
   assert.equal(pages.some(page => page.title.includes('Leaderboard')), false);
 });
 
+test('report ranking limits omit rank 21 while raw archive visual exports retain every company', () => {
+  const rows = Array.from({ length: 25 }, (_, index) => ({ ...response('Supplier', index), rating: 4 - index / 10 }));
+  const analytics = buildArchiveAnalyticsData(rows);
+  const limited = buildArchiveAnalyticsVisuals(analytics.map(item => ({ ...item, leaderboardLimit: 20 })));
+  const leaderboards = limited.filter(page => page.title.includes('Leaderboard'));
+  assert.equal(leaderboards.length, 1);
+  assert.equal([...leaderboards[0].svg.matchAll(/<g><rect /g)].length, 20);
+  assert.doesNotMatch(leaderboards[0].description!, /Rank 21:/);
+  assert.equal(analytics[0].summary.totalSubmissions, 25);
+  assert.equal(buildArchiveAnalyticsVisuals(analytics).filter(page => page.title.includes('Leaderboard')).length, 2);
+});
+
 test('months without a score leave a gap rather than inventing a zero in the rating trend', () => {
   const analytics = buildArchiveAnalyticsData([response('Courier')]);
   analytics[0].summary.monthly = [

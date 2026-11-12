@@ -21,7 +21,7 @@ export interface ArchiveAnalyticsVisual {
   continuation?: boolean;
 }
 
-export interface ArchiveAnalyticsData { category: SurveyType; summary: AnalyticsSnapshot }
+export interface ArchiveAnalyticsData { category: SurveyType; summary: AnalyticsSnapshot; leaderboardLimit?: number }
 
 /** Derive display data without retaining respondent identities or raw comments. */
 export function buildArchiveAnalyticsData(responses: SurveyResponse[], series: ArchiveSeries[] = []): ArchiveAnalyticsData[] {
@@ -34,7 +34,7 @@ export function buildArchiveAnalyticsData(responses: SurveyResponse[], series: A
 /** The caller supplies the exact exported archive cohort; no current-period or registry filter is applied. */
 export function buildArchiveAnalyticsVisuals(analytics: ArchiveAnalyticsData[]): ArchiveAnalyticsVisual[] {
   const pages: ArchiveAnalyticsVisual[] = [];
-  for (const { category, summary } of analytics) {
+  for (const { category, summary, leaderboardLimit } of analytics) {
     const add = (title: string, body: string, height: number) => {
       const header = text(32, 44, `${category} Analytics`, 28, '#0063a9') + text(32, 76, 'Selected archived records · current rubric', 16, '#64748b');
       const page: ArchiveAnalyticsVisual = { title: `${category} ${title}`, width: WIDTH, height,
@@ -103,7 +103,7 @@ export function buildArchiveAnalyticsVisuals(analytics: ArchiveAnalyticsData[]):
       add('Category performance', body, 245 + sections.length * 96);
     }
 
-    const leaderboard = summary.companies;
+    const leaderboard = summary.companies.slice(0, leaderboardLimit);
     // Bound raster height for large archives; continuation images join the same Excel sheet.
     for (let offset = 0; offset < leaderboard.length; offset += 20) {
       const entries = leaderboard.slice(offset, offset + 20);
