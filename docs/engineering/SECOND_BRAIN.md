@@ -1,6 +1,18 @@
 # Supplier Management System — Engineering Second Brain
 
-Last verified: 2026-11-12
+Last verified: 2026-11-13
+
+### 2026-11-13 - Removed automated browser E2E suite
+
+Removed the Playwright E2E spec/config, npm script/dependency, TypeScript inclusion, and GitHub Actions browser-test steps at the owner's request. Unit and integration Node tests, type checks, production build, dependency audit, and secret scan remain. README and AGENTS verification instructions now reflect that no browser journeys run in CI. Past entries below record historical browser coverage. Recovery: restore the E2E files and wiring from the prior revision; no application data changed.
+
+### 2026-11-13 - Manual Entry business classification
+
+Manual Entry now requires a domestic partner to select Corporation (Corp) or Sole Proprietorship (Sole) and persists the value as `businessClassification`; Foreign Suppliers keep their separate checklist and do not require a local classification. Master List import infers Corp from provided GIS/SEC/Articles evidence, Sole from provided DTI/owner-ID evidence, and leaves conflicting or absent evidence unclassified; existing manual classifications are preserved. Missing Corp/Sole documents on newly classified imports receive the standard pending-verification remark required at the persistence boundary. Existing `getRequiredDocumentKeys` rules activate the matching documents (Corp: Articles of Incorporation, SEC, GIS; Sole: DTI and owner ID). Partner details and Document Tracker hide the opposite classification's documents from active lists while retaining stored history. Evidence: `PartnerCompaniesPage.tsx`, `useSurveyData.ts`, `masterListImport.ts`, and registration/import/document tests. Final verification passed: all 552 Node tests, TypeScript checks, production build, and diff whitespace checks. Browser visual review was unavailable. Recovery: revert the registration and import classification changes; persisted classifications remain valid company data.
+
+### 2026-11-13 - Trade and Non-Trade compliance roll-up
+
+Trade and Non-Trade remain separate BP-code branches within one partner company and use the same category/origin/legal-classification checklist, matching the Master List import model. Compliance resolves each required document across both branches, so both rows show one company-level progress result; the latest complete provided document record wins for legacy differences. New edits/imports synchronize `provided` and `expiryDate` across branches through migration `202611130001`; branch-specific remarks and file metadata remain attached to their original BP code. Company status preserves `For Update` separately from `Expired`; the Directory's combined expired/for-update lens still includes both. Focused regression coverage verifies shared requirements, shared progress, and the status distinction. The migration was added locally but not applied remotely. Recovery: revert code and migration; no remote data was changed.
 
 ### 2026-11-12 - Fixed paper boxes and lighter preview preparation
 

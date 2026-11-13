@@ -170,11 +170,11 @@ Use a risk-based test pyramid:
 - **Unit tests** for pure domain rules, scoring, RBAC, import mapping, date/compliance logic, and reducers.
 - **Component tests** for user interactions, validation, accessibility semantics, and conditional states.
 - **Integration tests** at storage, Supabase, authentication, Graph/email, import/export, and routing boundaries. Mock only outside the boundary being tested.
-- **End-to-end tests** for a small set of critical journeys: sign-in and authorization, survey submission, partner/document management, reporting, and data import.
+- There is currently no browser E2E suite; critical rendered user journeys are not covered by automated browser tests.
 
 Test observable behavior rather than private implementation. Include negative cases, malformed external data, authorization boundaries, time zones/date edges, partial failures, and regression cases for bugs.
 
-Current repository reality: `npm test` discovers colocated Node tests through `tsx` under `src/`, `server/`, and `scripts/`. `npm run test:unit` selects domain/utils; `npm run test:integration` includes remaining service, HTTP, presentation, import, and tooling tests. Playwright's `npm run test:e2e` exercises the built application with synthetic external-service responses at desktop/mobile sizes; it does not verify live RLS or hosting. Coverage is not repository-wide. `npm run lint` performs TypeScript checks; ESLint is not configured. Report these checks by their real names instead of describing TypeScript checking as stylistic linting or claiming broader test coverage than exists.
+Current repository reality: `npm test` discovers colocated Node tests through `tsx` under `src/`, `server/`, and `scripts/`. `npm run test:unit` selects domain/utils; `npm run test:integration` includes remaining service, HTTP, presentation, import, and tooling tests. There is no browser E2E suite. Coverage is not repository-wide. `npm run lint` performs TypeScript checks; ESLint is not configured. Report these checks by their real names instead of describing TypeScript checking as stylistic linting or claiming broader test coverage than exists.
 
 Current verification commands:
 
@@ -182,16 +182,15 @@ Current verification commands:
 npm test
 npm run lint
 npm run build
-npm run test:e2e
 ```
 
-`npm run verify` runs these gates plus the dependency audit. Install Chromium with `npx playwright install chromium` before browser tests. `npm run hooks:install` enables the opt-in local pre-push gate; CI remains authoritative.
+`npm run verify` runs the TypeScript checks, production build, and dependency audit. `npm run hooks:install` enables the opt-in local pre-push gate; CI remains authoritative.
 
 When test and formatting scripts are introduced, use the scripts declared in `package.json`; CI and local verification must call the same commands.
 
 ## CI/CD contract
 
-CI exists in `.github/workflows/verify.yml`: clean install, TypeScript checks, Node tests, production build, desktop/mobile E2E, dependency audit, and secret scan. Preserve these gates when evolving CI/CD:
+CI exists in `.github/workflows/verify.yml`: clean install, TypeScript checks, Node tests, production build, dependency audit, and secret scan. There is no automated browser E2E gate. Preserve these gates when evolving CI/CD:
 
 - Pull requests run on a clean checkout with `npm ci`, type checking, linting, automated tests, and a production build.
 - Add dependency/security scanning and secret scanning with explicit triage; do not silently ignore high-severity findings.

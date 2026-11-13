@@ -41,7 +41,7 @@ npm install --prefix .vite/active-evaluation-db --no-save --package-lock=false @
 node scripts/verification/active-evaluation-lists.rehearsal.mjs .vite/active-evaluation-db/node_modules/@electric-sql/pglite/dist/index.js
 ```
 
-The rehearsal uses an in-memory PostgreSQL instance and synthetic confirmed-account/RLS fixtures. It verifies latest-list selection, equal-time ordering, anonymous/unconfirmed denial, employee privacy, insert/update/delete invalidation, missing lists and unchanged survey payloads. It never connects to Supabase or reads credentials. Run the normal `npm test`, `npm run lint`, `npm run build` and `npm run test:e2e` gates separately.
+The rehearsal uses an in-memory PostgreSQL instance and synthetic confirmed-account/RLS fixtures. It verifies latest-list selection, equal-time ordering, anonymous/unconfirmed denial, employee privacy, insert/update/delete invalidation, missing lists and unchanged survey payloads. It never connects to Supabase or reads credentials. Run `npm test`, `npm run lint`, and `npm run build` separately; the browser E2E suite has since been removed.
 
 Initial local verification on 2026-10-30: all 451 Node tests, TypeScript checks and production build passed. All 48 desktop/mobile browser cases passed before the final ordered-refresh adjustment; all four affected employee-assignment/Admin-send browser cases passed again after rebuilding that adjustment. Desktop/mobile employee screenshots were reviewed. The database rehearsal passed. The Dashboard error-isolation follow-up passed all 452 Node tests, TypeScript checks, production build and four focused desktop/mobile Dashboard-recovery/employee-assignment cases. No production checks or business-data writes were performed; existing bundle-size warnings remain.
 

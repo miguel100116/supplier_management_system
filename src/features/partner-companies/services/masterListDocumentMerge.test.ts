@@ -49,6 +49,31 @@ test('separate blank-code rows and coded branches remain distinct across re-uplo
   assert.equal(computeCategoryRankSummary(repeated.companies).total, 3);
 });
 
+test('Master List imports infer Corp or Sole from provided legal documents and leave unclear cases unset', () => {
+  const row = (bpName: string, category: string, cells: unknown[]): RawMasterListRow => ({
+    ...blankCodeRow(101), bpCode: bpName, bpName, category, cells,
+  });
+  const importRow = (input: RawMasterListRow) => mergeRowsIntoCompanies([input], []).companies[0];
+  const corpCells: unknown[] = [];
+  corpCells[29] = 'Yes';
+  const corp = importRow(row('Corp Company', 'Supplier-Local', corpCells));
+  assert.equal(corp.businessClassification, 'CORP');
+  assert.ok(corp.branches?.[0].documents?.['GIS (Corp)']?.remarks, 'inferred Corp classification records a reason for the missing GIS');
+
+  const soleCells: unknown[] = [];
+  soleCells[37] = '12/31/2027';
+  const sole = importRow(row('Sole Company', 'Supplier-Local', soleCells));
+  assert.equal(sole.businessClassification, 'SOL');
+
+  const conflictingCells = [...corpCells];
+  conflictingCells[37] = '12/31/2027';
+  assert.equal(importRow(row('Unclear Company', 'Supplier-Local', conflictingCells)).businessClassification, undefined);
+
+  const foreignCells: unknown[] = [];
+  foreignCells[51] = 'Yes';
+  assert.equal(importRow(row('Foreign Company', 'Supplier-Foreign', foreignCells)).businessClassification, undefined);
+});
+
 test('Master List refresh preserves remarks, old expiry data, and supplementary document records', () => {
   const merged = mergeExistingDocuments({
     'DTI (Sole)': { provided: true, expiryDate: '2027-06-30', remarks: 'Renewal submitted' },

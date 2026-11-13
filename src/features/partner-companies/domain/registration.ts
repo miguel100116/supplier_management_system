@@ -1,7 +1,17 @@
-import type { BranchRecord, PartnerCompany } from '../../../types/survey';
+import type { BranchRecord, BusinessClassification, PartnerCompany, PartnerCompanyType, SupplierOrigin } from '../../../types/survey';
 import { isNTBranch } from '../../document-tracker/domain/compliance';
 
 export type RegistrationType = 'Trade' | 'Non-Trade' | 'Both';
+
+export function manualEntryBusinessClassification(
+  type: PartnerCompanyType,
+  origin: SupplierOrigin | undefined,
+  classification?: BusinessClassification,
+): BusinessClassification | undefined {
+  if (type === 'Supplier' && origin === 'Foreign') return undefined;
+  if (!classification) throw new Error('Select Corporation (Corp) or Sole Proprietorship (Sole).');
+  return classification;
+}
 
 export function registrationType(company: Pick<PartnerCompany, 'branches'>): RegistrationType {
   const branches = company.branches ?? [];

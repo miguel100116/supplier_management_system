@@ -7,7 +7,7 @@ import { Search, Globe, MapPin, Truck, Package, Layers, RefreshCw, X, Check, Use
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, LabelList, Legend, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { BranchRecord, BranchStatus, ComplianceDocument, DocumentStatus, PartnerCompany, PartnerCompanyType, SupplierOrigin, SurveyResponse } from '../types/survey';
 import { getEvaluationLeaderboardTopTwenty } from '../features/evaluations/domain/leaderboardSelection';
-import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, isBranchDocumentCompliant, isNTBranch, summarizeDocumentAttention } from '../features/document-tracker/domain/compliance';
+import { branchAwareCompanyLabel, computeCompanyDocumentSummary, computeDocumentStatus, getBranchDocumentRecord, getCompanyDocumentRecord, isBranchDocumentCompliant, isNTBranch, summarizeDocumentAttention } from '../features/document-tracker/domain/compliance';
 import { COMMON_DOCUMENTS, getAvailableDocumentKeys, getForeignSupplierRequirement, getRequiredDocumentKeys, isDocumentApplicableToClassification, isExpiryDocument, shouldShowHistoricalDocument } from '../features/document-tracker/domain/documentRequirements';
 import { companyDocumentRemarksError } from '../features/document-tracker/domain/documentValidation';
 import { RequiredDocumentAttention, type RequiredDocumentAttentionStatus } from '../features/document-tracker/components/RequiredDocumentAttention';
@@ -899,7 +899,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
         row.key,
         getRequiredDocumentKeys(row.company.type, row.company.supplierOrigin, row.company.businessClassification).map((docName) => {
           const branch = row.branch;
-          const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
+          const doc = branch ? getBranchDocumentRecord(row.company, branch, docName) : getCompanyDocumentRecord(row.company, docName);
           const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName, row.company);
           return { docName, status, daysLeft, doc, branch, expiryBased: isExpiryDocument(docName, row.company.type, row.company.supplierOrigin), inactiveClassification: false };
         })
@@ -1131,7 +1131,7 @@ export function DocumentRegisterPage({ categoryFromUrl = null, onCategoryChange,
       getRequiredDocumentKeys(c.type, c.supplierOrigin, c.businessClassification).filter((docName) => isExpiryDocument(docName, c.type, c.supplierOrigin)).forEach((docName) => {
         const branches = visibleBranches.length ? visibleBranches : [undefined];
         branches.forEach((branch) => {
-          const doc: ComplianceDocument = (branch?.documents?.[docName] ?? {}) as ComplianceDocument;
+          const doc = branch ? getBranchDocumentRecord(c, branch, docName) : getCompanyDocumentRecord(c, docName);
           const { status, daysLeft } = computeDocumentStatus(doc, effectiveNow, docName, c);
 
           if (status === 'Expiring Soon' || status === 'Expired' || status === 'For Update') {

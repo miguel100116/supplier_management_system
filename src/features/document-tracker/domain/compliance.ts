@@ -70,9 +70,47 @@ export function computeDocumentStatus(
 
 export type BranchDocumentComplianceStatus = DocumentStatus | 'Needs classification' | 'No branch';
 
+export function hasTradeAndNonTradeBranches(company: Pick<PartnerCompany, 'branches'>): boolean {
+  const branches = company.branches ?? [];
+  return branches.some(isNTBranch) && branches.some((branch) => !isNTBranch(branch));
+}
+
+/** Chooses the most complete legacy branch record until a shared edit is saved. */
+export function getCompanyDocumentRecord(
+  company: Pick<PartnerCompany, 'branches'>,
+  documentName: string,
+): ComplianceDocument {
+  const branches = company.branches ?? [];
+  if (!hasTradeAndNonTradeBranches(company)) return branches[0]?.documents?.[documentName] ?? {};
+  const records = branches
+    .map((branch) => branch.documents?.[documentName])
+    .filter((document): document is ComplianceDocument => Boolean(document));
+  const provided = records.filter((document) => document.provided === true)
+    .sort((a, b) => (b.expiryDate ?? '').localeCompare(a.expiryDate ?? '')
+      || (b.file?.uploadedAt ?? '').localeCompare(a.file?.uploadedAt ?? ''));
+  if (provided.length) return provided[0];
+  return records.find((document) => document.provided === false) ?? records[0] ?? {};
+}
+
+/** Uses shared compliance values while retaining BP-code-specific file and remark metadata. */
+export function getBranchDocumentRecord(
+  company: Pick<PartnerCompany, 'branches'>,
+  branch: BranchRecord,
+  documentName: string,
+): ComplianceDocument {
+  const localDocument = branch.documents?.[documentName] ?? {};
+  if (!hasTradeAndNonTradeBranches(company)) return localDocument;
+  const sharedDocument = getCompanyDocumentRecord(company, documentName);
+  return {
+    ...localDocument,
+    ...(sharedDocument.provided !== undefined ? { provided: sharedDocument.provided } : {}),
+    ...(sharedDocument.expiryDate ? { expiryDate: sharedDocument.expiryDate } : {}),
+  };
+}
+
 /** Derives one branch's compliance state from its applicable documents and current expiry dates. */
 export function getBranchDocumentComplianceStatus(
-  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification'>,
+  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification' | 'branches'>,
   branch: BranchRecord | undefined,
   referenceDate: Date = new Date(),
 ): BranchDocumentComplianceStatus {
@@ -82,7 +120,7 @@ export function getBranchDocumentComplianceStatus(
     && !(company.type === 'Supplier' && company.supplierOrigin === 'Foreign')
     && !['CORP', 'SOL'].includes(company.businessClassification ?? '');
   const documentStatuses = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification)
-    .map((docName) => computeDocumentStatus(branch.documents?.[docName] ?? {}, referenceDate, docName, company).status);
+    .map((docName) => computeDocumentStatus(getBranchDocumentRecord(company, branch, docName), referenceDate, docName, company).status);
 
   if (documentStatuses.includes('Expired')) return 'Expired';
   if (documentStatuses.includes('Missing')) return 'Missing';
@@ -94,7 +132,7 @@ export function getBranchDocumentComplianceStatus(
 
 /** A branch is fully compliant only when every applicable document is current. */
 export function isBranchDocumentCompliant(
-  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification'>,
+  company: Pick<PartnerCompany, 'type' | 'supplierOrigin' | 'businessClassification' | 'branches'>,
   branch: BranchRecord | undefined,
   referenceDate: Date = new Date(),
 ): boolean {
@@ -133,11 +171,11 @@ export function summarizeDocumentAttention(
   );
 }
 
-// Company-wide status is never persisted - always rolled up live from the
-// documents required for every branch in this company's category.
+// Company-level compliance is rolled up live from one shared record per
+// required document, resolved across its Trade and Non-Trade branches.
 // 'Missing' means a required document or its required expiry date is absent;
 // it must never fall through to 'Current' just because no date can be checked.
-export type CompanyDocumentStatus = 'Current' | 'Expiring Soon' | 'Expired' | 'Missing';
+export type CompanyDocumentStatus = 'Current' | 'Expiring Soon' | 'Expired' | 'For Update' | 'Missing';
 
 export interface CompanyDocumentSummary {
   status: CompanyDocumentStatus;
@@ -156,40 +194,34 @@ export function computeCompanyDocumentSummary(
 ): CompanyDocumentSummary {
   const requiredKeys = getRequiredDocumentKeys(company.type, company.supplierOrigin, company.businessClassification);
   const branches = company.branches ?? [];
+  const sharesDocuments = hasTradeAndNonTradeBranches(company);
 
   let expiredCount = 0;
   let expiringSoonCount = 0;
   let forUpdateCount = 0;
   let missingCount = 0;
   const issues: DocumentAlertDetail[] = [];
-  const branchesToCheck: Array<BranchRecord | undefined> = branches.length > 0 ? branches : [undefined];
+  const branchesToCheck: Array<BranchRecord | undefined> = sharesDocuments
+    ? [undefined]
+    : branches.length > 0 ? branches : [undefined];
+  branchesToCheck.forEach((branch) => requiredKeys.forEach((key) => {
+    const doc = sharesDocuments ? getCompanyDocumentRecord({ branches }, key) : branch?.documents?.[key] ?? {};
+    const { status, daysLeft } = computeDocumentStatus(doc, referenceDate, key, company);
+    if (status === 'Expired' || status === 'Expiring Soon' || status === 'For Update') {
+      issues.push({ documentName: key, ...(branch ? { branchId: branch.id, branchCode: branch.bpCode } : {}), expiryDate: doc.expiryDate, daysLeft, status });
+    }
+    if (status === 'Expired') expiredCount++;
+    else if (status === 'Expiring Soon') expiringSoonCount++;
+    else if (status === 'For Update') forUpdateCount++;
+    else if (status === 'Missing') missingCount++;
+  }));
 
-  branchesToCheck.forEach((branch) => {
-    requiredKeys.forEach((key) => {
-      const doc: ComplianceDocument | undefined = branch?.documents?.[key];
-      const { status, daysLeft } = computeDocumentStatus(doc ?? {}, referenceDate, key, company);
-      if (status === 'Expired' || status === 'Expiring Soon' || status === 'For Update') {
-        issues.push({
-          documentName: key,
-          branchId: branch?.id,
-          branchCode: branch?.bpCode,
-          expiryDate: doc?.expiryDate,
-          daysLeft,
-          status,
-        });
-      }
-      if (status === 'Expired') expiredCount++;
-      else if (status === 'Expiring Soon') expiringSoonCount++;
-      else if (status === 'For Update') forUpdateCount++;
-      else if (status === 'Missing') missingCount++;
-    });
-  });
-
-  const status: CompanyDocumentStatus =
-    expiredCount > 0 || forUpdateCount > 0
-      ? 'Expired'
-      : missingCount > 0
-        ? 'Missing'
+  const status: CompanyDocumentStatus = expiredCount > 0
+    ? 'Expired'
+    : missingCount > 0
+      ? 'Missing'
+      : forUpdateCount > 0
+        ? 'For Update'
         : expiringSoonCount > 0
           ? 'Expiring Soon'
           : 'Current';

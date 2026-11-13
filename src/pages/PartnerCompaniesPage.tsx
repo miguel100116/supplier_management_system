@@ -35,9 +35,9 @@ import { AccreditationStatus, BranchRecord, BranchStatus, BusinessClassification
 import { getMaxRatingForResponses } from '../features/analytics/domain/analytics';
 import { computeCompanyComposite } from '../features/evaluations/domain/scoring';
 import { formatCompositeScore } from '../data/questionWeights';
-import { branchAwareCompanyLabel, computeDocumentStatus, computeCompanyDocumentSummary, CompanyDocumentSummary, isNTBranch } from '../features/document-tracker/domain/compliance';
+import { branchAwareCompanyLabel, computeDocumentStatus, computeCompanyDocumentSummary, CompanyDocumentSummary, getBranchDocumentRecord, getCompanyDocumentRecord, hasTradeAndNonTradeBranches, isNTBranch } from '../features/document-tracker/domain/compliance';
 import { computeCategoryRankSummary } from '../features/partner-companies/domain/categorySummary';
-import { getRequiredDocumentKeys, isExpiryDocument } from '../features/document-tracker/domain/documentRequirements';
+import { getRequiredDocumentKeys, isDocumentApplicableToClassification, isExpiryDocument, shouldShowHistoricalDocument } from '../features/document-tracker/domain/documentRequirements';
 import { companyDocumentRemarksError } from '../features/document-tracker/domain/documentValidation';
 import { findMissingProfileFields, MISSING_FIELD_LABELS, MissingProfileField } from '../features/partner-companies/domain/dataCompleteness';
 import {
@@ -61,6 +61,7 @@ import { PartnerDirectoryArchiveButton } from '../features/partner-companies/com
 import { matchesDirectoryClassificationFilters } from '../features/partner-companies/domain/directoryClassificationFilters';
 import { PartnerRegistrationEditor } from '../features/partner-companies/components/PartnerRegistrationEditor';
 import { PartnerDirectoryStatusPicker, type PartnerDirectoryStatusOption } from '../features/partner-companies/components/PartnerDirectoryStatusPicker';
+import { manualEntryBusinessClassification } from '../features/partner-companies/domain/registration';
 
 const MISSING_FIELD_ICONS: Record<MissingProfileField, typeof MapPin> = {
   address: MapPin,
@@ -155,7 +156,7 @@ const DOCUMENT_STATUS_STYLES: Record<DocumentStatus, string> = {
   Current: 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/40',
   'Expiring Soon': 'bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/40',
   Expired: 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/40',
-  'For Update': 'bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:border-rose-900/40',
+  'For Update': 'bg-yellow-50 text-yellow-900 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-200 dark:border-yellow-700',
   Missing: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/50',
 };
 
@@ -170,7 +171,8 @@ interface PartnerCompaniesPageProps {
     bpCode?: string,
     ntBpCode?: string,
     supplierOrigin?: SupplierOrigin,
-    registrationType?: 'Trade' | 'Non-Trade' | 'Both'
+    registrationType?: 'Trade' | 'Non-Trade' | 'Both',
+    businessClassification?: BusinessClassification
   ) => Promise<PartnerCompany>;
   onRemoveCompany: (id: string) => Promise<void>;
   onUpdateCompany: (company: PartnerCompany) => Promise<PartnerCompany>;
@@ -274,6 +276,7 @@ export function PartnerCompaniesPage({
   // supplier doc checklist (see documentRequirements.ts) and which
   // Category Summary bucket (Supplier-Local/-Foreign) this registration counts toward.
   const [newSupplierOrigin, setNewSupplierOrigin] = useState<SupplierOrigin>('Local');
+  const [newBusinessClassification, setNewBusinessClassification] = useState<BusinessClassification | ''>('');
   const [newAffiliation, setNewAffiliation] = useState('');
   const [newRegDate, setNewRegDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [newBpCode, setNewBpCode] = useState('');
@@ -428,7 +431,7 @@ export function PartnerCompaniesPage({
         return;
       }
       active.push(c);
-      if (computeCompanyDocumentSummary(c, effectiveNow).status === 'Expired') {
+      if (['Expired', 'For Update'].includes(computeCompanyDocumentSummary(c, effectiveNow).status)) {
         expired.push(c);
       }
     });
@@ -471,6 +474,18 @@ export function PartnerCompaniesPage({
       return;
     }
 
+    let businessClassification: BusinessClassification | undefined;
+    try {
+      businessClassification = manualEntryBusinessClassification(
+        newType,
+        newType === 'Supplier' ? newSupplierOrigin : undefined,
+        newBusinessClassification || undefined,
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Select a business type.');
+      return;
+    }
+
     try {
       await onAddCompany(
         newName.trim(),
@@ -480,7 +495,8 @@ export function PartnerCompaniesPage({
         newRegistrationType === 'Non-Trade' ? undefined : trimmedBpCode || undefined,
         trimmedNtBpCode || undefined,
         newType === 'Supplier' ? newSupplierOrigin : undefined,
-        newRegistrationType
+        newRegistrationType,
+        businessClassification
       );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to add the partner company.');
@@ -496,6 +512,7 @@ export function PartnerCompaniesPage({
     setNewRegistrationType('Trade');
     setNewNtBpCode('');
     setNewSupplierOrigin('Local');
+    setNewBusinessClassification('');
     setIsRegisterOpen(false);
 
     setTimeout(() => setSuccessMessage(''), 4000);
@@ -704,7 +721,7 @@ export function PartnerCompaniesPage({
         const summary = computeCompanyDocumentSummary(company, effectiveNow);
         if (documentFilter === 'current') return summary.status === 'Current';
         if (documentFilter === 'expiring') return summary.status === 'Expiring Soon';
-        if (documentFilter === 'expired') return summary.status === 'Expired';
+        if (documentFilter === 'expired') return summary.status === 'Expired' || summary.status === 'For Update';
         return summary.status === 'Missing';
       });
     }
@@ -846,7 +863,7 @@ export function PartnerCompaniesPage({
 
   const requestFlagToggle = (branch: BranchRecord, docName: string) => {
     if (!canRenew) return;
-    setFlagConfirmTarget({ branch, docName, remarks: branch.documents?.[docName]?.remarks ?? '' });
+    setFlagConfirmTarget({ branch, docName, remarks: selectedCompany ? getBranchDocumentRecord(selectedCompany, branch, docName).remarks ?? '' : '' });
   };
 
   // Assigns/changes a partner's type (and origin, for Suppliers) - the
@@ -886,21 +903,29 @@ export function PartnerCompaniesPage({
   const saveBusinessClassification = async () => {
     if (!selectedCompany || !isAdmin || !businessClassificationDraft) return;
     const classDocumentNames = businessClassificationDraft === 'CORP' ? ['GIS (Corp)', 'SEC (Corp)'] : ['DTI (Sole)'];
-    const needs: Array<{ branch: BranchRecord; docName: string; key: string }> = [];
-    (selectedCompany.branches ?? []).forEach((branch) => classDocumentNames.forEach((docName) => {
-      const doc = branch.documents?.[docName];
-      const isMissing = !doc?.provided || (['GIS (Corp)', 'DTI (Sole)'].includes(docName) && !doc.expiryDate);
-      if (isMissing) needs.push({ branch, docName, key: `${branch.id}:${docName}` });
-    }));
-    const missingRemark = needs.find(({ key, branch, docName }) => !(businessClassificationRemarks[key] ?? branch.documents?.[docName]?.remarks ?? '').trim());
+    const shared = hasTradeAndNonTradeBranches(selectedCompany);
+    const needs: Array<{ branch?: BranchRecord; docName: string; key: string }> = [];
+    if (shared) {
+      classDocumentNames.forEach((docName) => {
+        const doc = getCompanyDocumentRecord(selectedCompany, docName);
+        if (!doc.provided || (['GIS (Corp)', 'DTI (Sole)'].includes(docName) && !doc.expiryDate)) needs.push({ docName, key: docName });
+      });
+    } else {
+      (selectedCompany.branches ?? []).forEach((branch) => classDocumentNames.forEach((docName) => {
+        const doc = branch.documents?.[docName];
+        if (!doc?.provided || (['GIS (Corp)', 'DTI (Sole)'].includes(docName) && !doc.expiryDate)) needs.push({ branch, docName, key: `${branch.id}:${docName}` });
+      }));
+    }
+    const missingRemark = needs.find(({ branch, key, docName }) => !(businessClassificationRemarks[key] ?? (branch ? branch.documents?.[docName]?.remarks : getCompanyDocumentRecord(selectedCompany, docName).remarks) ?? '').trim());
     if (missingRemark) {
-      setErrorMessage(`Add a required remark for ${missingRemark.docName} (${missingRemark.branch.bpCode || 'branch'}).`);
+      setErrorMessage(`Add a required remark for ${missingRemark.docName}${missingRemark.branch ? ` (${missingRemark.branch.bpCode || 'branch'})` : ''}.`);
       return;
     }
     const branches = (selectedCompany.branches ?? []).map((branch) => {
       const documents = { ...(branch.documents ?? {}) };
-      needs.filter((need) => need.branch.id === branch.id).forEach(({ docName, key }) => {
-        documents[docName] = { ...(documents[docName] ?? {}), provided: false, remarks: (businessClassificationRemarks[key] ?? documents[docName]?.remarks ?? '').trim() };
+      needs.filter((need) => shared ? true : need.branch?.id === branch.id).forEach(({ branch: targetBranch, docName, key }) => {
+        const source = shared ? getCompanyDocumentRecord(selectedCompany, docName) : targetBranch?.documents?.[docName] ?? {};
+        documents[docName] = { ...source, provided: false, remarks: (businessClassificationRemarks[key] ?? source.remarks ?? '').trim() };
       });
       return { ...branch, documents };
     });
@@ -1203,7 +1228,7 @@ export function PartnerCompaniesPage({
                       </td>
                       <td className="px-5 py-3.5 align-middle text-right">
                         <div className="admin-directory-actions" onClick={(e) => e.stopPropagation()}>
-                          {(docSummary.status === 'Expired' || docSummary.status === 'Missing') && canRenew && (
+                          {(docSummary.status === 'Expired' || docSummary.status === 'For Update' || docSummary.status === 'Missing') && canRenew && (
                             <button
                               onClick={() => handleCompanyClick(c, 'branches')}
                               className="admin-directory-review-link"
@@ -1247,7 +1272,7 @@ export function PartnerCompaniesPage({
                 archivedDate={company.isArchived && company.archivedAt ? formatDateTime(company.archivedAt) : undefined}
                 attentionCount={attentionCount}
                 missingProfileCount={missingProfileCount}
-                canReviewDocuments={Boolean(canRenew && (summary.status === 'Expired' || summary.status === 'Missing'))}
+                canReviewDocuments={Boolean(canRenew && (summary.status === 'Expired' || summary.status === 'For Update' || summary.status === 'Missing'))}
                 isAdmin={Boolean(isAdmin)}
                 onOpen={() => handleCompanyClick(company)}
                 onCategoryChange={(value) => handleDirectoryCategoryChange(company, value)}
@@ -1457,8 +1482,8 @@ export function PartnerCompaniesPage({
                     <div className="bg-slate-100 border border-slate-200 text-slate-600 p-3 rounded-lg text-xs font-medium">
                       This partner is archived. Archived partners are suspended and excluded from surveys/modifications.
                     </div>
-                  ) : selectedCompanyDocSummary.forUpdateCount > 0 && selectedCompanyDocSummary.expiredCount === 0 ? (
-                    <div className="bg-blue-50 border border-blue-200 text-blue-700 p-3 rounded-lg text-xs font-medium dark:bg-blue-950/20 dark:border-blue-900 dark:text-blue-300">
+                  ) : selectedCompanyDocSummary.status === 'For Update' ? (
+                    <div className="bg-yellow-50 border border-yellow-300 text-yellow-900 p-3 rounded-lg text-xs font-medium dark:bg-yellow-950/40 dark:border-yellow-700 dark:text-yellow-200">
                       <strong>{selectedCompanyDocSummary.forUpdateCount} AFS filing{selectedCompanyDocSummary.forUpdateCount === 1 ? ' needs' : 's need'} update.</strong> This company is disabled from evaluation forms until the filing is updated.
                     </div>
                   ) : selectedCompanyDocSummary.status === 'Expired' ? (
@@ -1643,7 +1668,8 @@ export function PartnerCompaniesPage({
                         // just the ones that happen to have data, so admins can also fill
                         // in documents that are currently Missing.
                         const requiredKeys = getRequiredDocumentKeys(selectedCompany.type, selectedCompany.supplierOrigin, selectedCompany.businessClassification);
-                        const extraKeys = Object.keys(branch.documents ?? {}).filter((k) => !requiredKeys.includes(k));
+                        const extraKeys = Object.keys(branch.documents ?? {}).filter((key) => !requiredKeys.includes(key)
+                          && shouldShowHistoricalDocument(key, selectedCompany.type, selectedCompany.supplierOrigin, selectedCompany.businessClassification));
                         const allKeys = [...requiredKeys, ...extraKeys];
                         if (allKeys.length === 0) {
                           return (
@@ -1655,12 +1681,14 @@ export function PartnerCompaniesPage({
                         return (
                           <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-dashed border-slate-200 dark:border-slate-800">
                             {allKeys.map((docName) => {
-                              const doc = (branch.documents?.[docName] ?? {}) as ComplianceDocument;
+                              const doc = requiredKeys.includes(docName)
+                                ? getBranchDocumentRecord(selectedCompany, branch, docName)
+                                : (branch.documents?.[docName] ?? {}) as ComplianceDocument;
                               const { status } = computeDocumentStatus(doc, effectiveNow, docName, selectedCompany);
                               const expiryBased = isExpiryDocument(docName, selectedCompany.type, selectedCompany.supplierOrigin);
-                              const inactiveClassificationDocument = ['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(docName)
-                                && ((docName === 'DTI (Sole)' && selectedCompany.businessClassification !== 'SOL')
-                                  || (docName !== 'DTI (Sole)' && selectedCompany.businessClassification !== 'CORP'));
+                              const inactiveClassificationDocument = !(selectedCompany.type === 'Supplier' && selectedCompany.supplierOrigin === 'Foreign')
+                                && ['DTI (Sole)', "Sole Proprietorship (Owner's ID)", 'GIS (Corp)', 'SEC (Corp)', 'Articles of Incorporation'].includes(docName)
+                                && !isDocumentApplicableToClassification(docName, selectedCompany.businessClassification);
                               return (
                                 <button
                                   key={docName}
@@ -1945,7 +1973,7 @@ export function PartnerCompaniesPage({
           the same confirm dialog on the Document Register page, so both entry points into
           editing a company's compliance documents behave the same way. */}
       {flagConfirmTarget && selectedCompany && (() => {
-        const willBeProvided = !(flagConfirmTarget.branch.documents?.[flagConfirmTarget.docName]?.provided);
+        const willBeProvided = !getBranchDocumentRecord(selectedCompany, flagConfirmTarget.branch, flagConfirmTarget.docName).provided;
         const legalRemarkRequired = ['DTI (Sole)', 'GIS (Corp)', 'SEC (Corp)'].includes(flagConfirmTarget.docName)
           && !(selectedCompany.type === 'Supplier' && selectedCompany.supplierOrigin === 'Foreign')
           && ((flagConfirmTarget.docName === 'DTI (Sole)' && selectedCompany.businessClassification === 'SOL')
@@ -2140,7 +2168,10 @@ export function PartnerCompaniesPage({
                       <button
                         key={origin}
                         type="button"
-                        onClick={() => setNewSupplierOrigin(origin)}
+                        onClick={() => {
+                          setNewSupplierOrigin(origin);
+                          if (origin === 'Foreign') setNewBusinessClassification('');
+                        }}
                         className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all duration-150 cursor-pointer ${
                           newSupplierOrigin === origin
                             ? 'bg-[#2187CD] text-white shadow-xs'
@@ -2152,6 +2183,30 @@ export function PartnerCompaniesPage({
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {!(newType === 'Supplier' && newSupplierOrigin === 'Foreign') && (
+                <div>
+                  <label htmlFor="modal-reg-business-classification" className="field-label">Business Type <span className="text-rose-600" aria-hidden="true">*</span></label>
+                  <select
+                    id="modal-reg-business-classification"
+                    className="field text-xs py-2.5"
+                    value={newBusinessClassification}
+                    onChange={(event) => setNewBusinessClassification(event.target.value as BusinessClassification | '')}
+                    required
+                  >
+                    <option value="">Select business type</option>
+                    <option value="CORP">Corporation (Corp)</option>
+                    <option value="SOL">Sole Proprietorship (Sole)</option>
+                  </select>
+                  {newBusinessClassification && (
+                    <p className="mt-1 text-[10.5px] text-slate-400">
+                      {newBusinessClassification === 'CORP'
+                        ? 'This activates Articles of Incorporation, SEC (Corp), and GIS (Corp) in the Document Tracker.'
+                        : 'This activates DTI (Sole) and Sole Proprietorship (Owner’s ID) in the Document Tracker.'}
+                    </p>
+                  )}
                 </div>
               )}
 
