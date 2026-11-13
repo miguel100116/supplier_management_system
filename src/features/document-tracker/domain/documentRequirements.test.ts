@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { FOREIGN_SUPPLIER_REQUIREMENTS, getAvailableDocumentKeys, getRequiredDocumentKeys, isExpiryDocument, shouldShowHistoricalDocument } from './documentRequirements';
-import { computeCompanyDocumentSummary, computeDocumentStatus } from './compliance';
+import { computeCompanyDocumentSummary, computeDocumentStatus, getBranchDocumentComplianceStatus, getBranchDocumentRecord, isBranchDocumentCompliant } from './compliance';
 
 const localSupplier = { type: 'Supplier' as const, supplierOrigin: 'Local' as const, createdAt: '2026-01-01', id: 'c', name: 'Supplier', branches: [{ id: 'b', bpCode: 'BP-1', documents: {} }] };
 
@@ -74,7 +74,7 @@ test('classified local partners hide inapplicable history while unclassified and
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', undefined, undefined), true);
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', 'Foreign', 'CORP'), true);
   }
-  for (const name of ['GIS (Corp)', 'SEC (Corp)']) {
+  for (const name of ['GIS (Corp)', 'SEC (Corp)', 'Articles of Incorporation']) {
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', 'Local', 'SOL'), false);
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', 'Local', 'CORP'), true);
     assert.equal(shouldShowHistoricalDocument(name, 'Supplier', undefined, undefined), true);
@@ -103,6 +103,60 @@ test('corporation compliance requires independently current GIS and SEC records 
   }
   const sharedMissing = { ...company, branches: [{ ...company.branches[0], documents: { ...baseDocuments, SIF: { provided: false } } }] };
   assert.equal(computeCompanyDocumentSummary(sharedMissing, new Date('2026-11-05T00:00:00Z')).missingCount, 1);
+});
+
+test('Trade and Non-Trade branches share one checklist and company-level completion', () => {
+  const referenceDate = new Date('2026-11-05T00:00:00Z');
+  const required = getRequiredDocumentKeys('Supplier', 'Local', 'CORP');
+  const currentDocuments = Object.fromEntries(required.map((name) => [name, {
+    provided: true,
+    ...(isExpiryDocument(name) ? { expiryDate: '2027-12-31' } : {}),
+  }]));
+  const company = {
+    ...localSupplier,
+    businessClassification: 'CORP' as const,
+    branches: [
+      { id: 'trade', bpCode: 'BP-1', businessType: 'Trade' as const, documents: currentDocuments },
+      { id: 'non-trade', bpCode: 'BP-1-NT', businessType: 'Non-Trade' as const, documents: { ...currentDocuments, SIF: { provided: false, remarks: 'Branch note' }, 'Business Permit': { provided: true, expiryDate: '2026-10-01' } } },
+    ],
+  };
+
+  assert.deepEqual(getRequiredDocumentKeys('Supplier', 'Local', 'CORP'), required);
+  assert.equal(computeCompanyDocumentSummary(company, referenceDate).missingCount, 0);
+  assert.equal(computeCompanyDocumentSummary(company, referenceDate).totalRequired, required.length);
+  assert.equal(computeCompanyDocumentSummary(company, referenceDate).status, 'Current');
+  assert.equal(getBranchDocumentComplianceStatus(company, company.branches[0], referenceDate), 'Current');
+  assert.equal(getBranchDocumentComplianceStatus(company, company.branches[1], referenceDate), 'Current');
+  assert.equal(isBranchDocumentCompliant(company, company.branches[0], referenceDate), true);
+  assert.equal(isBranchDocumentCompliant(company, company.branches[1], referenceDate), true);
+  assert.equal(getBranchDocumentRecord(company, company.branches[1], 'SIF').remarks, 'Branch note');
+});
+
+test('company compliance keeps For Update distinct from Expired', () => {
+  const required = getRequiredDocumentKeys('Supplier', 'Local', 'CORP');
+  const currentDocuments = Object.fromEntries(required.map((name) => [name, {
+    provided: true,
+    ...(isExpiryDocument(name) ? { expiryDate: name === 'AFS' ? '2024-12-31' : '2027-12-31' } : {}),
+  }]));
+  const company = { ...localSupplier, businessClassification: 'CORP' as const, branches: [{ ...localSupplier.branches[0], documents: currentDocuments }] };
+  const summary = computeCompanyDocumentSummary(company, new Date('2026-11-05T00:00:00Z'));
+
+  assert.equal(summary.forUpdateCount, 1);
+  assert.equal(summary.expiredCount, 0);
+  assert.equal(summary.status, 'For Update');
+});
+
+test('companies without both Trade and Non-Trade branches keep separate compliance counts', () => {
+  const company = {
+    ...localSupplier,
+    branches: [
+      { id: 'one', bpCode: 'BP-1', businessType: 'Trade' as const, documents: {} },
+      { id: 'two', bpCode: 'BP-2', businessType: 'Trade' as const, documents: {} },
+    ],
+  };
+  const summary = computeCompanyDocumentSummary(company);
+
+  assert.equal(summary.totalRequired, getRequiredDocumentKeys('Supplier', 'Local').length * 2);
 });
 
 test('an explicit not-provided status stays missing even when an old expiry date is retained for history', () => {

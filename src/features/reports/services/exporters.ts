@@ -6,6 +6,7 @@ import { saveReportDownload } from './exportHistory';
 import type { ReportRecipe } from '../domain/reportHistory';
 import { paperSizePoints, paperSizeTwips, type PaperSize } from '../domain/paperSize';
 import { applyPdfBranding, loadPdfBranding, PDF_CONTENT_TOP, PDF_CONTENT_BOTTOM } from './pdfBranding';
+import { addWorkbookVisuals, type ExportVisual } from './workbookVisuals';
 
 /** Editable Word tables matching the compact legacy PDF typography and spacing. */
 export async function exportTablesAsWord(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4') {
@@ -58,9 +59,28 @@ export function exportTablesAsCSV(tables: ExportTable[], filenameBase: string, r
 }
 
 /** One workbook, one sheet per table (sheet name = table title, truncated to Excel's 31-char limit). */
-export function exportTablesAsExcel(tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe) {
+export function exportTablesAsExcel(tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, visuals: ExportVisual[] = []) {
   const workbook = XLSX.utils.book_new();
   const usedNames = new Set<string>();
+  const leadingVisuals = visuals.filter(visual => visual.placement === 'before-tables');
+  const trailingVisuals = visuals.filter(visual => !visual.placement);
+  const orderedVisuals = [...leadingVisuals, ...trailingVisuals];
+  const visualSheets: number[] = [];
+  const rankingSheets = new Map<string, number>();
+  const appendVisual = (visual: ExportVisual, index: number) => {
+    const existingSheet = visual.placement === 'before-tables' ? rankingSheets.get(visual.title) : undefined;
+    if (existingSheet) { visualSheets.push(existingSheet); return; }
+    const base = visual.title.replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || `Analytics ${index + 1}`;
+    let name = base;
+    let suffix = 2;
+    while (usedNames.has(name)) name = `${base.slice(0, 27)} ${suffix++}`;
+    usedNames.add(name);
+    // A single heading row keeps image sheets out of archived-response re-imports.
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([[visual.title]]), name);
+    visualSheets.push(workbook.SheetNames.length);
+    if (visual.placement === 'before-tables') rankingSheets.set(visual.title, workbook.SheetNames.length);
+  };
+  leadingVisuals.forEach(appendVisual);
 
   tables.forEach((table) => {
     const sheetData = [table.columns, ...table.rows];
@@ -77,11 +97,14 @@ export function exportTablesAsExcel(tables: ExportTable[], filenameBase: string,
     XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
   });
 
-  return saveReportDownload(new Blob([XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), tables[0]?.title || filenameBase, 'excel', recipe);
+  trailingVisuals.forEach(appendVisual);
+  const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const output = visuals.length ? addWorkbookVisuals(bytes, orderedVisuals, visualSheets) : bytes;
+  return saveReportDownload(new Blob([output], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), tables[0]?.title || filenameBase, 'excel', recipe);
 }
 
 /** One PDF, one heading + table per section, stacked vertically (auto page-breaks via autoTable). */
-export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, introduction?: string, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4') {
+export async function createTablesPdf(reportTitle: string, tables: ExportTable[], introduction?: string, paperSize: PaperSize = 'a4', visuals: ExportVisual[] = []) {
   const doc = new jsPDF({ unit: 'pt', format: paperSizePoints(paperSize) });
   const branding = await loadPdfBranding();
   const marginLeft = 40;
@@ -103,7 +126,29 @@ export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable
   doc.text(`Confidential: For internal distribution only`, marginLeft, cursorY);
   cursorY += 30;
 
+  const drawVisual = (visual: ExportVisual, startY: number) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(0, 99, 169);
+    const titleHeight = visual.continuation ? 0 : 18;
+    if (!visual.continuation) doc.text(visual.title, marginLeft, startY);
+    const availableHeight = doc.internal.pageSize.height - startY - PDF_CONTENT_BOTTOM - titleHeight - 8;
+    const scale = Math.min(contentWidth / visual.width, availableHeight / visual.height);
+    const width = visual.width * scale, height = visual.height * scale;
+    doc.addImage(visual.dataUrl, 'PNG', marginLeft + (contentWidth - width) / 2, startY + titleHeight, width, height, undefined, 'FAST');
+    return startY + titleHeight + height + (visual.placement === 'before-tables' ? 0 : 24);
+  };
+  const leadingVisuals = visuals.filter(visual => visual.placement === 'before-tables');
+  for (const visual of leadingVisuals) {
+    if (cursorY + visual.height * contentWidth / visual.width + 42 > doc.internal.pageSize.height - PDF_CONTENT_BOTTOM) {
+      doc.addPage(); cursorY = PDF_CONTENT_TOP;
+    }
+    cursorY = drawVisual(visual, cursorY);
+  }
+  if (leadingVisuals.length) { doc.addPage(); cursorY = PDF_CONTENT_TOP; }
+
   // Introduction Paragraph
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
   doc.setTextColor(40);
   const introText = doc.splitTextToSize(
@@ -165,6 +210,14 @@ export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 30;
   });
 
+  for (const visual of visuals.filter(item => !item.placement)) {
+    doc.addPage();
+    drawVisual(visual, PDF_CONTENT_TOP);
+  }
   applyPdfBranding(doc, branding, { title: reportTitle, margin: marginLeft });
-  return saveReportDownload(doc.output('blob'), reportTitle, 'pdf', recipe);
+  return doc.output('blob');
+}
+
+export async function exportTablesAsPDF(reportTitle: string, tables: ExportTable[], filenameBase: string, recipe?: ReportRecipe, introduction?: string, paperSize: PaperSize = recipe?.parameters.paperSize ?? 'a4', visuals: ExportVisual[] = []) {
+  return saveReportDownload(await createTablesPdf(reportTitle, tables, introduction, paperSize, visuals), reportTitle, 'pdf', recipe);
 }

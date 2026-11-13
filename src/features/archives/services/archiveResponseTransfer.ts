@@ -3,6 +3,8 @@ import Papa from 'papaparse';
 import { ArchiveSeries, SurveyResponse, SurveyType } from '../../../types/survey';
 import { ExportTable, exportTablesAsCSV, exportTablesAsExcel } from '../../reports/services/exporters';
 import { FORM_SPECS } from '../../evaluation-imports/services/rawEvaluationImport';
+import { createArchiveAnalyticsImages } from '../../reports/services/archiveAnalyticsImages';
+import { buildArchiveAnalyticsData } from '../../reports/domain/archiveAnalyticsVisuals';
 
 // Single source of truth for the archived-response export/import shape, so
 // a file exported here can always be re-imported losslessly by the parser
@@ -41,8 +43,8 @@ export function exportArchivedResponsesAsCSV(responses: SurveyResponse[], filena
   exportTablesAsCSV([toExportTable(responses, seriesList)], filenameBase);
 }
 
-export function exportArchivedResponsesAsExcel(responses: SurveyResponse[], filenameBase: string, seriesList: ArchiveSeries[] = []) {
-  exportTablesAsExcel([toExportTable(responses, seriesList)], filenameBase);
+export async function exportArchivedResponsesAsExcel(responses: SurveyResponse[], filenameBase: string, seriesList: ArchiveSeries[] = []) {
+  await exportTablesAsExcel([toExportTable(responses, seriesList)], filenameBase, undefined, await createArchiveAnalyticsImages(buildArchiveAnalyticsData(responses, seriesList)));
 }
 
 /* ------------------------------------------------------------------ */

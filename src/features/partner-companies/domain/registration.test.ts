@@ -1,9 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registrationBranches, registrationType } from './registration';
+import { manualEntryBusinessClassification, registrationBranches, registrationType } from './registration';
 import { parseApplicationRecordPayload } from '../../../services/applicationRecordSchemas';
 
 const company = { id: 'test', type: 'Courier' as const };
+test('manual entry requires Corp or Sole for domestic partners and skips it for foreign suppliers', () => {
+  assert.equal(manualEntryBusinessClassification('Supplier', 'Local', 'CORP'), 'CORP');
+  assert.equal(manualEntryBusinessClassification('Courier', undefined, 'SOL'), 'SOL');
+  assert.equal(manualEntryBusinessClassification('Supplier', 'Foreign'), undefined);
+  assert.throws(() => manualEntryBusinessClassification('Subcontractor', undefined), /Select Corporation/);
+});
+
 test('registration stores only applicable branches and requires an explicit NT code', () => {
   for (const type of ['Trade', 'Non-Trade', 'Both'] as const) {
     const branches = registrationBranches(company, type, 'BP1', 'BP2');

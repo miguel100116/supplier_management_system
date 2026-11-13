@@ -197,6 +197,15 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   assert.equal(service.getExportHistory()[0].format, 'docx');
   assert.match(service.getExportHistory()[0].filename, /\.docx$/);
   const { exportArchivedReportAsPDF } = await import('./archivedReportExport');
+  const { createArchivedReportPdf } = await import('./archivedReportExport');
+  const priorDownload = downloaded;
+  const priorHistoryCount = service.getExportHistory().length;
+  const preview = await createArchivedReportPdf('Archived Survey Report', 'Preview only', 'Courier', [
+    { title: 'Report scope', columns: ['Field', 'Value'], rows: [['Selected item', 'Preview only']] },
+  ], { kind: 'archived-survey', parameters: { category: 'Courier', archivedItemId: 'preview' } });
+  assert.match(Buffer.from(await preview.arrayBuffer()).toString('latin1'), /^%PDF-/);
+  assert.equal(downloaded, priorDownload, 'Preparing a paper preview must not trigger a download');
+  assert.equal(service.getExportHistory().length, priorHistoryCount, 'Preparing a paper preview must not save export history');
   await exportArchivedReportAsPDF('Archived Survey Report', 'Selected archive', 'Courier', [
     { title: 'Report scope', columns: ['Field', 'Value'], rows: [['Selected item', 'Selected archive'], ['Category', 'Courier']] },
     { title: 'Current results', columns: ['Answer'], rows: [['Latest saved answer']] },
@@ -206,7 +215,7 @@ test('history persists per user, re-downloads exact bytes, survives refresh, and
   assert.match(pdf, /\/Count 1\b/, 'The compact fixture starts its tables on page one, without a cover');
   assert.match(pdf, /Latest saved answer/);
   assert.match(pdf, /Selected archive/);
-  assert.match(pdf, /current rubric/);
+  assert.match(pdf, /current rubric/i);
   assert.match(pdf, /Supplier Management System/);
   assert.doesNotMatch(pdf, /MBS Partner Evaluation System/);
   assert.equal(service.getExportHistory()[0].recipe?.kind, 'archived-survey');

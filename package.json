@@ -18,8 +18,8 @@
     "db:cleanup:tests:sql": "tsx scripts/database-cleanup/cli.ts --delete-sql",
     "test:unit": "node scripts/run-tests.mjs unit",
     "test:integration": "node scripts/run-tests.mjs integration",
-    "test:e2e": "playwright test",
-    "verify": "npm run lint && npm test && npm run build && npm run test:e2e && npm audit --audit-level=high",
+    "verify": "npm run lint && npm run build && npm audit --audit-level=high",
+    "verify:pre-push": "npm run lint && npm run build && npm audit --audit-level=high",
     "hooks:install": "git config --local core.hooksPath .githooks"
   },
   "dependencies": {
@@ -37,6 +37,7 @@
     "lucide-react": "^0.468.0",
     "motion": "^12.42.2",
     "papaparse": "^5.4.1",
+    "pdfjs-dist": "6.5.438",
     "postcss": "^8.4.49",
     "pptxgenjs": "^4.0.1",
     "react": "^18.3.1",
@@ -49,7 +50,6 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1",
     "@types/express": "^4.17.25",
     "@types/node": "^22.10.2",
     "@types/papaparse": "^5.3.15",

@@ -2,7 +2,7 @@ import { toNotification, groupResponsesToNotifications } from '../features/notif
 import { registrationBranches, registrationType as inferRegistrationType } from '../features/partner-companies/domain/registration';
 import { compareNotificationDates } from '../features/notifications/domain/notificationPresentation';
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
-import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
+import { QuestionDefinition, ResponseNotification, SurveyResponse, SurveyType, CustomForm, Rating, PartnerCompany, PartnerCompanyType, BranchRecord, ArchiveSeries, SupplierOrigin, BusinessClassification, ComplianceDocument, DocumentAlertDetail } from '../types/survey';
 import { surveyQuestions } from '../data/questions';
 import {
   ImportResult,
@@ -1882,7 +1882,8 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
     bpCode?: string,
     ntBpCode?: string,
     supplierOrigin?: SupplierOrigin,
-    registrationType: 'Trade' | 'Non-Trade' | 'Both' = 'Trade'
+    registrationType: 'Trade' | 'Non-Trade' | 'Both' = 'Trade',
+    businessClassification?: BusinessClassification
   ) => {
     const todayStr = new Date().toISOString().slice(0, 10);
     const id = `pc-${Date.now()}`;
@@ -1894,6 +1895,7 @@ export function useSurveyData(accounts: SurveyAccount[] = [], currentUserEmail?:
       registrationType,
       type,
       supplierOrigin: type === 'Supplier' ? (supplierOrigin ?? 'Local') : undefined,
+      businessClassification,
       affiliation: affiliation?.trim() || 'General partner',
       createdAt: new Date().toISOString(),
       registeredAt: registeredAt || todayStr,

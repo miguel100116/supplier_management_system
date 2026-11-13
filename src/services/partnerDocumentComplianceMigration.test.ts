@@ -4,6 +4,19 @@ import test from 'node:test';
 
 const migration = readFileSync(new URL('../../supabase/migrations/202610280001_partner_document_compliance_rules.sql', import.meta.url), 'utf8');
 const remarksMigration = readFileSync(new URL('../../supabase/migrations/202610290001_partner_document_remarks.sql', import.meta.url), 'utf8');
+const sharedBranchDocumentsMigration = readFileSync(new URL('../../supabase/migrations/202611130001_share_trade_nontrade_compliance_documents.sql', import.meta.url), 'utf8');
+
+test('Trade and Non-Trade company documents synchronize before compliance validation', () => {
+  assert.match(sharedBranchDocumentsMigration, /create or replace function public\.share_trade_nontrade_partner_documents/i);
+  assert.match(sharedBranchDocumentsMigration, /branch\.value ->> 'businessType' in \('Trade', 'Non-Trade'\)/i);
+  assert.match(sharedBranchDocumentsMigration, /~\* '-NT\$'/i);
+  assert.match(sharedBranchDocumentsMigration, /changed_count = 1[\s\S]*?v_document := v_branches/i);
+  assert.match(sharedBranchDocumentsMigration, /order by coalesce\(\(candidate\.value ->> 'provided'\)::boolean, false\) desc/i);
+  assert.match(sharedBranchDocumentsMigration, /before insert or update of payload/i);
+  assert.match(sharedBranchDocumentsMigration, /application_records_00_share_trade_nontrade_documents/i);
+  assert.match(sharedBranchDocumentsMigration, /update public\.application_records company\s+set payload = payload/i);
+  assert.doesNotMatch(sharedBranchDocumentsMigration, /delete from public\.application_records|delete from storage\.objects/i);
+});
 
 test('document remarks RPC has the frontend-compatible signature, admin permission guard, and authenticated-only execution', () => {
   assert.match(remarksMigration, /create or replace function public\.update_partner_document_remarks\(\s*p_company_id text,\s*p_branch_id text,\s*p_document_name text,\s*p_expected_document jsonb,\s*p_remarks text\s*\)/i);

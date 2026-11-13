@@ -709,6 +709,11 @@ export default function App() {
     ? partnerCompanies.filter(company => company.type === 'Uncategorized').map(company => company.id)
     : [], [isAdmin, partnerCompanies]);
 
+  const archivedReportCompanies = useMemo(
+    () => partnerCompanies.filter(company => effectiveSurveyTypes.some(type => type === company.type)),
+    [partnerCompanies, effectiveSurveyTypes],
+  );
+
   const filteredResponses = useMemo(() => applyFilters(scopedAccessibleResponses, filters), [scopedAccessibleResponses, filters]);
   const officialAnalyticsResponses = useMemo(
     () => scopedAccessibleResponses.filter(isOfficialAnalyticsResponse),
@@ -1306,7 +1311,7 @@ export default function App() {
           responses: userAccessibleAllTimeResponses,
           surveys: userAccessibleSurveys,
           knownSurveys: surveys,
-          companies: partnerCompanies.filter(company => effectiveSurveyTypes.some(type => type === company.type)),
+          companies: archivedReportCompanies,
           series: archiveSeries,
         }}
         responses={filteredResponses}

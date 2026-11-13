@@ -4,6 +4,7 @@ export { normalizeCompanyName } from '../domain/companyName';
 import {
   BranchRecord,
   BranchStatus,
+  BusinessClassification,
   ComplianceDocument,
   PartnerCompany,
   PartnerCompanyType,
@@ -573,6 +574,14 @@ function rowToBranch(row: RawMasterListRow, category: CategoryResolution): Branc
   };
 }
 
+export function inferBusinessClassification(branches: BranchRecord[]): BusinessClassification | undefined {
+  const corp = ['GIS (Corp)', 'SEC (Corp)', 'Articles of Incorporation']
+    .some((name) => branches.some((branch) => branch.documents?.[name]?.provided === true));
+  const sole = ['DTI (Sole)', "Sole Proprietorship (Owner's ID)"]
+    .some((name) => branches.some((branch) => branch.documents?.[name]?.provided === true));
+  return corp === sole ? undefined : corp ? 'CORP' : 'SOL';
+}
+
 function newCompanyId(row: RawMasterListRow): string {
   return `pc-import-${row.bpCode || row.sourceRow}`;
 }
@@ -612,6 +621,7 @@ export function mergeRowsIntoCompanies(
   companies.forEach(indexCompany);
 
   const log: ImportLogEntry[] = [];
+  const importedCompanyIds = new Set<string>();
   const changesById = new Map<string, CompanyChangeSummary>();
   const stats: ImportResult['stats'] = {
     totalRows: rows.length,
@@ -656,11 +666,14 @@ export function mergeRowsIntoCompanies(
     }
 
     if (match) {
+      importedCompanyIds.add(match.id);
       const beforeType = match.type;
       const beforeOrigin = match.supplierOrigin;
       const existingBranchIdx = (match.branches ?? []).findIndex(
-        (b) => b.bpCode && row.bpCode && b.bpCode === row.bpCode
-          && (!repeatedBpCodes.has(row.bpCode) || b.sourceRow === row.sourceRow)
+        (b) => row.bpCode
+          ? b.bpCode === row.bpCode && (!repeatedBpCodes.has(row.bpCode) || b.sourceRow === row.sourceRow)
+          // shortcut: blank codes use source-row IDs; assign BP codes before moving rows.
+          : !b.bpCode && b.id === branch.id
       );
       const isNewBranch = existingBranchIdx < 0;
       const beforeDocs = isNewBranch ? undefined : match.branches![existingBranchIdx].documents;
@@ -723,6 +736,7 @@ export function mergeRowsIntoCompanies(
         branches: [branch],
       };
       companies.push(company);
+      importedCompanyIds.add(company.id);
       indexCompany(company);
       stats.createdCompanies++;
       if (isAccredited) stats.accredited++; else stats.uncategorized++;
@@ -730,9 +744,15 @@ export function mergeRowsIntoCompanies(
     }
   }
 
+  companies.forEach((company) => {
+    if (!importedCompanyIds.has(company.id) || company.businessClassification
+      || (company.type === 'Supplier' && company.supplierOrigin === 'Foreign')) return;
+    company.businessClassification = inferBusinessClassification(company.branches ?? []);
+  });
+
   // A workbook has no remarks column. Record the observable import condition,
   // without inventing a reason or treating a missing document as provided.
-  const touchedIds = new Set(log.flatMap(entry => entry.matchedCompanyId ? [entry.matchedCompanyId] : []));
+  const touchedIds = importedCompanyIds;
   companies.filter(company => touchedIds.has(company.id)).forEach(company => {
     company.branches?.forEach(branch => {
       for (const docName of ['GIS (Corp)', 'SEC (Corp)', 'DTI (Sole)']) {
